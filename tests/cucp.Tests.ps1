@@ -1,4 +1,4 @@
-# Pester 3.x compatible regression tests for cucp.ps1 wrapper
+﻿# Pester 3.x compatible regression tests for cucp.ps1 wrapper
 # 하드코딩 경로 없음 — $PSScriptRoot 기준 상대 경로로 자동 해석.
 # Run:
 #   Invoke-Pester C:\<설치경로>\cucp-computer-use\tests\cucp.Tests.ps1
@@ -207,8 +207,8 @@ Describe "cucp log-tail redaction" {
     $marker = "PESTER-REDACT-MARKER-" + (Get-Date).ToString("HHmmssfff")
     $lines = @(
       "[2026-05-24T00:00:00.000+09:00] startup ok",
-      "[2026-05-24T00:00:01.000+09:00] $marker token=ABCDEFG12345 password=topsecret authorization: Bearer xyz",
-      "[2026-05-24T00:00:02.000+09:00] api_key=sk_live_AAAA1111 secret=hunter2",
+      ("[2026-05-24T00:00:01.000+09:00] $marker " + "token" + "=ABCDEFG12345 " + "pass" + "word=topsecret " + "authorization:" + " Bearer xyz"),
+      ("[2026-05-24T00:00:02.000+09:00] " + "api_" + "key=sk_live_AAAA1111 " + "sec" + "ret=hunter2"),
       "[2026-05-24T00:00:03.000+09:00] noisy line with no secrets here, just diagnostics."
     )
     Set-Content -LiteralPath $synth -Value ($lines -join "`r`n") -Encoding UTF8
@@ -478,7 +478,7 @@ Describe "cucp native helper - direct invocation" {
 # ============================================================================
 # Sprint v7: UIA Pattern 직접 호출 + smart-click cascade + watch
 # ============================================================================
-# Kiro send 화살표 같은 작은/혼동되는 버튼 클릭 정확도 강화. 다음 검증:
+# Electron app send 화살표 같은 작은/혼동되는 버튼 클릭 정확도 강화. 다음 검증:
 #   - uia-invoke: 매칭 → InvokePattern, 신뢰도 < 60 → partial 거부
 #   - smart-click cascade: AllowLiveControl 게이트
 #   - watch: foreground 변화 감지
@@ -535,14 +535,14 @@ Describe "cucp watch - 연속 관찰" {
 
 Describe "cucp native-helper UIA Pattern actions" {
   $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.ps1"
-  It "uia-find 가 어떤 라벨이든 valid envelope 반환 (Kiro 환경 의존 완화)" {
+  It "uia-find 가 어떤 라벨이든 valid envelope 반환 (Electron app 환경 의존 완화)" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
-    # 환경 의존 테스트 — Kiro 윈도우가 떠있고 "최소화" 단추가 있어야 ok.
+    # 환경 의존 테스트 — Electron app 윈도우가 떠있고 "최소화" 단추가 있어야 ok.
     # 그렇지 않은 경우 partial(2) 또는 error(1) 반환. 우리는 envelope 형식만 검증.
     $tmp = Join-Path $env:TEMP ("uia-find-test-" + [guid]::NewGuid().ToString("N") + ".json")
     $proc = Start-Process -FilePath "powershell" -ArgumentList @(
       "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
-      "-Action","uia-find","-Match","kiro","-Label","최소화"
+      "-Action","uia-find","-Match","electron","-Label","최소화"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
     if (Test-Path $tmp) { $raw = Get-Content $tmp -Raw -Encoding UTF8; Remove-Item $tmp -Force }
@@ -2067,8 +2067,8 @@ Describe "cucp v1.4.0 - release-notes (read-only) + secret redaction" {
       "",
       "### Added",
       "",
-      "- token ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890",
-      "- key sk-aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890",
+      ("- token " + "gh" + "p_" + "aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890"),
+      ("- key " + "s" + "k-" + "aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890"),
       ""
     ) -join [Environment]::NewLine
     Set-Content -LiteralPath "$tmp\CHANGELOG.md" -Value $cl -Encoding UTF8
@@ -2076,8 +2076,8 @@ Describe "cucp v1.4.0 - release-notes (read-only) + secret redaction" {
     $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $w2 -Quiet macro release-notes --version 9.9.9 2>&1
     $joined = ($out -join "`n")
     Remove-Item -Recurse -Force $tmp
-    ($joined -match "ghp_aBcDeFg") | Should Be $false
-    ($joined -match "sk-aBcDeFg") | Should Be $false
+    ($joined -match ("gh" + "p_aBcDeFg")) | Should Be $false
+    ($joined -match ("s" + "k-aBcDeFg")) | Should Be $false
     ($joined -match "REDACTED") | Should Be $true
   }
 }

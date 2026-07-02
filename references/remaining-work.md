@@ -1,29 +1,25 @@
-# Remaining Work
+# CUCP Remaining Work
 
-Public repository scope: vendor-neutral Windows GUI automation for local AI
-agents.
+Updated: 2026-05-31
 
-## Current Focus
+Public repository scope: Windows computer-use control plane, desktop observation, UIA/CDP/OCR routing, guarded live control, workflow planning, diagnostics, and release hygiene.
 
-- Keep the `cucp` wrapper easy to install and easy to run without admin rights.
-- Keep live-control behavior explicit, gated, auditable, and recoverable.
-- Keep public docs focused on generic Windows desktop automation.
-- Keep examples centered on Notepad, Explorer, browsers, Chromium/Electron apps,
-  forms, and other common desktop workflows.
+## Done
 
-## Next Improvements
+- Removed private vendor-specific assets and public-facing references.
+- Kept the reusable CUCP core focused on Windows GUI automation.
+- Preserved public examples around Notepad, Electron app, Chrome, generic forms, documents, and browser/Electron workflows.
 
-- Add clearer unsupported-mode notes for macOS and Linux.
-- Improve multi-monitor coordinate validation documentation.
-- Add repeatable benchmark instructions that separate smoke tests from live
-  desktop tests.
-- Add issue templates for bug reports that avoid collecting private screenshots.
-- Add more deterministic examples for CDP, UIA, OCR fallback, and recovery.
-- Keep private workflow details out of public release notes and references.
+## Next
 
-## Verification Targets
+- Keep daemon startup and helper-server paths easy to install.
+- Add concise macOS/Linux unsupported-mode notes.
+- Improve DXGI capture and multi-monitor coordinate validation.
+- Add benchmark documentation and repeatable smoke-test instructions.
+- Keep release notes and public docs free of private workflow details.
+
+## Verified Targets
 
 - PowerShell AST parse for core scripts.
-- Fast Pester smoke tests for wrapper and read-only macro surface.
+- Fast smoke tests for wrapper surface and read-only macros.
 - Public documentation keyword scan before release.
-- Manual live smoke only when the user explicitly approves desktop control.

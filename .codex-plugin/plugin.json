@@ -1,0 +1,41 @@
+{
+  "name": "cucp",
+  "version": "2.4.2",
+  "description": "Windows Computer Use Control Plane for local desktop observation, grounded GUI automation, verification, and safety-gated live control.",
+  "author": {
+    "name": "Local developer"
+  },
+  "license": "MIT",
+  "keywords": [
+    "cucp",
+    "computer-use",
+    "windows-automation",
+    "gui-automation",
+    "uia",
+    "ocr",
+    "cdp",
+    "safety-gate"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "CUCP",
+    "shortDescription": "Safety-gated Windows computer-use runtime.",
+    "longDescription": "CUCP exposes a local Windows computer-use runtime for observing desktop state, grounding UI targets through Win32, UI Automation, OCR, and optional Chromium CDP, then executing live actions only through explicit safety gates.",
+    "developerName": "Local developer",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Local Runtime",
+      "Windows Automation",
+      "GUI Automation",
+      "Safety Gated",
+      "Documentation"
+    ],
+    "defaultPrompt": [
+      "Inspect the CUCP runtime status.",
+      "Use CUCP read-only observation.",
+      "Plan a safety-gated Windows GUI automation step."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

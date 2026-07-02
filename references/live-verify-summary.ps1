@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$Root = (Join-Path (Split-Path -Parent $PSScriptRoot) 'live-verify'),
   [string]$Out,
   [switch]$JsonOnly

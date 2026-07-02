@@ -1,0 +1,3 @@
+# CUCP has no Python runtime dependencies.
+# This file is present so dependency scanners can record that the absence of
+# pip packages is intentional.

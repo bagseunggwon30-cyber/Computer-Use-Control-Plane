@@ -1,4 +1,5 @@
 # CUCP runtime/cache files created during local runs.
+.cucp/
 *.log
 *.ndjson
 wrapper-cache/
@@ -7,6 +8,7 @@ appshot-*.png
 screenshots/
 trajectory.ndjson
 smart-click-history.ndjson
+live-verify/
 
 # OS/editor metadata.
 .DS_Store
@@ -14,6 +16,8 @@ Thumbs.db
 *.swp
 *.swo
 *~
+.idea/
+.vscode/
 
 # Python scratch environments.
 __pycache__/
@@ -26,24 +30,27 @@ node_modules/
 
 # Secret-bearing local files.
 .env
-.env.local
+.env.*
+!.env.example
 *.key
 *.pem
+*.pfx
+*.p12
 secrets/
 credentials/
+tokens/
+*.token
+*.secret
 
 # Build/test temp.
 *.tmp
 *.bak
 *.pester-out
 TestResult.xml
+coverage/
 
 # Test scratch files.
 tests/_*.ps1
 tests/scratch-*.ps1
 tests/.*.ps1
 tests/.*.txt
-
-# Live verification cassettes may include local window titles, URLs, or screen
-# metadata. Regenerate them locally instead of committing them.
-live-verify/

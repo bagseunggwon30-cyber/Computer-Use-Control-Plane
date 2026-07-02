@@ -4,7 +4,7 @@
   "actions": [
     {
       "action": "observe_context",
-      "match": "메모장",
+      "match": "Notepad",
       "annotate": true,
       "semantic": true
     },
@@ -12,7 +12,7 @@
       "action": "type",
       "text": "hello from cucp plan\n",
       "after": "$lastObservation",
-      "targetWindow": "메모장",
+      "targetWindow": "Notepad",
       "clear": false,
       "enter": false
     }

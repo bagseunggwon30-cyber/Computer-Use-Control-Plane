@@ -1146,7 +1146,7 @@ function _Vision-GateOrRecord {
 # stdout으로 받아 파싱합니다.
 #
 # Parameters:
-#   -ArgList  string[]  helper에 그대로 전달할 인자 (예: @("-Action","windows","-Match","kiro"))
+#   -ArgList  string[]  helper에 그대로 전달할 인자 (예: @("-Action","windows","-Match","electron"))
 #   -TimeoutMs int       타임아웃 (기본 wrapper의 InvokeTimeoutMs)
 #
 # Returns: pscustomobject @{
@@ -5758,10 +5758,10 @@ function Invoke-MacroLogTail {
 function Invoke-MacroDiagnoseLag {
   # macro diagnose-lag [--sample-ms <n>] [--json-only]
   #
-  # Read-only runtime load report intended to explain why the Codex/Kiro
+  # Read-only runtime load report intended to explain why the Codex/Electron app
   # desktop app feels laggy during long CUCP sessions.
   #
-  # Reports for selected processes (Codex, Kiro, node, powershell, Chrome,
+  # Reports for selected processes (Codex, Electron app, node, powershell, Chrome,
   # CUCP helper if detectable):
   #   - count, total memory (MB), median private memory
   #   - CPU delta over a short sample window (default 3000ms, capped 8000ms)
@@ -5793,7 +5793,7 @@ function Invoke-MacroDiagnoseLag {
   # Process groups we care about. Names are case-insensitive.
   $groups = @(
     @{ id = "codex";       names = @("codex","Codex") },
-    @{ id = "kiro";        names = @("Kiro","kiro","Code") },
+    @{ id = "electron";    names = @("electron","Code","Cursor","Windsurf") },
     @{ id = "node";        names = @("node") },
     @{ id = "powershell";  names = @("powershell","pwsh") },
     @{ id = "chrome";      names = @("chrome","msedge","brave","whale") },
@@ -5926,7 +5926,7 @@ function Invoke-MacroDiagnoseLag {
 
   $electronChildCount = 0
   foreach ($r in $report) {
-    if ($r.group -eq "kiro" -or $r.group -eq "codex" -or $r.group -eq "chrome") {
+    if ($r.group -eq "electron" -or $r.group -eq "codex" -or $r.group -eq "chrome") {
       $electronChildCount += $r.count
     }
   }
@@ -5935,7 +5935,7 @@ function Invoke-MacroDiagnoseLag {
     [void]$recommended.Add([pscustomobject]@{
       code = "electron_pressure"
       message = "Many Electron child processes detected"
-      recommended_action = "Close unused Kiro/Codex/Chrome windows; consider lowering Kiro priority manually if Codex is the active focus."
+      recommended_action = "Close unused Electron app/Codex/Chrome windows; consider lowering Electron app priority manually if Codex is the active focus."
     })
   }
 
@@ -6994,7 +6994,7 @@ function _Resolve-AppPath {
   $shortcuts = @()
   $startMenuRoots = @(
     "$env:APPDATA\Microsoft\Windows\Start Menu\Programs",
-    "$env:ProgramData\Microsoft\Windows\Start Menu\Programs"
+    [Environment]::GetFolderPath("CommonPrograms")
   )
   foreach ($root in $startMenuRoots) {
     if (-not (Test-Path -LiteralPath $root)) { continue }
@@ -7909,13 +7909,13 @@ function Invoke-MacroUiaToggle {
 # ============================================================================
 # v1.2.0 — hit-test 가드 + safe-type
 # ============================================================================
-# 라이브 검증에서 발견된 두 사고 ((a) 코드 에디터 의도치 않은 입력, (b) Kiro 전체화면
+# 라이브 검증에서 발견된 두 사고 ((a) 코드 에디터 의도치 않은 입력, (b) Electron app 전체화면
 # → 창모드 변경) 의 본질은 "좌표 클릭 직전 검증 부재". v1.2.0 은 좌표가 의도한
 # 윈도우 안인지 Win32 WindowFromPoint 로 검증 + 입력 후 OCR probe 로 진짜 들어갔는지
 # 확인하는 안전망 추가.
 # ============================================================================
 
-# macro hit-test --x N --y N [--target-match Kiro | --target-hwnd N]
+# macro hit-test --x N --y N [--target-match Electron app | --target-hwnd N]
 # 좌표가 어떤 윈도우 안인지 확인 (read-only, 클릭 안 함)
 function Invoke-MacroHitTest {
   param([string[]]$Rest)
@@ -8804,7 +8804,7 @@ function Invoke-MacroSafeType {
 # ============================================================================
 # v1.3.0 — Electron CDP wrapper macros
 # ============================================================================
-# DOM 직접 제어로 Kiro / VS Code / Slack 같은 Electron 앱의 좌표 무관 actuation.
+# DOM 직접 제어로 Electron app / VS Code / Slack 같은 Electron 앱의 좌표 무관 actuation.
 # 활성화 가이드: references/cdp-setup.md
 # ============================================================================
 
@@ -8945,7 +8945,7 @@ function Invoke-MacroCdpDetect {
   return $exitCode
 }
 
-# macro cdp-eval --expr "<javascript>" [--expr-b64 <base64>] [--page-match Kiro] [--port 9222]
+# macro cdp-eval --expr "<javascript>" [--expr-b64 <base64>] [--page-match Electron app] [--port 9222]
 # 임의 JS 실행 (read-only — 사용자가 무엇을 실행하는지 알아서 책임)
 function Invoke-MacroCdpEval {
   param([string[]]$Rest)
@@ -8979,7 +8979,7 @@ function Invoke-MacroCdpEval {
   return $exitCode
 }
 
-# macro cdp-type --selector "<css>" --text "<msg>" [--page-match Kiro] [--port 9222]
+# macro cdp-type --selector "<css>" --text "<msg>" [--page-match Electron app] [--port 9222]
 #                [--press-enter] [--clear-first]
 # DOM selector 의 element 에 focus + value set + dispatchEvent.
 # -AllowLiveControl 필수 (실제 actuation).
@@ -9033,7 +9033,7 @@ function Invoke-MacroCdpType {
   return $exitCode
 }
 
-# macro cdp-click --selector "<css>" [--page-match Kiro] [--port 9222]
+# macro cdp-click --selector "<css>" [--page-match Electron app] [--port 9222]
 # DOM selector 의 element.click(). 마우스 좌표 안 씀.
 # -AllowLiveControl 필수.
 function Invoke-MacroCdpClick {
@@ -9076,7 +9076,7 @@ function Invoke-MacroCdpClick {
   return $exitCode
 }
 
-# macro cdp-smart-click --text "<visible label>" [--page-match Kiro] [--port 9222]
+# macro cdp-smart-click --text "<visible label>" [--page-match Electron app] [--port 9222]
 # DOM visible text / aria-label / title / placeholder 기반 element.click().
 function Invoke-MacroCdpSmartFind {
   param([string[]]$Rest)
@@ -9177,7 +9177,7 @@ function Invoke-MacroCdpSmartClick {
   return $exitCode
 }
 
-# macro cdp-smart-type --label "<field label>" --text "<msg>" [--page-match Kiro] [--port 9222]
+# macro cdp-smart-type --label "<field label>" --text "<msg>" [--page-match Electron app] [--port 9222]
 # DOM visible label / placeholder 기반 input/contenteditable 직접 입력.
 function Invoke-MacroCdpSmartType {
   param([string[]]$Rest)
@@ -10669,7 +10669,7 @@ function Invoke-MacroAppProfile {
 
   _AppProfileAddOptions -Items @("--match",$targetMatch,"--precision-points","--settle-ms","150","--verify-after-step","--retry-failed-step","1")
 
-  $browserLike = ($processLower -match '^(chrome|msedge|brave|firefox|kiro|cursor|code|windsurf|electron)$') -or ($classLower -like '*chrome_widgetwin*')
+  $browserLike = ($processLower -match '^(chrome|msedge|brave|firefox|electron|cursor|code|windsurf)$') -or ($classLower -like '*chrome_widgetwin*')
   $officeLike = ($identity -match 'winword|excel|powerpnt|outlook|onenote|hwp|wordpad|notepad')
   $runCdpProbe = (-not $noProbe) -and ($probeCdpRequested -or $browserLike)
   $runUiaProbe = (-not $noProbe) -and $probeUiaRequested
@@ -13389,7 +13389,7 @@ if (-not $CucpArgs -or $CucpArgs.Count -eq 0) {
   Write-Host "  macro form-run           --field <label=value>... [--send-label <text>] [--allow-cdp] [--dry-run] [--confirm-sensitive]   (live: executes safe form-plan)"
   Write-Host "  macro focus-verify       --name <substring> [--timeout-ms <n>]   (live: focus + Win32 verify)"
   Write-Host "  macro log-tail           [--lines <n>] [--max-bytes <n>] [--path <file>] [--errors-only]   (bounded read + redact)"
-  Write-Host "  macro diagnose-lag       [--sample-ms <n>] [--json-only]   (Codex/Kiro/Chrome process snapshot + warnings)"
+  Write-Host "  macro diagnose-lag       [--sample-ms <n>] [--json-only]   (Codex/Electron app/Chrome process snapshot + warnings)"
   Write-Host "  macro cleanup            --dry-run | --execute   [--older-than-minutes <n>] [--keep-latest <n>] [--max-files <n>] [--max-mb <n>]"
   Write-Host "  macro icon-find          --label <text> [--window <s>] [--max-size <px>] [--near-x <n>] [--near-y <n>]   (small toolbar icon resolver)"
   Write-Host "  macro icon-click         --label <text> [--window <s>] [--max-size <px>] [--near-x <n>] [--near-y <n>]   (live: refuses ambiguous)"
@@ -14512,7 +14512,7 @@ function Invoke-MacroDaemonServe {
 # 좌표 클릭의 정확도 cassette. -AllowLiveControl 필수. 실제 click 후 도착 좌표
 # (post_click.actual_x/y) 와 요청 좌표 비교 → drift 측정.
 # 정확도 = drift_max ≤ 3px AND target window 일치율 100%.
-# 본체에서 1환경 검증 후 cassette 보존 (Notepad / Kiro / Chrome).
+# 본체에서 1환경 검증 후 cassette 보존 (Notepad / Electron app / Chrome).
 # ----------------------------------------------------------------------------
 function Invoke-MacroMouseVerify {
   param([string[]]$Rest)

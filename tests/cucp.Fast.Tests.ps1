@@ -1,4 +1,4 @@
-# Pester 3.x compatible fast smoke tests for CUCP.
+﻿# Pester 3.x compatible fast smoke tests for CUCP.
 # This suite intentionally avoids OCR, screenshots, benchmarks, helper timeouts,
 # and live app dependencies. Use tests/cucp.Tests.ps1 for full regression.
 

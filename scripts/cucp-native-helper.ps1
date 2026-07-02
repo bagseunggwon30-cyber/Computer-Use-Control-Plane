@@ -1153,7 +1153,7 @@ function _Resolve-OcrUiaFusionCandidate {
 # ============================================================================
 # v1.3.0 — Chrome DevTools Protocol (CDP) 통합
 # ============================================================================
-# Electron 앱 (Kiro / VS Code / Slack / Discord 등) 의 DOM 직접 제어를 위한
+# Electron 앱 (Electron app / VS Code / Slack / Discord 등) 의 DOM 직접 제어를 위한
 # CDP 클라이언트. 좌표 / Win32 SendInput / UIA 우회 — DOM API 로 element 직접
 # focus / value set / dispatchEvent.
 #
@@ -1599,7 +1599,7 @@ function _Action-Screenshot {
 # 윈도우 안인지 Win32 WindowFromPoint 로 검증.
 #
 # 사고 사례:
-#   1. click (1500, 935) — Kiro 가 전체화면일 땐 codex 패널, 창모드일 땐 코드 에디터
+#   1. click (1500, 935) — Electron app 가 전체화면일 땐 codex 패널, 창모드일 땐 코드 에디터
 #   2. click (1700, 945) — toolbar 의 maximize 영역에 떨어져서 창 모드 토글
 #
 # 해결: click 직전에 _Test-CoordsInTarget 호출 → 다른 윈도우면 exit 3 (블록).
@@ -2421,7 +2421,7 @@ function _Action-CdpDetect {
       reason = "cdp_port_closed"
       port = $CdpPort
       detail = $detect.error
-      recommended_action = "Start the Electron app with --remote-debugging-port=$CdpPort. For Kiro: see references/cdp-setup.md"
+      recommended_action = "Start the Electron app with --remote-debugging-port=$CdpPort. For Electron app: see references/cdp-setup.md"
     }) 2
   }
   $verObj = $detect.version
@@ -2439,7 +2439,7 @@ function _Action-CdpDetect {
 # ============================================================================
 # Action: cdp-eval ─ Runtime.evaluate JavaScript 실행
 # ============================================================================
-# 입력: -CdpExpr "document.title" [-CdpPageMatch "Kiro"]
+# 입력: -CdpExpr "document.title" [-CdpPageMatch "Electron app"]
 # 출력: { result_type, result_value, page_id, page_title }
 # ============================================================================
 function _Action-CdpEval {
@@ -2505,7 +2505,7 @@ function _Action-CdpEval {
 # ============================================================================
 # Action: cdp-type ─ DOM selector → focus + value set + dispatchEvent
 # ============================================================================
-# 입력: -CdpSelector "textarea" -Text "msg" [-CdpPageMatch "Kiro"]
+# 입력: -CdpSelector "textarea" -Text "msg" [-CdpPageMatch "Electron app"]
 #       [-PressEnter] [-ClearFirst]
 # 동작:
 #   1. element = document.querySelector(selector)
