@@ -107,6 +107,9 @@ Describe "pcucp-next fast smoke - python router" {
     $obj.kind | Should Be "uia-tree"
     $obj.route.primary | Should Be "dotnet-native-host"
     ($null -ne $obj.data.count) | Should Be $true
+    if ($obj.data.nodes.Count -gt 0) {
+      ($null -ne $obj.data.nodes[0].patterns) | Should Be $true
+    }
   }
 
   It "runs find-label in Python over native window observations" {
@@ -121,6 +124,17 @@ Describe "pcucp-next fast smoke - python router" {
     ($obj.route.observations -contains "dotnet-native-host/windows") | Should Be $true
     ($obj.route.observations -contains "dotnet-native-host/uia-tree") | Should Be $true
     ($null -ne $obj.uia_node_count) | Should Be $true
+  }
+
+  It "includes UIA pattern metadata in Python find-label candidates" {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+    $r = Invoke-PcuCpPython -ArgList @("find-label", "--label", "Pane", "--limit", "5", "--json")
+    $r.ExitCode | Should Be 0
+    $obj = $r.Raw | ConvertFrom-Json
+    $obj.schema | Should Be "pcucp.find-label/v1"
+    $uia = $obj.candidates | Where-Object { $_.kind -eq "uia" } | Select-Object -First 1
+    ($null -ne $uia) | Should Be $true
+    ($null -ne $uia.patterns) | Should Be $true
   }
 
   It "creates a Python task-plan with live actions gated by default" {

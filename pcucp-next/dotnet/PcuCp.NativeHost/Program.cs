@@ -78,6 +78,8 @@ internal sealed record UiaNode(
     string NativeWindowHandle,
     [property: JsonPropertyName("bounding_rectangle")]
     RectInfo? BoundingRectangle,
+    [property: JsonPropertyName("patterns")]
+    IReadOnlyList<string> Patterns,
     [property: JsonPropertyName("children")]
     IReadOnlyList<UiaNode> Children
 );
@@ -185,8 +187,41 @@ internal static class UiaTreeObserver
             SafeInt(() => current.ProcessId),
             $"0x{SafeInt(() => current.NativeWindowHandle):X}",
             RectFrom(current.BoundingRectangle),
+            SupportedPatterns(element),
             children
         );
+    }
+
+    private static IReadOnlyList<string> SupportedPatterns(AutomationElement element)
+    {
+        try
+        {
+            return element.GetSupportedPatterns()
+                .Select(pattern => CleanPatternName(pattern.ProgrammaticName))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    private static string CleanPatternName(string programmaticName)
+    {
+        if (string.IsNullOrWhiteSpace(programmaticName))
+        {
+            return string.Empty;
+        }
+        var name = programmaticName
+            .Replace("PatternIdentifiers.Pattern", "", StringComparison.Ordinal)
+            .Replace("Pattern.Pattern", "", StringComparison.Ordinal)
+            .Replace("Identifiers.Pattern", "", StringComparison.Ordinal)
+            .Replace("Pattern", "", StringComparison.Ordinal)
+            .Replace(".", "", StringComparison.Ordinal);
+        return name.Trim();
     }
 
     private static RectInfo? RectFrom(System.Windows.Rect rect)

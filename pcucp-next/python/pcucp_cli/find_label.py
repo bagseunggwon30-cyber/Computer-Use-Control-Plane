@@ -117,6 +117,7 @@ def find_label(label: str, limit: int = 10) -> tuple[int, dict[str, Any]]:
                 "pid": node.get("process_id"),
                 "hwnd": node.get("native_window_handle"),
                 "bounding_rectangle": node.get("bounding_rectangle"),
+                "patterns": node.get("patterns", []),
                 "source": "dotnet-native-host/uia-tree",
             }
         )

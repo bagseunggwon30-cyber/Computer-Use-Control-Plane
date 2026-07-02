@@ -37,17 +37,17 @@ Currently migrated into `pcucp-next`:
 - `windows`: Python router calls the C# native host for visible top-level
   window observation.
 - `uia-tree`: Python router calls the C# native host for bounded UI Automation
-  tree observation.
+  tree observation, including supported UIA pattern metadata.
 - `find-label`: Python searches the native window observation result for
-  matching top-level window titles, process names, and UIA node metadata.
+  matching top-level window titles, process names, UIA node metadata, and UIA
+  pattern metadata.
 - `task-plan`: Python creates read-only plan JSON with live-control safety
   metadata.
 
 Still on the legacy PowerShell path:
 
-- Full UIA control-tree extraction
 - OCR text recognition
-- Deep `find-label` across OCR text and full control patterns
+- Deep `find-label` across OCR text
 - Live actuation and recovery commands
 
 Target language split for future implementation:
@@ -238,7 +238,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester .\tests\cu
 # Result: 6 passed, 0 failed
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester .\tests\pcucp-next.Fast.Tests.ps1"
-# Result: 15 passed, 0 failed
+# Result: 16 passed, 0 failed
 ```
 
 The full legacy Pester suite exists in `tests/cucp.Tests.ps1`, but the fast
