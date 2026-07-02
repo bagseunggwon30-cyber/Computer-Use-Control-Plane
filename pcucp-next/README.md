@@ -22,13 +22,15 @@ C# native host one at a time.
 
 - `windows`: Python CLI invokes `PcuCp.NativeHost` and returns
   `pcucp.observation/v1`.
-- `find-label`: Python searches native top-level window observations. This is
-  not yet the full UIA/OCR label resolver.
+- `uia-tree`: Python CLI invokes `PcuCp.NativeHost` and returns a bounded
+  `pcucp.uia-tree/v1` UI Automation tree.
+- `find-label`: Python searches native top-level window observations and the
+  bounded UIA tree. This is not yet the full OCR/control-pattern label resolver.
 - `task-plan`: Python emits a safe plan envelope with live-control metadata. It
   does not execute live actions.
 
-Remaining migration targets include full UIA tree extraction, OCR text
-recognition, deep label matching, and live action execution parity.
+Remaining migration targets include OCR text recognition, deeper control-pattern
+label matching, and live action execution parity.
 
 ## Layout
 

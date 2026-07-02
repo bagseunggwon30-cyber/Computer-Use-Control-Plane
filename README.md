@@ -36,8 +36,10 @@ Currently migrated into `pcucp-next`:
 
 - `windows`: Python router calls the C# native host for visible top-level
   window observation.
+- `uia-tree`: Python router calls the C# native host for bounded UI Automation
+  tree observation.
 - `find-label`: Python searches the native window observation result for
-  matching top-level window titles and process names.
+  matching top-level window titles, process names, and UIA node metadata.
 - `task-plan`: Python creates read-only plan JSON with live-control safety
   metadata.
 
@@ -45,7 +47,7 @@ Still on the legacy PowerShell path:
 
 - Full UIA control-tree extraction
 - OCR text recognition
-- Deep `find-label` across UIA/OCR/control text
+- Deep `find-label` across OCR text and full control patterns
 - Live actuation and recovery commands
 
 Target language split for future implementation:
@@ -105,6 +107,7 @@ Run the staged next-generation router directly:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 version --json
 powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 plan --command windows --json
 powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 windows --json
+powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 uia-tree --max-depth 1 --json
 powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 task-plan --type-text "hello" --shortcut "ctrl+s" --json
 ```
 
@@ -235,7 +238,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester .\tests\cu
 # Result: 6 passed, 0 failed
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester .\tests\pcucp-next.Fast.Tests.ps1"
-# Result: 12 passed, 0 failed
+# Result: 15 passed, 0 failed
 ```
 
 The full legacy Pester suite exists in `tests/cucp.Tests.ps1`, but the fast

@@ -26,6 +26,10 @@ def build_parser() -> argparse.ArgumentParser:
     windows = sub.add_parser("windows", help="observe visible top-level Windows through the native host")
     windows.add_argument("--json", action="store_true", help="emit JSON")
 
+    uia_tree = sub.add_parser("uia-tree", help="observe a bounded UI Automation tree through the native host")
+    uia_tree.add_argument("--max-depth", default="1", help="maximum UIA child depth, capped by native host")
+    uia_tree.add_argument("--json", action="store_true", help="emit JSON")
+
     find = sub.add_parser("find-label", help="find top-level labels using native observations")
     find.add_argument("--label", required=True, help="label text to find")
     find.add_argument("--limit", type=int, default=10, help="maximum candidates to return")
@@ -62,6 +66,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         code, payload, error = run_native("windows")
         if payload is None:
             return emit_native_error("windows", code, error)
+        emit(payload, as_json=bool(ns.json))
+        return 0
+
+    if ns.verb == "uia-tree":
+        code, payload, error = run_native("uia-tree", ["--max-depth", str(ns.max_depth)])
+        if payload is None:
+            return emit_native_error("uia-tree", code, error)
         emit(payload, as_json=bool(ns.json))
         return 0
 

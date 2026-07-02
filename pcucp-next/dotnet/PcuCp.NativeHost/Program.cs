@@ -3,9 +3,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Windows.Automation;
 
 Console.OutputEncoding = Encoding.UTF8;
 var command = args.Length > 0 ? args[0].Trim().ToLowerInvariant() : "version";
+var commandArgs = args.Skip(1).ToArray();
 var options = new JsonSerializerOptions { WriteIndented = true };
 
 switch (command)
@@ -15,6 +17,9 @@ switch (command)
         return 0;
     case "windows":
         Console.WriteLine(JsonSerializer.Serialize(WindowEnumerator.Observe(), options));
+        return 0;
+    case "uia-tree":
+        Console.WriteLine(JsonSerializer.Serialize(UiaTreeObserver.Observe(commandArgs), options));
         return 0;
     default:
         Console.Error.WriteLine($"unknown native host command: {command}");
@@ -46,6 +51,178 @@ internal sealed record WindowInfo(
     [property: JsonPropertyName("visible")]
     bool Visible
 );
+
+internal sealed record RectInfo(
+    [property: JsonPropertyName("x")]
+    double X,
+    [property: JsonPropertyName("y")]
+    double Y,
+    [property: JsonPropertyName("width")]
+    double Width,
+    [property: JsonPropertyName("height")]
+    double Height
+);
+
+internal sealed record UiaNode(
+    [property: JsonPropertyName("name")]
+    string Name,
+    [property: JsonPropertyName("control_type")]
+    string ControlType,
+    [property: JsonPropertyName("automation_id")]
+    string AutomationId,
+    [property: JsonPropertyName("class_name")]
+    string ClassName,
+    [property: JsonPropertyName("process_id")]
+    int ProcessId,
+    [property: JsonPropertyName("native_window_handle")]
+    string NativeWindowHandle,
+    [property: JsonPropertyName("bounding_rectangle")]
+    RectInfo? BoundingRectangle,
+    [property: JsonPropertyName("children")]
+    IReadOnlyList<UiaNode> Children
+);
+
+internal static class UiaTreeObserver
+{
+    public static object Observe(string[] args)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return Error("PcuCp.NativeHost UIA observation requires Windows.");
+        }
+
+        var maxDepth = ParseIntOption(args, "--max-depth", 1);
+        maxDepth = Math.Clamp(maxDepth, 0, 4);
+        var nodes = new List<UiaNode>();
+        var errors = new List<string>();
+
+        try
+        {
+            var root = AutomationElement.RootElement;
+            var children = root.FindAll(TreeScope.Children, Condition.TrueCondition);
+            foreach (AutomationElement child in children)
+            {
+                try
+                {
+                    nodes.Add(ReadNode(child, 0, maxDepth));
+                }
+                catch (ElementNotAvailableException)
+                {
+                    errors.Add("Skipped unavailable UIA element.");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    errors.Add($"Skipped UIA element: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or COMException)
+        {
+            errors.Add(ex.Message);
+        }
+
+        return new
+        {
+            schema = "pcucp.uia-tree/v1",
+            status = errors.Count == 0 ? "ok" : "partial",
+            kind = "uia-tree",
+            data = new
+            {
+                max_depth = maxDepth,
+                nodes,
+                count = nodes.Count
+            },
+            errors
+        };
+    }
+
+    private static object Error(string message) => new
+    {
+        schema = "pcucp.uia-tree/v1",
+        status = "error",
+        kind = "uia-tree",
+        data = new { max_depth = 0, nodes = Array.Empty<UiaNode>(), count = 0 },
+        errors = new[] { message }
+    };
+
+    private static UiaNode ReadNode(AutomationElement element, int depth, int maxDepth)
+    {
+        var current = element.Current;
+        var children = new List<UiaNode>();
+        if (depth < maxDepth)
+        {
+            AutomationElementCollection? childElements = null;
+            try
+            {
+                childElements = element.FindAll(TreeScope.Children, Condition.TrueCondition);
+            }
+            catch
+            {
+                childElements = null;
+            }
+
+            if (childElements is not null)
+            {
+                foreach (AutomationElement child in childElements)
+                {
+                    try
+                    {
+                        children.Add(ReadNode(child, depth + 1, maxDepth));
+                    }
+                    catch (ElementNotAvailableException)
+                    {
+                        // UIA trees are volatile. Skip disappeared nodes.
+                    }
+                }
+            }
+        }
+
+        return new UiaNode(
+            SafeString(() => current.Name),
+            SafeString(() => current.ControlType.ProgrammaticName.Replace("ControlType.", "", StringComparison.Ordinal)),
+            SafeString(() => current.AutomationId),
+            SafeString(() => current.ClassName),
+            SafeInt(() => current.ProcessId),
+            $"0x{SafeInt(() => current.NativeWindowHandle):X}",
+            RectFrom(current.BoundingRectangle),
+            children
+        );
+    }
+
+    private static RectInfo? RectFrom(System.Windows.Rect rect)
+    {
+        if (rect.IsEmpty)
+        {
+            return null;
+        }
+        return new RectInfo(rect.X, rect.Y, rect.Width, rect.Height);
+    }
+
+    private static string SafeString(Func<string> read)
+    {
+        try { return read() ?? string.Empty; }
+        catch { return string.Empty; }
+    }
+
+    private static int SafeInt(Func<int> read)
+    {
+        try { return read(); }
+        catch { return 0; }
+    }
+
+    private static int ParseIntOption(string[] args, string name, int defaultValue)
+    {
+        for (var i = 0; i < args.Length - 1; i++)
+        {
+            if (string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase) &&
+                int.TryParse(args[i + 1], out var value))
+            {
+                return value;
+            }
+        }
+        return defaultValue;
+    }
+}
 
 internal static class WindowEnumerator
 {

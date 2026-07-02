@@ -98,6 +98,17 @@ Describe "pcucp-next fast smoke - python router" {
     ($null -ne $obj.data.count) | Should Be $true
   }
 
+  It "executes UIA tree observation through Python into the native host" {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+    $r = Invoke-PcuCpPython -ArgList @("uia-tree", "--max-depth", "1", "--json")
+    $r.ExitCode | Should Be 0
+    $obj = $r.Raw | ConvertFrom-Json
+    $obj.schema | Should Be "pcucp.uia-tree/v1"
+    $obj.kind | Should Be "uia-tree"
+    $obj.route.primary | Should Be "dotnet-native-host"
+    ($null -ne $obj.data.count) | Should Be $true
+  }
+
   It "runs find-label in Python over native window observations" {
     if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
     $r = Invoke-PcuCpPython -ArgList @("find-label", "--label", "__pcucp_unlikely_label__", "--json")
@@ -107,7 +118,9 @@ Describe "pcucp-next fast smoke - python router" {
     $obj.status | Should Be "not_found"
     $obj.query.label | Should Be "__pcucp_unlikely_label__"
     $obj.route.primary | Should Be "python-router"
-    $obj.route.observation | Should Be "dotnet-native-host"
+    ($obj.route.observations -contains "dotnet-native-host/windows") | Should Be $true
+    ($obj.route.observations -contains "dotnet-native-host/uia-tree") | Should Be $true
+    ($null -ne $obj.uia_node_count) | Should Be $true
   }
 
   It "creates a Python task-plan with live actions gated by default" {
@@ -159,6 +172,26 @@ Describe "pcucp-next fast smoke - thin launcher" {
       Remove-Item -LiteralPath $out,$err -Force -ErrorAction SilentlyContinue
     }
   }
+
+  It "delegates UIA tree observation to the Python/native path" {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+    $launcher = Join-Path $nextRoot "powershell\cucp-next.ps1"
+    $out = Join-Path $env:TEMP ("pcucp-next-launcher-uia-out-" + [guid]::NewGuid().ToString("N") + ".txt")
+    $err = Join-Path $env:TEMP ("pcucp-next-launcher-uia-err-" + [guid]::NewGuid().ToString("N") + ".txt")
+    try {
+      $proc = Start-Process -FilePath "powershell.exe" -ArgumentList @(
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $launcher, "uia-tree", "--max-depth", "1", "--json"
+      ) -RedirectStandardOutput $out -RedirectStandardError $err -NoNewWindow -PassThru -Wait
+      $raw = Get-Content -LiteralPath $out -Raw -Encoding UTF8
+      $proc.ExitCode | Should Be 0
+      $obj = $raw | ConvertFrom-Json
+      $obj.schema | Should Be "pcucp.uia-tree/v1"
+      $obj.kind | Should Be "uia-tree"
+      $obj.route.primary | Should Be "dotnet-native-host"
+    } finally {
+      Remove-Item -LiteralPath $out,$err -Force -ErrorAction SilentlyContinue
+    }
+  }
 }
 
 Describe "pcucp-next fast smoke - schemas and native host" {
@@ -189,5 +222,17 @@ Describe "pcucp-next fast smoke - schemas and native host" {
     $obj = ($raw -join "`n") | ConvertFrom-Json
     $obj.schema | Should Be "pcucp.observation/v1"
     $obj.kind | Should Be "windows"
+  }
+
+  It "builds and runs the native host UIA tree observation when dotnet is available" {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+    $project = Join-Path $repoRoot "pcucp-next\dotnet\PcuCp.NativeHost\PcuCp.NativeHost.csproj"
+    $build = & dotnet build $project --nologo --verbosity quiet 2>&1
+    $LASTEXITCODE | Should Be 0
+    $raw = & dotnet run --project $project --no-build -- uia-tree --max-depth 1 2>&1
+    $LASTEXITCODE | Should Be 0
+    $obj = ($raw -join "`n") | ConvertFrom-Json
+    $obj.schema | Should Be "pcucp.uia-tree/v1"
+    $obj.kind | Should Be "uia-tree"
   }
 }
