@@ -18,6 +18,18 @@ This directory is intentionally additive. The legacy `scripts/cucp.ps1` runtime
 remains available while verified commands move behind the Python router and
 C# native host one at a time.
 
+## Migrated Commands
+
+- `windows`: Python CLI invokes `PcuCp.NativeHost` and returns
+  `pcucp.observation/v1`.
+- `find-label`: Python searches native top-level window observations. This is
+  not yet the full UIA/OCR label resolver.
+- `task-plan`: Python emits a safe plan envelope with live-control metadata. It
+  does not execute live actions.
+
+Remaining migration targets include full UIA tree extraction, OCR text
+recognition, deep label matching, and live action execution parity.
+
 ## Layout
 
 ```text

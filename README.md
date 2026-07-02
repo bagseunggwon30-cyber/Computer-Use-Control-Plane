@@ -32,6 +32,22 @@ New staged split included under `pcucp-next/`:
   `pcucp-next/config/`
 - Fast smoke tests: `tests/pcucp-next.Fast.Tests.ps1`
 
+Currently migrated into `pcucp-next`:
+
+- `windows`: Python router calls the C# native host for visible top-level
+  window observation.
+- `find-label`: Python searches the native window observation result for
+  matching top-level window titles and process names.
+- `task-plan`: Python creates read-only plan JSON with live-control safety
+  metadata.
+
+Still on the legacy PowerShell path:
+
+- Full UIA control-tree extraction
+- OCR text recognition
+- Deep `find-label` across UIA/OCR/control text
+- Live actuation and recovery commands
+
 Target language split for future implementation:
 
 ```text
@@ -88,6 +104,8 @@ Run the staged next-generation router directly:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 version --json
 powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 plan --command windows --json
+powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 windows --json
+powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 task-plan --type-text "hello" --shortcut "ctrl+s" --json
 ```
 
 ## Quick Start
@@ -217,7 +235,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester .\tests\cu
 # Result: 6 passed, 0 failed
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester .\tests\pcucp-next.Fast.Tests.ps1"
-# Result: 8 passed, 0 failed
+# Result: 12 passed, 0 failed
 ```
 
 The full legacy Pester suite exists in `tests/cucp.Tests.ps1`, but the fast

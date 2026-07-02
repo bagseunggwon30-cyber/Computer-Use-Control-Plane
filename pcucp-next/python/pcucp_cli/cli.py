@@ -3,9 +3,12 @@ from __future__ import annotations
 import argparse
 from typing import Sequence
 
+from .find_label import find_label
 from .legacy import run_legacy
+from .native_host import emit_native_error, run_native
 from .planner import plan_command
 from .protocol import emit, version_payload
+from .task_plan import create_task_plan
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -19,6 +22,23 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--command", dest="target_command", required=True, help="CUCP command or macro name")
     plan.add_argument("--arg", action="append", default=[], help="optional command argument for planning")
     plan.add_argument("--json", action="store_true", help="emit JSON")
+
+    windows = sub.add_parser("windows", help="observe visible top-level Windows through the native host")
+    windows.add_argument("--json", action="store_true", help="emit JSON")
+
+    find = sub.add_parser("find-label", help="find top-level labels using native observations")
+    find.add_argument("--label", required=True, help="label text to find")
+    find.add_argument("--limit", type=int, default=10, help="maximum candidates to return")
+    find.add_argument("--json", action="store_true", help="emit JSON")
+
+    task_plan = sub.add_parser("task-plan", help="create a Python task plan without live execution")
+    task_plan.add_argument("--app", help="application name to launch or focus")
+    task_plan.add_argument("--wait-title", help="window title to wait for")
+    task_plan.add_argument("--field", action="append", default=[], help="field assignment in Label=Value form")
+    task_plan.add_argument("--type-text", help="text to type in a live step")
+    task_plan.add_argument("--shortcut", action="append", default=[], help="shortcut keys such as ctrl+s")
+    task_plan.add_argument("--click-label", help="label to click as a live step")
+    task_plan.add_argument("--json", action="store_true", help="emit JSON")
 
     legacy = sub.add_parser("legacy", help="delegate to the existing PowerShell CUCP wrapper")
     legacy.add_argument("args", nargs=argparse.REMAINDER)
@@ -37,6 +57,30 @@ def main(argv: Sequence[str] | None = None) -> int:
     if ns.verb == "plan":
         emit(plan_command(ns.target_command, ns.arg), as_json=bool(ns.json))
         return 0
+
+    if ns.verb == "windows":
+        code, payload, error = run_native("windows")
+        if payload is None:
+            return emit_native_error("windows", code, error)
+        emit(payload, as_json=bool(ns.json))
+        return 0
+
+    if ns.verb == "find-label":
+        code, payload = find_label(ns.label, ns.limit)
+        emit(payload, as_json=bool(ns.json))
+        return code
+
+    if ns.verb == "task-plan":
+        payload = create_task_plan(
+            app=ns.app,
+            wait_title=ns.wait_title,
+            fields=ns.field,
+            type_text=ns.type_text,
+            shortcuts=ns.shortcut,
+            click_label=ns.click_label,
+        )
+        emit(payload, as_json=bool(ns.json))
+        return 0 if payload["status"] == "ok" else 2
 
     if ns.verb == "legacy":
         args = list(ns.args)

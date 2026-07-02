@@ -42,7 +42,10 @@ Describe "pcucp-next fast smoke - structure" {
       "pcucp-next\powershell\cucp-next.ps1",
       "pcucp-next\python\pcucp_cli\__main__.py",
       "pcucp-next\python\pcucp_cli\cli.py",
+      "pcucp-next\python\pcucp_cli\find_label.py",
+      "pcucp-next\python\pcucp_cli\native_host.py",
       "pcucp-next\python\pcucp_cli\planner.py",
+      "pcucp-next\python\pcucp_cli\task_plan.py",
       "pcucp-next\dotnet\PcuCp.NativeHost\PcuCp.NativeHost.csproj",
       "pcucp-next\dotnet\PcuCp.NativeHost\Program.cs",
       "pcucp-next\schemas\command.schema.json",
@@ -83,6 +86,40 @@ Describe "pcucp-next fast smoke - python router" {
     $obj.route.primary | Should Be "dotnet-native-host"
     $obj.route.fallback | Should Be "legacy-powershell"
   }
+
+  It "executes windows observation through Python into the native host" {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+    $r = Invoke-PcuCpPython -ArgList @("windows", "--json")
+    $r.ExitCode | Should Be 0
+    $obj = $r.Raw | ConvertFrom-Json
+    $obj.schema | Should Be "pcucp.observation/v1"
+    $obj.kind | Should Be "windows"
+    ($obj.route.primary -eq "dotnet-native-host") | Should Be $true
+    ($null -ne $obj.data.count) | Should Be $true
+  }
+
+  It "runs find-label in Python over native window observations" {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+    $r = Invoke-PcuCpPython -ArgList @("find-label", "--label", "__pcucp_unlikely_label__", "--json")
+    $r.ExitCode | Should Be 2
+    $obj = $r.Raw | ConvertFrom-Json
+    $obj.schema | Should Be "pcucp.find-label/v1"
+    $obj.status | Should Be "not_found"
+    $obj.query.label | Should Be "__pcucp_unlikely_label__"
+    $obj.route.primary | Should Be "python-router"
+    $obj.route.observation | Should Be "dotnet-native-host"
+  }
+
+  It "creates a Python task-plan with live actions gated by default" {
+    $r = Invoke-PcuCpPython -ArgList @("task-plan", "--type-text", "hello", "--shortcut", "ctrl+s", "--json")
+    $r.ExitCode | Should Be 0
+    $obj = $r.Raw | ConvertFrom-Json
+    $obj.schema | Should Be "pcucp.task-plan/v1"
+    $obj.route.primary | Should Be "python-router"
+    $obj.safety.live_control_required | Should Be $true
+    $obj.safety.default_allow_live_control | Should Be $false
+    $obj.steps.Count | Should Be 2
+  }
 }
 
 Describe "pcucp-next fast smoke - thin launcher" {
@@ -98,6 +135,26 @@ Describe "pcucp-next fast smoke - thin launcher" {
       $proc.ExitCode | Should Be 0
       $obj = $raw | ConvertFrom-Json
       $obj.schema | Should Be "pcucp.version/v1"
+    } finally {
+      Remove-Item -LiteralPath $out,$err -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It "delegates windows observation to the Python/native path" {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+    $launcher = Join-Path $nextRoot "powershell\cucp-next.ps1"
+    $out = Join-Path $env:TEMP ("pcucp-next-launcher-windows-out-" + [guid]::NewGuid().ToString("N") + ".txt")
+    $err = Join-Path $env:TEMP ("pcucp-next-launcher-windows-err-" + [guid]::NewGuid().ToString("N") + ".txt")
+    try {
+      $proc = Start-Process -FilePath "powershell.exe" -ArgumentList @(
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $launcher, "windows", "--json"
+      ) -RedirectStandardOutput $out -RedirectStandardError $err -NoNewWindow -PassThru -Wait
+      $raw = Get-Content -LiteralPath $out -Raw -Encoding UTF8
+      $proc.ExitCode | Should Be 0
+      $obj = $raw | ConvertFrom-Json
+      $obj.schema | Should Be "pcucp.observation/v1"
+      $obj.kind | Should Be "windows"
+      $obj.route.primary | Should Be "dotnet-native-host"
     } finally {
       Remove-Item -LiteralPath $out,$err -Force -ErrorAction SilentlyContinue
     }

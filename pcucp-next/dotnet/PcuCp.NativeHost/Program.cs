@@ -2,7 +2,9 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
+Console.OutputEncoding = Encoding.UTF8;
 var command = args.Length > 0 ? args[0].Trim().ToLowerInvariant() : "version";
 var options = new JsonSerializerOptions { WriteIndented = true };
 
@@ -33,10 +35,15 @@ internal static class NativeVersion
 }
 
 internal sealed record WindowInfo(
+    [property: JsonPropertyName("hwnd")]
     string Hwnd,
+    [property: JsonPropertyName("title")]
     string Title,
+    [property: JsonPropertyName("process_name")]
     string ProcessName,
+    [property: JsonPropertyName("process_id")]
     int ProcessId,
+    [property: JsonPropertyName("visible")]
     bool Visible
 );
 
