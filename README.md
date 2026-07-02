@@ -1,18 +1,18 @@
 # CUCP - Computer Use Control Plane
 
-CUCP is a PowerShell-first Windows computer-use control plane for local AI
-agents. It provides one command surface for observing Windows desktop state,
-planning grounded UI actions, and running live GUI control only after explicit
-safety gates are enabled.
+CUCP is a Windows computer-use control plane for local AI agents. It provides
+one command surface for observing Windows desktop state, planning grounded UI
+actions, and running live GUI control only after explicit safety gates are
+enabled.
 
-This repository currently contains the public CUCP core runtime, not a
-multi-language full platform. GitHub may therefore show this repository as
-PowerShell-only. That is expected for the current release because the executable
-runtime in this public package is implemented as PowerShell scripts.
+The stable compatibility runtime is still the PowerShell CUCP core in
+`scripts/`. New internal work is split under `pcucp-next/` so CUCP can move
+toward a Python planner, C#/.NET native host, schema/config contracts, and a
+thin PowerShell launcher without breaking the existing command surface.
 
 ## Current Status
 
-Included in this repository:
+Stable public core included in this repository:
 
 - PowerShell CLI wrapper: `scripts/cucp.ps1`
 - Native helper script for Win32, UI Automation, OCR, screenshot, and CDP-backed
@@ -23,19 +23,28 @@ Included in this repository:
 - Codex skill entry: `skills/cucp/SKILL.md`
 - Command references, troubleshooting notes, install script, and Pester tests
 
-Not included in this public core:
+New staged split included under `pcucp-next/`:
 
-- A Python planner/runtime package
-- A C#/.NET project
-- A database-backed state service
-- Go or Rust native modules
-- Any unfinished domain-specific generator work
+- PowerShell thin launcher: `pcucp-next/powershell/cucp-next.ps1`
+- Python router/planner package: `pcucp-next/python/pcucp_cli/`
+- C#/.NET native host project: `pcucp-next/dotnet/PcuCp.NativeHost/`
+- JSON schemas and runtime profile: `pcucp-next/schemas/`,
+  `pcucp-next/config/`
+- Fast smoke tests: `tests/pcucp-next.Fast.Tests.ps1`
 
-The intended current identity of this repo is:
+Target language split for future implementation:
 
 ```text
-PowerShell-first CUCP public core
+PowerShell 15-25%  install, thin launcher, safety wrapper, command shim
+Python     35-45%  planner, orchestrator, task graph, diagnostics, tests
+C#/.NET    20-30%  Win32/UIA/OCR/capture bridge and native host
+Config/DB   5-10%  schemas, profiles, policies, run history, target maps
+Rust/C++    0-10%  optional hot-path acceleration only when justified
 ```
+
+Current status is a staged migration, not full feature parity in the new stack.
+The legacy PowerShell runtime remains the fallback while verified commands move
+behind Python and C# one by one.
 
 ## What CUCP Does
 
@@ -72,6 +81,13 @@ You can also run the wrapper directly:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\cucp.ps1 -Quiet version
+```
+
+Run the staged next-generation router directly:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 version --json
+powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 plan --command windows --json
 ```
 
 ## Quick Start
@@ -131,6 +147,18 @@ cucp/
     cucp-native-helper.ps1
     cucp-helper-server.ps1
     README.md
+  pcucp-next/
+    powershell/
+      cucp-next.ps1
+    python/
+      pcucp_cli/
+    dotnet/
+      PcuCp.NativeHost/
+    schemas/
+      command.schema.json
+      observation.schema.json
+    config/
+      runtime-profile.json
   references/
     command-reference.md
     cdp-setup.md
@@ -165,11 +193,14 @@ Runtime:
 
 Optional:
 
+- Python 3.10+ for the staged `pcucp-next` router and planner
+- .NET 8 SDK for building the staged C# native host
 - Pester for tests
 - Chromium/Electron application launched with a local CDP port for CDP commands
 
-There are no Python, npm, Go, or Rust runtime dependencies in this public core.
-See `DEPENDENCIES.md`.
+There are no external pip, npm, Go, or Rust package dependencies in the current
+public tree. The Python code uses only the standard library. See
+`DEPENDENCIES.md`.
 
 ## Verification
 
@@ -184,10 +215,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\cucp.ps1 -Quiet ve
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester .\tests\cucp.Fast.Tests.ps1"
 # Result: 6 passed, 0 failed
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester .\tests\pcucp-next.Fast.Tests.ps1"
+# Result: 8 passed, 0 failed
 ```
 
-The full Pester suite exists in `tests/cucp.Tests.ps1`, but the fast smoke suite
-is the recommended quick validation path for this public package.
+The full legacy Pester suite exists in `tests/cucp.Tests.ps1`, but the fast
+smoke suites are the recommended quick validation path for this public package.
 
 ## Documentation
 
@@ -198,16 +232,17 @@ is the recommended quick validation path for this public package.
 - `skills/cucp/SKILL.md` - Codex plugin skill entry
 - `SECURITY.md` - safety and disclosure policy
 - `DEPENDENCIES.md` - runtime and optional dependency inventory
+- `pcucp-next/README.md` - staged Python/C# split details
 
 ## Roadmap
 
-Near-term public-core work:
+Near-term work:
 
 - Keep the PowerShell runtime stable and testable.
-- Improve documentation around safe live-control usage.
-- Split future non-PowerShell modules into separate, real projects only after
-  they are implemented and verified.
-- Keep unfinished or domain-specific experimental work out of the public core.
+- Move read-only observation commands through the Python router first.
+- Build and verify the C# native host for fast Win32/UIA/OCR observation.
+- Keep live actions on the legacy safety wrapper until native parity is proven.
+- Add config/profile persistence only after the schema contracts are stable.
 
 ## License
 

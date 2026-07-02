@@ -1,6 +1,8 @@
 # Dependencies
 
-CUCP is PowerShell-first and has no npm or pip runtime dependency.
+CUCP has a stable PowerShell core and a staged `pcucp-next` split. The next
+split adds Python standard-library code and a C#/.NET native host project, but
+does not add external pip, npm, Go, or Rust package dependencies.
 
 ## Runtime
 
@@ -12,6 +14,8 @@ CUCP is PowerShell-first and has no npm or pip runtime dependency.
 
 ## Optional Capabilities
 
+- Python 3.10+ for `pcucp-next/python/pcucp_cli`
+- .NET 8 SDK for `pcucp-next/dotnet/PcuCp.NativeHost`
 - Chromium or Electron app launched with a local CDP port for CDP commands
 - Pester for the regression tests
 
@@ -21,8 +25,8 @@ Install-Module Pester -Scope CurrentUser
 
 ## Package Manifests
 
-- `requirements.txt` is intentionally empty except for comments because there
-  are no Python runtime packages required.
+- `requirements.txt` is intentionally empty except for comments because
+  `pcucp-next` uses Python standard-library modules only.
 - No `package.json` is included because the public runtime does not require
   Node.js packages.
 

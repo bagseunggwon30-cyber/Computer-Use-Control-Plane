@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/pcucp/observation.schema.json",
+  "title": "PCUCP Observation",
+  "type": "object",
+  "required": ["schema", "status", "kind", "data"],
+  "properties": {
+    "schema": {
+      "const": "pcucp.observation/v1"
+    },
+    "status": {
+      "enum": ["ok", "partial", "error", "blocked"]
+    },
+    "kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "data": {
+      "type": "object"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}

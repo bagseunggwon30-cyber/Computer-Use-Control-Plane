@@ -22,8 +22,13 @@ Thumbs.db
 # Python scratch environments.
 __pycache__/
 *.pyc
+.pytest_cache/
 .venv/
 venv/
+
+# .NET build output.
+bin/
+obj/
 
 # Node dependencies if future helper tooling is added.
 node_modules/

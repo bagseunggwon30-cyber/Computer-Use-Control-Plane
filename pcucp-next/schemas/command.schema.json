@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/pcucp/command.schema.json",
+  "title": "PCUCP Command",
+  "type": "object",
+  "required": ["schema", "command", "args", "safety"],
+  "properties": {
+    "schema": {
+      "const": "pcucp.command/v1"
+    },
+    "command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "args": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "safety": {
+      "type": "object",
+      "required": ["live_control_allowed", "confirm_sensitive"],
+      "properties": {
+        "live_control_allowed": {
+          "type": "boolean"
+        },
+        "confirm_sensitive": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

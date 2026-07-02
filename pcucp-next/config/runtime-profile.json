@@ -1,0 +1,21 @@
+{
+  "schema": "pcucp.runtime-profile/v1",
+  "name": "pcucp-next",
+  "status": "staged",
+  "compatibility": {
+    "legacy_wrapper": "scripts/cucp.ps1",
+    "strategy": "new commands route through Python first; verified commands may use the native host; legacy PowerShell remains the fallback"
+  },
+  "language_targets": {
+    "powershell": "15-25%",
+    "python": "35-45%",
+    "dotnet": "20-30%",
+    "config_db": "5-10%",
+    "rust_cpp_optional": "0-10%"
+  },
+  "safety": {
+    "default_live_control": false,
+    "requires_explicit_live_gate": true,
+    "blocks_sensitive_actions_by_default": true
+  }
+}
