@@ -43,13 +43,12 @@ def run_native(command: str, args: list[str] | None = None) -> tuple[int, dict[s
         errors="replace",
     )
 
-    stderr = completed.stderr.strip()
-    if completed.returncode != 0:
-        return int(completed.returncode), None, stderr or completed.stdout.strip()
-
     try:
         payload = json.loads(completed.stdout)
     except json.JSONDecodeError as exc:
+        stderr = completed.stderr.strip()
+        if completed.returncode != 0:
+            return int(completed.returncode), None, stderr or completed.stdout.strip()
         return 1, None, f"native host returned invalid JSON: {exc}"
 
     payload.setdefault("route", {})
@@ -60,7 +59,7 @@ def run_native(command: str, args: list[str] | None = None) -> tuple[int, dict[s
             "invoked_by": "python-router",
         }
     )
-    return 0, payload, stderr
+    return int(completed.returncode), payload, completed.stderr.strip()
 
 
 def emit_native_error(command: str, exit_code: int, error: str) -> int:

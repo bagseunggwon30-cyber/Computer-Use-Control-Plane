@@ -16,6 +16,8 @@ does not add external pip, npm, Go, or Rust package dependencies.
 
 - Python 3.10+ for `pcucp-next/python/pcucp_cli`
 - .NET 8 SDK for `pcucp-next/dotnet/PcuCp.NativeHost`
+- Windows SDK APIs exposed by `net8.0-windows10.0.19041.0` for the staged OCR
+  route
 - Chromium or Electron app launched with a local CDP port for CDP commands
 - Pester for the regression tests
 

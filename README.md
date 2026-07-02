@@ -41,12 +41,16 @@ Currently migrated into `pcucp-next`:
 - `find-label`: Python searches the native window observation result for
   matching top-level window titles, process names, UIA node metadata, and UIA
   pattern metadata.
+- `ocr-image`: Python router calls the C# native host to run Windows OCR on an
+  image file.
+- `ocr-find-text`: Python matches text over the native OCR image result and
+  returns candidate coordinates.
 - `task-plan`: Python creates read-only plan JSON with live-control safety
   metadata.
 
 Still on the legacy PowerShell path:
 
-- OCR text recognition
+- OCR screen capture
 - Deep `find-label` across OCR text
 - Live actuation and recovery commands
 
@@ -108,6 +112,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp
 powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 plan --command windows --json
 powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 windows --json
 powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 uia-tree --max-depth 1 --json
+powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 ocr-image --path .\sample.png --json
+powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 ocr-find-text --path .\sample.png --text "Send" --json
 powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 task-plan --type-text "hello" --shortcut "ctrl+s" --json
 ```
 
@@ -238,7 +244,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester .\tests\cu
 # Result: 6 passed, 0 failed
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester .\tests\pcucp-next.Fast.Tests.ps1"
-# Result: 16 passed, 0 failed
+# Result: 20 passed, 0 failed
 ```
 
 The full legacy Pester suite exists in `tests/cucp.Tests.ps1`, but the fast

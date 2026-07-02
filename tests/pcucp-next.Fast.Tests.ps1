@@ -36,6 +36,23 @@ function Invoke-PcuCpPython {
   }
 }
 
+function New-PcuCpOcrFixturePng {
+  param([string]$Path)
+
+  Add-Type -AssemblyName System.Drawing
+  $bmp = New-Object System.Drawing.Bitmap 520, 140
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $g.Clear([System.Drawing.Color]::White)
+  $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+  $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+  $font = New-Object System.Drawing.Font("Segoe UI", 30, [System.Drawing.FontStyle]::Bold)
+  $g.DrawString("Send Message", $font, [System.Drawing.Brushes]::Black, 24.0, 36.0)
+  $font.Dispose()
+  $g.Dispose()
+  $bmp.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+  $bmp.Dispose()
+}
+
 Describe "pcucp-next fast smoke - structure" {
   It "contains the requested multi-runtime layout" {
     @(
@@ -44,6 +61,7 @@ Describe "pcucp-next fast smoke - structure" {
       "pcucp-next\python\pcucp_cli\cli.py",
       "pcucp-next\python\pcucp_cli\find_label.py",
       "pcucp-next\python\pcucp_cli\native_host.py",
+      "pcucp-next\python\pcucp_cli\ocr.py",
       "pcucp-next\python\pcucp_cli\planner.py",
       "pcucp-next\python\pcucp_cli\task_plan.py",
       "pcucp-next\dotnet\PcuCp.NativeHost\PcuCp.NativeHost.csproj",
@@ -147,6 +165,46 @@ Describe "pcucp-next fast smoke - python router" {
     $obj.safety.default_allow_live_control | Should Be $false
     $obj.steps.Count | Should Be 2
   }
+
+  It "routes OCR image recognition through Python into the native host" {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+    $fixture = Join-Path $env:TEMP ("pcucp-next-ocr-" + [guid]::NewGuid().ToString("N") + ".png")
+    try {
+      New-PcuCpOcrFixturePng -Path $fixture
+      $r = Invoke-PcuCpPython -ArgList @("ocr-image", "--path", $fixture, "--json")
+      (@(0,1) -contains $r.ExitCode) | Should Be $true
+      $obj = $r.Raw | ConvertFrom-Json
+      $obj.schema | Should Be "pcucp.ocr-image/v1"
+      $obj.kind | Should Be "ocr-image"
+      $obj.route.primary | Should Be "dotnet-native-host"
+      if ($obj.status -eq "ok") {
+        ($obj.text -match "Send|Message") | Should Be $true
+      }
+    } finally {
+      Remove-Item -LiteralPath $fixture -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It "finds OCR text through Python over native OCR image output" {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+    $fixture = Join-Path $env:TEMP ("pcucp-next-ocr-find-" + [guid]::NewGuid().ToString("N") + ".png")
+    try {
+      New-PcuCpOcrFixturePng -Path $fixture
+      $r = Invoke-PcuCpPython -ArgList @("ocr-find-text", "--path", $fixture, "--text", "Send", "--json")
+      (@(0,1) -contains $r.ExitCode) | Should Be $true
+      $obj = $r.Raw | ConvertFrom-Json
+      $obj.schema | Should Be "pcucp.ocr-find-text/v1"
+      $obj.kind | Should Be "ocr-find-text"
+      $obj.route.primary | Should Be "python-router"
+      $obj.route.observation | Should Be "dotnet-native-host/ocr-image"
+      if ($obj.status -eq "ok") {
+        ($obj.top.text -match "Send") | Should Be $true
+        ($obj.top.score -ge 60) | Should Be $true
+      }
+    } finally {
+      Remove-Item -LiteralPath $fixture -Force -ErrorAction SilentlyContinue
+    }
+  }
 }
 
 Describe "pcucp-next fast smoke - thin launcher" {
@@ -206,6 +264,28 @@ Describe "pcucp-next fast smoke - thin launcher" {
       Remove-Item -LiteralPath $out,$err -Force -ErrorAction SilentlyContinue
     }
   }
+
+  It "delegates OCR image recognition to the Python/native path" {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+    $launcher = Join-Path $nextRoot "powershell\cucp-next.ps1"
+    $fixture = Join-Path $env:TEMP ("pcucp-next-launcher-ocr-" + [guid]::NewGuid().ToString("N") + ".png")
+    $out = Join-Path $env:TEMP ("pcucp-next-launcher-ocr-out-" + [guid]::NewGuid().ToString("N") + ".txt")
+    $err = Join-Path $env:TEMP ("pcucp-next-launcher-ocr-err-" + [guid]::NewGuid().ToString("N") + ".txt")
+    try {
+      New-PcuCpOcrFixturePng -Path $fixture
+      $proc = Start-Process -FilePath "powershell.exe" -ArgumentList @(
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $launcher, "ocr-image", "--path", $fixture, "--json"
+      ) -RedirectStandardOutput $out -RedirectStandardError $err -NoNewWindow -PassThru -Wait
+      (@(0,1) -contains $proc.ExitCode) | Should Be $true
+      $raw = Get-Content -LiteralPath $out -Raw -Encoding UTF8
+      $obj = $raw | ConvertFrom-Json
+      $obj.schema | Should Be "pcucp.ocr-image/v1"
+      $obj.kind | Should Be "ocr-image"
+      $obj.route.primary | Should Be "dotnet-native-host"
+    } finally {
+      Remove-Item -LiteralPath $fixture,$out,$err -Force -ErrorAction SilentlyContinue
+    }
+  }
 }
 
 Describe "pcucp-next fast smoke - schemas and native host" {
@@ -222,7 +302,7 @@ Describe "pcucp-next fast smoke - schemas and native host" {
 
   It "defines a Windows native host project without adding external packages" {
     $csproj = Get-Content -LiteralPath (Join-Path $repoRoot "pcucp-next\dotnet\PcuCp.NativeHost\PcuCp.NativeHost.csproj") -Raw -Encoding UTF8
-    ($csproj -match "<TargetFramework>net8.0-windows</TargetFramework>") | Should Be $true
+    ($csproj -match "<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>") | Should Be $true
     ($csproj -match "<PackageReference") | Should Be $false
   }
 
@@ -248,5 +328,23 @@ Describe "pcucp-next fast smoke - schemas and native host" {
     $obj = ($raw -join "`n") | ConvertFrom-Json
     $obj.schema | Should Be "pcucp.uia-tree/v1"
     $obj.kind | Should Be "uia-tree"
+  }
+
+  It "builds and runs the native host OCR image route when dotnet is available" {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+    $project = Join-Path $repoRoot "pcucp-next\dotnet\PcuCp.NativeHost\PcuCp.NativeHost.csproj"
+    $fixture = Join-Path $env:TEMP ("pcucp-next-native-ocr-" + [guid]::NewGuid().ToString("N") + ".png")
+    try {
+      New-PcuCpOcrFixturePng -Path $fixture
+      $build = & dotnet build $project --nologo --verbosity quiet 2>&1
+      $LASTEXITCODE | Should Be 0
+      $raw = & dotnet run --project $project --no-build -- ocr-image --path $fixture 2>&1
+      (@(0,1) -contains $LASTEXITCODE) | Should Be $true
+      $obj = ($raw -join "`n") | ConvertFrom-Json
+      $obj.schema | Should Be "pcucp.ocr-image/v1"
+      $obj.kind | Should Be "ocr-image"
+    } finally {
+      Remove-Item -LiteralPath $fixture -Force -ErrorAction SilentlyContinue
+    }
   }
 }

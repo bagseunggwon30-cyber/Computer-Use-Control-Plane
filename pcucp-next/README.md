@@ -27,11 +27,15 @@ C# native host one at a time.
 - `find-label`: Python searches native top-level window observations and the
   bounded UIA tree, including UIA pattern metadata. This is not yet the full OCR
   label resolver.
+- `ocr-image`: Python CLI invokes `PcuCp.NativeHost` and returns
+  `pcucp.ocr-image/v1` for image-file OCR.
+- `ocr-find-text`: Python matches text over the native OCR image result and
+  returns `pcucp.ocr-find-text/v1` candidates.
 - `task-plan`: Python emits a safe plan envelope with live-control metadata. It
   does not execute live actions.
 
-Remaining migration targets include OCR text recognition, deeper text-range
-label matching, and live action execution parity.
+Remaining migration targets include OCR screen capture, deeper text-range label
+matching, and live action execution parity.
 
 ## Layout
 

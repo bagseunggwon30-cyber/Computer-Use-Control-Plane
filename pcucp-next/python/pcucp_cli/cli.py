@@ -6,6 +6,7 @@ from typing import Sequence
 from .find_label import find_label
 from .legacy import run_legacy
 from .native_host import emit_native_error, run_native
+from .ocr import ocr_find_text
 from .planner import plan_command
 from .protocol import emit, version_payload
 from .task_plan import create_task_plan
@@ -29,6 +30,18 @@ def build_parser() -> argparse.ArgumentParser:
     uia_tree = sub.add_parser("uia-tree", help="observe a bounded UI Automation tree through the native host")
     uia_tree.add_argument("--max-depth", default="1", help="maximum UIA child depth, capped by native host")
     uia_tree.add_argument("--json", action="store_true", help="emit JSON")
+
+    ocr_image = sub.add_parser("ocr-image", help="run OCR on an image file through the native host")
+    ocr_image.add_argument("--path", required=True, help="path to an image file")
+    ocr_image.add_argument("--language", help="optional OCR language tag such as en-US or ko")
+    ocr_image.add_argument("--json", action="store_true", help="emit JSON")
+
+    ocr_find = sub.add_parser("ocr-find-text", help="find text in an OCR image result")
+    ocr_find.add_argument("--path", required=True, help="path to an image file")
+    ocr_find.add_argument("--text", required=True, help="text to find")
+    ocr_find.add_argument("--match", default="contains", choices=["contains", "exact", "prefix"], help="text matching mode")
+    ocr_find.add_argument("--language", help="optional OCR language tag such as en-US or ko")
+    ocr_find.add_argument("--json", action="store_true", help="emit JSON")
 
     find = sub.add_parser("find-label", help="find top-level labels using native observations")
     find.add_argument("--label", required=True, help="label text to find")
@@ -75,6 +88,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             return emit_native_error("uia-tree", code, error)
         emit(payload, as_json=bool(ns.json))
         return 0
+
+    if ns.verb == "ocr-image":
+        native_args = ["--path", ns.path]
+        if ns.language:
+            native_args += ["--language", ns.language]
+        code, payload, error = run_native("ocr-image", native_args)
+        if payload is None:
+            return emit_native_error("ocr-image", code, error)
+        emit(payload, as_json=bool(ns.json))
+        return code
+
+    if ns.verb == "ocr-find-text":
+        code, payload = ocr_find_text(ns.path, ns.text, ns.match, ns.language)
+        emit(payload, as_json=bool(ns.json))
+        return code
 
     if ns.verb == "find-label":
         code, payload = find_label(ns.label, ns.limit)
