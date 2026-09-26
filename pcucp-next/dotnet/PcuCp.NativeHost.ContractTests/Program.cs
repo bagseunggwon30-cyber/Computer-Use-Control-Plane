@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 
@@ -55,4 +56,45 @@ var encoded = JsonSerializer.Serialize(NativeResult.Error("click", "target_misma
 using var json = JsonDocument.Parse(encoded);
 Check(json.RootElement.GetProperty("status").GetString() == "error", "Error presented as success");
 Check(json.RootElement.GetProperty("errors")[0].GetProperty("code").GetString() == "target_mismatch", "Machine-readable error lost");
+// The resident wire boundary is testable without calling Windows APIs.
+string Request(long id, string command = "version", string[]? args = null) => JsonSerializer.Serialize(new
+    { schema = "pcucp.native.request/v1", id, command, args = args ?? Array.Empty<string>() });
+Check(NativeSession.Parse(Request(1), false, 0).Id == 1, "First request rejected");
+Reject(() => NativeSession.Parse(Request(1), false, 1), "Duplicate request replay accepted");
+Reject(() => NativeSession.Parse(Request(0), false, 0), "Zero request ID accepted");
+Reject(() => NativeSession.Parse(Request(1, "serve"), true, 0), "Nested server accepted");
+Reject(() => NativeSession.Parse(Request(1, "click", ["--allow-live-control"]), false, 0), "Request elevated read-only worker");
+Reject(() => NativeSession.Parse(Request(1, "version", ["--ALLOW-LIVE-CONTROL"]), false, 0), "Uppercase authority flag accepted");
+Check(NativeSession.Parse(Request(1, "click", ["--allow-live-control"]), true, 0).Command == "click", "Startup opt-in lost");
+var dispatched = new List<string>();
+Task<DispatchResult> FakeDispatch(string command, string[] args)
+{
+    dispatched.Add(command);
+    return Task.FromResult(new DispatchResult(0, NativeResult.Ok(command, new { process = 123 })));
+}
+async Task<(int Code, string Output)> RunWire(byte[] bytes, bool allow = false)
+{
+    using var stream = new MemoryStream(bytes);
+    using var writer = new StringWriter();
+    var code = await NativeSession.RunAsync(stream, writer, allow, FakeDispatch);
+    return (code, writer.ToString());
+}
+var wire = await RunWire(System.Text.Encoding.UTF8.GetBytes(Request(1) + "\n" + Request(2) + "\n"));
+Check(wire.Code == 0 && dispatched.Count == 2, "Sequential wire requests did not execute");
+var responses = wire.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+using var second = JsonDocument.Parse(responses[1]);
+Check(second.RootElement.GetProperty("id").GetInt64() == 2, "Response correlation lost");
+Check(second.RootElement.GetProperty("payload").GetProperty("data").GetProperty("process").GetInt32() == 123, "Payload not preserved");
+dispatched.Clear();
+wire = await RunWire(System.Text.Encoding.UTF8.GetBytes(Request(1) + "\n" + Request(1) + "\n" + Request(2) + "\n"));
+Check(wire.Code == 2 && dispatched.Count == 1, "Duplicate did not terminate without replay");
+dispatched.Clear();
+wire = await RunWire(System.Text.Encoding.UTF8.GetBytes(Request(1, "click", ["--allow-live-control"]) + "\n"));
+Check(wire.Code == 2 && dispatched.Count == 0, "Readonly wire dispatched a mutation");
+wire = await RunWire(new byte[NativeSession.MaxFrameBytes + 1]);
+Check(wire.Code == 2 && dispatched.Count == 0, "Oversized frame executed");
+wire = await RunWire(System.Text.Encoding.UTF8.GetBytes(Request(1)));
+Check(wire.Code == 2 && dispatched.Count == 0, "Unterminated frame executed");
+wire = await RunWire(new byte[] { 0xff, 10 });
+Check(wire.Code == 2 && dispatched.Count == 0, "Invalid UTF8 executed");
 Console.WriteLine($"PASS: {count} ABI, geometry and command-authority contract checks (no Windows input executed).");

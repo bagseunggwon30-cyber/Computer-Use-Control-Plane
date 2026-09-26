@@ -6,7 +6,7 @@ actions, and running live GUI control only after explicit safety gates are
 enabled.
 
 The new core preview in `pcucp-next/` provides a persistent Python session,
-C# Windows capture/input, and a [Pi extension](integrations/pi/README.md).
+a reused C# Windows capture/input process, and a [Pi extension](integrations/pi/README.md).
 Start with the [setup guide](pcucp-next/README.md) and
 [development direction](docs/core-modernization.md). Development now focuses
 on a generic embeddable engine; new application-specific profiles are out of scope.
@@ -286,7 +286,7 @@ Near-term work:
 
 - Verify the new core on an interactive Windows desktop and generic UI fixtures.
 - Measure capture/input latency and wrong-target failures before optimizing.
-- Add a resident native broker, scoped elevation and UIA element references.
+- Harden the resident native worker, then add scoped elevation and UIA element references.
 - Add observation events and region zoom with explicit image/coordinate contracts.
 - Reuse the execution contract for other agent hosts. See the
   [phased roadmap](docs/core-modernization.md).

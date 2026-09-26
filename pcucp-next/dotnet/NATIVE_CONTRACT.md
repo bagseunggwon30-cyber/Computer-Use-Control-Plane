@@ -1,7 +1,9 @@
 # Native desktop runtime
 
-The native host is a one-command process with one JSON document on stdout. Python
-owns session state and imposes a hard subprocess timeout. Publish once with
+The native host supports one-command execution and a persistent `serve` mode.
+Python `serve` owns one native worker and imposes a hard request timeout.
+See [the resident session contract](../../docs/resident-native-session.md).
+Standalone commands retain one JSON document on stdout. Publish once with
 `./publish-native.ps1`; normal operations invoke the published executable, never
 `dotnet run`.
 

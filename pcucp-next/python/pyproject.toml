@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cucp-core"
-version = "0.2.0"
+version = "0.3.0"
 description = "Local Windows computer-use execution engine for agent hosts"
 requires-python = ">=3.10"
 dependencies = []

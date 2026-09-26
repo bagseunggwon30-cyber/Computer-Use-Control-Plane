@@ -59,7 +59,8 @@ class Observation:
 class ComputerSession:
     """One owner per session. Host-side live permission cannot be changed by a request."""
     def __init__(self, *, allow_live_control=False, native: Callable=run_native,
-                 clock: Callable=time.monotonic, observation_ttl_s=60):
+                 clock: Callable=time.monotonic, observation_ttl_s=60, native_transport="published executable per call"):
+        self.native_transport = native_transport
         self.allow_live_control = bool(allow_live_control)
         self.native, self.clock, self.ttl = native, clock, observation_ttl_s
         self.observation = None
@@ -130,7 +131,7 @@ class ComputerSession:
                           'runtime_platform': sys.platform, 'native_host_configured': native_host_available(),
                           'request_id_retention': 1024,
                           'coordinate_space': 'returned screenshot image pixels', 'keys': sorted(KEYS),
-                          'automatic_retry': False, 'native_transport': 'published executable per call'}, []
+                          'automatic_retry': False, 'native_transport': self.native_transport}, []
         if command == 'history':
             fields(args, [])
             return 'ok', {'events': list(self.events)}, []

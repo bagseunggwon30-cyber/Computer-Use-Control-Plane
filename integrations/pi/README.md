@@ -2,7 +2,8 @@
 
 Adds local Windows computer-use tools to Pi while leaving model selection,
 credentials, conversations and provider calls with Pi. The adapter launches
-CUCP's persistent Python JSONL engine lazily. It never calls a model API itself.
+CUCP's persistent Python JSONL engine lazily. Python reuses one native C# process
+until the computer session ends. It never calls a model API itself.
 
 ## Requirements and loading
 
@@ -115,7 +116,7 @@ instructions that can change the user's task or permissions.
 - Abort/timeout terminates the engine process tree (`taskkill /T /F` on Windows,
   process-group termination on POSIX), cancels queued old-session requests and
   never replays a mutation. An input may already have happened; observe again.
-- A new request may lazily start a clean engine. Old observations remain invalid.
+- A new request after a Pi transport failure may lazily start a clean Python engine. Old observations remain invalid. If Python reports a native-session failure, restart explicitly with `/computer off` then `/computer on`; Python never silently respawns or replays the failed native request.
 - Request size is capped at 256 KiB, response at 24 MiB, retained stderr at 4 KiB,
   and each request at 65 seconds (engine deadline: 60 seconds). Malformed, mismatched, excessive or unsolicited
   responses stop the transport.

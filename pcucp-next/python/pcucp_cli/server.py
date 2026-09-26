@@ -5,6 +5,7 @@ import signal
 import sys
 from .engine import ComputerSession
 from .native_host import cancel_all_native
+from .native_session import NativeSession
 
 MAX_REQUEST_BYTES = 256 * 1024
 
@@ -15,7 +16,12 @@ def protocol_error(code, message):
 def serve(*, allow_live_control=False, source=None, sink=None):
     source = source if source is not None else sys.stdin.buffer
     sink = sink if sink is not None else sys.stdout
-    session = ComputerSession(allow_live_control=allow_live_control)
+    with NativeSession(allow_live_control=allow_live_control) as native:
+        session = ComputerSession(allow_live_control=allow_live_control, native=native,
+                                  native_transport="persistent subprocess (stdio-jsonl)")
+        return _serve_frames(source, sink, session)
+
+def _serve_frames(source, sink, session):
     while True:
         line = source.readline(MAX_REQUEST_BYTES + 1)
         if not line:

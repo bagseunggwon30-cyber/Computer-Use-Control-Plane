@@ -29,9 +29,18 @@ jobs:
           dotnet-version: '8.0.x'
       - run: dotnet build pcucp-next/dotnet/PcuCp.NativeHost/PcuCp.NativeHost.csproj -c Release
       - run: dotnet run --project pcucp-next/dotnet/PcuCp.NativeHost.ContractTests -c Release
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Native resident transport (no desktop input)
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = Join-Path (Get-Location).Path 'pcucp-next/python'
+          $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          python -m unittest discover -s tests/python -p test_native_session.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - shell: pwsh
         run: |
-          Install-Module Pester -RequiredVersion 4.10.1 -Force -Scope CurrentUser
-          Import-Module Pester -RequiredVersion 4.10.1 -Force
-          Invoke-Pester -Script tests/cucp.LegacyRegression.Tests.ps1 -EnableExit
+          Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
+          Invoke-Pester -Path tests/cucp.LegacyRegression.Tests.ps1 -CI
       # No interactive desktop input tests on hosted runners. See manual Windows checks.

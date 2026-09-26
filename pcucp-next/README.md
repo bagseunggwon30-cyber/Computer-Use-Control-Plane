@@ -2,9 +2,11 @@
 
 Computer Use가 없는 Pi 같은 에이전트 호스트에 **로컬 Windows 관찰·입력 기능**을 연결합니다. 모델 선택, API 자격 증명과 대화 관리는 호스트가 담당합니다. CUCP는 별도 LLM을 호출하지 않습니다.
 
-이번 구현은 **상주 Python JSONL 세션 + 호출마다 실행하는 게시된 C# 네이티브 실행 파일**입니다. C# 상주 브로커는 후속 단계입니다. 기존 PowerShell 명령을 모두 이전한 버전은 아니며, 신규 Pi 도구는 레거시 실행기로 자동 우회하지 않습니다.
+이번 구현은 **상주 Python JSONL 세션 + 세션 동안 재사용하는 C# 네이티브 프로세스**입니다. C#은 첫 네이티브 요청 때 시작됩니다. 별도 관리자 브로커와 UIA 참조 캐시는 후속 단계입니다. 기존 PowerShell 명령을 모두 이전한 버전은 아니며, 신규 Pi 도구는 레거시 실행기로 자동 우회하지 않습니다.
 
 개발 범위와 후속 단계는 [개발 방향](../docs/core-modernization.md), Pi 도구 계약은 [Pi 연결 안내](../integrations/pi/README.md)를 참고하세요.
+
+상주 실행기의 오류 처리와 검증은 [상주 세션 계약](../docs/resident-native-session.md)을 참고하세요.
 
 ## 구성과 현재 기능
 
@@ -36,7 +38,7 @@ $env:PYTHONPATH = Join-Path $cucpRoot 'pcucp-next\python'
 python -m pcucp_cli windows --json
 ```
 
-게시 스크립트의 기본 대상은 `win-x64`입니다. ARM64 Windows에서는 `-Runtime win-arm64`를 사용합니다. 게시 결과는 self-contained이며, 정상 실행 경로에서 `dotnet run`이나 재빌드를 호출하지 않습니다.
+게시 스크립트의 기본 대상은 `win-x64`입니다. ARM64 Windows에서는 `-Runtime win-arm64`를 사용합니다. 게시 결과는 self-contained이며, Python `serve`에서는 같은 네이티브 프로세스를 재사용합니다. 개별 관찰 CLI는 일회 실행을 유지합니다. 정상 실행 경로에서 `dotnet run`이나 재빌드를 호출하지 않습니다.
 
 `CUCP_NATIVE_HOST`는 절대 실행 파일 경로로 지정합니다. 설정하지 않으면 `pcucp-next/bin/native/PcuCp.NativeHost.exe`를 찾습니다. 직접 게시한 DLL 경로도 지원하지만 이 경우 해당 런타임의 `dotnet` 실행 파일이 필요합니다.
 

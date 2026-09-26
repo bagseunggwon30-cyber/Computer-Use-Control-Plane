@@ -12,5 +12,6 @@
     <Compile Include="../PcuCp.NativeHost/DesktopActions.cs" Link="DesktopActions.cs" />
     <Compile Include="../PcuCp.NativeHost/WindowTarget.cs" Link="WindowTarget.cs" />
     <Compile Include="../PcuCp.NativeHost/PrivilegeInspector.cs" Link="PrivilegeInspector.cs" />
+    <Compile Include="../PcuCp.NativeHost/NativeSession.cs" Link="NativeSession.cs" />
   </ItemGroup>
 </Project>
