@@ -71,10 +71,10 @@ def ocr_find_text(path: str, text: str, match: str = "contains", language: str |
     route = {
         "primary": "python-router",
         "observation": "dotnet-native-host/ocr-image",
-        "fallback": "legacy-powershell",
+        "fallback": None,
     }
     if ocr_payload is None:
-        return code, {
+        return code or 1, {
             "schema": "pcucp.ocr-find-text/v1",
             "status": "error",
             "kind": "ocr-find-text",
@@ -84,8 +84,8 @@ def ocr_find_text(path: str, text: str, match: str = "contains", language: str |
             "candidates": [],
             "errors": [error],
         }
-    if ocr_payload.get("status") != "ok":
-        return code, {
+    if code != 0 or ocr_payload.get("status") != "ok":
+        return code or 1, {
             "schema": "pcucp.ocr-find-text/v1",
             "status": "error",
             "kind": "ocr-find-text",
@@ -93,7 +93,9 @@ def ocr_find_text(path: str, text: str, match: str = "contains", language: str |
             "route": route,
             "top": None,
             "candidates": [],
-            "errors": ocr_payload.get("errors", []),
+            "errors": ocr_payload.get("errors", []) or [error or "OCR provider did not complete successfully"],
+            "provider_status": ocr_payload.get("status"),
+            "provider_exit_code": code,
         }
 
     candidates: list[dict[str, Any]] = []

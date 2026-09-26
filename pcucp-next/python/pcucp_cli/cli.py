@@ -16,6 +16,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pcucp")
     sub = parser.add_subparsers(dest="verb")
 
+    server = sub.add_parser("serve", help="serve local JSONL computer-use requests")
+    server.add_argument("--allow-live-control", action="store_true", help="operator opt-in for this process")
+    caps = sub.add_parser("capabilities", help="show engine tool contract")
+    caps.add_argument("--json", action="store_true")
+    privileges = sub.add_parser("privileges", help="diagnose Windows input privilege boundaries")
+    privileges.add_argument("--pid", type=int)
+    privileges.add_argument("--json", action="store_true")
+
     version = sub.add_parser("version", help="show PCUCP component versions")
     version.add_argument("--json", action="store_true", help="emit JSON")
 
@@ -67,27 +75,39 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     ns = parser.parse_args(argv)
 
+    if ns.verb == "serve":
+        from .server import run_server
+        return run_server(allow_live_control=ns.allow_live_control)
+
+    if ns.verb in {"capabilities", "privileges"}:
+        from .engine import ComputerSession
+        args = {"pid": ns.pid} if ns.verb == "privileges" and ns.pid is not None else {}
+        payload = ComputerSession().handle({"schema": "cucp.request/v1", "id": "cli", "command": ns.verb, "args": args})
+        emit(payload, as_json=bool(ns.json))
+        return 0 if payload["status"] == "ok" else 2
+
     if ns.verb == "version":
         emit(version_payload(), as_json=bool(ns.json))
         return 0
 
     if ns.verb == "plan":
-        emit(plan_command(ns.target_command, ns.arg), as_json=bool(ns.json))
-        return 0
+        payload = plan_command(ns.target_command, ns.arg)
+        emit(payload, as_json=bool(ns.json))
+        return 0 if payload["status"] == "ok" else 2
 
     if ns.verb == "windows":
         code, payload, error = run_native("windows")
         if payload is None:
             return emit_native_error("windows", code, error)
         emit(payload, as_json=bool(ns.json))
-        return 0
+        return code
 
     if ns.verb == "uia-tree":
         code, payload, error = run_native("uia-tree", ["--max-depth", str(ns.max_depth)])
         if payload is None:
             return emit_native_error("uia-tree", code, error)
         emit(payload, as_json=bool(ns.json))
-        return 0
+        return code
 
     if ns.verb == "ocr-image":
         native_args = ["--path", ns.path]

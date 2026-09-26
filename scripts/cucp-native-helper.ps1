@@ -176,6 +176,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$Script:_HasCoordinates = $PSBoundParameters.ContainsKey("X") -and $PSBoundParameters.ContainsKey("Y")
 try {
   [System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
   $OutputEncoding = [System.Text.Encoding]::UTF8
@@ -458,7 +459,7 @@ public static class CucpNative {
       }}
     };
     var moveArr = new INPUT[] { move };
-    SendInput(1u, moveArr, Marshal.SizeOf(typeof(INPUT)));
+    SendInputChecked(moveArr);
 
     // 5ms micro-sleep — OS 가 hover state 디스패치할 시간 확보
     System.Threading.Thread.Sleep(5);
@@ -467,7 +468,7 @@ public static class CucpNative {
     var down = new INPUT { type = INPUT_MOUSE, u = new INPUTUNION { mi = new MOUSEINPUT { dwFlags = downFlag } } };
     var up   = new INPUT { type = INPUT_MOUSE, u = new INPUTUNION { mi = new MOUSEINPUT { dwFlags = upFlag } } };
     var clickArr = new INPUT[] { down, up };
-    SendInput(2u, clickArr, Marshal.SizeOf(typeof(INPUT)));
+    SendInputChecked(clickArr);
 
     // 도착 좌표 검증 — 호출자가 hit-test 시 사용
     POINT p;
@@ -481,7 +482,18 @@ public static class CucpNative {
 
     if (doubleClick) {
       System.Threading.Thread.Sleep(60);
-      SendInput(2u, clickArr, Marshal.SizeOf(typeof(INPUT)));
+      SendInputChecked(clickArr);
+    }
+  }
+
+  private static void SendInputChecked(INPUT[] inputs) {
+    uint requested = (uint)inputs.Length;
+    uint inserted = SendInput(requested, inputs, Marshal.SizeOf(typeof(INPUT)));
+    if (inserted != requested) {
+      int error = Marshal.GetLastWin32Error();
+      throw new InvalidOperationException("input_injection_incomplete: inserted=" + inserted +
+        ", requested=" + requested + ", win32_error=" + error +
+        ". Input may be blocked by UIPI or the desktop boundary; do not replay blindly.");
     }
   }
 
@@ -499,7 +511,7 @@ public static class CucpNative {
       inputs.Add(down);
       inputs.Add(up);
     }
-    SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+    SendInputChecked(inputs.ToArray());
   }
 
   // ----- send virtual key (down/up) -----
@@ -509,7 +521,7 @@ public static class CucpNative {
       time = 0, dwExtraInfo = IntPtr.Zero
     }}};
     var arr = new INPUT[] { input };
-    SendInput(1u, arr, Marshal.SizeOf(typeof(INPUT)));
+    SendInputChecked(arr);
   }
 }
 "@
@@ -1662,8 +1674,8 @@ function _Test-CoordsInTarget {
 # ============================================================================
 function _Action-HitTest {
   if (-not (_Ensure-Win32Native)) { _Emit @{status="error"; reason="win32_load_failed"} 1 }
-  if ($X -le 0 -or $Y -le 0) {
-    _Emit @{status="error"; reason="invalid_coords"; recommended_action="provide positive -X and -Y"} 1
+  if (-not $Script:_HasCoordinates) {
+    _Emit @{status="error"; reason="missing_coords"; recommended_action="provide -X and -Y (zero and negative screen coordinates are valid)"} 1
   }
   $pt = New-Object CucpNative+POINT
   $pt.X = $X; $pt.Y = $Y
@@ -1742,8 +1754,8 @@ function _Action-HitTest {
 
 function _Action-HitScan {
   if (-not (_Ensure-Win32Native)) { _Emit @{status="error"; reason="win32_load_failed"} 1 }
-  if ($X -le 0 -or $Y -le 0) {
-    _Emit @{status="error"; reason="invalid_coords"; recommended_action="provide positive -X and -Y"} 1
+  if (-not $Script:_HasCoordinates) {
+    _Emit @{status="error"; reason="missing_coords"; recommended_action="provide -X and -Y (zero and negative screen coordinates are valid)"} 1
   }
   if ($ScanRadius -lt 0) { $ScanRadius = 0 }
   if ($ScanRadius -gt 64) { $ScanRadius = 64 }
@@ -1751,6 +1763,10 @@ function _Action-HitScan {
   if ($ScanStep -gt 16) { $ScanStep = 16 }
   if ($ClickInset -le 0) { $ClickInset = 3 }
 
+  $vx = [CucpNative]::GetSystemMetrics([CucpNative]::SM_XVIRTUALSCREEN)
+  $vy = [CucpNative]::GetSystemMetrics([CucpNative]::SM_YVIRTUALSCREEN)
+  $vw = [CucpNative]::GetSystemMetrics([CucpNative]::SM_CXVIRTUALSCREEN)
+  $vh = [CucpNative]::GetSystemMetrics([CucpNative]::SM_CYVIRTUALSCREEN)
   $swScan = [System.Diagnostics.Stopwatch]::StartNew()
   $candidates = New-Object System.Collections.ArrayList
   $sampleCount = 0
@@ -1771,7 +1787,7 @@ function _Action-HitScan {
     foreach ($dx in $offsets) {
       $sx = $X + $dx
       $sy = $Y + $dy
-      if ($sx -le 0 -or $sy -le 0) { continue }
+      if ($sx -lt $vx -or $sx -ge ($vx + $vw) -or $sy -lt $vy -or $sy -ge ($vy + $vh)) { continue }
       $sampleCount++
 
       $sampleHit = _Test-CoordsInTarget -X $sx -Y $sy -ExpectedHwnd $TargetHwnd -ExpectedMatch $TargetMatch
@@ -2691,15 +2707,15 @@ function _Action-CdpSmartType {
 # ============================================================================
 function _Action-Click {
   if (-not (_Ensure-Win32Native)) { _Emit @{status="error"; reason="win32_load_failed"} 1 }
-  if ($X -le 0 -or $Y -le 0) {
-    _Emit @{status="error"; reason="invalid_coords"; recommended_action="provide positive -X and -Y"} 1
+  if (-not $Script:_HasCoordinates) {
+    _Emit @{status="error"; reason="missing_coords"; recommended_action="provide -X and -Y (zero and negative screen coordinates are valid)"} 1
   }
   # 안전: 가상 데스크톱 범위 밖이면 차단
   $vx = [CucpNative]::GetSystemMetrics([CucpNative]::SM_XVIRTUALSCREEN)
   $vy = [CucpNative]::GetSystemMetrics([CucpNative]::SM_YVIRTUALSCREEN)
   $vw = [CucpNative]::GetSystemMetrics([CucpNative]::SM_CXVIRTUALSCREEN)
   $vh = [CucpNative]::GetSystemMetrics([CucpNative]::SM_CYVIRTUALSCREEN)
-  if ($X -lt $vx -or $X -gt ($vx + $vw) -or $Y -lt $vy -or $Y -gt ($vy + $vh)) {
+  if ($X -lt $vx -or $X -ge ($vx + $vw) -or $Y -lt $vy -or $Y -ge ($vy + $vh)) {
     _Emit @{
       status = "blocked"
       reason = "coords_out_of_virtual_desktop"
@@ -2789,11 +2805,7 @@ function _Action-Click {
 # ============================================================================
 # Action: type  ─ 유니코드 텍스트 입력 (한글, 이모지 OK) + v1.2.0 focus 가드
 # ============================================================================
-function _Action-Type {
-  if (-not (_Ensure-Win32Native)) { _Emit @{status="error"; reason="win32_load_failed"} 1 }
-  if (-not $Text -and -not $ClearFirst -and -not $PressEnter) {
-    _Emit @{status="error"; reason="missing_text"} 1
-  }
+function _Assert-ForegroundTarget {
   # v1.2.0: focus 가드 — TargetHwnd / TargetMatch 명시되면 현재 foreground 검증
   if ($TargetHwnd -gt 0 -or $TargetMatch) {
     $fgHwnd = [CucpNative]::GetForegroundWindow()
@@ -2823,6 +2835,14 @@ function _Action-Type {
       } 3
     }
   }
+}
+
+function _Action-Type {
+  if (-not (_Ensure-Win32Native)) { _Emit @{status="error"; reason="win32_load_failed"} 1 }
+  if (-not $Text -and -not $ClearFirst -and -not $PressEnter) {
+    _Emit @{status="error"; reason="missing_text"} 1
+  }
+  _Assert-ForegroundTarget
   if ($ClearFirst) {
     # Ctrl+A → Backspace
     [CucpNative]::SendVk([CucpNative]::VK_CONTROL, $false)
@@ -2851,6 +2871,8 @@ function _Action-Type {
 function _Action-Shortcut {
   if (-not (_Ensure-Win32Native)) { _Emit @{status="error"; reason="win32_load_failed"} 1 }
   if (-not $Keys) { _Emit @{status="error"; reason="missing_keys"} 1 }
+
+  _Assert-ForegroundTarget
 
   # 키 토큰 → vk 매핑. PowerShell이 직접 vk 변환을 도와줌.
   $tokens = ($Keys.ToLowerInvariant() -split '\+') | ForEach-Object { $_.Trim() }
@@ -4491,6 +4513,7 @@ function _Action-ModalDetect {
 # ============================================================================
 # Dispatch
 # ============================================================================
+try {
 switch ($Action) {
   "health"        { _Action-Health }
   "windows"       { _Action-Windows }
@@ -4526,4 +4549,12 @@ switch ($Action) {
   "cdp-prosemirror-insert" { _Action-CdpProseMirrorInsert }
   "ime-paste"       { _Action-ImePaste }
   "modal-detect"    { _Action-ModalDetect }
+}
+} catch {
+  _Emit ([ordered]@{
+    status = "error"
+    reason = "native_action_failed"
+    detail = $_.Exception.Message
+    retryable = $false
+  }) 1
 }

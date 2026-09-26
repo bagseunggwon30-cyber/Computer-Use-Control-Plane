@@ -1,0 +1,26 @@
+{
+  "name": "cucp-pi-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local CUCP computer-use tools for Pi",
+  "keywords": ["pi-package", "computer-use"],
+  "engines": { "node": ">=22.19.0" },
+  "pi": { "extensions": ["./src/index.ts"] },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "test:engine": "node --import tsx test/engine-smoke.ts"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "0.87.1",
+    "@earendil-works/pi-coding-agent": "0.87.1",
+    "@types/node": "^22.19.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

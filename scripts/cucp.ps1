@@ -1040,7 +1040,7 @@ function Invoke-MacroPolicyCheck {
   # 기본 정책: live macro = require_confirm, read-only = allow.
   # 정책 파일이 있으면 그 결과로 override.
   $liveMacros = @("click-label","click-id","click-point","fill-label","shortcut","type-native",
-    "smart-click","ime-paste","safe-type-ime","safe-type","cdp-smart-click","cdp-smart-type",
+    "smart-click","ime-paste","safe-type-ime","safe-type","cdp-eval","cdp-smart-click","cdp-smart-type",
     "cdp-prosemirror-insert","mouse-verify","recovery-run","auto-do","goal","app-launch","app-close")
   $sensitiveMacros = @("recovery-run","auto-do","goal")
   $decision = "allow"
@@ -2441,7 +2441,7 @@ function Invoke-Macro {
     "uia-invoke","uia-set-value","uia-toggle","safe-type","smart-click","form-run",
     "icon-click","vision-click","vision-click-precise","click-and-verify",
     "click-and-verify-screen","ocr-click","ocr-uia-invoke","cdp-type","cdp-click",
-    "cdp-smart-click","cdp-smart-type","auto-do","goal","clipboard",
+    "cdp-eval","cdp-smart-click","cdp-smart-type","auto-do","goal","clipboard",
     "mouse-verify","cdp-prosemirror-insert","ime-paste","safe-type-ime",
     "recovery-run"
   )
@@ -3850,28 +3850,6 @@ function Invoke-MacroClickId {
     else { [Console]::Out.WriteLine("err click-id '$id' exit=$($r.ExitCode)") }
   }
   return $r.ExitCode
-}
-
-function Invoke-MacroClickPoint {
-  param([string[]]$Rest)
-  # NOTE(v2.1.1 정리): 이 단순 버전은 과거 이 위치와 파일 뒤쪽(~라인 7600대)에 중복
-  # 정의돼 있었다. 실제 동작하던 건 뒤쪽의 가드 포함 버전(target-match/target-hwnd
-  # hit-test + micro-refine + anchor-history + precision)이고, PowerShell 은 나중
-  # 정의가 이기므로 이 단순 버전은 죽은 코드였다. 가드 없는 좌표 클릭을 남겨둘 이유가
-  # 없어 본체를 비우고, 뒤쪽 정교 버전으로 호출을 위임한다. (정의 순서상 이 정의는
-  # 뒤쪽 정의로 덮어써진다.)
-  $x = [int](_Read-OptValue -Rest $Rest -Name "--x")
-  $y = [int](_Read-OptValue -Rest $Rest -Name "--y")
-  $button = _Read-OptValue -Rest $Rest -Name "--button"
-  $clicks = [int](_Read-OptValue -Rest $Rest -Name "--clicks")
-  if ($x -le 0 -or $y -le 0) { throw "macro click-point requires --x and --y" }
-  if (-not $AllowLiveControl) { throw "macro click-point requires -AllowLiveControl" }
-  if (-not $button) { $button = "left" }
-  if ($clicks -le 0) { $clicks = 1 }
-  _Native-ClickPoint -X $x -Y $y -Button $button -Clicks $clicks
-  _Trajectory-Append -Kind "click_point" -Payload @{ x = $x; y = $y; button = $button; clicks = $clicks; source = "native" }
-  if ($Brief) { [Console]::Out.WriteLine("ok click-point @($x,$y) button=$button clicks=$clicks source=native") }
-  return 0
 }
 
 function Invoke-MacroWaitLabel {
@@ -7430,8 +7408,13 @@ function Invoke-MacroClickPoint {
   # 좌표 기반 클릭 (UIA / vision 우회). -AllowLiveControl 필수.
   param([string[]]$Rest)
   if (-not $AllowLiveControl) { throw "macro click-point requires -AllowLiveControl" }
-  $x = [int](_Read-OptValue -Rest $Rest -Name "--x")
-  $y = [int](_Read-OptValue -Rest $Rest -Name "--y")
+  $xRaw = _Read-OptValue -Rest $Rest -Name "--x"
+  $yRaw = _Read-OptValue -Rest $Rest -Name "--y"
+  if ($null -eq $xRaw -or "$xRaw" -eq "" -or $null -eq $yRaw -or "$yRaw" -eq "") {
+    throw "macro click-point requires --x and --y"
+  }
+  $x = [int]$xRaw
+  $y = [int]$yRaw
   $btn = _Read-OptValue -Rest $Rest -Name "--button"
   $targetMatch = _Read-OptValue -Rest $Rest -Name "--target-match"
   if (-not $targetMatch) { $targetMatch = _Read-OptValue -Rest $Rest -Name "--match" }
@@ -7459,7 +7442,6 @@ function Invoke-MacroClickPoint {
   if ($null -ne $precisionStepRaw -and "$precisionStepRaw" -ne "") { $precisionStep = [int]$precisionStepRaw }
   if ($null -ne $pointCacheTtlRaw -and "$pointCacheTtlRaw" -ne "") { $pointCacheTtl = [int]$pointCacheTtlRaw }
   if (-not $btn) { $btn = "left" }
-  if ($x -le 0 -or $y -le 0) { throw "macro click-point requires --x and --y" }
   if ($clickInset -le 0) { $clickInset = 3 }
   if ($precisionRadius -lt 0) { $precisionRadius = 0 }
   if ($precisionRadius -gt 64) { $precisionRadius = 64 }
@@ -8627,178 +8609,111 @@ function Invoke-MacroTargetValidate {
   return 2
 }
 
-# macro safe-type --text "..." --target-match <window>
-#                 [--click-x N --click-y N]    (입력란 클릭 좌표 — 비어있으면 현재 focus 유지)
-#                 [--probe N]                  (verify probe 길이, 기본 8)
-#                 [--enter | --ctrl-enter]     (전송 단축키)
-#                 [--max-attempts N]           (재시도 — 클릭 좌표 빗나갔으면 helper 가 자동 abort)
-# 안전 흐름:
-#   1. (옵션) target window 가 foreground 인지 확인 + focus
-#   2. (옵션) 입력란 클릭 — hit-test 가드 통과해야 함 (다른 윈도우면 abort)
-#   3. probe 짧은 텍스트 type (target match focus 가드 통과해야 함)
-#   4. OCR 으로 probe 가 target window 안에 있는지 검증
-#   5. 매칭이면 본 텍스트 추가 type + (옵션) 전송 단축키
-#   6. 매칭 안 되면 즉시 abort + Ctrl+Z 자동 복구
-#
-# -AllowLiveControl 필수.
+# macro safe-type --text "..." --target-match <unique window title> | --target-hwnd N
+# [--click-x N --click-y N] [--enter | --ctrl-enter] [--max-attempts N]
+# Legacy --probe/--skip-probe arguments remain accepted but no text is inserted as a probe.
+# Only focus preparation is retried; uncertain clicks or text insertion are never replayed.
 function Invoke-MacroSafeType {
   param([string[]]$Rest)
   if (-not $AllowLiveControl) { throw "macro safe-type requires -AllowLiveControl" }
-
   $text = _Read-OptValue -Rest $Rest -Name "--text"
   $tm = _Read-OptValue -Rest $Rest -Name "--target-match"
-  $clickX = [int](_Read-OptValue -Rest $Rest -Name "--click-x")
-  $clickY = [int](_Read-OptValue -Rest $Rest -Name "--click-y")
-  $probeLen = [int](_Read-OptValue -Rest $Rest -Name "--probe")
+  $targetHwnd = [int64](_Read-OptValue -Rest $Rest -Name "--target-hwnd")
+  $clickXRaw = _Read-OptValue -Rest $Rest -Name "--click-x"
+  $clickYRaw = _Read-OptValue -Rest $Rest -Name "--click-y"
+  $hasClickX = ($null -ne $clickXRaw -and "$clickXRaw" -ne "")
+  $hasClickY = ($null -ne $clickYRaw -and "$clickYRaw" -ne "")
   $sendEnter = _Read-Switch -Rest $Rest -Name "--enter"
   $sendCtrlEnter = _Read-Switch -Rest $Rest -Name "--ctrl-enter"
   $maxAttempts = [int](_Read-OptValue -Rest $Rest -Name "--max-attempts")
-  # v1.2.1: probe 검증 비활성화 옵션 — OCR이 작은 폰트의 입력란 안 텍스트를
-  # 못 찾는 false-negative 방지. hit-test 가드 + focus 가드만으로 충분.
-  $skipProbe = _Read-Switch -Rest $Rest -Name "--skip-probe"
-
   if (-not $text) { throw "macro safe-type requires --text" }
-  if (-not $tm) { throw "macro safe-type requires --target-match (window title substring)" }
-  if ($probeLen -le 0) { $probeLen = 8 }
+  if (-not $tm -and $targetHwnd -le 0) { throw "macro safe-type requires --target-match or --target-hwnd" }
+  if ($hasClickX -ne $hasClickY) { throw "macro safe-type requires both --click-x and --click-y" }
+  if ($sendEnter -and $sendCtrlEnter) { throw "choose --enter or --ctrl-enter, not both" }
   if ($maxAttempts -le 0) { $maxAttempts = 1 }
+  if ($maxAttempts -gt 10) { $maxAttempts = 10 }
+  if ($hasClickX) { $clickX = [int]$clickXRaw; $clickY = [int]$clickYRaw }
 
-  # probe — 안전한 ASCII 8글자
-  $probe = "CUCP" + ([string]([char]([int][char]'A' + (Get-Random -Min 0 -Max 26)))) + ([string]([char]([int][char]'A' + (Get-Random -Min 0 -Max 26)))) + ([string]([char]([int][char]'A' + (Get-Random -Min 0 -Max 26)))) + ([string]([char]([int][char]'A' + (Get-Random -Min 0 -Max 26))))
-  if ($probe.Length -gt $probeLen) { $probe = $probe.Substring(0, $probeLen) }
-
-  # Step 1: target focus
-  $rFocus = Invoke-NativeHelper -ArgList @("-Action","focus","-WindowTitle",$tm)
-  if (-not ($rFocus.Json -and $rFocus.Json.verified)) {
-    if ($Brief) { [Console]::Out.WriteLine("err safe-type focus_failed target='$tm'") }
-    return 1
+  # Resolve ambiguous titles before touching any window. An explicit HWND pins the target.
+  $rWindows = Invoke-NativeHelper -ArgList @("-Action", "windows")
+  $candidates = @()
+  if ($rWindows.ExitCode -eq 0 -and $rWindows.Json -and $rWindows.Json.status -eq "ok") {
+    $candidates = @($rWindows.Json.windows | Where-Object {
+      ($targetHwnd -le 0 -or [int64]$_.hwnd -eq $targetHwnd) -and
+      (-not $tm -or ($_.title -and $_.title.IndexOf($tm, [StringComparison]::OrdinalIgnoreCase) -ge 0))
+    })
   }
-  $targetHwnd = [int64]$rFocus.Json.target_hwnd
-  Start-Sleep -Milliseconds 200
-
+  $lastReason = ""
   $attempt = 0
   $success = $false
-  $lastReason = ""
-
-  while ($attempt -lt $maxAttempts -and -not $success) {
-    $attempt++
-
-    # Step 2: 입력란 클릭 (hit-test 가드)
-    if ($clickX -gt 0 -and $clickY -gt 0) {
-      $rClick = Invoke-NativeHelper -ArgList @(
-        "-Action","click","-X","$clickX","-Y","$clickY",
-        "-TargetHwnd","$targetHwnd"
-      )
-      if (-not ($rClick.Json -and $rClick.Json.status -eq "ok")) {
-        $lastReason = "click_blocked_or_failed"
-        if ($Brief) {
-          [Console]::Out.WriteLine("partial safe-type attempt=$attempt click_blocked actual='$($rClick.Json.actual_title)' reason=$($rClick.Json.reason)")
-        }
-        continue
-      }
-      Start-Sleep -Milliseconds 600
-    }
-
-    # Step 3-4: probe type + OCR 검증 (--skip-probe 옵션 시 우회)
-    # OCR 이 작은 폰트의 입력란 안 텍스트를 못 찾는 false-negative 가 있음.
-    # hit-test 가드가 click 단계에서 이미 확인했으므로 probe 검증은 옵션.
-    if (-not $skipProbe) {
-      # Step 3: probe type (focus 가드)
-      $rProbe = Invoke-NativeHelper -ArgList @(
-        "-Action","type","-Text",$probe,
-        "-TargetHwnd","$targetHwnd"
-      )
-      if (-not ($rProbe.Json -and $rProbe.Json.status -eq "ok")) {
-        $lastReason = "probe_blocked_focus_lost"
-        if ($Brief) { [Console]::Out.WriteLine("partial safe-type attempt=$attempt probe_blocked focus_lost") }
-        continue
-      }
-      Start-Sleep -Milliseconds 600
-
-      # Step 4: probe OCR 검증
-      $rWin = Invoke-NativeHelper -ArgList @("-Action","windows","-Match",$tm)
-      $winRect = $null
-      if ($rWin.Json -and $rWin.Json.windows -and $rWin.Json.windows.Count -gt 0) {
-        $matchWin = $rWin.Json.windows | Where-Object { [int64]$_.hwnd -eq $targetHwnd } | Select-Object -First 1
-        if ($matchWin) { $winRect = $matchWin.rect }
-      }
-
-      $rOcr = Invoke-NativeHelper -ArgList @(
-        "-Action","ocr-find-text","-OcrText",$probe,"-OcrMatch","contains"
-      )
-      $probeInTarget = $false
-      if ($rOcr.Json -and $rOcr.Json.status -eq "ok" -and $rOcr.Json.top) {
-        $cx = [int]$rOcr.Json.top.cx
-        $cy = [int]$rOcr.Json.top.cy
-        if ($winRect) {
-          if ($cx -ge [int]$winRect.x -and $cx -le ([int]$winRect.x + [int]$winRect.width) -and
-              $cy -ge [int]$winRect.y -and $cy -le ([int]$winRect.y + [int]$winRect.height)) {
-            $probeInTarget = $true
-          }
-        } else {
-          $probeInTarget = $true
-        }
-      }
-
-      if (-not $probeInTarget) {
-        $lastReason = "probe_outside_target"
-        if ($Brief) {
-          [Console]::Out.WriteLine("partial safe-type attempt=$attempt probe_outside_target probe='$probe'")
-        }
-        # Ctrl+Z 로 probe 입력 복구
-        for ($i = 0; $i -lt 3; $i++) {
-          Invoke-NativeHelper -ArgList @("-Action","shortcut","-Keys","ctrl+z") | Out-Null
-        }
-        Start-Sleep -Milliseconds 200
-        continue
-      }
-    }
-
-    # Step 5: 본 텍스트 추가
-    # v1.2.1: TargetHwnd 가드 제거 — focus 가드가 race condition 으로 false 차단.
-    # hit-test 는 click 단계에서 이미 통과 → 추가 가드 불필요.
-    $rType = Invoke-NativeHelper -ArgList @(
-      "-Action","type","-Text",$text
-    )
-    if (-not ($rType.Json -and $rType.Json.status -eq "ok")) {
-      $lastReason = "main_type_blocked"
-      if ($Brief) { [Console]::Out.WriteLine("partial safe-type attempt=$attempt main_type_blocked") }
-      continue
-    }
-    Start-Sleep -Milliseconds 400
-
-    # Step 6: 전송 단축키 (옵션)
-    if ($sendCtrlEnter) {
-      Invoke-NativeHelper -ArgList @("-Action","shortcut","-Keys","ctrl+enter") | Out-Null
-    } elseif ($sendEnter) {
-      Invoke-NativeHelper -ArgList @("-Action","shortcut","-Keys","enter") | Out-Null
-    }
-
-    $success = $true
-  }
-
-  if (-not $success) {
-    if ($Brief) {
-      [Console]::Out.WriteLine("partial safe-type failed attempts=$attempt last_reason=$lastReason")
-    }
-    return 2
-  }
-
-  if ($Brief) {
-    $sendInfo = "no_send"
-    if ($sendCtrlEnter) { $sendInfo = "ctrl+enter" } elseif ($sendEnter) { $sendInfo = "enter" }
-    [Console]::Out.WriteLine("ok safe-type target='$tm' attempts=$attempt probe='$probe' send=$sendInfo")
+  $textDispatched = $false
+  if ($candidates.Count -ne 1) {
+    $lastReason = if ($candidates.Count -gt 1) { "ambiguous_target" } else { "target_unavailable" }
   } else {
-    [Console]::Out.WriteLine(([pscustomobject]@{
-      schema = "cucp.safe-type/v1"
-      status = "ok"
-      target_match = $tm
-      target_hwnd = $targetHwnd
-      attempts = $attempt
-      probe = $probe
-      send = if ($sendCtrlEnter) { "ctrl+enter" } elseif ($sendEnter) { "enter" } else { "none" }
-    } | ConvertTo-Json -Depth 4))
+    $targetHwnd = [int64]$candidates[0].hwnd
+    while ($attempt -lt $maxAttempts -and -not $success) {
+      $attempt++
+      $rFocus = Invoke-NativeHelper -ArgList @("-Action", "focus", "-WindowHwnd", "$targetHwnd")
+      if (-not ($rFocus.ExitCode -eq 0 -and $rFocus.Json -and $rFocus.Json.verified -and
+          [int64]$rFocus.Json.target_hwnd -eq $targetHwnd)) {
+        $lastReason = "focus_failed"
+        continue
+      }
+      if ($hasClickX) {
+        $rClick = Invoke-NativeHelper -ArgList @(
+          "-Action", "click", "-X", "$clickX", "-Y", "$clickY", "-TargetHwnd", "$targetHwnd"
+        )
+        if (-not ($rClick.ExitCode -eq 0 -and $rClick.Json -and $rClick.Json.status -eq "ok")) {
+          $lastReason = "click_blocked_or_failed"
+          # Click may have partly executed: do not replay it automatically.
+          break
+        }
+      }
+      # The helper checks foreground identity immediately before injecting text.
+      $textDispatched = $null # Failed injection may have delivered only part of the text.
+      $rType = Invoke-NativeHelper -ArgList @(
+        "-Action", "type", "-Text", $text, "-TargetHwnd", "$targetHwnd"
+      )
+      if (-not ($rType.ExitCode -eq 0 -and $rType.Json -and $rType.Json.status -eq "ok")) {
+        $lastReason = "main_type_blocked_or_failed"
+        break
+      }
+      $textDispatched = $true
+      if ($sendEnter -or $sendCtrlEnter) {
+        $sendKeys = if ($sendCtrlEnter) { "ctrl+enter" } else { "enter" }
+        $rSend = Invoke-NativeHelper -ArgList @(
+          "-Action", "shortcut", "-Keys", $sendKeys, "-TargetHwnd", "$targetHwnd"
+        )
+        if (-not ($rSend.ExitCode -eq 0 -and $rSend.Json -and $rSend.Json.status -eq "ok")) {
+          $lastReason = "send_blocked_or_failed"
+          break
+        }
+      }
+      $success = $true
+    }
   }
-  return 0
+  $status = if ($success) { "ok" } else { "partial" }
+  $payload = [ordered]@{
+    schema = "cucp.safe-type/v1"
+    status = $status
+    reason = $lastReason
+    target_match = $tm
+    target_hwnd = $targetHwnd
+    attempts = $attempt
+    probe = $null
+    probe_mode = "disabled"
+    text_dispatched = $textDispatched
+    # Input dispatch is not proof that an application accepted or saved the text.
+    application_result_verified = $false
+    send = if ($sendCtrlEnter) { "ctrl+enter" } elseif ($sendEnter) { "enter" } else { "none" }
+  }
+  if ($Brief) {
+    [Console]::Out.WriteLine("$status safe-type target='$tm' attempts=$attempt reason=$lastReason")
+  } else {
+    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 4))
+  }
+  if ($success) { return 0 }
+  return 2
 }
 
 # ============================================================================
@@ -8946,9 +8861,10 @@ function Invoke-MacroCdpDetect {
 }
 
 # macro cdp-eval --expr "<javascript>" [--expr-b64 <base64>] [--page-match Electron app] [--port 9222]
-# 임의 JS 실행 (read-only — 사용자가 무엇을 실행하는지 알아서 책임)
+# Arbitrary JavaScript can mutate a page; use the same live-control boundary as other actions.
 function Invoke-MacroCdpEval {
   param([string[]]$Rest)
+  if (-not $AllowLiveControl) { throw "macro cdp-eval requires -AllowLiveControl" }
   $expr = _Read-OptValue -Rest $Rest -Name "--expr"
   $exprB64 = _Read-OptValue -Rest $Rest -Name "--expr-b64"
   $pm = _Read-OptValue -Rest $Rest -Name "--page-match"
@@ -9747,7 +9663,7 @@ function _Build-WorkflowPlan {
     "health-quick","health-detail","native-health","metrics","perf","log-tail","diagnose-lag",
     "session","trajectory","history","screenshot","native-screenshot",
     "safety-classify","coord-profile","coord-map","coord-anchor","hit-test","hit-test-batch","hit-scan","point-plan","target-validate","smart-plan","app-profile","task-preset","task-plan","form-plan",
-    "cdp-detect","cdp-eval","cdp-smart-find","cdp-smart-type-find",
+    "cdp-detect","cdp-smart-find","cdp-smart-type-find",
     "ocr-screen","ocr-image","ocr-find-text","ocr-uia-fuse","screenshot-diff",
     "cdp-deep-find","modal-detect","recovery-plan","precision-validate","benchmark","release-notes"
   )
@@ -9758,7 +9674,7 @@ function _Build-WorkflowPlan {
     "uia-invoke","uia-set-value","uia-toggle","safe-type","smart-click","form-run",
     "icon-click","vision-click","vision-click-precise","click-and-verify",
     "click-and-verify-screen","ocr-click","ocr-uia-invoke","cdp-type","cdp-click",
-    "cdp-smart-click","cdp-smart-type","auto-do","goal","notify","multi-select",
+    "cdp-eval","cdp-smart-click","cdp-smart-type","auto-do","goal","notify","multi-select",
     "multi-edit","clipboard","process","registry",
     "ime-paste","safe-type-ime","recovery-run"
   )
@@ -13908,10 +13824,10 @@ function Invoke-MacroPrecisionValidate {
       $elapsed = [int]$sw.ElapsedMilliseconds
       $totalMs += $elapsed
       $bestX = $null; $bestY = $null; $score = 0
-      if ($r.Json -and $r.Json.best) {
-        if ($r.Json.best.x)     { $bestX = [int]$r.Json.best.x }
-        if ($r.Json.best.y)     { $bestY = [int]$r.Json.best.y }
-        if ($r.Json.best.score) { $score = [int]$r.Json.best.score }
+      if ($r.ExitCode -eq 0 -and $r.Json -and $r.Json.status -eq "ok" -and $r.Json.recommended_point) {
+        if ($null -ne $r.Json.recommended_point.x) { $bestX = [int]$r.Json.recommended_point.x }
+        if ($null -ne $r.Json.recommended_point.y) { $bestY = [int]$r.Json.recommended_point.y }
+        if ($r.Json.best -and $null -ne $r.Json.best.final_score) { $score = [int]$r.Json.best.final_score }
       }
       if ($null -ne $bestX -and $null -ne $bestY) {
         [void]$points.Add([ordered]@{ iteration=$i+1; x=$bestX; y=$bestY; elapsed_ms=$elapsed; score=$score })
@@ -13942,31 +13858,34 @@ function Invoke-MacroPrecisionValidate {
     }
     $driftAvg = $sumD / $points.Count
   }
-  $stable = ($driftMax -le 2.0)
+  $hasEvidence = ($points.Count -ge 2 -and $errors -eq 0)
+  $stable = ($hasEvidence -and $driftMax -le 2.0)
   $rec = "use_uia_pattern_or_relabel"
   if ($stable) { $rec = "safe_to_use_anchor" }
-  elseif ($driftMax -le 5.0) { $rec = "use_with_micro_refine" }
+  elseif ($hasEvidence -and $driftMax -le 5.0) { $rec = "use_with_micro_refine" }
+  if (-not $hasEvidence) { $rec = "collect_successful_samples" }
   $avgElapsed = 0
   if ($samples -gt 0) { $avgElapsed = [int]($totalMs / $samples) }
   $out = [ordered]@{
     schema = $Script:CucpV14Schema.PrecisionValidate
-    status = "ok"
+    status = if ($hasEvidence) { "ok" } else { "partial" }
     input  = [ordered]@{ x=$x; y=$y; target_match=$tm; samples=$samples }
     sample_count = [int]$points.Count
     error_count  = [int]$errors
     avg_elapsed_ms = $avgElapsed
     points = @($points)
-    drift_max = [Math]::Round($driftMax, 2)
-    drift_avg = [Math]::Round($driftAvg, 2)
+    drift_max = if ($points.Count -ge 2) { [Math]::Round($driftMax, 2) } else { $null }
+    drift_avg = if ($points.Count -ge 2) { [Math]::Round($driftAvg, 2) } else { $null }
     stable    = $stable
     recommendation = $rec
   }
   if ($Brief) {
-    [Console]::Out.WriteLine("ok precision-validate samples=$($out.sample_count) drift_max=$($out.drift_max)px stable=$stable rec=$rec")
+    [Console]::Out.WriteLine("$($out.status) precision-validate samples=$($out.sample_count) drift_max=$($out.drift_max)px stable=$stable rec=$rec")
   } else {
     [Console]::Out.WriteLine(($out | ConvertTo-Json -Depth 10))
   }
-  return 0
+  if ($hasEvidence) { return 0 }
+  return 2
 }
 
 # ----------------------------------------------------------------------------
@@ -14000,7 +13919,7 @@ function Invoke-MacroBenchmark {
       try {
         $r = Invoke-NativeHelper -ArgList $t.args
         $sw.Stop()
-        if ($r.Json) {
+        if ($r.ExitCode -eq 0 -and $r.Json) {
           if ($r.Json.status) {
             if ($r.Json.status -eq "ok") { $okFlag = $true }
           } else {
@@ -14016,20 +13935,21 @@ function Invoke-MacroBenchmark {
       [void]$samples.Add($entry)
     }
     $okMs = @($samples | Where-Object { $_.ok } | ForEach-Object { $_.ms })
-    $p50 = 0; $p95 = 0; $avg = 0
+    $p50 = $null; $p95 = $null; $avg = $null
     if ($okMs.Count -gt 0) {
       $sorted = @($okMs | Sort-Object)
-      $i50 = [int]([Math]::Floor(($sorted.Count - 1) * 0.5))
-      $i95 = [int]([Math]::Floor(($sorted.Count - 1) * 0.95))
+      $i50 = [int]([Math]::Ceiling($sorted.Count * 0.5)) - 1
+      $i95 = [int]([Math]::Ceiling($sorted.Count * 0.95)) - 1
       if ($i50 -lt 0) { $i50 = 0 }
       if ($i95 -lt 0) { $i95 = 0 }
       $p50 = $sorted[$i50]
       $p95 = $sorted[$i95]
       $avg = [int](($okMs | Measure-Object -Average).Average)
     }
-    $sloOk = ($p95 -le $t.slo_ms)
+    # A passing timing percentile cannot conceal failures or an empty sample.
+    $sloOk = ($okMs.Count -eq $iters -and $okMs.Count -gt 0 -and $p95 -le $t.slo_ms)
     [void]$results.Add([ordered]@{
-      name=$t.name; iters=$iters; ok_count=$okMs.Count;
+      name=$t.name; iters=$iters; ok_count=$okMs.Count; failure_count=($iters - $okMs.Count);
       p50_ms=$p50; p95_ms=$p95; avg_ms=$avg;
       slo_ms=$t.slo_ms; slo_ok=$sloOk;
       samples=@($samples)
@@ -14054,7 +13974,7 @@ function Invoke-MacroBenchmark {
       $improved  = 0
       foreach ($cur in $results) {
         $b = $base.results | Where-Object { $_.name -eq $cur.name } | Select-Object -First 1
-        if (-not $b) { continue }
+        if (-not $b -or $null -eq $cur.p50_ms -or $null -eq $b.p50_ms) { continue }
         $deltaP50 = $cur.p50_ms - [int]$b.p50_ms
         $deltaP95 = $cur.p95_ms - [int]$b.p95_ms
         $pctP50 = 0

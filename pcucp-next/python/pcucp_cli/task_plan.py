@@ -4,7 +4,7 @@ from typing import Any
 
 
 def _field_step(spec: str) -> dict[str, Any]:
-    if "=" not in spec:
+    if "=" not in spec or not spec.split("=", 1)[0].strip():
         return {
             "kind": "field",
             "mode": "live",
@@ -38,9 +38,9 @@ def create_task_plan(
         steps.append(
             {
                 "kind": "app-launch",
-                "mode": "read-only-plan",
+                "mode": "live",
                 "app": app,
-                "requires_live_control": False,
+                "requires_live_control": True,
             }
         )
     if wait_title:
@@ -91,7 +91,7 @@ def create_task_plan(
         "status": "ok" if not errors else "partial",
         "route": {
             "primary": "python-router",
-            "fallback": "legacy-powershell",
+            "fallback": None,
         },
         "safety": {
             "live_control_required": live_required,

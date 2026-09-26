@@ -5,10 +5,17 @@ one command surface for observing Windows desktop state, planning grounded UI
 actions, and running live GUI control only after explicit safety gates are
 enabled.
 
-The stable compatibility runtime is still the PowerShell CUCP core in
-`scripts/`. New internal work is split under `pcucp-next/` so CUCP can move
-toward a Python planner, C#/.NET native host, schema/config contracts, and a
-thin PowerShell launcher without breaking the existing command surface.
+The new core preview in `pcucp-next/` provides a persistent Python session,
+C# Windows capture/input, and a [Pi extension](integrations/pi/README.md).
+Start with the [setup guide](pcucp-next/README.md) and
+[development direction](docs/core-modernization.md). Development now focuses
+on a generic embeddable engine; new application-specific profiles are out of scope.
+The older PowerShell command surface remains available separately in `scripts/`.
+
+The core preview supports image/UIA observations, guarded input, bounded batches,
+and privilege diagnostics. Input starts off and requires the human operator's
+`/computer on`. Windows GUI and elevated-input verification remains a release
+gate; see the setup guide for current validation limits.
 
 ## Current Status
 
@@ -48,11 +55,15 @@ Currently migrated into `pcucp-next`:
 - `task-plan`: Python creates read-only plan JSON with live-control safety
   metadata.
 
-Still on the legacy PowerShell path:
+Additional new core commands are exposed through `python -m pcucp_cli serve`:
+`observe`, `screenshot`, `focus`, `click`, `type`, `key`, `scroll`, `batch`,
+`privileges`, `capabilities`, and `history`. The Pi adapter handles this protocol.
+
+Still on the separate legacy PowerShell path:
 
 - OCR screen capture
 - Deep `find-label` across OCR text
-- Live actuation and recovery commands
+- Existing advanced macros and recovery commands
 
 Target language split for future implementation:
 
@@ -65,8 +76,8 @@ Rust/C++    0-10%  optional hot-path acceleration only when justified
 ```
 
 Current status is a staged migration, not full feature parity in the new stack.
-The legacy PowerShell runtime remains the fallback while verified commands move
-behind Python and C# one by one.
+The new engine never falls back automatically to legacy commands after a failure.
+Use the explicit `legacy` command when compatibility behavior is required.
 
 ## What CUCP Does
 
@@ -225,13 +236,21 @@ Optional:
 - Pester for tests
 - Chromium/Electron application launched with a local CDP port for CDP commands
 
-There are no external pip, npm, Go, or Rust package dependencies in the current
-public tree. The Python code uses only the standard library. See
-`DEPENDENCIES.md`.
+The Python runtime uses only the standard library. The Pi integration adds
+Pi peer packages and TypeScript development dependencies; see
+`integrations/pi/package.json`. See `DEPENDENCIES.md` for legacy dependencies.
 
 ## Verification
 
-Recent local verification for this public core:
+Core preview validation: 60 Python tests, 15 Pi tests, TypeScript checking and
+the Pi-to-real-Python smoke check pass. Native source compiles against .NET 8,
+WPF and Windows SDK reference assemblies, with separate ABI/geometry/argument
+checks. Actual Windows GUI behavior, normal Windows publishing and PowerShell
+tests remain unverified in this development environment. The new CI workflow
+defines the Windows build and regression gates.
+
+Historical baseline verification recorded before the core preview (not rerun
+as evidence for the current changes):
 
 ```powershell
 # PowerShell parser check for all .ps1 files
@@ -265,11 +284,12 @@ smoke suites are the recommended quick validation path for this public package.
 
 Near-term work:
 
-- Keep the PowerShell runtime stable and testable.
-- Move read-only observation commands through the Python router first.
-- Build and verify the C# native host for fast Win32/UIA/OCR observation.
-- Keep live actions on the legacy safety wrapper until native parity is proven.
-- Add config/profile persistence only after the schema contracts are stable.
+- Verify the new core on an interactive Windows desktop and generic UI fixtures.
+- Measure capture/input latency and wrong-target failures before optimizing.
+- Add a resident native broker, scoped elevation and UIA element references.
+- Add observation events and region zoom with explicit image/coordinate contracts.
+- Reuse the execution contract for other agent hosts. See the
+  [phased roadmap](docs/core-modernization.md).
 
 ## License
 

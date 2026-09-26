@@ -1,10 +1,10 @@
 {
   "schema": "pcucp.runtime-profile/v1",
   "name": "pcucp-next",
-  "status": "staged",
+  "status": "core-preview",
   "compatibility": {
     "legacy_wrapper": "scripts/cucp.ps1",
-    "strategy": "new commands route through Python first; verified commands may use the native host; legacy PowerShell remains the fallback"
+    "strategy": "New engine uses explicit Python/native commands. Legacy PowerShell is available only via the separate legacy command; no automatic fallback."
   },
   "language_targets": {
     "powershell": "15-25%",
@@ -16,6 +16,6 @@
   "safety": {
     "default_live_control": false,
     "requires_explicit_live_gate": true,
-    "blocks_sensitive_actions_by_default": true
+    "live_gate_scope": "CUCP input commands only; host tools and observed content require host policy"
   }
 }

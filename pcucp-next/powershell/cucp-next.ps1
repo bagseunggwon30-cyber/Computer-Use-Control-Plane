@@ -8,9 +8,7 @@ $ErrorActionPreference = "Stop"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
 $nextRoot = Split-Path -Parent $PSScriptRoot
-$repoRoot = Split-Path -Parent $nextRoot
 $pythonRoot = Join-Path $nextRoot "python"
-$legacyWrapper = Join-Path $repoRoot "scripts\cucp.ps1"
 
 function Find-PcuCpPython {
   foreach ($name in @("python.exe", "python", "py.exe")) {
@@ -33,10 +31,5 @@ if ($python) {
   }
 }
 
-if (Test-Path -LiteralPath $legacyWrapper) {
-  & powershell -NoProfile -ExecutionPolicy Bypass -File $legacyWrapper @RemainingArgs
-  exit $LASTEXITCODE
-}
-
-Write-Error "Neither Python nor the legacy CUCP wrapper is available."
+Write-Error "Python 3.10 or later is required. No legacy fallback was executed."
 exit 2

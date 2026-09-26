@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CUCP local session response",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "cucp.response/v1"
+    },
+    "id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "command": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "partial",
+        "error",
+        "blocked"
+      ]
+    },
+    "data": {
+      "type": "object"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "duration_ms": {
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "schema",
+    "id",
+    "command",
+    "status",
+    "data",
+    "errors",
+    "duration_ms"
+  ],
+  "additionalProperties": false
+}

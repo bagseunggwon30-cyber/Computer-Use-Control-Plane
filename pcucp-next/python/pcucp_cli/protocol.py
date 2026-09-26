@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +18,8 @@ LANGUAGE_TARGETS: dict[str, str] = {
 
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    configured = os.environ.get("CUCP_ROOT")
+    return Path(configured).resolve() if configured else Path(__file__).resolve().parents[3]
 
 
 def next_root() -> Path:

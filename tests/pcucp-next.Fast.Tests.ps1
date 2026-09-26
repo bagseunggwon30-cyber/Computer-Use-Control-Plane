@@ -1,6 +1,6 @@
-# Pester 3.x compatible fast smoke tests for the next-generation CUCP split.
-# This suite verifies that the multi-runtime skeleton is real and executable
-# without requiring live desktop control, dotnet restore, or long-running tests.
+# Pester 3.x/4.x compatible read-only smoke tests for the CUCP core.
+# Native tests use a published host only: no build, restore, input, or elevation.
+# Missing prerequisites are reported as skipped/pending, never as passing tests.
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $nextRoot = Join-Path $repoRoot "pcucp-next"
@@ -14,6 +14,48 @@ function Get-TestPython {
   return $null
 }
 
+
+function Test-PcuCpPublishedHost {
+  if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return $false }
+  $path = $env:CUCP_NATIVE_HOST
+  if (-not $path) { $path = Join-Path $nextRoot "bin\native\PcuCp.NativeHost.exe" }
+  if (-not [IO.Path]::IsPathRooted($path) -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { return $false }
+  if ([IO.Path]::GetExtension($path) -eq ".dll") {
+    return $null -ne (Get-Command dotnet -ErrorAction SilentlyContinue)
+  }
+  return [IO.Path]::GetExtension($path) -eq ".exe"
+}
+
+function Get-PcuCpSkipParameters {
+  param([bool]$Unavailable)
+  if (-not $Unavailable) { return @{} }
+  $parameters = (Get-Command It -ErrorAction Stop).Parameters
+  # Pester versions that expose Skip use it; older versions expose Pending.
+  # Both mark the test unexecuted in the report instead of returning a false pass.
+  if ($parameters.ContainsKey("Skip")) { return @{ Skip = $true } }
+  if ($parameters.ContainsKey("Pending")) { return @{ Pending = $true } }
+  throw "This Pester version cannot report skipped tests. Install Pester 3.4 or later."
+}
+
+$skipPython = Get-PcuCpSkipParameters -Unavailable (-not (Get-TestPython))
+$skipNative = Get-PcuCpSkipParameters -Unavailable ((-not (Get-TestPython)) -or (-not (Test-PcuCpPublishedHost)))
+$skipLauncher = Get-PcuCpSkipParameters -Unavailable ((-not (Get-TestPython)) -or ($null -eq (Get-Command powershell.exe -ErrorAction SilentlyContinue)))
+$skipNativeLauncher = Get-PcuCpSkipParameters -Unavailable ((-not (Test-PcuCpPublishedHost)) -or (-not (Get-TestPython)) -or ($null -eq (Get-Command powershell.exe -ErrorAction SilentlyContinue)))
+
+function Assert-PcuCpBoundedObservation {
+  param($Result, $Payload)
+  # An explicit partial observation is expected when UIA exhausts its bounded
+  # budget. Actual errors must still fail this smoke test.
+  (@("ok", "partial") -contains $Payload.status) | Should Be $true
+  if ($Payload.status -eq "ok") {
+    $Result.ExitCode | Should Be 0
+    @($Payload.errors).Count | Should Be 0
+  } else {
+    ($Result.ExitCode -ne 0) | Should Be $true
+    (@($Payload.errors).Count -gt 0) | Should Be $true
+  }
+}
+
 function Invoke-PcuCpPython {
   param([string[]]$ArgList)
 
@@ -23,6 +65,7 @@ function Invoke-PcuCpPython {
   $out = Join-Path $env:TEMP ("pcucp-next-out-" + [guid]::NewGuid().ToString("N") + ".txt")
   $err = Join-Path $env:TEMP ("pcucp-next-err-" + [guid]::NewGuid().ToString("N") + ".txt")
   $pythonPath = Join-Path $nextRoot "python"
+  $oldPythonPath = $env:PYTHONPATH
   try {
     $env:PYTHONPATH = $pythonPath
     $proc = Start-Process -FilePath $python -ArgumentList (@("-m", "pcucp_cli") + $ArgList) -RedirectStandardOutput $out -RedirectStandardError $err -NoNewWindow -PassThru -Wait
@@ -32,6 +75,7 @@ function Invoke-PcuCpPython {
     if (Test-Path -LiteralPath $err) { $stderr = Get-Content -LiteralPath $err -Raw -Encoding UTF8 }
     return [pscustomobject]@{ ExitCode = $proc.ExitCode; Raw = $raw; Stderr = $stderr }
   } finally {
+    $env:PYTHONPATH = $oldPythonPath
     Remove-Item -LiteralPath $out,$err -Force -ErrorAction SilentlyContinue
   }
 }
@@ -80,7 +124,7 @@ Describe "pcucp-next fast smoke - structure" {
 }
 
 Describe "pcucp-next fast smoke - python router" {
-  It "reports the target language split and component paths" {
+  It "reports the target language split and component paths" @skipPython {
     $r = Invoke-PcuCpPython -ArgList @("version", "--json")
     $r.ExitCode | Should Be 0
     $obj = $r.Raw | ConvertFrom-Json
@@ -94,7 +138,7 @@ Describe "pcucp-next fast smoke - python router" {
     $obj.components.legacy_wrapper | Should Not BeNullOrEmpty
   }
 
-  It "plans read-only commands through Python before native or legacy execution" {
+  It "plans read-only commands through Python before native or legacy execution" @skipPython {
     $r = Invoke-PcuCpPython -ArgList @("plan", "--command", "windows", "--json")
     $r.ExitCode | Should Be 0
     $obj = $r.Raw | ConvertFrom-Json
@@ -102,11 +146,10 @@ Describe "pcucp-next fast smoke - python router" {
     $obj.command | Should Be "windows"
     $obj.safety.live_control_required | Should Be $false
     $obj.route.primary | Should Be "dotnet-native-host"
-    $obj.route.fallback | Should Be "legacy-powershell"
+    $obj.route.fallback | Should Be "none"
   }
 
-  It "executes windows observation through Python into the native host" {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+  It "executes windows observation through Python into the native host" @skipNative {
     $r = Invoke-PcuCpPython -ArgList @("windows", "--json")
     $r.ExitCode | Should Be 0
     $obj = $r.Raw | ConvertFrom-Json
@@ -116,11 +159,10 @@ Describe "pcucp-next fast smoke - python router" {
     ($null -ne $obj.data.count) | Should Be $true
   }
 
-  It "executes UIA tree observation through Python into the native host" {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+  It "executes UIA tree observation through Python into the native host" @skipNative {
     $r = Invoke-PcuCpPython -ArgList @("uia-tree", "--max-depth", "1", "--json")
-    $r.ExitCode | Should Be 0
     $obj = $r.Raw | ConvertFrom-Json
+    Assert-PcuCpBoundedObservation -Result $r -Payload $obj
     $obj.schema | Should Be "pcucp.uia-tree/v1"
     $obj.kind | Should Be "uia-tree"
     $obj.route.primary | Should Be "dotnet-native-host"
@@ -130,13 +172,20 @@ Describe "pcucp-next fast smoke - python router" {
     }
   }
 
-  It "runs find-label in Python over native window observations" {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+  It "runs find-label in Python over native window observations" @skipNative {
     $r = Invoke-PcuCpPython -ArgList @("find-label", "--label", "__pcucp_unlikely_label__", "--json")
-    $r.ExitCode | Should Be 2
     $obj = $r.Raw | ConvertFrom-Json
     $obj.schema | Should Be "pcucp.find-label/v1"
-    $obj.status | Should Be "not_found"
+    (@("not_found", "partial") -contains $obj.status) | Should Be $true
+    if ($obj.status -eq "partial") {
+      $r.ExitCode | Should Be 3
+      (@($obj.errors).Count -gt 0) | Should Be $true
+      (@($obj.providers | Where-Object { $_.status -eq "partial" }).Count -gt 0) | Should Be $true
+      @($obj.providers | Where-Object { $_.status -eq "error" }).Count | Should Be 0
+    } else {
+      $r.ExitCode | Should Be 2
+    }
+    @($obj.candidates).Count | Should Be 0
     $obj.query.label | Should Be "__pcucp_unlikely_label__"
     $obj.route.primary | Should Be "python-router"
     ($obj.route.observations -contains "dotnet-native-host/windows") | Should Be $true
@@ -144,18 +193,23 @@ Describe "pcucp-next fast smoke - python router" {
     ($null -ne $obj.uia_node_count) | Should Be $true
   }
 
-  It "includes UIA pattern metadata in Python find-label candidates" {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
-    $r = Invoke-PcuCpPython -ArgList @("find-label", "--label", "Pane", "--limit", "5", "--json")
-    $r.ExitCode | Should Be 0
-    $obj = $r.Raw | ConvertFrom-Json
-    $obj.schema | Should Be "pcucp.find-label/v1"
-    $uia = $obj.candidates | Where-Object { $_.kind -eq "uia" } | Select-Object -First 1
-    ($null -ne $uia) | Should Be $true
-    ($null -ne $uia.patterns) | Should Be $true
+  It "returns a nonzero native transport error without legacy fallback" @skipPython {
+    $oldHost = $env:CUCP_NATIVE_HOST
+    try {
+      $env:CUCP_NATIVE_HOST = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString("N") + ".exe")
+      $r = Invoke-PcuCpPython -ArgList @("windows", "--json")
+      ($r.ExitCode -ne 0) | Should Be $true
+      $obj = $r.Raw | ConvertFrom-Json
+      $obj.schema | Should Be "pcucp.native/v1"
+      $obj.status | Should Be "error"
+      $obj.errors[0].code | Should Be "native_transport_error"
+      ($null -eq $obj.route.fallback) | Should Be $true
+    } finally {
+      $env:CUCP_NATIVE_HOST = $oldHost
+    }
   }
 
-  It "creates a Python task-plan with live actions gated by default" {
+  It "creates a Python task-plan with live actions gated by default" @skipPython {
     $r = Invoke-PcuCpPython -ArgList @("task-plan", "--type-text", "hello", "--shortcut", "ctrl+s", "--json")
     $r.ExitCode | Should Be 0
     $obj = $r.Raw | ConvertFrom-Json
@@ -166,41 +220,37 @@ Describe "pcucp-next fast smoke - python router" {
     $obj.steps.Count | Should Be 2
   }
 
-  It "routes OCR image recognition through Python into the native host" {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+  It "routes OCR image recognition through Python into the native host" @skipNative {
     $fixture = Join-Path $env:TEMP ("pcucp-next-ocr-" + [guid]::NewGuid().ToString("N") + ".png")
     try {
       New-PcuCpOcrFixturePng -Path $fixture
       $r = Invoke-PcuCpPython -ArgList @("ocr-image", "--path", $fixture, "--json")
-      (@(0,1) -contains $r.ExitCode) | Should Be $true
+      $r.ExitCode | Should Be 0
       $obj = $r.Raw | ConvertFrom-Json
       $obj.schema | Should Be "pcucp.ocr-image/v1"
+      $obj.status | Should Be "ok"
       $obj.kind | Should Be "ocr-image"
       $obj.route.primary | Should Be "dotnet-native-host"
-      if ($obj.status -eq "ok") {
-        ($obj.text -match "Send|Message") | Should Be $true
-      }
+      ($obj.text -match "Send|Message") | Should Be $true
     } finally {
       Remove-Item -LiteralPath $fixture -Force -ErrorAction SilentlyContinue
     }
   }
 
-  It "finds OCR text through Python over native OCR image output" {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+  It "finds OCR text through Python over native OCR image output" @skipNative {
     $fixture = Join-Path $env:TEMP ("pcucp-next-ocr-find-" + [guid]::NewGuid().ToString("N") + ".png")
     try {
       New-PcuCpOcrFixturePng -Path $fixture
       $r = Invoke-PcuCpPython -ArgList @("ocr-find-text", "--path", $fixture, "--text", "Send", "--json")
-      (@(0,1) -contains $r.ExitCode) | Should Be $true
+      $r.ExitCode | Should Be 0
       $obj = $r.Raw | ConvertFrom-Json
       $obj.schema | Should Be "pcucp.ocr-find-text/v1"
       $obj.kind | Should Be "ocr-find-text"
       $obj.route.primary | Should Be "python-router"
       $obj.route.observation | Should Be "dotnet-native-host/ocr-image"
-      if ($obj.status -eq "ok") {
-        ($obj.top.text -match "Send") | Should Be $true
-        ($obj.top.score -ge 60) | Should Be $true
-      }
+      $obj.status | Should Be "ok"
+      ($obj.top.text -match "Send") | Should Be $true
+      ($obj.top.score -ge 60) | Should Be $true
     } finally {
       Remove-Item -LiteralPath $fixture -Force -ErrorAction SilentlyContinue
     }
@@ -208,7 +258,7 @@ Describe "pcucp-next fast smoke - python router" {
 }
 
 Describe "pcucp-next fast smoke - thin launcher" {
-  It "delegates version requests to the Python router" {
+  It "delegates version requests to the Python router" @skipLauncher {
     $launcher = Join-Path $nextRoot "powershell\cucp-next.ps1"
     $out = Join-Path $env:TEMP ("pcucp-next-launcher-out-" + [guid]::NewGuid().ToString("N") + ".txt")
     $err = Join-Path $env:TEMP ("pcucp-next-launcher-err-" + [guid]::NewGuid().ToString("N") + ".txt")
@@ -225,8 +275,7 @@ Describe "pcucp-next fast smoke - thin launcher" {
     }
   }
 
-  It "delegates windows observation to the Python/native path" {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+  It "delegates windows observation to the Python/native path" @skipNativeLauncher {
     $launcher = Join-Path $nextRoot "powershell\cucp-next.ps1"
     $out = Join-Path $env:TEMP ("pcucp-next-launcher-windows-out-" + [guid]::NewGuid().ToString("N") + ".txt")
     $err = Join-Path $env:TEMP ("pcucp-next-launcher-windows-err-" + [guid]::NewGuid().ToString("N") + ".txt")
@@ -245,8 +294,7 @@ Describe "pcucp-next fast smoke - thin launcher" {
     }
   }
 
-  It "delegates UIA tree observation to the Python/native path" {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+  It "delegates UIA tree observation to the Python/native path" @skipNativeLauncher {
     $launcher = Join-Path $nextRoot "powershell\cucp-next.ps1"
     $out = Join-Path $env:TEMP ("pcucp-next-launcher-uia-out-" + [guid]::NewGuid().ToString("N") + ".txt")
     $err = Join-Path $env:TEMP ("pcucp-next-launcher-uia-err-" + [guid]::NewGuid().ToString("N") + ".txt")
@@ -255,8 +303,8 @@ Describe "pcucp-next fast smoke - thin launcher" {
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $launcher, "uia-tree", "--max-depth", "1", "--json"
       ) -RedirectStandardOutput $out -RedirectStandardError $err -NoNewWindow -PassThru -Wait
       $raw = Get-Content -LiteralPath $out -Raw -Encoding UTF8
-      $proc.ExitCode | Should Be 0
       $obj = $raw | ConvertFrom-Json
+      Assert-PcuCpBoundedObservation -Result $proc -Payload $obj
       $obj.schema | Should Be "pcucp.uia-tree/v1"
       $obj.kind | Should Be "uia-tree"
       $obj.route.primary | Should Be "dotnet-native-host"
@@ -265,8 +313,7 @@ Describe "pcucp-next fast smoke - thin launcher" {
     }
   }
 
-  It "delegates OCR image recognition to the Python/native path" {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
+  It "delegates OCR image recognition to the Python/native path" @skipNativeLauncher {
     $launcher = Join-Path $nextRoot "powershell\cucp-next.ps1"
     $fixture = Join-Path $env:TEMP ("pcucp-next-launcher-ocr-" + [guid]::NewGuid().ToString("N") + ".png")
     $out = Join-Path $env:TEMP ("pcucp-next-launcher-ocr-out-" + [guid]::NewGuid().ToString("N") + ".txt")
@@ -276,10 +323,11 @@ Describe "pcucp-next fast smoke - thin launcher" {
       $proc = Start-Process -FilePath "powershell.exe" -ArgumentList @(
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $launcher, "ocr-image", "--path", $fixture, "--json"
       ) -RedirectStandardOutput $out -RedirectStandardError $err -NoNewWindow -PassThru -Wait
-      (@(0,1) -contains $proc.ExitCode) | Should Be $true
+      $proc.ExitCode | Should Be 0
       $raw = Get-Content -LiteralPath $out -Raw -Encoding UTF8
       $obj = $raw | ConvertFrom-Json
       $obj.schema | Should Be "pcucp.ocr-image/v1"
+      $obj.status | Should Be "ok"
       $obj.kind | Should Be "ocr-image"
       $obj.route.primary | Should Be "dotnet-native-host"
     } finally {
@@ -306,45 +354,19 @@ Describe "pcucp-next fast smoke - schemas and native host" {
     ($csproj -match "<PackageReference") | Should Be $false
   }
 
-  It "builds and runs the native host window observation when dotnet is available" {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
-    $project = Join-Path $repoRoot "pcucp-next\dotnet\PcuCp.NativeHost\PcuCp.NativeHost.csproj"
-    $build = & dotnet build $project --nologo --verbosity quiet 2>&1
-    $LASTEXITCODE | Should Be 0
-    $raw = & dotnet run --project $project --no-build -- windows 2>&1
-    $LASTEXITCODE | Should Be 0
-    $obj = ($raw -join "`n") | ConvertFrom-Json
-    $obj.schema | Should Be "pcucp.observation/v1"
-    $obj.kind | Should Be "windows"
-  }
-
-  It "builds and runs the native host UIA tree observation when dotnet is available" {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
-    $project = Join-Path $repoRoot "pcucp-next\dotnet\PcuCp.NativeHost\PcuCp.NativeHost.csproj"
-    $build = & dotnet build $project --nologo --verbosity quiet 2>&1
-    $LASTEXITCODE | Should Be 0
-    $raw = & dotnet run --project $project --no-build -- uia-tree --max-depth 1 2>&1
-    $LASTEXITCODE | Should Be 0
-    $obj = ($raw -join "`n") | ConvertFrom-Json
-    $obj.schema | Should Be "pcucp.uia-tree/v1"
-    $obj.kind | Should Be "uia-tree"
-  }
-
-  It "builds and runs the native host OCR image route when dotnet is available" {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return }
-    $project = Join-Path $repoRoot "pcucp-next\dotnet\PcuCp.NativeHost\PcuCp.NativeHost.csproj"
-    $fixture = Join-Path $env:TEMP ("pcucp-next-native-ocr-" + [guid]::NewGuid().ToString("N") + ".png")
-    try {
-      New-PcuCpOcrFixturePng -Path $fixture
-      $build = & dotnet build $project --nologo --verbosity quiet 2>&1
-      $LASTEXITCODE | Should Be 0
-      $raw = & dotnet run --project $project --no-build -- ocr-image --path $fixture 2>&1
-      (@(0,1) -contains $LASTEXITCODE) | Should Be $true
-      $obj = ($raw -join "`n") | ConvertFrom-Json
-      $obj.schema | Should Be "pcucp.ocr-image/v1"
-      $obj.kind | Should Be "ocr-image"
-    } finally {
-      Remove-Item -LiteralPath $fixture -Force -ErrorAction SilentlyContinue
+  It "runs the published native host without building a project" @skipNative {
+    $hostPath = $env:CUCP_NATIVE_HOST
+    if (-not $hostPath) { $hostPath = Join-Path $nextRoot "bin\native\PcuCp.NativeHost.exe" }
+    if ([IO.Path]::GetExtension($hostPath) -eq ".dll") {
+      $raw = & dotnet $hostPath version
+    } else {
+      $raw = & $hostPath version
     }
+    $LASTEXITCODE | Should Be 0
+    $obj = ($raw -join "`n") | ConvertFrom-Json
+    $obj.schema | Should Be "pcucp.native/v1"
+    $obj.status | Should Be "ok"
+    $obj.kind | Should Be "version"
+    $obj.data.component | Should Be "PcuCp.NativeHost"
   }
 }
