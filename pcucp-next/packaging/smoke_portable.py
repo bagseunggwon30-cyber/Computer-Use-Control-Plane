@@ -50,7 +50,11 @@ def smoke(bundle: Path):
         check(info["distribution"] == "portable", "Executable did not use frozen mode")
         diagnostic = json.loads(invoke([exe, "doctor", "--json"]))
         check(diagnostic["status"] == "ok" and diagnostic["desktop_verified"] is False, str(diagnostic))
-        check(str(relocated) in diagnostic["native_command"][0], "Native path did not follow relocated executable")
+        # Windows TEMP can use an 8.3 alias (RUNNER~1), while resolve() returns
+        # its long name. Compare file identity instead of textual path prefixes.
+        expected_native = relocated / "native" / "PcuCp.NativeHost.exe"
+        check(Path(diagnostic["native_command"][0]).samefile(expected_native),
+              f"Native path did not follow relocated executable: {diagnostic['native_command']}")
         requests = [
             {"schema": "cucp.request/v1", "id": "caps-한글", "command": "capabilities", "args": {}},
             {"schema": "cucp.request/v1", "id": "no-input", "command": "click", "args": {"observation_id": "bad", "x": 0, "y": 0}},
