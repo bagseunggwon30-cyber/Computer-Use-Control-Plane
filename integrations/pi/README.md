@@ -2,13 +2,13 @@
 
 Adds local Windows computer-use tools to Pi while leaving model selection,
 credentials, conversations and provider calls with Pi. The adapter launches
-CUCP's persistent Python JSONL engine lazily. Python reuses one native C# process
+CUCP's persistent Python JSONL engine lazily, using CUCP.exe in a portable bundle. Python reuses one native C# process
 until the computer session ends. It never calls a model API itself.
 
 ## Requirements and loading
 
-- Windows desktop for real screenshots/input; CUCP Python/native prerequisites
-  from `pcucp-next/README.md`.
+- Windows desktop for real screenshots/input. The portable bundle includes the CUCP
+  Python/.NET runtimes. Source development prerequisites are in `pcucp-next/README.md`.
 - Node.js 22.19 or later and Pi. This adapter was typechecked against the actual
   `@earendil-works/pi-coding-agent` and `@earendil-works/pi-ai` **0.87.1** packages.
   Current official source: `earendil-works/pi`, commit
@@ -39,7 +39,13 @@ npm test
 npm run test:engine
 ```
 
-Keep the full CUCP checkout in place. `CUCP_ROOT` optionally selects another
+Keep the full portable folder or CUCP checkout in place. Portable mode detects
+`CUCP.exe` at the root and runs `CUCP.exe serve`, with no external Python or Node
+service. `CUCP_EXECUTABLE` selects an absolute CUCP executable in another folder.
+An invalid explicit path fails immediately; it never falls back to Python.
+Pi's own runtime requirements are independent of the bundled CUCP engine.
+
+In source mode, `CUCP_ROOT` optionally selects another
 checkout root; otherwise it is resolved from this extension's location.
 `CUCP_PYTHON` optionally names a Python executable (one executable path, no
 arguments). The transport runs `python -u -m pcucp_cli serve`, with
@@ -63,8 +69,8 @@ clicks do not require another prompt. Turning it off interrupts pending work.
 This switch governs CUCP tools; it is not an OS sandbox for Pi's separate bash
 tool or other extensions.
 
-For elevated target applications, launch explicitly with
-`pcucp-next/powershell/start-pi.ps1 -Elevated` and inspect `cucp_privileges` with
+For elevated target applications, start the host from a human-approved elevated
+terminal (source checkout also provides `pcucp-next/powershell/start-pi.ps1 -Elevated`) and inspect `cucp_privileges` with
 the target `pid`. The Windows UAC consent is human-operated. This launcher
 elevates **Pi and all of its loaded extensions/tools**, not only a narrow CUCP
 broker. Use that mode only for trusted sessions. This extension does not silently
@@ -75,8 +81,9 @@ elevate, automate a UAC consent dialog, or control the Windows secure desktop.
 | Tool | Purpose |
 | --- | --- |
 | `cucp_windows` | List windows, handles and process IDs |
+| `cucp_wait_window` | Bounded title/PID wait; returns ambiguous candidates without selecting one |
 | `cucp_observe` | Capture a selected `hwnd`, optionally checking `pid`, with UIA data |
-| `cucp_action` | One click, type, key, scroll or focus operation |
+| `cucp_action` | Click (optional `count: 2` for double-click), type, key, scroll or focus |
 | `cucp_batch` | Up to 12 ordered actions; stop on first failure |
 | `cucp_capabilities` | Read available operations, readiness and control mode |
 | `cucp_privileges` | Read the native process's privilege diagnostics |
@@ -91,7 +98,7 @@ seen, use separate actions and inspect each returned image.
 ```json
 {
   "command": "click",
-  "args": { "observation_id": "<from observation>", "x": 120, "y": 80, "button": "left" }
+  "args": { "observation_id": "<from observation>", "x": 120, "y": 80, "button": "left", "count": 2 }
 }
 ```
 

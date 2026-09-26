@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { delimiter, resolve } from "node:path";
+import { engineLaunch } from "./launch.ts";
 import { CucpFailure, parseResponse, type CucpResponse } from "./protocol.ts";
 
 export interface ClientOptions {
@@ -68,11 +68,8 @@ export class CucpClient {
 
   private start(): void {
     if (this.child) return;
-    const env = { ...process.env, ...this.options.env };
-    const source = resolve(this.options.root, "pcucp-next", "python");
-    env.PYTHONPATH = [source, env.PYTHONPATH].filter(Boolean).join(delimiter);
-    const argv = this.options.argv ?? ["-u", "-m", "pcucp_cli", "serve"];
-    const child = spawn(this.options.executable ?? env.CUCP_PYTHON ?? "python", [...argv, ...(this.live ? ["--allow-live-control"] : [])], {
+    const { executable, argv, env } = engineLaunch(this.options, this.live);
+    const child = spawn(executable, argv, {
       cwd: this.options.root,
       env,
       stdio: ["pipe", "pipe", "pipe"],

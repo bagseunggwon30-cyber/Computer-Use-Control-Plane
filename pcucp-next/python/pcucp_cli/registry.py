@@ -8,7 +8,7 @@ class CommandSpec:
     route: str = "python-router"
     available_in_engine: bool = True
 
-_CORE = [CommandSpec(n) for n in ("capabilities", "history", "observe", "screenshot")]
+_CORE = [CommandSpec(n) for n in ("capabilities", "history", "observe", "screenshot", "wait-window")]
 _CORE += [CommandSpec(n, route="dotnet-native-host") for n in ("windows", "privileges", "uia-tree")]
 _CORE += [CommandSpec(n, "write", "dotnet-native-host") for n in ("focus", "click", "type", "key", "scroll")]
 _CORE += [CommandSpec("batch", "conditional")]

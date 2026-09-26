@@ -53,6 +53,7 @@ tokens/
 *.pester-out
 TestResult.xml
 coverage/
+dist/
 
 # Test scratch files.
 tests/_*.ps1

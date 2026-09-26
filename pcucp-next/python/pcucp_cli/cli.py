@@ -8,12 +8,12 @@ from .legacy import run_legacy
 from .native_host import emit_native_error, run_native
 from .ocr import ocr_find_text
 from .planner import plan_command
-from .protocol import emit, version_payload
+from .protocol import emit, frozen, version_payload
 from .task_plan import create_task_plan
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="pcucp")
+    parser = argparse.ArgumentParser(prog="cucp")
     sub = parser.add_subparsers(dest="verb")
 
     server = sub.add_parser("serve", help="serve local JSONL computer-use requests")
@@ -26,6 +26,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     version = sub.add_parser("version", help="show PCUCP component versions")
     version.add_argument("--json", action="store_true", help="emit JSON")
+
+    doctor = sub.add_parser("doctor", help="check engine and native runtime without desktop input")
+    doctor.add_argument("--json", action="store_true")
 
     plan = sub.add_parser("plan", help="plan route and safety for a CUCP command")
     plan.add_argument("--command", dest="target_command", required=True, help="CUCP command or macro name")
@@ -65,8 +68,9 @@ def build_parser() -> argparse.ArgumentParser:
     task_plan.add_argument("--click-label", help="label to click as a live step")
     task_plan.add_argument("--json", action="store_true", help="emit JSON")
 
-    legacy = sub.add_parser("legacy", help="delegate to the existing PowerShell CUCP wrapper")
-    legacy.add_argument("args", nargs=argparse.REMAINDER)
+    if not frozen():
+        legacy = sub.add_parser("legacy", help="source-only legacy PowerShell compatibility")
+        legacy.add_argument("args", nargs=argparse.REMAINDER)
 
     return parser
 
@@ -74,6 +78,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     ns = parser.parse_args(argv)
+
+    if ns.verb == "doctor":
+        from .doctor import diagnose
+        payload = diagnose()
+        emit(payload, as_json=bool(ns.json))
+        return 0 if payload["status"] == "ok" else 2
 
     if ns.verb == "serve":
         from .server import run_server

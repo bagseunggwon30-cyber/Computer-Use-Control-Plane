@@ -11,7 +11,7 @@ internal static class DesktopActions
     {
         var extra = command switch
         {
-            "click" => new[] { "--x", "--y", "--button" }, "type" => new[] { "--text-b64" }, "key" => new[] { "--key" },
+            "click" => new[] { "--x", "--y", "--button", "--count" }, "type" => new[] { "--text-b64" }, "key" => new[] { "--key" },
             "scroll" => new[] { "--direction", "--amount" }, _ => Array.Empty<string>()
         };
         // Restoring a minimized window changes its rectangle. Reject geometry constraints
@@ -49,6 +49,7 @@ internal static class DesktopActions
     {
         var x = options.RequiredInteger("--x");
         var y = options.RequiredInteger("--y");
+        var count = options.Integer("--count", 1, 1, 2);
         var flags = (options.Get("--button") ?? "left").ToLowerInvariant() switch
         {
             "left" => (0x0002u, 0x0004u), "right" => (0x0008u, 0x0010u), "middle" => (0x0020u, 0x0040u),
@@ -64,7 +65,15 @@ internal static class DesktopActions
         target.HitTest(x, y);
         if (!NativeMethods.GetCursorPos(out var actual) || actual.X != x || actual.Y != y)
             throw new NativeFailure("pointer_position_mismatch", "The pointer did not reach the requested pixel; no click was sent.");
-        Dispatch(target, [Mouse(flags.Item1), Mouse(flags.Item2)]);
+        // Keep both clicks together so another input producer cannot interleave
+        // an unrelated action between the pair. App-level success still needs observation.
+        Dispatch(target, ClickEvents(flags.Item1, flags.Item2, count));
+    }
+
+    internal static NativeMethods.INPUT[] ClickEvents(uint down, uint up, int count)
+    {
+        if (count is < 1 or > 2) throw CommandOptions.Invalid("Click count must be 1 or 2.");
+        return Enumerable.Range(0, count).SelectMany(_ => new[] { Mouse(down), Mouse(up) }).ToArray();
     }
 
     private static void Type(WindowTarget target, CommandOptions options)

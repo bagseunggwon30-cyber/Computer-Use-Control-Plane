@@ -1,5 +1,7 @@
 name: CUCP core
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   core:
     runs-on: ubuntu-latest
@@ -44,3 +46,41 @@ jobs:
           Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
           Invoke-Pester -Path tests/cucp.LegacyRegression.Tests.ps1 -CI
       # No interactive desktop input tests on hosted runners. See manual Windows checks.
+  windows-portable:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: python -m pip install -r pcucp-next/packaging/requirements-build.txt
+      - name: Build and verify relocated portable bundle
+        run: python pcucp-next/packaging/build_portable.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: integrations/pi/package-lock.json
+      - run: npm ci --ignore-scripts
+        working-directory: integrations/pi
+      - name: Pi adapter with packaged engine and no Python on child PATH
+        shell: pwsh
+        run: |
+          $env:CUCP_EXECUTABLE = (Resolve-Path '../../dist/CUCP-0.4.0-win-x64/CUCP.exe').Path
+          $node = (Get-Command node).Source
+          $env:PATH = Join-Path $env:SystemRoot 'System32'
+          & $node --import tsx test/engine-smoke.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        working-directory: integrations/pi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CUCP-0.4.0-win-x64
+          path: |
+            dist/CUCP-0.4.0-win-x64.zip
+            dist/CUCP-0.4.0-win-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

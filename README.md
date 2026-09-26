@@ -1,297 +1,81 @@
-# CUCP - Computer Use Control Plane
+# CUCP — Computer Use Control Plane
 
-CUCP is a Windows computer-use control plane for local AI agents. It provides
-one command surface for observing Windows desktop state, planning grounded UI
-actions, and running live GUI control only after explicit safety gates are
-enabled.
+CUCP는 Computer Use가 없는 AI 호스트에 Windows 관찰·입력 기능을 연결하는 실행 엔진입니다.
+**Python 본체 + C# Windows 제어부 + 최소 TypeScript Pi 연결부**를 사용합니다.
+모델·API 키·대화 관리는 호스트가 담당합니다. 앱별 확장 개발은 종료하고 범용 코어에 집중합니다.
 
-The new core preview in `pcucp-next/` provides a persistent Python session,
-a reused C# Windows capture/input process, and a [Pi extension](integrations/pi/README.md).
-Start with the [setup guide](pcucp-next/README.md) and
-[development direction](docs/core-modernization.md). Development now focuses
-on a generic embeddable engine; new application-specific profiles are out of scope.
-The older PowerShell command surface remains available separately in `scripts/`.
+## 시작하기
 
-The core preview supports image/UIA observations, guarded input, bounded batches,
-and privilege diagnostics. Input starts off and requires the human operator's
-`/computer on`. Windows GUI and elevated-input verification remains a release
-gate; see the setup guide for current validation limits.
-
-## Current Status
-
-Stable public core included in this repository:
-
-- PowerShell CLI wrapper: `scripts/cucp.ps1`
-- Native helper script for Win32, UI Automation, OCR, screenshot, and CDP-backed
-  operations: `scripts/cucp-native-helper.ps1`
-- Helper server script for resident/local command handling:
-  `scripts/cucp-helper-server.ps1`
-- Codex plugin metadata: `.codex-plugin/plugin.json`
-- Codex skill entry: `skills/cucp/SKILL.md`
-- Command references, troubleshooting notes, install script, and Pester tests
-
-New staged split included under `pcucp-next/`:
-
-- PowerShell thin launcher: `pcucp-next/powershell/cucp-next.ps1`
-- Python router/planner package: `pcucp-next/python/pcucp_cli/`
-- C#/.NET native host project: `pcucp-next/dotnet/PcuCp.NativeHost/`
-- JSON schemas and runtime profile: `pcucp-next/schemas/`,
-  `pcucp-next/config/`
-- Fast smoke tests: `tests/pcucp-next.Fast.Tests.ps1`
-
-Currently migrated into `pcucp-next`:
-
-- `windows`: Python router calls the C# native host for visible top-level
-  window observation.
-- `uia-tree`: Python router calls the C# native host for bounded UI Automation
-  tree observation, including supported UIA pattern metadata.
-- `find-label`: Python searches the native window observation result for
-  matching top-level window titles, process names, UIA node metadata, and UIA
-  pattern metadata.
-- `ocr-image`: Python router calls the C# native host to run Windows OCR on an
-  image file.
-- `ocr-find-text`: Python matches text over the native OCR image result and
-  returns candidate coordinates.
-- `task-plan`: Python creates read-only plan JSON with live-control safety
-  metadata.
-
-Additional new core commands are exposed through `python -m pcucp_cli serve`:
-`observe`, `screenshot`, `focus`, `click`, `type`, `key`, `scroll`, `batch`,
-`privileges`, `capabilities`, and `history`. The Pi adapter handles this protocol.
-
-Still on the separate legacy PowerShell path:
-
-- OCR screen capture
-- Deep `find-label` across OCR text
-- Existing advanced macros and recovery commands
-
-Target language split for future implementation:
+[GitHub Actions의 CUCP core](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/workflows/core.yml)
+에서 해당 커밋의 성공한 `windows-portable` 작업이 올린 **CUCP-0.4.0-win-x64** 아티팩트를 받습니다.
+안의 ZIP을 풀고 폴더 전체를 유지하세요. CUCP용 Python·Node.js·.NET의 별도 설치가 필요 없습니다.
+Pi와 모델은 포함하지 않으며, Pi는 이미 사용하는 호스트의 설치 요건을 따릅니다.
 
 ```text
-PowerShell 15-25%  install, thin launcher, safety wrapper, command shim
-Python     35-45%  planner, orchestrator, task graph, diagnostics, tests
-C#/.NET    20-30%  Win32/UIA/OCR/capture bridge and native host
-Config/DB   5-10%  schemas, profiles, policies, run history, target maps
-Rust/C++    0-10%  optional hot-path acceleration only when justified
+.\CUCP.exe doctor --json
+pi --extension .\integrations\pi\src\index.ts
 ```
 
-Current status is a staged migration, not full feature parity in the new stack.
-The new engine never falls back automatically to legacy commands after a failure.
-Use the explicit `legacy` command when compatibility behavior is required.
+Pi에서 `/computer status`로 확인하고 사람이 `/computer on`을 실행하면 입력을 허용합니다.
+`/computer off`는 CUCP 입력을 끕니다. `cucp_windows` → `cucp_observe` → `cucp_action` 순으로 사용합니다.
+실행 파일은 CLI/JSONL 엔진이며 별도의 채팅 GUI는 없습니다.
 
-## What CUCP Does
+- [포터블 사용 설명](pcucp-next/packaging/PORTABLE.md)
+- [배포 구조와 빌드·검증](docs/portable-distribution.md)
+- [소스 개발과 Windows 준비](pcucp-next/README.md)
+- [Pi 연결 계약](integrations/pi/README.md)
+- [개발 방향](docs/core-modernization.md)
 
-CUCP helps agents avoid blind coordinate clicking by grounding desktop actions
-through Windows and browser automation signals:
+## 구현 범위
 
-- Win32 window enumeration and foreground window checks
-- UI Automation control discovery and invocation
-- Windows OCR-backed text discovery
-- Chromium CDP support for Chromium/Electron applications launched with a local
-  debugging port
-- Hit-test and target validation before live clicks
-- Explicit live-control gate for mouse, keyboard, and text actions
-- Redaction helpers for secret-shaped output
+| 기능 | 실행 위치 |
+| --- | --- |
+| JSONL 세션·명령 검증·관찰 ID·배치·시간 제한·창 대기 | Python |
+| 창 목록·화면 캡처·UIA 트리·OCR·권한 진단 | C# |
+| 포커스·클릭·더블클릭·Unicode 입력·단축키·스크롤 | C# + Python 검증/후속 관찰 |
+| 도구 등록·이미지 전달·취소·세션 종료 | Pi TypeScript 연결부 |
+| 포터블 빌드·실행 진단 | Python |
 
-CUCP follows this loop:
+`wait-window`는 제목과 선택 PID로 최대 10초 대기하고 여러 창이 맞으면 선택을 요구합니다.
+더블클릭은 `click`에 `count: 2`를 전달합니다. 입력에는 최신 관찰 ID가 필요하며 각 조작 후 새 화면을 반환합니다.
+성공 응답은 입력 전달과 후속 관찰을 뜻하며, 파일 저장 같은 최종 목표 달성을 자동 입증하지 않습니다.
+배치는 최대 12단계이며 첫 실패에서 중단합니다. 실패한 입력을 자동 재시도하지 않습니다.
+
+다른 호스트는 `CUCP.exe serve`를 자식 프로세스로 실행하여 UTF-8 JSONL을 주고받습니다.
+사람이 입력을 허용한 세션에만 `--allow-live-control` 시작 인자를 붙입니다.
+기본 실행 경로에서 PowerShell·Node 서버·`dotnet run`·자동 빌드를 호출하지 않습니다.
+
+## 검증과 제한
+
+자동 검증은 Python/TypeScript 동작 테스트, C# 입력 ABI·좌표·권한·프로토콜 검사,
+Windows 빌드, 실제 실행 파일을 다른 한글/공백 경로로 옮긴 후의 시작·통신 검사를 포함합니다.
+**실제 데스크톱 앱 조작, IME, 혼합 DPI, 관리자 앱 입력은 별도 수동 검증이 필요합니다.**
+`doctor` 통과가 GUI 호환성 통과를 의미하지 않습니다.
+
+관리자 앱 입력은 사람이 호스트를 관리자 권한으로 시작하고 UAC를 승인하는 방식입니다.
+현재는 Pi 전체와 도구가 함께 승격되며 분리된 권한 브로커는 없습니다.
+SYSTEM/PPL·UAC 보안 데스크톱·로그인 화면 제어는 지원하지 않습니다.
+드래그·UIA 요소 참조 실행·이벤트 기반 관찰은 후속 개발 범위입니다.
+현재 배포는 Windows x64 미리보기이며 코드 서명·설치기·자동 업데이트가 없습니다.
+
+## 기존 PowerShell 코드
+
+`scripts/`, 기존 `install.ps1`, Codex 플러그인/스킬 및 앱별 매크로는 **레거시 호환 소스**입니다.
+새 배포본에 포함하지 않으며, 새 Pi 도구가 자동으로 호출하지 않습니다.
+기존 설치기는 레거시를 설치하므로 새 코어는 위 포터블 안내를 사용하세요.
+소스 개발자가 필요할 때만 `python -m pcucp_cli legacy -- ...`로 명시적으로 호출할 수 있습니다.
+
+GitHub 언어 비율에는 보존 중인 레거시 코드가 계속 포함됩니다. 언어 비율을 바꾸려고
+통계에서 숨기거나 미이전 기능을 삭제하지 않았습니다. 전체 레거시 기능 포팅은 완료되지 않았습니다.
+이후 범용 기능의 대체와 Windows 회귀 검증을 거쳐 레거시 정리를 진행합니다.
+
+## 개발자 검증
 
 ```text
-observe -> plan -> act only with permission -> verify -> recover if needed
+python -m unittest discover -s tests/python -v
 ```
 
-## Install
+Pi 연결부는 `integrations/pi`에서 `npm ci --ignore-scripts`, `npm run typecheck`,
+`npm test`, `npm run test:engine`으로 확인합니다. 배포본 빌드는 [빌드 안내](docs/portable-distribution.md)를 따릅니다.
 
-```powershell
-git clone https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane.git cucp
-cd cucp
-powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
-```
-
-The installer is user-scope and does not require administrator privileges. It
-creates a local `cucp` command shim and runs a quick health check.
-
-You can also run the wrapper directly:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\cucp.ps1 -Quiet version
-```
-
-Run the staged next-generation router directly:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 version --json
-powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 plan --command windows --json
-powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 windows --json
-powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 uia-tree --max-depth 1 --json
-powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 ocr-image --path .\sample.png --json
-powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 ocr-find-text --path .\sample.png --text "Send" --json
-powershell -NoProfile -ExecutionPolicy Bypass -File .\pcucp-next\powershell\cucp-next.ps1 task-plan --type-text "hello" --shortcut "ctrl+s" --json
-```
-
-## Quick Start
-
-Read-only commands:
-
-```powershell
-cucp macro windows
-cucp macro find-label --label "Save" --explain
-cucp macro ocr-find-text --text "Save"
-cucp macro cdp-detect
-```
-
-Live-control commands require `-AllowLiveControl`:
-
-```powershell
-cucp -AllowLiveControl macro smart-click --label "Save" --match "Notepad"
-cucp -AllowLiveControl macro fill-label --label "Name" --text "Alice"
-cucp -AllowLiveControl macro shortcut --keys "ctrl+s"
-```
-
-Use read-only planning and dry runs before live control:
-
-```powershell
-cucp macro task-plan --app notepad --wait-title Notepad --type-text "hello" --shortcut "ctrl+s"
-cucp macro task-run --dry-run --app notepad --wait-title Notepad --type-text "hello" --shortcut "ctrl+s"
-```
-
-## Safety Model
-
-CUCP treats live desktop control as a privileged operation.
-
-Safety rules in the current core:
-
-- Live actuation is blocked unless `-AllowLiveControl` is present.
-- Sensitive screens and destructive actions are refused or blocked unless the
-  exact action has been explicitly approved.
-- Coordinate actions can be guarded by target window checks.
-- Low-confidence target matches are rejected instead of guessed.
-- Logs and release notes redact common secret-shaped values before output.
-- Runtime caches, screenshots, logs, local credentials, keys, and tokens are
-  excluded by `.gitignore`.
-
-See `SECURITY.md` for the public security policy.
-
-## Repository Layout
-
-```text
-cucp/
-  .codex-plugin/
-    plugin.json
-  skills/
-    cucp/
-      SKILL.md
-  scripts/
-    cucp.ps1
-    cucp-native-helper.ps1
-    cucp-helper-server.ps1
-    README.md
-  pcucp-next/
-    powershell/
-      cucp-next.ps1
-    python/
-      pcucp_cli/
-    dotnet/
-      PcuCp.NativeHost/
-    schemas/
-      command.schema.json
-      observation.schema.json
-    config/
-      runtime-profile.json
-  references/
-    command-reference.md
-    cdp-setup.md
-    troubleshooting.md
-    remaining-work.md
-  plans/
-    notepad-hello-world.json
-    README.md
-  tests/
-    cucp.Fast.Tests.ps1
-    cucp.Tests.ps1
-    baseline-v1.4.0.json
-    baseline-v1.6.0.json
-    README.md
-  install.ps1
-  README.md
-  CHANGELOG.md
-  SECURITY.md
-  DEPENDENCIES.md
-  requirements.txt
-  LICENSE
-```
-
-## Dependencies
-
-Runtime:
-
-- Windows 10 or Windows 11
-- Windows PowerShell 5.1 or PowerShell 7+
-- Windows UI Automation
-- Windows OCR support through `Windows.Media.Ocr`
-
-Optional:
-
-- Python 3.10+ for the staged `pcucp-next` router and planner
-- .NET 8 SDK for building the staged C# native host
-- Pester for tests
-- Chromium/Electron application launched with a local CDP port for CDP commands
-
-The Python runtime uses only the standard library. The Pi integration adds
-Pi peer packages and TypeScript development dependencies; see
-`integrations/pi/package.json`. See `DEPENDENCIES.md` for legacy dependencies.
-
-## Verification
-
-Core preview validation: 72 Python tests with a configured native test host,
-15 Pi tests, TypeScript checking and
-the Pi-to-real-Python smoke check pass. Native source compiles against .NET 8,
-WPF and Windows SDK reference assemblies, with separate ABI/geometry/argument
-checks. [Windows CI](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36216294498)
-also passed the .NET build, 12 resident-transport tests and 14 Pester regressions.
-Actual Windows GUI behavior and self-contained publishing remain separate gates.
-
-Historical baseline verification recorded before the core preview (not rerun
-as evidence for the current changes):
-
-```powershell
-# PowerShell parser check for all .ps1 files
-# Result: 8 PowerShell files parsed successfully
-
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\cucp.ps1 -Quiet version
-# Result: status ok
-
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester .\tests\cucp.Fast.Tests.ps1"
-# Result: 6 passed, 0 failed
-
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester .\tests\pcucp-next.Fast.Tests.ps1"
-# Result: 20 passed, 0 failed
-```
-
-The full legacy Pester suite exists in `tests/cucp.Tests.ps1`, but the fast
-smoke suites are the recommended quick validation path for this public package.
-
-## Documentation
-
-- `references/command-reference.md` - command and macro reference
-- `references/cdp-setup.md` - CDP setup for Chromium/Electron apps
-- `references/troubleshooting.md` - diagnostics and recovery notes
-- `SKILL.md` - root skill-style usage notes
-- `skills/cucp/SKILL.md` - Codex plugin skill entry
-- `SECURITY.md` - safety and disclosure policy
-- `DEPENDENCIES.md` - runtime and optional dependency inventory
-- `pcucp-next/README.md` - staged Python/C# split details
-
-## Roadmap
-
-Near-term work:
-
-- Verify the new core on an interactive Windows desktop and generic UI fixtures.
-- Measure capture/input latency and wrong-target failures before optimizing.
-- Harden the resident native worker, then add scoped elevation and UIA element references.
-- Add observation events and region zoom with explicit image/coordinate contracts.
-- Reuse the execution contract for other agent hosts. See the
-  [phased roadmap](docs/core-modernization.md).
-
-## License
-
-MIT. See `LICENSE`.
+MIT License. [LICENSE](LICENSE)

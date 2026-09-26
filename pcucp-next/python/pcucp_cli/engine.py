@@ -59,10 +59,11 @@ class Observation:
 class ComputerSession:
     """One owner per session. Host-side live permission cannot be changed by a request."""
     def __init__(self, *, allow_live_control=False, native: Callable=run_native,
-                 clock: Callable=time.monotonic, observation_ttl_s=60, native_transport="published executable per call"):
+                 clock: Callable=time.monotonic, sleep: Callable=time.sleep,
+                 observation_ttl_s=60, native_transport="published executable per call"):
         self.native_transport = native_transport
         self.allow_live_control = bool(allow_live_control)
-        self.native, self.clock, self.ttl = native, clock, observation_ttl_s
+        self.native, self.clock, self.sleep, self.ttl = native, clock, sleep, observation_ttl_s
         self.observation = None
         self.seen, self.order = set(), deque()
         self.events = deque(maxlen=200)
@@ -138,6 +139,8 @@ class ComputerSession:
         if command == 'windows':
             fields(args, [])
             return self.call_native(command, [], deadline)
+        if command == 'wait-window':
+            return self.wait_window(args, deadline)
         if command == 'privileges':
             fields(args, ['pid'])
             native_args = ['--pid', str(integer(args['pid'], 'pid', 1, 2**31-1))] if 'pid' in args else []
@@ -155,6 +158,38 @@ class ComputerSession:
         if command == 'batch':
             return self.batch(args, deadline)
         return self.action(command, args, deadline, allow_latest=allow_latest)
+
+    def wait_window(self, args, deadline):
+        fields(args, ['title', 'pid', 'timeout_ms', 'poll_ms'], ['title'])
+        title = args['title']
+        if not isinstance(title, str) or not 1 <= len(title) <= 256 or not title.strip() or '\x00' in title:
+            raise EngineError('invalid_argument', 'title must contain 1..256 nonblank characters, no NUL')
+        pid = integer(args['pid'], 'pid', 1, 2**31-1) if 'pid' in args else None
+        timeout = integer(args.get('timeout_ms', 5000), 'timeout_ms', 100, 10000) / 1000
+        poll = integer(args.get('poll_ms', 250), 'poll_ms', 100, 1000) / 1000
+        end = min(deadline, self.clock() + timeout)
+        self.observation = None
+        attempts = 0
+        while self.clock() < end:
+            status, data, errors = self.call_native('windows', [], end)
+            attempts += 1
+            if status != 'ok':
+                return status, {**data, 'attempts': attempts}, errors
+            windows = data.get('windows')
+            if not isinstance(windows, list) or any(not isinstance(w, dict) for w in windows):
+                raise EngineError('native_protocol_error', 'windows response requires a list of objects')
+            matches = [w for w in windows if title.casefold() in str(w.get('title', '')).casefold()
+                       and (pid is None or w.get('process_id') == pid)]
+            if matches:
+                if len(matches) != 1:
+                    return 'blocked', {'windows': matches, 'attempts': attempts}, [
+                        {'code': 'ambiguous_target', 'message': 'Several windows match. Select an explicit hwnd or narrow title/pid.'}]
+                return 'ok', {'windows': matches, 'attempts': attempts, 'next': 'observe the selected hwnd before input'}, []
+            remaining = end - self.clock()
+            if remaining > 0:
+                self.sleep(min(poll, remaining))
+        return 'error', {'windows': [], 'attempts': attempts}, [
+            {'code': 'window_wait_timeout', 'message': 'No matching window appeared within the bounded wait.'}]
 
     def observe(self, args, deadline, *, include_ui=False):
         self.observation = None
@@ -202,7 +237,7 @@ class ComputerSession:
             native_args = ['--hwnd', target['hwnd'], '--pid', str(target['pid'])]
         else:
             required = {'click': {'x','y'}, 'type': {'text'}, 'key': {'keys'}, 'scroll': {'direction','amount'}}[command]
-            fields(args, required | {'observation_id'} | ({'button'} if command == 'click' else set()), required | {'observation_id'})
+            fields(args, required | {'observation_id'} | ({'button', 'count'} if command == 'click' else set()), required | {'observation_id'})
             obs = self.observation
             if not isinstance(args['observation_id'], str) or obs is None or (args['observation_id'] != obs.id and not (allow_latest and args['observation_id'] == 'latest')) or self.clock() - obs.created > self.ttl:
                 raise EngineError('stale_observation', 'observe target again before acting', 'blocked')
@@ -219,6 +254,8 @@ class ComputerSession:
                 px = math.floor(obs.geometry['x'] + x * obs.geometry['width'] / obs.geometry['image_width'])
                 py = math.floor(obs.geometry['y'] + y * obs.geometry['height'] / obs.geometry['image_height'])
                 native_args += ['--x', str(px), '--y', str(py), '--button', button]
+                if 'count' in args:
+                    native_args += ['--count', str(integer(args['count'], 'count', 1, 2))]
             elif command == 'type':
                 value = args['text']
                 if not isinstance(value, str) or not 1 <= len(value) <= 4096 or '\x00' in value:

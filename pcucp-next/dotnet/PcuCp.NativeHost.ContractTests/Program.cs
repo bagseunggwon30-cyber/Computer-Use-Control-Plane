@@ -38,6 +38,14 @@ Reject(() => new CommandOptions(["--hwnd", "--allow-live-control"]), "Flag consu
 Reject(() => new CommandOptions(["--unsafe", "yes"]).Allow("--pid"), "Unknown option accepted");
 var negative = new CommandOptions(["--x", "-1920", "--y", "0"]);
 Check(negative.RequiredInteger("--x") == -1920 && negative.RequiredInteger("--y") == 0, "Signed physical coordinates rejected");
+foreach (var (down, up) in new[] { (2u, 4u), (8u, 16u), (32u, 64u) })
+{
+    var clicks = DesktopActions.ClickEvents(down, up, 2);
+    Check(clicks.Length == 4, "Double-click must use four events in one dispatch");
+    Check(clicks.Select(e => e.Data.Mouse.Flags).SequenceEqual(new[] { down, up, down, up }), "Double-click left a button held or reordered input");
+}
+Reject(() => DesktopActions.ClickEvents(2, 4, 0), "Zero clicks accepted");
+Reject(() => DesktopActions.ClickEvents(2, 4, 3), "Unbounded click count accepted");
 
 // These cases must fail before any platform call or focus mutation, even on Linux.
 Reject(() => DesktopActions.Execute("click", new CommandOptions(["--hwnd", "0x1", "--pid", "1", "--x", "0", "--y", "0"])), "Native action without authority accepted");

@@ -14,7 +14,7 @@ internal static class NativeDispatcher
                 cli.Allow();
                 return new(0, NativeResult.Ok(command, new
                 {
-                    component = "PcuCp.NativeHost", version = "0.3.0", runtime = RuntimeInformation.FrameworkDescription,
+                    component = "PcuCp.NativeHost", version = "0.4.0", runtime = RuntimeInformation.FrameworkDescription,
                     os = RuntimeInformation.OSDescription, process = Environment.ProcessId,
                     transport_protocol = "pcucp.native.request/v1",
                     commands = new[] { "version", "windows", "uia-tree", "ocr-image", "screenshot", "focus", "click", "type", "key", "scroll", "privileges", "serve" }

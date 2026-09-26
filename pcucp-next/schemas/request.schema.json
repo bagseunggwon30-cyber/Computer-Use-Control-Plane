@@ -193,6 +193,12 @@
                     "right",
                     "middle"
                   ]
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2,
+                  "default": 1
                 }
               },
               "required": [
@@ -347,6 +353,48 @@
               },
               "required": [
                 "hwnd"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "command",
+            "args"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "command": {
+              "const": "wait-window"
+            },
+            "args": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "pid": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 10000
+                },
+                "poll_ms": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 1000
+                }
+              },
+              "required": [
+                "title"
               ],
               "additionalProperties": false
             }
@@ -661,6 +709,12 @@
                 "right",
                 "middle"
               ]
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2,
+              "default": 1
             }
           },
           "required": [
@@ -898,6 +952,58 @@
           },
           "required": [
             "actions"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "wait-window"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "pid": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 10000
+            },
+            "poll_ms": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 1000
+            }
+          },
+          "required": [
+            "title"
           ],
           "additionalProperties": false
         }

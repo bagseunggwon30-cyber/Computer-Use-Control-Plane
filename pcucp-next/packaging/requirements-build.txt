@@ -1,0 +1,2 @@
+# Build machine only; no pip/Python/Node/.NET installation on the CUCP user's PC.
+PyInstaller==6.22.3

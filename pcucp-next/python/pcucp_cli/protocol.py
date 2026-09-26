@@ -2,22 +2,30 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
 from . import __version__
 
 
-LANGUAGE_TARGETS: dict[str, str] = {
-    "powershell": "15-25%",
-    "python": "35-45%",
-    "dotnet": "20-30%",
-    "config_db": "5-10%",
-    "rust_cpp_optional": "0-10%",
+LANGUAGE_ROLES: dict[str, str] = {
+    "python": "session, protocol, orchestration, diagnostics, packaging",
+    "dotnet": "Windows capture, UIA, OCR, input, privilege diagnostics",
+    "typescript": "optional Pi host adapter",
+    "powershell": "source-only legacy compatibility and optional developer launchers",
 }
 
 
+def frozen() -> bool:
+    return bool(getattr(sys, "frozen", False))
+
+
 def repo_root() -> Path:
+    # Frozen assets belong to this executable, never to the working directory or
+    # a stale development CUCP_ROOT inherited from an unrelated host session.
+    if frozen():
+        return Path(sys.executable).resolve().parent
     configured = os.environ.get("CUCP_ROOT")
     return Path(configured).resolve() if configured else Path(__file__).resolve().parents[3]
 
@@ -34,6 +42,11 @@ def rel(path: Path) -> str:
 
 
 def component_paths() -> dict[str, str]:
+    if frozen():
+        return {"engine": str(Path(sys.executable).resolve()),
+                "native_host": str(repo_root() / "native" / "PcuCp.NativeHost.exe"),
+                "pi_adapter": str(repo_root() / "integrations" / "pi"),
+                "legacy_wrapper": "not included"}
     root = repo_root()
     nxt = next_root()
     return {
@@ -50,8 +63,9 @@ def version_payload() -> dict[str, Any]:
         "schema": "pcucp.version/v1",
         "status": "ok",
         "version": __version__,
-        "surface": "python-router+dotnet-native-host+legacy-powershell",
-        "language_targets": LANGUAGE_TARGETS,
+        "surface": "python-core+dotnet-native-host",
+        "distribution": "portable" if frozen() else "source",
+        "language_roles": LANGUAGE_ROLES,
         "components": component_paths(),
     }
 

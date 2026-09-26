@@ -21,12 +21,23 @@ Computer Use가 없는 Pi 같은 에이전트 호스트에 **로컬 Windows 관�
 새 세션 명령은 `windows`, `observe`, `screenshot`, `uia-tree`, `privileges`, `capabilities`, `history`, `focus`, `click`, `type`, `key`, `scroll`, `batch`입니다. `find-label`, `ocr-image`, `ocr-find-text`, `task-plan` 등의 기존 Python CLI도 남아 있습니다. 이 CLI 전체가 Pi 도구로 노출되는 것은 아닙니다.
 
 - `observe`는 지정 창의 화면 이미지와 제한된 UIA 트리를 수집합니다. UIA 결과는 관찰 데이터이며, 지속되는 요소 참조로 직접 실행하는 기능은 아직 없습니다.
+- `click`은 `count: 2`로 더블클릭을 지원합니다. `wait-window`는 제목과 선택 PID로 최대 10초 대기하며 다중 후보는 오류와 함께 반환합니다.
 - `click`, `type`, `key`, `scroll`은 최신 `observation_id`를 요구합니다. `focus`는 명시적인 `hwnd`와 `pid`를 요구합니다.
 - 각 조작 이후 새 화면을 수집합니다. 이는 후속 관찰이며, 입력값 저장·파일 저장 같은 작업 목표를 자동으로 입증하지 않습니다.
 - 배치는 최대 12단계이며 첫 실패에서 중단합니다. 미실행 단계는 `skipped`로 반환합니다.
 - 드래그, 지속 키 누르기, 확대 영역 관찰, UIA 요소 참조 실행, 이벤트 기반 화면 감시는 이번 구현 범위에 없습니다.
 
-## Windows 준비
+## 설치 없는 포터블 실행 (0.4.0)
+
+새 사용자 배포는 [포터블 안내](packaging/PORTABLE.md)를 따릅니다. Windows x64 ZIP에는
+Python 인터프리터와 C#/.NET 런타임이 함께 들어가며 CUCP용 Node 서버가 없습니다.
+폴더 전체를 유지하고 `CUCP.exe doctor --json`으로 시작을 확인하세요.
+Pi는 기존 호스트를 사용하며 `pi --extension .\integrations\pi\src\index.ts`로 연결합니다.
+
+빌드·CI·체크섬·검증 범위는 [배포 문서](../docs/portable-distribution.md)에 있습니다.
+배포본에서는 `legacy` 명령을 제공하지 않습니다. 다음 준비 절차는 **소스 개발자용**입니다.
+
+## Windows 소스 개발 준비
 
 저장소 루트에서 실행합니다. Windows 대화형 데스크톱, Python 3.10 이상, 최초 게시용 .NET 8 SDK가 필요합니다. Pi 어댑터에는 Node.js 22.19 이상과 Pi가 필요합니다. 개발 의존성은 `@earendil-works/pi-coding-agent` / `@earendil-works/pi-ai` **0.87.1**에 맞춰져 있습니다.
 
@@ -64,7 +75,7 @@ pi --extension .\integrations\pi\src\index.ts
 pi install .\integrations\pi
 ```
 
-확장은 자체 위치로 저장소를 찾습니다. 필요하면 `CUCP_ROOT`로 다른 저장소 루트를, `CUCP_PYTHON`으로 Python 실행 파일 경로 하나를 지정합니다. 확장이 Python의 `PYTHONPATH`를 준비하므로 Pi 사용 시 직접 설정할 필요는 없습니다.
+확장은 자체 위치에서 포터블 폴더 또는 저장소를 찾습니다. `CUCP_EXECUTABLE`은 별도 위치의 CUCP.exe 절대 경로를 선택합니다. 명시한 실행 파일 실패 시 Python으로 자동 전환하지 않습니다. 필요하면 `CUCP_ROOT`로 다른 저장소 루트를, `CUCP_PYTHON`으로 Python 실행 파일 경로 하나를 지정합니다. 확장이 Python의 `PYTHONPATH`를 준비하므로 Pi 사용 시 직접 설정할 필요는 없습니다.
 
 Pi 세션에서 조작은 기본적으로 꺼져 있습니다.
 
@@ -134,6 +145,7 @@ npm run test:engine
 | 네이티브 ABI·좌표 계산·인자 계약 검사 | 통과 |
 | Windows CI .NET 빌드·상주 네이티브 전송 | 빌드 및 전송 검사 12개 통과 |
 | 레거시 Pester 5 회귀 검사 | Windows CI에서 14개 통과 |
-| Windows `dotnet publish`와 실제 GUI 조작 | 미검증 |
+| Windows self-contained publish·포터블 시작·Pi EXE 연결 | `windows-portable` CI에서 검증 |
+| 실제 Windows GUI 조작 | 미검증 |
 
-로컬 Linux 환경의 MSBuild 제한은 남아 있지만 [Windows CI](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36216294498)에서 표준 .NET 빌드와 실제 네이티브 프로세스 통신을 확인했습니다. 이 검사는 Windows 게시·GUI 입력 검증을 대신하지 않습니다. Python·Node의 모의/프로세스 통합 검증 또한 실제 Windows GUI 작동의 증거와 구분합니다. **이번 개발 환경에서는 Windows 화면 캡처·실제 입력·한글 IME·UAC·다중 모니터를 실행 검증하지 못했습니다.** 기존 `pcucp-next.Fast.Tests.ps1`은 일부 Windows 기능을 다루는 별도 테스트이며 새 계약 전체의 합격 기준을 대신하지 않습니다.
+로컬 Linux 환경의 MSBuild 제한은 남아 있지만 [Windows CI](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36216294498)에서 표준 .NET 빌드와 실제 네이티브 프로세스 통신을 확인했습니다. 0.4.0 게시 검증은 별도 `windows-portable` 작업이 담당합니다. 실행 파일 시작 검사는 GUI 입력 검증을 대신하지 않습니다. Python·Node의 모의/프로세스 통합 검증 또한 실제 Windows GUI 작동의 증거와 구분합니다. **이번 개발 환경에서는 Windows 화면 캡처·실제 입력·한글 IME·UAC·다중 모니터를 실행 검증하지 못했습니다.** 기존 `pcucp-next.Fast.Tests.ps1`은 일부 Windows 기능을 다루는 별도 테스트이며 새 계약 전체의 합격 기준을 대신하지 않습니다.

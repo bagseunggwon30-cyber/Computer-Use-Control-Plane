@@ -20,7 +20,7 @@ function mockPi() {
 test("factory only registers tools, command and lifecycle handlers", async () => {
   const { pi, tools, events, commands } = mockPi();
   cucpExtension(pi);
-  assert.deepEqual(Object.keys(tools), ["cucp_windows", "cucp_observe", "cucp_action", "cucp_batch", "cucp_capabilities", "cucp_privileges"]);
+  assert.deepEqual(Object.keys(tools), ["cucp_windows", "cucp_wait_window", "cucp_observe", "cucp_action", "cucp_batch", "cucp_capabilities", "cucp_privileges"]);
   assert.ok(commands.computer);
   assert.ok(events.session_shutdown);
   for (const tool of Object.values(tools)) assert.equal(tool.executionMode, "sequential");

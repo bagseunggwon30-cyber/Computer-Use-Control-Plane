@@ -19,7 +19,7 @@ Standalone commands retain one JSON document on stdout. Publish once with
 | `screenshot` | `--hwnd 0xHEX`, optional `--pid INT`, `--max-width 64..4096` (1600), `--max-height 64..4096` (1000) |
 | `privileges` | Optional `--pid INT` |
 | `focus` | Action target and authority arguments below |
-| `click` | Action arguments, `--x INT --y INT`, optional `--button left/right/middle` (left) |
+| `click` | Action arguments, `--x INT --y INT`, optional `--button left/right/middle` (left), `--count 1/2` (1) |
 | `type` | Action arguments, `--text-b64 BASE64_UTF8` |
 | `key` | Action arguments, `--key SHORTCUT` |
 | `scroll` | Action arguments, `--direction up/down/left/right`, optional `--amount 1..20` (3) |
@@ -41,6 +41,10 @@ clipboard modification; individual applications may still reject or reinterpret 
 
 `scroll` uses the current pointer position and verifies that it belongs to the
 target. It does not move the pointer or click implicitly.
+
+`click --count 2` dispatches down/up/down/up in one bounded SendInput call.
+The application decides whether it recognizes this as a double-click; the
+engine observes afterwards and does not assert the application's outcome.
 
 ## Responses and results
 

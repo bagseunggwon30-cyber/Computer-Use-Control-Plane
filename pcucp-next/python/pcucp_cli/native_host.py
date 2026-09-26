@@ -15,7 +15,7 @@ import subprocess
 import threading
 from typing import Any
 
-from .protocol import repo_root
+from .protocol import frozen, repo_root
 
 MAX_STDOUT_BYTES = 32 * 1024 * 1024
 MAX_STDERR_BYTES = 64 * 1024
@@ -30,7 +30,8 @@ def native_project_path() -> Path:
 
 def _native_argv() -> tuple[list[str] | None, str]:
     configured = os.environ.get("CUCP_NATIVE_HOST")
-    path = Path(configured) if configured else repo_root() / "pcucp-next" / "bin" / "native" / "PcuCp.NativeHost.exe"
+    default = (repo_root() / "native" if frozen() else repo_root() / "pcucp-next" / "bin" / "native") / "PcuCp.NativeHost.exe"
+    path = Path(configured) if configured else default
     if not path.is_absolute():
         return None, "CUCP_NATIVE_HOST must be an absolute executable or DLL path"
     if not path.is_file():

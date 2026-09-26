@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from .native_host import _terminate_process_tree
-from .protocol import repo_root
+from .protocol import frozen, repo_root
 
 
 def legacy_wrapper_path() -> Path:
@@ -16,6 +16,9 @@ def legacy_wrapper_path() -> Path:
 def run_legacy(args: list[str], *, timeout_s: float = 60.0) -> int:
     """Explicit compatibility route only; no shell construction or automatic retry."""
     import os
+    if frozen():
+        print("Legacy PowerShell is source-only and is not included in the portable engine.", file=sys.stderr)
+        return 2
     wrapper = legacy_wrapper_path()
     if not wrapper.exists():
         print(f"legacy wrapper not found: {wrapper}", file=sys.stderr)

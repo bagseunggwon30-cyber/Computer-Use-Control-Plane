@@ -124,15 +124,15 @@ Describe "pcucp-next fast smoke - structure" {
 }
 
 Describe "pcucp-next fast smoke - python router" {
-  It "reports the target language split and component paths" @skipPython {
+  It "reports language roles and source component paths" @skipPython {
     $r = Invoke-PcuCpPython -ArgList @("version", "--json")
     $r.ExitCode | Should Be 0
     $obj = $r.Raw | ConvertFrom-Json
     $obj.schema | Should Be "pcucp.version/v1"
     $obj.status | Should Be "ok"
-    $obj.language_targets.powershell | Should Be "15-25%"
-    $obj.language_targets.python | Should Be "35-45%"
-    $obj.language_targets.dotnet | Should Be "20-30%"
+    $obj.language_roles.powershell | Should Match "legacy"
+    $obj.language_roles.python | Should Match "session"
+    $obj.language_roles.dotnet | Should Match "Windows"
     $obj.components.python_cli | Should Not BeNullOrEmpty
     $obj.components.native_host_project | Should Not BeNullOrEmpty
     $obj.components.legacy_wrapper | Should Not BeNullOrEmpty

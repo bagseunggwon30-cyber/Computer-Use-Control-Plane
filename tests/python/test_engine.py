@@ -282,6 +282,62 @@ class EngineTests(unittest.TestCase):
         self.assertEqual([call[0] for call in self.native.calls], ['focus', 'screenshot'])
         self.assertTrue(result['data']['observation_id'])
 
+    def test_double_click_uses_one_native_action_then_observes(self):
+        token = self.observe()
+        result = self.request('click', {'observation_id': token, 'x': 25, 'y': 30, 'count': 2})
+        self.assertEqual(result['status'], 'ok', result)
+        self.assertEqual([c[0] for c in self.native.calls], ['screenshot', 'click', 'screenshot'])
+        args = self.native.calls[1][1]
+        self.assertEqual(args[args.index('--count') + 1], '2')
+        self.assertNotEqual(token, result['data']['observation_id'])
+
+    def test_invalid_click_count_sends_no_input(self):
+        token = self.observe()
+        for count in (0, 3, True, 1.5, '2'):
+            result = self.request('click', {'observation_id': token, 'x': 0, 'y': 0, 'count': count})
+            self.assert_error_code(result, 'invalid_argument')
+        self.assertEqual([c[0] for c in self.native.calls], ['screenshot'])
+
+    def test_wait_window_is_read_only_and_waits_for_title_and_pid(self):
+        def sleep(seconds):
+            self.now += seconds
+        self.session.sleep = sleep
+        self.session.allow_live_control = False
+        self.native.queue('windows', envelope('windows', data={'windows': []}),
+            envelope('windows', data={'windows': [{'hwnd': '0x20', 'process_id': 42, 'title': '메모장 - TEST'}]}))
+        result = self.request('wait-window', {'title': 'test', 'pid': 42, 'timeout_ms': 500})
+        self.assertEqual(result['status'], 'ok', result)
+        self.assertEqual(result['data']['attempts'], 2)
+        self.assertEqual(result['data']['windows'][0]['hwnd'], '0x20')
+        self.assertEqual([c[0] for c in self.native.calls], ['windows', 'windows'])
+        self.assertIsNone(self.session.observation)
+
+    def test_wait_window_timeout_is_bounded_and_does_not_focus(self):
+        self.session.sleep = lambda seconds: setattr(self, 'now', self.now + seconds)
+        result = self.request('wait-window', {'title': 'absent', 'timeout_ms': 500})
+        self.assert_error_code(result, 'window_wait_timeout')
+        self.assertEqual(self.now, 100.5)
+        self.assertEqual(len(self.native.calls), 2)
+        self.assertLessEqual(self.native.calls[-1][2]['timeout_s'], 0.25)
+
+    def test_wait_window_ambiguity_and_native_failure_stop(self):
+        self.native.queue('windows', envelope('windows', data={'windows': [
+            {'hwnd': '0x20', 'process_id': 42, 'title': 'Test'},
+            {'hwnd': '0x21', 'process_id': 43, 'title': 'Test'}]}))
+        result = self.request('wait-window', {'title': 'Test'})
+        self.assert_error_code(result, 'ambiguous_target')
+        self.assertEqual(len(result['data']['windows']), 2)
+        self.native.queue('windows', (1, None, 'native died'))
+        result = self.request('wait-window', {'title': 'Test'})
+        self.assert_error_code(result, 'native_unavailable')
+        self.assertEqual(len(self.native.calls), 2)
+
+    def test_invalid_wait_arguments_never_enumerate(self):
+        for args in ({'title': ''}, {'title': ' '}, {'title': 'x', 'timeout_ms': 0},
+                     {'title': 'x', 'timeout_ms': 10001}, {'title': 'x', 'poll_ms': 0}, {'title': 'x', 'pid': True}):
+            self.assert_error_code(self.request('wait-window', args), 'invalid_argument')
+        self.assertEqual(self.native.calls, [])
+
 
 if __name__ == '__main__':
     unittest.main()
