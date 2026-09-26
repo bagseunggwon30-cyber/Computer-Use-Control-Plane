@@ -12,6 +12,7 @@ Standalone commands retain one JSON document on stdout. Publish once with
 | Command | Arguments |
 | --- | --- |
 | `version` | None |
+| `serve` | Optional startup `--allow-live-control`; inherited JSONL stdin/stdout |
 | `windows` | None |
 | `uia-tree` | Optional `--hwnd 0xHEX --pid INT`, `--max-depth 0..12` (1), `--max-nodes 1..2000` (200), `--deadline-ms 50..10000` (1500) |
 | `ocr-image` | `--path FILE`, optional `--language TAG`; existing OCR payload retained |

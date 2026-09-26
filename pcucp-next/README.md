@@ -132,7 +132,8 @@ npm run test:engine
 | Pi 실제 패키지 타입 검사·Node 프로세스 테스트·Python 엔진 연결 | 통과 |
 | C# 전체 소스, 실제 .NET 8/WPF/Windows SDK 참조를 사용한 Roslyn 컴파일 | 경고를 오류로 처리하여 통과 |
 | 네이티브 ABI·좌표 계산·인자 계약 검사 | 통과 |
-| 레거시 Pester | PowerShell 런타임 부재로 미실행 |
+| Windows CI .NET 빌드·상주 네이티브 전송 | 빌드 및 전송 검사 12개 통과 |
+| 레거시 Pester 5 회귀 검사 | Windows CI에서 14개 통과 |
 | Windows `dotnet publish`와 실제 GUI 조작 | 미검증 |
 
-이 환경에서는 표준 MSBuild 실행도 환경의 프로세스 메타데이터 문제로 완료하지 못했습니다. 직접 컴파일과 계산 계약 검증은 Windows 게시·실행 검증을 대신하지 않습니다. Python·Node의 모의/프로세스 통합 검증 또한 실제 Windows GUI 작동의 증거와 구분합니다. **이번 개발 환경에서는 Windows 화면 캡처·실제 입력·한글 IME·UAC·다중 모니터를 실행 검증하지 못했습니다.** 기존 `pcucp-next.Fast.Tests.ps1`은 일부 Windows 기능을 다루는 별도 테스트이며 새 계약 전체의 합격 기준을 대신하지 않습니다.
+로컬 Linux 환경의 MSBuild 제한은 남아 있지만 [Windows CI](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36216294498)에서 표준 .NET 빌드와 실제 네이티브 프로세스 통신을 확인했습니다. 이 검사는 Windows 게시·GUI 입력 검증을 대신하지 않습니다. Python·Node의 모의/프로세스 통합 검증 또한 실제 Windows GUI 작동의 증거와 구분합니다. **이번 개발 환경에서는 Windows 화면 캡처·실제 입력·한글 IME·UAC·다중 모니터를 실행 검증하지 못했습니다.** 기존 `pcucp-next.Fast.Tests.ps1`은 일부 Windows 기능을 다루는 별도 테스트이며 새 계약 전체의 합격 기준을 대신하지 않습니다.

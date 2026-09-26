@@ -44,4 +44,6 @@ python -m unittest discover -s tests/python -p test_native_session.py -v
 
 0.2.0의 첫 GitHub 실행에서는 Windows C# 빌드·네이티브 계약 검사가 통과했다. Pester 4 설치는 기존 Pester 5와의 인증서 차이로 실패했다. 이번 변경은 회귀 테스트를 Pester 5 실행 단계에 맞추고, 설치된 Pester 5를 사용한다. 서명 검사를 끄지 않는다.
 
+[Windows GitHub 검사](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36216294498)에서도 표준 .NET 빌드, 네이티브 계약 12,199개, 상주 전송 테스트 12개, Pester 5 회귀 테스트 14개가 모두 통과했다. Linux 작업도 통과했다.
+
 Windows 실제 화면·UIA·입력·한글·관리자 앱·혼합 DPI 검증과 지연 측정은 별도 필요하다. 상주 구조만으로 모든 앱 동작이나 속도 향상을 보장하지 않는다.

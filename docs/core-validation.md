@@ -1,5 +1,16 @@
 # Core preview validation — 2026-09-26
 
+This document records the initial 0.2.0 preview. See
+[the resident-session validation](resident-native-session.md) for the 0.3.0
+implementation and its 72 Python / 12,199 native assertions.
+
+After publication, the Windows .NET build and native contracts passed on
+[the first GitHub run](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36215990046).
+The Pester 4 installation failed due to a certificate-chain mismatch against the
+preinstalled Pester 5. The follow-up migrated the regression suite to Pester 5;
+[the subsequent Windows run](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36216294498)
+passed the build, 12 resident-transport tests and 14 Pester regressions.
+
 Base revision: `adc2413760d9b94525d666fa3c598594300644fc`.
 Development branch: `feature/pi-computer-use-core`.
 
@@ -24,8 +35,8 @@ coordinate ranges; they do not represent 12,184 end-to-end application tasks.
 
 ## Remaining release gates
 
-- Run the Windows build/publish and both new Pester regression and compatibility
-  suites. No PowerShell runtime was available in this development environment.
+- Run self-contained Windows publishing and the older compatibility suite.
+  The Windows build and new Pester regressions have since passed in CI.
 - Exercise real capture, UIA, input and cancellation on a dedicated interactive
   Windows desktop, including Korean text/IME and application acceptance.
 - Verify mixed DPI and negative-origin monitors, occlusion, focus races, window
@@ -37,7 +48,7 @@ coordinate ranges; they do not represent 12,184 end-to-end application tasks.
   the same as Job Object ownership when a parent crashes first.
 
 The GitHub workflow specifies Linux contract checks and Windows compilation /
-Pester checks. It has not run remotely as part of this local change. Hosted CI
+Pester checks. The remote follow-up results are linked above. Hosted CI
 compilation is not evidence of interactive desktop behavior.
 
 See [the roadmap](core-modernization.md) for the generic Windows test matrix and

@@ -242,12 +242,13 @@ Pi peer packages and TypeScript development dependencies; see
 
 ## Verification
 
-Core preview validation: 60 Python tests, 15 Pi tests, TypeScript checking and
+Core preview validation: 72 Python tests with a configured native test host,
+15 Pi tests, TypeScript checking and
 the Pi-to-real-Python smoke check pass. Native source compiles against .NET 8,
 WPF and Windows SDK reference assemblies, with separate ABI/geometry/argument
-checks. Actual Windows GUI behavior, normal Windows publishing and PowerShell
-tests remain unverified in this development environment. The new CI workflow
-defines the Windows build and regression gates.
+checks. [Windows CI](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36216294498)
+also passed the .NET build, 12 resident-transport tests and 14 Pester regressions.
+Actual Windows GUI behavior and self-contained publishing remain separate gates.
 
 Historical baseline verification recorded before the core preview (not rerun
 as evidence for the current changes):

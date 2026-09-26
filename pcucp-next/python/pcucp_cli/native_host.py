@@ -19,7 +19,7 @@ from .protocol import repo_root
 
 MAX_STDOUT_BYTES = 32 * 1024 * 1024
 MAX_STDERR_BYTES = 64 * 1024
-_PROCESS_LOCK = threading.Lock()
+_PROCESS_LOCK = threading.RLock()  # SIGINT/SIGTERM cleanup may re-enter on the owner thread.
 _PROCESSES: set[subprocess.Popen[bytes]] = set()
 
 
