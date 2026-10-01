@@ -200,6 +200,17 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
             self.assertEqual(len(actual), len(cases))
             if parsed_feed and os.environ.get("CUCP_NATIVE_TEST_HOST"):
                 self.check_native_parsed_dispatch(actual_inputs, expected)
+                # The actual retained PS entry point must preserve the same full
+                # plans, including parser diagnostics, through native stdin.
+                bridge_runner = root / "bridge.ps1"
+                bridge_runner.write_text(runner.read_text(encoding="utf-8-sig").replace(
+                    "@('_Read-OptValue','_Safety-Truncate','_Classify-SafetyFromText','_Parse-WorkflowStepTokens','_Read-WorkflowStepSpecs','_Build-WorkflowPlan')",
+                    "@('_Invoke-LegacyCompatibility','_Parse-WorkflowStepTokens','_Read-WorkflowStepSpecs','_Build-WorkflowPlan')"), encoding="utf-8-sig")
+                bridged = subprocess.run([self.powershell, "-NoProfile", "-NonInteractive", "-File", str(bridge_runner),
+                    "-SourcePath", str(ROOT / "scripts/cucp.ps1"), "-InputPath", str(inputs)],
+                    env={**os.environ, "CUCP_NATIVE_HOST": os.environ["CUCP_NATIVE_TEST_HOST"]}, capture_output=True, timeout=180)
+                self.assertEqual(bridged.returncode, 0, bridged.stderr.decode(errors="replace"))
+                self.assertEqual([value["expected"] for value in json.loads(bridged.stdout.decode("utf-8-sig"))], expected)
             return list(zip(cases, expected, actual))
 
     def check_native_parsed_dispatch(self, fixtures, expected):

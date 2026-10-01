@@ -167,3 +167,7 @@ The fix and new parsed-feed path require a subsequent Windows run.
 The same run confirmed the separately reported conservative grammar gaps.
 The candidate remains excluded from production and is still not a qualified
 replacement for the PowerShell parser.
+
+## Qualified plan-body retirement
+
+Checkpoint `2d8443d789a319f232ea5e28c53522f9eb551527`, run `36898932493`, passed all four jobs. The complete 254-case original-PSParser-fed assembly comparison and eight actual native dispatcher cases passed. The retained `_Build-WorkflowPlan` now only tokenizes with the original parser and forwards parsed data to the qualified assembler. No candidate grammar is shipped or substituted. This removes a net **4,541 further PS bytes**, including operation-routing overhead. The same suite now exercises this actual PS adapter across the whole corpus; its next-commit qualification remains required.

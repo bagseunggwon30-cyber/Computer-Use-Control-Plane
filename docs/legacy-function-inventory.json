@@ -1,6 +1,6 @@
 {
-  "baseline_commit": "8a8426ae5319e71fd9a3655e04a99ef291fbb51e",
-  "note": "Current retained legacy functions after qualified OCR and safety body retirement, plus compiled C# interop extraction. Source baseline remains in normal Git history; compatibility bridges are explicit.",
+  "baseline_commit": "9ffa354b9904235835a7bc6eb78ed8d3d76317c8",
+  "note": "Current retained legacy function navigation after qualified OCR/safety/coordinate/workflow-body retirement and compiled C# interop extraction. The exact workflow tokenizer and unqualified families remain. Git history holds the baseline.",
   "files": [
     {
       "path": "scripts/cucp-helper-server.ps1",
@@ -312,7 +312,7 @@
     },
     {
       "path": "scripts/cucp.ps1",
-      "lines": 14212,
+      "lines": 14111,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -980,207 +980,207 @@
         },
         {
           "name": "Invoke-MacroWorkflowPlan",
-          "line": 9370
+          "line": 9269
         },
         {
           "name": "Invoke-MacroWorkflowRun",
-          "line": 9383
+          "line": 9282
         },
         {
           "name": "_TaskPlan-QuoteToken",
-          "line": 9769
+          "line": 9668
         },
         {
           "name": "_TaskPlan-StepString",
-          "line": 9777
+          "line": 9676
         },
         {
           "name": "_TaskPlan-UnwrapCommand",
-          "line": 9793
+          "line": 9692
         },
         {
           "name": "_AppStrategy-NormalizeRoute",
-          "line": 9801
+          "line": 9700
         },
         {
           "name": "_AppStrategy-Key",
-          "line": 9820
+          "line": 9719
         },
         {
           "name": "_AppStrategy-Read",
-          "line": 9829
+          "line": 9728
         },
         {
           "name": "_AppStrategy-LastGood",
-          "line": 9842
+          "line": 9741
         },
         {
           "name": "_AppStrategy-Append",
-          "line": 9852
+          "line": 9751
         },
         {
           "name": "_AppProfile-StrategyScore",
-          "line": 9895
+          "line": 9794
         },
         {
           "name": "Invoke-MacroAppProfile",
-          "line": 9998
+          "line": 9897
         },
         {
           "name": "Invoke-MacroTaskPreset",
-          "line": 10349
+          "line": 10248
         },
         {
           "name": "Invoke-MacroTaskPlan",
-          "line": 10640
+          "line": 10539
         },
         {
           "name": "Invoke-MacroTaskRun",
-          "line": 10903
+          "line": 10802
         },
         {
           "name": "Invoke-MacroFormPlan",
-          "line": 11044
+          "line": 10943
         },
         {
           "name": "Invoke-MacroFormRun",
-          "line": 11216
+          "line": 11115
         },
         {
           "name": "Invoke-MacroSmartClick",
-          "line": 11456
+          "line": 11355
         },
         {
           "name": "Invoke-MacroWatch",
-          "line": 11960
+          "line": 11859
         },
         {
           "name": "Invoke-MacroOcrScreen",
-          "line": 12033
+          "line": 11932
         },
         {
           "name": "Invoke-MacroOcrImage",
-          "line": 12062
+          "line": 11961
         },
         {
           "name": "Invoke-MacroOcrFindText",
-          "line": 12086
+          "line": 11985
         },
         {
           "name": "Invoke-MacroOcrClick",
-          "line": 12129
+          "line": 12028
         },
         {
           "name": "Invoke-MacroOcrUiaFuse",
-          "line": 12203
+          "line": 12102
         },
         {
           "name": "Invoke-MacroOcrUiaInvoke",
-          "line": 12246
+          "line": 12145
         },
         {
           "name": "Invoke-MacroScreenshotDiff",
-          "line": 12288
+          "line": 12187
         },
         {
           "name": "Invoke-MacroClickAndVerifyScreen",
-          "line": 12327
+          "line": 12226
         },
         {
           "name": "Invoke-MacroAutoDo",
-          "line": 12424
+          "line": 12323
         },
         {
           "name": "_Trajectory-Append",
-          "line": 12533
+          "line": 12432
         },
         {
           "name": "_Trajectory-Read",
-          "line": 12557
+          "line": 12456
         },
         {
           "name": "_Trajectory-Clear",
-          "line": 12571
+          "line": 12470
         },
         {
           "name": "_History-Append",
-          "line": 12595
+          "line": 12494
         },
         {
           "name": "_History-PickBestStrategy",
-          "line": 12634
+          "line": 12533
         },
         {
           "name": "_History-Stats",
-          "line": 12681
+          "line": 12580
         },
         {
           "name": "_Helper-IsUp",
-          "line": 12718
+          "line": 12617
         },
         {
           "name": "_Helper-Ensure",
-          "line": 12723
+          "line": 12622
         },
         {
           "name": "Invoke-MacroSession",
-          "line": 12744
+          "line": 12643
         },
         {
           "name": "_Cucp-RedactSecrets",
-          "line": 12962
+          "line": 12861
         },
         {
           "name": "Invoke-MacroCdpDeepFind",
-          "line": 12986
+          "line": 12885
         },
         {
           "name": "Invoke-MacroImePaste",
-          "line": 13039
+          "line": 12938
         },
         {
           "name": "Invoke-MacroSafeTypeIme",
-          "line": 13091
+          "line": 12990
         },
         {
           "name": "Invoke-MacroModalDetect",
-          "line": 13171
+          "line": 13070
         },
         {
           "name": "Invoke-MacroRecoveryPlan",
-          "line": 13204
+          "line": 13103
         },
         {
           "name": "Invoke-MacroRecoveryRun",
-          "line": 13309
+          "line": 13208
         },
         {
           "name": "Invoke-MacroPrecisionValidate",
-          "line": 13408
+          "line": 13307
         },
         {
           "name": "Invoke-MacroBenchmark",
-          "line": 13504
+          "line": 13403
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 13645
+          "line": 13544
         },
         {
           "name": "Invoke-MacroCdpProseMirrorInsert",
-          "line": 13759
+          "line": 13658
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 13833
+          "line": 13732
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 13948
+          "line": 13847
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 14044
+          "line": 13943
         }
       ]
     }
@@ -1249,8 +1249,32 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 977889,
-    "removed": 35589,
+    "current": 973348,
+    "removed": 40130,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
-  }
+  },
+  "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
+  "retired_bodies": [
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_Classify-SafetyFromText",
+      "replacement": "pcucp-next/dotnet/PcuCp.NativeHost/LegacySafetyKernel.cs",
+      "adapter": "bounded native stdin; fail closed",
+      "evidence": "kernel and actual retained bridge passed by 2d8443d/run36898932493"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_Build-CoordMap",
+      "replacement": "pcucp-next/dotnet/PcuCp.NativeHost/LegacyCoordinateKernel.cs",
+      "adapter": "window/virtual-screen/hit-test/profile acquisition retained",
+      "evidence": "115 kernel and actual adapter comparisons passed at 2d8443d/run36898932493"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_Build-WorkflowPlan",
+      "replacement": "pcucp-next/dotnet/PcuCp.NativeHost/LegacyWorkflowKernel.cs",
+      "adapter": "original PSParser and step reader retained verbatim",
+      "evidence": "254 exact parser-fed plans plus 8 native dispatcher cases passed at 2d8443d / run 36898932493; new retained adapter check pending"
+    }
+  ]
 }

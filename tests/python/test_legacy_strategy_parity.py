@@ -53,7 +53,23 @@ class StrategyFixtureTests(unittest.TestCase):
 class LegacyStrategyParityTests(unittest.TestCase):
     maxDiff = None
     def test_whole_strategy_results_match_pinned_powershell(self):
-        cases = strategy_cases()
+        self.compare_cases(strategy_cases())
+
+    def test_process_local_culture_parity(self):
+        project = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyStrategy.CultureTests'
+        with tempfile.TemporaryDirectory(prefix='CUCP culture harness ') as temp:
+            build = subprocess.run([shutil.which('dotnet'), 'build', str(project), '-c', 'Release', '--output', temp], capture_output=True, timeout=90)
+            self.assertEqual(build.returncode, 0, build.stdout.decode('utf-8', errors='replace') + build.stderr.decode('utf-8', errors='replace'))
+            host = Path(temp) / 'PcuCp.LegacyStrategy.CultureTests.dll'
+            cases = []
+            for order in (['I', 'i', 'İ', 'ı'], ['é', 'e\u0301'], ['가', '가'], ['ä', 'a', 'å'], ['straße', 'strasse']):
+                for routes in (order, list(reversed(order))):
+                    cases.append({'operation': 'strategy-score', 'args': {'route_order': routes, 'labels': order + order}})
+            for culture in ('en-US', 'ko-KR', 'tr-TR', ''):
+                with self.subTest(culture=culture):
+                    self.compare_cases(cases, culture=culture, fixture_host=host)
+
+    def compare_cases(self, cases, culture=None, fixture_host=None):
         source_data = subprocess.check_output(['git', 'show', f'{BASELINE_TREE}:scripts/cucp.ps1'], cwd=ROOT)
         with tempfile.TemporaryDirectory(prefix='CUCP strategy 한글 ') as temp:
             root = Path(temp)
@@ -61,7 +77,8 @@ class LegacyStrategyParityTests(unittest.TestCase):
             source.write_bytes(source_data)
             inputs.write_text(json.dumps(cases, ensure_ascii=True), encoding='utf-8-sig')
             runner.write_text(r'''
-param([string]$SourcePath,[string]$InputPath)
+param([string]$SourcePath,[string]$InputPath,[string]$CultureName,[switch]$SetCulture)
+if ($SetCulture) { [Threading.Thread]::CurrentThread.CurrentCulture=[Globalization.CultureInfo]::GetCultureInfo($(if ($CultureName -eq '__invariant__') { '' } else { $CultureName })) }
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 $tokens=$null; $errors=$null
@@ -84,15 +101,15 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
 [Console]::Out.WriteLine((ConvertTo-Json -InputObject @($results) -Depth 32 -Compress))
 ''', encoding='utf-8-sig')
             baseline = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(runner),
-                                       '-SourcePath', str(source), '-InputPath', str(inputs)], capture_output=True, timeout=30)
+                                       '-SourcePath', str(source), '-InputPath', str(inputs), *([] if culture is None else ['-SetCulture', '-CultureName', culture or '__invariant__'])], capture_output=True, timeout=30)
             self.assertEqual(baseline.returncode, 0, baseline.stderr.decode('utf-8', errors='replace'))
             expected = json.loads(baseline.stdout.decode('utf-8-sig'))
             self.assertEqual(len(expected), len(cases))
-            host = Path(os.environ['CUCP_NATIVE_TEST_HOST'])
+            host = fixture_host or Path(os.environ['CUCP_NATIVE_TEST_HOST'])
             native = [str(host)] if host.suffix.lower() == '.exe' else [shutil.which('dotnet'), str(host)]
             for case, before in zip(cases, expected):
                 with self.subTest(case=case):
-                    result = subprocess.run([*native, 'legacy-compat'], input=json.dumps({'schema': 'cucp.legacy-compat/v1', **case}, ensure_ascii=True).encode(),
+                    result = subprocess.run([*native, *( ['legacy-compat'] if culture is None else [culture])], input=json.dumps({'schema': 'cucp.legacy-compat/v1', **case}, ensure_ascii=True).encode(),
                                             capture_output=True, timeout=10)
                     self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8', errors='replace'))
                     after = json.loads(result.stdout.decode('utf-8-sig'))

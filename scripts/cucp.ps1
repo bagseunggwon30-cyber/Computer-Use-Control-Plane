@@ -2387,7 +2387,7 @@ function _Macro-NotImplemented {
 }
 
 function _Invoke-LegacyCompatibility {
-  param([ValidateSet('safety-classify','coord-map')][string]$Operation, [hashtable]$Arguments)
+  param([ValidateSet('safety-classify','coord-map','workflow-plan-from-parsed')][string]$Operation, [hashtable]$Arguments)
   # Compatibility only: pure logic now lives in bounded C# kernels. No shell or desktop calls.
   $native = $env:CUCP_NATIVE_HOST
   if (-not $native) { $native = Join-Path $PSScriptRoot '..\pcucp-next\bin\native\PcuCp.NativeHost.exe' }
@@ -9254,117 +9254,16 @@ function _Read-WorkflowStepSpecs {
 
 function _Build-WorkflowPlan {
   param([string[]]$Rest)
-  $stepSpecs = @(_Read-WorkflowStepSpecs -Rest $Rest)
-  $name = _Read-OptValue -Rest $Rest -Name "--name"
-  if ($stepSpecs.Count -eq 0) { throw "macro workflow-plan/run requires --step `"macro <name> ...`"" }
-
-  $readOnlyMacros = @(
-    "windows","native-windows","wait-window","wait-label","find-label","list-affordances",
-    "health-quick","health-detail","native-health","metrics","perf","log-tail","diagnose-lag",
-    "session","trajectory","history","screenshot","native-screenshot",
-    "safety-classify","coord-profile","coord-map","coord-anchor","hit-test","hit-test-batch","hit-scan","point-plan","target-validate","smart-plan","app-profile","task-preset","task-plan","form-plan",
-    "cdp-detect","cdp-smart-find","cdp-smart-type-find",
-    "ocr-screen","ocr-image","ocr-find-text","ocr-uia-fuse","screenshot-diff",
-    "cdp-deep-find","modal-detect","recovery-plan","precision-validate","benchmark","release-notes"
-  )
-  $liveMacros = @(
-    "app-launch","app-close","with-app","focus-window","focus-verify",
-    "click-label","double-click-label","right-click-label","click-id","click-point",
-    "fill-label","shortcut","shortcut-native","type-native","uia-click-label",
-    "uia-invoke","uia-set-value","uia-toggle","safe-type","smart-click","form-run",
-    "icon-click","vision-click","vision-click-precise","click-and-verify",
-    "click-and-verify-screen","ocr-click","ocr-uia-invoke","cdp-type","cdp-click",
-    "cdp-eval","cdp-smart-click","cdp-smart-type","auto-do","goal","notify","multi-select",
-    "multi-edit","clipboard","process","registry",
-    "ime-paste","safe-type-ime","recovery-run"
-  )
-  $blockedMacros = @("workflow-plan","workflow-run")
-  $steps = New-Object System.Collections.ArrayList
-  $errors = New-Object System.Collections.ArrayList
-  $index = 0
-
-  foreach ($raw in $stepSpecs) {
-    $index++
-    $parsed = _Parse-WorkflowStepTokens -Step "$raw"
-    if (-not $parsed.ok) {
-      [void]$errors.Add([pscustomobject]@{ index=$index; code=$parsed.error; message=$parsed.detail; step="$raw" })
-      continue
-    }
-    $cmd = @($parsed.tokens)
-    if ($cmd.Count -eq 0) {
-      [void]$errors.Add([pscustomobject]@{ index=$index; code="empty_step"; message="empty workflow step"; step="$raw" })
-      continue
-    }
-    if ($cmd[0] -ne "macro") { $cmd = @("macro") + $cmd }
-    if ($cmd.Count -lt 2) {
-      [void]$errors.Add([pscustomobject]@{ index=$index; code="missing_macro_name"; message="step must name a macro"; step="$raw" })
-      continue
-    }
-    $macroName = "$($cmd[1])"
-    $allowed = $false
-    $liveRequired = $false
-    $reason = ""
-    if ($blockedMacros -contains $macroName) {
-      $allowed = $false
-      $reason = "recursive_workflow_blocked"
-    } elseif ($macroName -eq "session") {
-      $sessionAction = if ($cmd.Count -ge 3) { "$($cmd[2])" } else { "info" }
-      $allowed = $sessionAction -in @("info", "helper-status", "autostart-status")
-      $liveRequired = -not $allowed
-      $reason = if ($allowed) { "read_only_session_action" } else { "mutating_session_action_not_in_workflow_allowlist" }
-    } elseif ($readOnlyMacros -contains $macroName) {
-      $allowed = $true
-      $liveRequired = $false
-      $reason = "read_only_macro"
-    } elseif ($liveMacros -contains $macroName) {
-      $allowed = $true
-      $liveRequired = $true
-      $reason = "live_macro"
-    } else {
-      $allowed = $false
-      $reason = "macro_not_in_workflow_allowlist"
-    }
-    if (-not $allowed) {
-      [void]$errors.Add([pscustomobject]@{ index=$index; code=$reason; message="workflow step macro is not allowed"; macro=$macroName; step="$raw" })
-    }
-    $safety = _Classify-SafetyFromText -Text ((@($cmd) -join " ")) -MacroName $macroName
-    $requiresSensitiveConfirmation = ([bool]$liveRequired -and [bool]$safety.requires_explicit_confirmation)
-    [void]$steps.Add([pscustomobject]@{
-      index = $index
-      raw = "$raw"
-      macro = $macroName
-      command = @($cmd)
-      allowed = [bool]$allowed
-      live_required = [bool]$liveRequired
-      reason = $reason
-      safety = $safety
-      requires_sensitive_confirmation = [bool]$requiresSensitiveConfirmation
-    })
+  # Retain the exact legacy PSParser language; only policy/plan assembly is C#.
+  $parsed = New-Object System.Collections.ArrayList
+  foreach ($spec in @(_Read-WorkflowStepSpecs -Rest $Rest)) {
+    [void]$parsed.Add((_Parse-WorkflowStepTokens -Step "$spec"))
   }
-
-  $allowedCount = @($steps | Where-Object { $_.allowed }).Count
-  $liveCount = @($steps | Where-Object { $_.live_required }).Count
-  $sensitiveCount = @($steps | Where-Object { $_.requires_sensitive_confirmation }).Count
-  $safeToRun = ($steps.Count -gt 0 -and $allowedCount -eq $steps.Count -and $errors.Count -eq 0)
-  return [pscustomobject]@{
-    schema = "cucp.workflow-plan/v1"
-    status = if ($safeToRun) { "ok" } else { "partial" }
-    name = $name
-    step_count = $steps.Count
-    allowed_count = $allowedCount
-    live_step_count = $liveCount
-    sensitive_step_count = $sensitiveCount
-    requires_sensitive_confirmation = [bool]($sensitiveCount -gt 0)
-    safe_to_run = [bool]$safeToRun
-    safety_policy = [pscustomobject]@{
-      schema = "cucp.safety-policy/v1"
-      confirmation_flag = "--confirm-sensitive"
-      levels_requiring_confirmation = @("medium","high","critical")
-      categories_requiring_confirmation = @("credentials","payment","destructive","external_send","identity_or_privacy","system_change","app_settings")
-    }
-    steps = @($steps)
-    errors = @($errors)
+  $result = _Invoke-LegacyCompatibility -Operation 'workflow-plan-from-parsed' -Arguments @{rest=@($Rest); parsed_steps=@($parsed)}
+  if ($result.schema -ne 'cucp.workflow-plan/v1' -or $result.status -notin @('ok','partial') -or $result.safe_to_run -isnot [bool] -or $result.requires_sensitive_confirmation -isnot [bool]) {
+    throw 'Invalid workflow plan response; execution remains blocked.'
   }
+  return $result
 }
 
 function Invoke-MacroWorkflowPlan {

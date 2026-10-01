@@ -40,3 +40,10 @@ accumulated weight and reason order. Hashing with .NET 8 ICU is avoided.
 Four isolated canonical-variant cases and complete failure diffs were added;
 all original exact assertions remain. This correction still needs Windows
 differential qualification before the PowerShell bodies can be retired.
+
+A separate test-only net8 culture harness links the exact candidate source and
+changes only its process culture. Ten targeted route/label fixtures are compared
+under en-US, ko-KR, tr-TR and invariant cultures against process-local Windows
+PowerShell 5.1 cultures. This checks the historical hashtable comparator rather
+than assuming an en-US success establishes non-English key merging. It changes
+no OS or user settings. The original production 89-case dispatcher check remains.

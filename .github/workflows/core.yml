@@ -100,6 +100,15 @@ jobs:
           $env:CUCP_LEGACY_INTEROP_TEST_DLL = (Resolve-Path 'pcucp-next/bin/legacy/PcuCp.LegacyInterop.dll').Path
           python -m unittest discover -s tests/python -p test_legacy_interop.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Legacy image decoder and pixel-diff qualification (generated files only)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          python pcucp-next/packaging/publish_legacy_images.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CUCP_LEGACY_IMAGES_TEST_DLL = (Resolve-Path 'pcucp-next/bin/legacy/PcuCp.LegacyImages.dll').Path
+          python -m unittest discover -s tests/python -p test_legacy_images.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - shell: pwsh
         run: |
           Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
