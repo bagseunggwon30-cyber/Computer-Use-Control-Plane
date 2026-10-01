@@ -95,7 +95,8 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
             source.write_bytes(original)
             inputs.write_text(json.dumps(cases, ensure_ascii=True), encoding='utf-8-sig')
             runner.write_text(r"""
-param([string]$SourcePath, [string]$InputPath, [switch]$Bridge)
+param([string]$SourcePath, [string]$InputPath, [switch]$Bridge, [switch]$SetCulture, [string]$CultureName)
+if ($SetCulture) { [Threading.Thread]::CurrentThread.CurrentCulture=[Globalization.CultureInfo]::GetCultureInfo($(if ($CultureName -eq '__invariant__') { '' } else { $CultureName })) }
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 $tokens=$null; $errors=$null
@@ -121,6 +122,19 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
                 env={**os.environ, 'CUCP_NATIVE_HOST': os.environ['CUCP_NATIVE_TEST_HOST']}, capture_output=True, timeout=90)
             self.assertEqual(after.returncode, 0, after.stderr.decode(errors='replace'))
             self.assertEqual(json.loads(after.stdout.decode('utf-8-sig')), json.loads(before.stdout.decode('utf-8-sig')))
+            # The caller's runspace culture is explicitly carried across the
+            # process boundary, including culture-sensitive regex case folding.
+            culture_cases = [{'operation': 'safety-classify', 'args': {'text': value, 'macro': 'type'}}
+                for value in ('password', 'PAſſWORD', 'İD CARD', 'ID CARD', '비밀번호', 'registry', 'settings', '--force')]
+            inputs.write_text(json.dumps(culture_cases, ensure_ascii=True), encoding='utf-8-sig')
+            for culture in ('en-US', 'ko-KR', 'tr-TR', ''):
+                with self.subTest(caller_culture=culture):
+                    before_culture = subprocess.run([*command, '-SourcePath', str(source), '-SetCulture', '-CultureName', culture or '__invariant__'], capture_output=True, timeout=30)
+                    after_culture = subprocess.run([*command, '-SourcePath', str(ROOT/'scripts/cucp.ps1'), '-Bridge', '-SetCulture', '-CultureName', culture or '__invariant__'],
+                        env={**os.environ, 'CUCP_NATIVE_HOST': os.environ['CUCP_NATIVE_TEST_HOST']}, capture_output=True, timeout=60)
+                    self.assertEqual(before_culture.returncode, 0, before_culture.stderr.decode(errors='replace'))
+                    self.assertEqual(after_culture.returncode, 0, after_culture.stderr.decode(errors='replace'))
+                    self.assertEqual(json.loads(after_culture.stdout.decode('utf-8-sig')), json.loads(before_culture.stdout.decode('utf-8-sig')))
             # A missing matching host must throw, never manufacture a low-risk reply.
             failed = subprocess.run([*command, '-SourcePath', str(ROOT/'scripts/cucp.ps1'), '-Bridge'],
                 env={**os.environ, 'CUCP_NATIVE_HOST': str(root/'missing.dll')}, capture_output=True, timeout=10)
@@ -132,3 +146,11 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
             request = {'schema': 'cucp.legacy-compat/v1', 'operation': 'safety-classify', 'args': args}
             result = subprocess.run([*self.native(), 'legacy-compat'], input=json.dumps(request).encode(), capture_output=True, timeout=10)
             self.assertNotEqual(result.returncode, 0)
+
+        for culture in (None, 1, [], {}, 'x' * 129):
+            request = {'schema': 'cucp.legacy-compat/v1', 'operation': 'safety-classify', 'args': {'text': 'password'}, 'culture': culture}
+            result = subprocess.run([*self.native(), 'legacy-compat'], input=json.dumps(request).encode(), capture_output=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+            response = json.loads(result.stdout.decode('utf-8-sig'))
+            self.assertEqual(response['status'], 'error')
+            self.assertEqual(response['errors'][0]['code'], 'invalid_arguments')

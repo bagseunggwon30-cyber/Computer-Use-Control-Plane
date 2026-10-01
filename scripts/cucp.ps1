@@ -2387,7 +2387,7 @@ function _Macro-NotImplemented {
 }
 
 function _Invoke-LegacyCompatibility {
-  param([ValidateSet('safety-classify','coord-map','workflow-plan-from-parsed')][string]$Operation, [hashtable]$Arguments)
+  param([ValidateSet('safety-classify','coord-map','workflow-plan-from-parsed','task-preset-prepare','task-preset-complete')][string]$Operation, [hashtable]$Arguments, [switch]$PreserveInvalidArguments)
   # Compatibility only: pure logic now lives in bounded C# kernels. No shell or desktop calls.
   $native = $env:CUCP_NATIVE_HOST
   if (-not $native) { $native = Join-Path $PSScriptRoot '..\pcucp-next\bin\native\PcuCp.NativeHost.exe' }
@@ -2406,7 +2406,7 @@ function _Invoke-LegacyCompatibility {
     $psi.FileName = $native
     $psi.Arguments = 'legacy-compat'
   } else { throw 'CUCP_NATIVE_HOST must be an executable or DLL, never a shell script.' }
-  $payload = @{schema='cucp.legacy-compat/v1'; operation=$Operation; args=$Arguments} | ConvertTo-Json -Depth 24 -Compress
+  $payload = @{schema='cucp.legacy-compat/v1'; operation=$Operation; args=$Arguments; culture=[Globalization.CultureInfo]::CurrentCulture.Name} | ConvertTo-Json -Depth 24 -Compress
   $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
   $bytes = $utf8.GetBytes($payload)
   if ($bytes.Length -gt 1048576) { throw 'Legacy compatibility request exceeds 1 MiB.' }
@@ -2434,6 +2434,10 @@ function _Invoke-LegacyCompatibility {
     if ($out.Length -gt 16777216 -or $err.Length -gt 65536) { throw 'Legacy compatibility response exceeds the protocol budget.' }
     $response = $out | ConvertFrom-Json -ErrorAction Stop
     if ($process.ExitCode -ne 0 -or $response.status -ne 'ok' -or $null -eq $response.data) {
+      $nativeErrors = @($response.errors)
+      if ($PreserveInvalidArguments -and $process.ExitCode -ne 0 -and $response.schema -eq 'pcucp.native/v1' -and $response.kind -eq 'legacy-compat' -and $response.status -eq 'error' -and $nativeErrors.Count -eq 1 -and $nativeErrors[0].code -eq 'invalid_arguments' -and $nativeErrors[0].message -is [string]) {
+        throw $nativeErrors[0].message
+      }
       throw ('Legacy compatibility operation failed; rebuild matching native runtime. ' + ($response.errors | ConvertTo-Json -Compress))
     }
     return $response.data
@@ -10247,292 +10251,56 @@ function Invoke-MacroAppProfile {
 
 function Invoke-MacroTaskPreset {
   param([string[]]$Rest)
-  $kind = _Read-OptValue -Rest $Rest -Name "--kind"
-  if (-not $kind) { $kind = _Read-OptValue -Rest $Rest -Name "--preset" }
-  if (-not $kind) { $kind = _Read-OptValue -Rest $Rest -Name "--type" }
   $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $kind = "$kind".ToLowerInvariant()
-  if (-not $kind) { throw "macro task-preset requires --kind document|mail|form-submit|file-upload|file-download|settings" }
-
-  $taskArgs = New-Object System.Collections.ArrayList
-  [void]$taskArgs.Add("macro")
-  [void]$taskArgs.Add("task-plan")
-  $presetMode = "task"
-  $workflowSteps = New-Object System.Collections.ArrayList
-  $extraCommands = New-Object System.Collections.ArrayList
-
-  function _PresetAdd {
-    param([string[]]$Items)
-    foreach ($it in @($Items)) {
-      if ($null -ne $it -and "$it" -ne "") { [void]$taskArgs.Add("$it") }
-    }
+  $preset = _Invoke-LegacyCompatibility -Operation 'task-preset-prepare' -Arguments @{rest=@($Rest)} -PreserveInvalidArguments
+  if ($preset.schema -ne 'cucp.task-preset-preparation/v1' -or $preset.mode -notin @('task','workflow') -or @($preset.queries).Count -ne 1) {
+    throw 'Invalid task preset preparation response; no planning query was executed.'
   }
-
-  function _PresetForwardValue {
-    param([string]$Name)
-    $v = _Read-OptValue -Rest $Rest -Name $Name
-    if ($v) { _PresetAdd -Items @($Name,$v) }
-  }
-
-  function _PresetForwardSwitch {
-    param([string]$Name)
-    if (_Read-Switch -Rest $Rest -Name $Name) { _PresetAdd -Items @($Name) }
-  }
-
+  $query = @($preset.queries)[0]
   function _PresetInvokeJson {
     param([string[]]$ChildArgs)
-    $rawLines = & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @ChildArgs 2>&1
+    $macroArgs = @($ChildArgs[1..($ChildArgs.Count - 1)])
+    $rawLines = & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -Quiet '--' @macroArgs 2>&1
     $exitCode = $LASTEXITCODE
     $raw = (($rawLines | ForEach-Object { $_.ToString() }) -join "`n")
     $obj = $null
     try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
     return [pscustomobject]@{ exit=[int]$exitCode; raw=$raw; json=$obj }
   }
-
-  $app = _Read-OptValue -Rest $Rest -Name "--app"
-  $waitTitle = _Read-OptValue -Rest $Rest -Name "--wait-title"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $notes = New-Object System.Collections.ArrayList
-
-  switch ($kind) {
-    "document" {
-      $text = _Read-OptValue -Rest $Rest -Name "--text"
-      if (-not $text) { $text = _Read-OptValue -Rest $Rest -Name "--body" }
-      if (-not $text) { throw "macro task-preset --kind document requires --text" }
-      if (-not $app) { $app = "notepad" }
-      if (-not $waitTitle) { $waitTitle = "Notepad" }
-      if (-not $match) { $match = $waitTitle }
-      _PresetAdd -Items @("--app",$app,"--wait-title",$waitTitle,"--match",$match,"--type-text",$text)
-      if (_Read-Switch -Rest $Rest -Name "--replace") { _PresetAdd -Items @("--pre-shortcut","ctrl+a") }
-      if (_Read-Switch -Rest $Rest -Name "--save") { _PresetAdd -Items @("--shortcut","ctrl+s") }
-      foreach ($shortcut in @(_Read-AllOptValues -Rest $Rest -Name "--shortcut")) { _PresetAdd -Items @("--shortcut",$shortcut) }
-      [void]$notes.Add("document preset maps to app launch/wait, optional replace, text input, optional save shortcut")
+  $elapsed = 0
+  if ($preset.mode -eq 'task') {
+    $childArgs = @($query.argv)
+    if ($query.kind -ne 'task_plan' -or $null -ne $query.rest -or $childArgs.Count -lt 4 -or
+        $childArgs[0] -ne '-Quiet' -or $childArgs[1] -ne 'macro' -or $childArgs[2] -ne 'task-plan' -or
+        $childArgs[-1] -ne '--json-only' -or @($childArgs | Where-Object { $_ -isnot [string] }).Count -gt 0) {
+      throw 'Invalid task preset child query; only the task-plan query is allowed.'
     }
-    "mail" {
-      $to = _Read-OptValue -Rest $Rest -Name "--to"
-      $subject = _Read-OptValue -Rest $Rest -Name "--subject"
-      $body = _Read-OptValue -Rest $Rest -Name "--body"
-      $sendLabel = _Read-OptValue -Rest $Rest -Name "--send-label"
-      if (-not $sendLabel -and (_Read-Switch -Rest $Rest -Name "--send")) { $sendLabel = "Send" }
-      if (-not $to -and -not $subject -and -not $body -and -not $sendLabel) { throw "macro task-preset --kind mail requires --to/--subject/--body and optionally --send-label" }
-      if ($app) { _PresetAdd -Items @("--app",$app) }
-      if ($waitTitle) { _PresetAdd -Items @("--wait-title",$waitTitle) }
-      if ($match) { _PresetAdd -Items @("--match",$match) }
-      $toLabel = _Read-OptValue -Rest $Rest -Name "--to-label"; if (-not $toLabel) { $toLabel = "To" }
-      $subjectLabel = _Read-OptValue -Rest $Rest -Name "--subject-label"; if (-not $subjectLabel) { $subjectLabel = "Subject" }
-      $bodyLabel = _Read-OptValue -Rest $Rest -Name "--body-label"; if (-not $bodyLabel) { $bodyLabel = "Body" }
-      if ($to) { _PresetAdd -Items @("--field",("$toLabel=$to")) }
-      if ($subject) { _PresetAdd -Items @("--field",("$subjectLabel=$subject")) }
-      if ($body) { _PresetAdd -Items @("--field",("$bodyLabel=$body")) }
-      if ($sendLabel) { _PresetAdd -Items @("--send-label",$sendLabel) }
-      if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { _PresetAdd -Items @("--allow-cdp") }
-      [void]$notes.Add("mail preset maps to form fields and optional send label; --allow-cdp is enabled unless --no-cdp is set")
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $planResult = _PresetInvokeJson -ChildArgs $childArgs
+    $sw.Stop()
+    $elapsed = [int]$sw.Elapsed.TotalMilliseconds
+    $captured = @{exit=[int]$planResult.exit; raw=$planResult.raw; json=$planResult.json}
+  } else {
+    if ($query.kind -ne 'workflow_plan' -or $null -ne $query.argv -or @($query.rest).Count -eq 0 -or
+        @($query.rest | Where-Object { $_ -isnot [string] }).Count -gt 0) {
+      throw 'Invalid task preset workflow query.'
     }
-    { $_ -eq "form" -or $_ -eq "form-submit" } {
-      $presetMode = "workflow"
-      $fieldSpecs = @(_Read-AllOptValues -Rest $Rest -Name "--field")
-      $sendLabel = _Read-OptValue -Rest $Rest -Name "--send-label"
-      if (-not $sendLabel) { $sendLabel = _Read-OptValue -Rest $Rest -Name "--submit-label" }
-      if (-not $sendLabel -and (_Read-Switch -Rest $Rest -Name "--submit")) { $sendLabel = "Submit" }
-      if ($fieldSpecs.Count -eq 0 -and -not $sendLabel) { throw "macro task-preset --kind form-submit requires --field and/or --send-label/--submit-label" }
-      $cmd = @("macro","form-run")
-      foreach ($f in $fieldSpecs) { $cmd += @("--field",$f) }
-      if ($sendLabel) { $cmd += @("--send-label",$sendLabel) }
-      if ($match) { $cmd += @("--match",$match) }
-      if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $cmd += "--allow-cdp" }
-      $cdpPageMatch = _Read-OptValue -Rest $Rest -Name "--cdp-page-match"
-      $cdpPort = _Read-OptValue -Rest $Rest -Name "--cdp-port"
-      if ($cdpPageMatch) { $cmd += @("--cdp-page-match",$cdpPageMatch) }
-      if ($cdpPort) { $cmd += @("--cdp-port",$cdpPort) }
-      if (_Read-Switch -Rest $Rest -Name "--clear-first") { $cmd += "--clear-first" }
-      if (_Read-Switch -Rest $Rest -Name "--include-ocr") { $cmd += "--include-ocr" }
-      if ((_Read-Switch -Rest $Rest -Name "--precision-points") -or (_Read-Switch -Rest $Rest -Name "--point-plan")) { $cmd += "--precision-points" }
-      [void]$workflowSteps.Add((_TaskPlan-StepString -Command $cmd))
-      [void]$extraCommands.Add([pscustomobject]@{ kind="form_dry_run"; command=@($cmd + "--dry-run") })
-      [void]$notes.Add("form-submit preset maps to one form-run workflow step; run the generated form dry-run command before live control")
-    }
-    { $_ -eq "file-upload" -or $_ -eq "upload" } {
-      $presetMode = "workflow"
-      $path = _Read-OptValue -Rest $Rest -Name "--path"
-      if (-not $path) { $path = _Read-OptValue -Rest $Rest -Name "--file" }
-      if (-not $path) { throw "macro task-preset --kind file-upload requires --path" }
-      $uploadLabel = _Read-OptValue -Rest $Rest -Name "--upload-label"
-      if (-not $uploadLabel) { $uploadLabel = _Read-OptValue -Rest $Rest -Name "--label" }
-      if (-not $uploadLabel) { $uploadLabel = "Upload" }
-      $dialogTitle = _Read-OptValue -Rest $Rest -Name "--dialog-title"
-      if (-not $dialogTitle) { $dialogTitle = "Open" }
-      $dialogTimeout = _Read-OptValue -Rest $Rest -Name "--dialog-timeout-ms"
-      if (-not $dialogTimeout) { $dialogTimeout = "8000" }
-      $clickCmd = @("macro","smart-click","--label",$uploadLabel,"--allow-mouse-fallback")
-      if ($match) { $clickCmd += @("--match",$match) }
-      if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $clickCmd += "--allow-cdp" }
-      if (_Read-Switch -Rest $Rest -Name "--precision-points") { $clickCmd += "--precision-points" }
-      if (_Read-Switch -Rest $Rest -Name "--include-ocr") { $clickCmd += "--include-ocr" }
-      [void]$workflowSteps.Add((_TaskPlan-StepString -Command $clickCmd))
-      [void]$workflowSteps.Add((_TaskPlan-StepString -Command @("macro","wait-window","--title",$dialogTitle,"--timeout-ms",$dialogTimeout)))
-      [void]$workflowSteps.Add((_TaskPlan-StepString -Command @("macro","safe-type","--target-match",$dialogTitle,"--text",$path,"--enter")))
-      [void]$notes.Add("file-upload preset maps to upload button click, file dialog wait, guarded path entry, and Enter")
-    }
-    { $_ -eq "file-download" -or $_ -eq "download" } {
-      $presetMode = "workflow"
-      $downloadLabel = _Read-OptValue -Rest $Rest -Name "--download-label"
-      if (-not $downloadLabel) { $downloadLabel = _Read-OptValue -Rest $Rest -Name "--label" }
-      if (-not $downloadLabel) { $downloadLabel = "Download" }
-      $clickCmd = @("macro","smart-click","--label",$downloadLabel,"--allow-mouse-fallback")
-      if ($match) { $clickCmd += @("--match",$match) }
-      if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $clickCmd += "--allow-cdp" }
-      if (_Read-Switch -Rest $Rest -Name "--precision-points") { $clickCmd += "--precision-points" }
-      if (_Read-Switch -Rest $Rest -Name "--include-ocr") { $clickCmd += "--include-ocr" }
-      [void]$workflowSteps.Add((_TaskPlan-StepString -Command $clickCmd))
-      $verifyLabel = _Read-OptValue -Rest $Rest -Name "--verify-label"
-      if ($verifyLabel) {
-        $verifyTimeout = _Read-OptValue -Rest $Rest -Name "--verify-timeout-ms"
-        if (-not $verifyTimeout) { $verifyTimeout = "5000" }
-        $waitCmd = @("macro","wait-label","--label",$verifyLabel,"--timeout-ms",$verifyTimeout)
-        if ($match) { $waitCmd += @("--window",$match) }
-        [void]$workflowSteps.Add((_TaskPlan-StepString -Command $waitCmd))
-      }
-      [void]$notes.Add("file-download preset maps to a download button click plus optional verification label wait")
-    }
-    { $_ -eq "settings" -or $_ -eq "app-settings" } {
-      $presetMode = "workflow"
-      $settingsLabel = _Read-OptValue -Rest $Rest -Name "--settings-label"
-      if (-not $settingsLabel) { $settingsLabel = "Settings" }
-      $fieldSpecs = @(_Read-AllOptValues -Rest $Rest -Name "--field")
-      $saveLabel = _Read-OptValue -Rest $Rest -Name "--save-label"
-      if (-not $saveLabel) { $saveLabel = _Read-OptValue -Rest $Rest -Name "--apply-label" }
-      if (-not $saveLabel -and (_Read-Switch -Rest $Rest -Name "--save")) { $saveLabel = "Save" }
-      if (-not $saveLabel -and (_Read-Switch -Rest $Rest -Name "--apply")) { $saveLabel = "Apply" }
-      $settingsCmd = @("macro","smart-click","--label",$settingsLabel,"--allow-mouse-fallback")
-      if ($match) { $settingsCmd += @("--match",$match) }
-      if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $settingsCmd += "--allow-cdp" }
-      [void]$workflowSteps.Add((_TaskPlan-StepString -Command $settingsCmd))
-      foreach ($spec in $fieldSpecs) {
-        $rawSpec = "$spec"
-        $eq = $rawSpec.IndexOf("=")
-        if ($eq -le 0) { throw "macro task-preset --kind settings field must be Label=Value" }
-        $fieldLabel = $rawSpec.Substring(0, $eq).Trim()
-        $fieldValue = $rawSpec.Substring($eq + 1)
-        if (-not $fieldLabel) { throw "macro task-preset --kind settings field label is empty" }
-        $fieldCmd = @("macro","smart-click","--label",$fieldLabel,"--allow-mouse-fallback")
-        if ($match) { $fieldCmd += @("--match",$match) }
-        if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $fieldCmd += "--allow-cdp" }
-        [void]$workflowSteps.Add((_TaskPlan-StepString -Command $fieldCmd))
-        if ($match) { [void]$workflowSteps.Add((_TaskPlan-StepString -Command @("macro","safe-type","--target-match",$match,"--text",$fieldValue))) }
-        else { [void]$workflowSteps.Add((_TaskPlan-StepString -Command @("macro","type-native","--text",$fieldValue))) }
-      }
-      foreach ($clickLabel in @(_Read-AllOptValues -Rest $Rest -Name "--click-label")) {
-        $cmd = @("macro","smart-click","--label",$clickLabel,"--allow-mouse-fallback")
-        if ($match) { $cmd += @("--match",$match) }
-        if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $cmd += "--allow-cdp" }
-        [void]$workflowSteps.Add((_TaskPlan-StepString -Command $cmd))
-      }
-      if ($saveLabel) {
-        $saveCmd = @("macro","smart-click","--label",$saveLabel,"--allow-mouse-fallback")
-        if ($match) { $saveCmd += @("--match",$match) }
-        if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $saveCmd += "--allow-cdp" }
-        [void]$workflowSteps.Add((_TaskPlan-StepString -Command $saveCmd))
-      }
-      [void]$notes.Add("settings preset maps to open settings, optional field edits, optional extra clicks, and optional save/apply")
-    }
-    default {
-      throw "macro task-preset supports --kind document|mail|form-submit|file-upload|file-download|settings"
-    }
+    $captured = @{workflow_plan=(_Build-WorkflowPlan -Rest @($query.rest))}
   }
-
-  if ($presetMode -eq "task") {
-    foreach ($name in @("--name","--verify-label","--verify-timeout-ms","--settle-ms","--observe-match","--verify-match","--verify-label-after-step","--verify-label-window","--verify-label-timeout-ms","--verify-label-interval-ms","--retry-failed-step","--retry-delay-ms","--precision-radius","--precision-step","--point-cache-ttl")) {
-      _PresetForwardValue -Name $name
-    }
-    foreach ($name in @("--allow-cdp","--no-cdp","--precision-points","--include-ocr","--verify-after-step","--observe-after-step","--retry-live-steps","--clear-first","--enter","--press-enter")) {
-      _PresetForwardSwitch -Name $name
-    }
-  }
-
-  if ($presetMode -eq "workflow") {
-    $workflowName = _Read-OptValue -Rest $Rest -Name "--name"
-    if (-not $workflowName) { $workflowName = $kind }
-    $workflowPlanRest = @("--name",$workflowName)
-    foreach ($s in @($workflowSteps)) { $workflowPlanRest += @("--step",$s) }
-    $workflowPlan = if ($workflowSteps.Count -gt 0) { _Build-WorkflowPlan -Rest $workflowPlanRest } else { $null }
-    $workflowPlanCommand = @("macro","workflow-plan") + $workflowPlanRest
-    $workflowRunCommand = @("macro","workflow-run")
-    $workflowDryRunCommand = @("macro","workflow-run","--dry-run")
-    foreach ($name in @("--settle-ms","--observe-match","--verify-match","--verify-label-after-step","--verify-label-window","--verify-label-timeout-ms","--verify-label-interval-ms","--retry-failed-step","--retry-delay-ms")) {
-      $v = _Read-OptValue -Rest $Rest -Name $name
-      if ($v) {
-        $workflowRunCommand += @($name,$v)
-        $workflowDryRunCommand += @($name,$v)
-      }
-    }
-    foreach ($name in @("--observe-after-step","--verify-after-step","--retry-live-steps")) {
-      if (_Read-Switch -Rest $Rest -Name $name) {
-        $workflowRunCommand += $name
-        $workflowDryRunCommand += $name
-      }
-    }
-    foreach ($s in @($workflowSteps)) {
-      $workflowRunCommand += @("--step",$s)
-      $workflowDryRunCommand += @("--step",$s)
-    }
-    $status = if ($workflowPlan -and [bool]$workflowPlan.safe_to_run) { "ok" } else { "partial" }
-    $payload = [pscustomobject]@{
-      schema = "cucp.task-preset/v1"
-      status = $status
-      kind = $kind
-      mode = "workflow"
-      elapsed_ms = 0
-      generated_task_plan_command = $null
-      generated_task_run_command = $null
-      generated_workflow_plan_command = @($workflowPlanCommand)
-      generated_workflow_run_command = @($workflowRunCommand)
-      generated_workflow_dry_run_command = @($workflowDryRunCommand)
-      extra_commands = @($extraCommands)
-      task_plan_exit = $null
-      task_plan = $null
-      task_plan_raw = $null
-      workflow_plan = $workflowPlan
-      notes = @($notes)
-      next_step = if ($status -eq "ok") { "Run generated_workflow_dry_run_command first. For live control, use generated_workflow_run_command with -AllowLiveControl; add --confirm-sensitive only after explicit approval when required." } else { "Inspect workflow_plan errors and narrow labels/window/app before running." }
-    }
-    if ($Brief -and -not $jsonOnly) {
-      [Console]::Out.WriteLine("$status task-preset kind=$kind mode=workflow steps=$($workflowSteps.Count)")
-    } else {
-      [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 18))
-    }
-    if ($status -eq "ok") { return 0 }
-    return 2
-  }
-
-  $taskRunArgs = New-Object System.Collections.ArrayList
-  [void]$taskRunArgs.Add("macro")
-  [void]$taskRunArgs.Add("task-run")
-  for ($i = 2; $i -lt $taskArgs.Count; $i++) { [void]$taskRunArgs.Add($taskArgs[$i]) }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $planResult = _PresetInvokeJson -ChildArgs (@("-Quiet") + @($taskArgs) + @("--json-only"))
-  $sw.Stop()
-  $taskPlan = $planResult.json
-  $status = if ($taskPlan -and [bool]$taskPlan.safe_to_run) { "ok" } else { "partial" }
-  $payload = [pscustomobject]@{
-    schema = "cucp.task-preset/v1"
-    status = $status
-    kind = $kind
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    generated_task_plan_command = @($taskArgs)
-    generated_task_run_command = @($taskRunArgs)
-    task_plan_exit = [int]$planResult.exit
-    task_plan = $taskPlan
-    task_plan_raw = if ($taskPlan) { $null } else { $planResult.raw }
-    notes = @($notes)
-    next_step = if ($status -eq "ok") { "Run generated_task_run_command with --dry-run first, then with -AllowLiveControl only after user authorization." } else { "Inspect task_plan errors and narrow labels/window/app before running." }
+  $payload = _Invoke-LegacyCompatibility -Operation 'task-preset-complete' -Arguments @{rest=@($Rest); captured_query_result=$captured; elapsed_ms=$elapsed} -PreserveInvalidArguments
+  if ($payload.schema -ne 'cucp.task-preset/v1' -or $payload.status -notin @('ok','partial') -or $payload.kind -ne $preset.kind) {
+    throw 'Invalid task preset completion response.'
   }
   if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine("$status task-preset kind=$kind task_plan_exit=$($planResult.exit) elapsed_ms=$($payload.elapsed_ms)")
+    if ($preset.mode -eq 'workflow') {
+      [Console]::Out.WriteLine("$($payload.status) task-preset kind=$($payload.kind) mode=workflow steps=$(@($preset.workflow_steps).Count)")
+    } else {
+      [Console]::Out.WriteLine("$($payload.status) task-preset kind=$($payload.kind) task_plan_exit=$($payload.task_plan_exit) elapsed_ms=$($payload.elapsed_ms)")
+    }
   } else {
     [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 18))
   }
-  if ($status -eq "ok") { return 0 }
+  if ($payload.status -eq 'ok') { return 0 }
   return 2
 }
 

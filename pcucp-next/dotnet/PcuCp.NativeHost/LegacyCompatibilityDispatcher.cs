@@ -8,7 +8,7 @@ internal static class LegacyCompatibilityDispatcher
         if (request.ValueKind != JsonValueKind.Object) throw CommandOptions.Invalid("Compatibility request must be an object.");
         var fields = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in request.EnumerateObject())
-            if (!fields.Add(property.Name) || property.Name is not ("schema" or "operation" or "args"))
+            if (!fields.Add(property.Name) || property.Name is not ("schema" or "operation" or "args" or "culture"))
                 throw CommandOptions.Invalid("Compatibility request has duplicate or unknown fields.");
         if (!request.TryGetProperty("schema", out var schema) || schema.ValueKind != JsonValueKind.String || schema.GetString() != "cucp.legacy-compat/v1" ||
             !request.TryGetProperty("operation", out var operation) || operation.ValueKind != JsonValueKind.String ||
@@ -22,6 +22,8 @@ internal static class LegacyCompatibilityDispatcher
             "strategy-score" => LegacyStrategyKernel.Score(args),
             "strategy-normalize" => LegacyStrategyKernel.Normalize(args),
             "workflow-plan-from-parsed" => LegacyWorkflowKernel.PlanFromParsed(args),
+            "task-preset-prepare" => LegacyTaskPresetKernel.PreparePreset(args),
+            "task-preset-complete" => LegacyTaskPresetKernel.CompletePreset(args),
             _ => throw CommandOptions.Invalid("Unsupported pure compatibility operation.")
         };
     }

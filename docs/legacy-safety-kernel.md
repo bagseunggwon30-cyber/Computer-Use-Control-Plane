@@ -29,3 +29,5 @@ comparison is required before removing any old PS function body. Linux pure test
 are useful but cannot establish Windows PowerShell/.NET serialization parity.
 
 The 57 exact differential cases passed on Windows at checkpoint `2934645`, run `36890543863`. The current PS classifier is a checked compatibility bridge, and its private truncation helper has been removed. The same suite now compares the retained bridge against the pinned original and verifies a missing native host throws without producing a low-risk result. This new bridge still requires its own exact-commit Windows qualification.
+
+Retained compatibility requests now carry the PowerShell caller's current culture. The one-off native pure entry validates the optional bounded culture name, applies it only inside that request, and restores the previous culture in `finally`. It changes no OS settings. The actual classifier bridge adds 32 comparisons spanning en-US, ko-KR, tr-TR and invariant culture, including culture-sensitive regex folding; these are required in current-commit Windows CI.

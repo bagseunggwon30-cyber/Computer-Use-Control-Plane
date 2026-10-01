@@ -40,3 +40,9 @@ The 55-case matrix also includes whitespace, signed integers, signed/uppercase
 hex, `1kb`, NaN/Infinity and the immediate Int32 boundaries. These are exact
 differential probes, not claims that every form is accepted. Candidate failures
 remain failures until their full envelopes agree with the pinned PS baseline.
+
+The next Windows run (b4ee39a/job110503026946) passed 53/55 exact
+comparisons. NaN and Infinity were rejected on both sides, but the candidate
+reported overflow instead of the baseline's format error. It now preserves the
+original integer-format exception for nonfinite fallback results. All existing
+55 comparisons, including full error text, remain unchanged for requalification.

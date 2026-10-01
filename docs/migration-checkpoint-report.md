@@ -1,0 +1,105 @@
+# Python/C# migration milestone
+
+## Result and limit
+
+This is a **partial, parity-tested migration**, not completion of the request to
+make PowerShell the smallest language or remove its runtime entirely. The work is
+on `migration/python-csharp-runtime`; `main` has not been merged or replaced.
+
+The provider-neutral core runs through Python and C# without PowerShell. Its 52
+MCP/JSONL tools do not require Pi or an authenticated model provider. The broader
+legacy command surface still enters through PowerShell compatibility adapters.
+Keeping those two scopes distinct avoids claiming that the new core already
+replaces every old macro.
+
+## Reproducible source retirement
+
+The baseline is published commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tree
+`bf895d3120dd5e145f360cb1c41e1d79a061d048`.
+
+| Canonical tracked PS source | Baseline | This milestone |
+| --- | ---: | ---: |
+| All `.ps1` source and tests | 1,013,478 bytes | 959,852 bytes |
+| Three legacy runtime scripts | 858,937 bytes | 809,074 bytes |
+| Actual all-source reduction | — | **53,626 bytes (5.29%)** |
+
+There are still 291 top-level legacy function entries. Function count is not a
+feature-completion percentage: several retained functions are now thin adapters,
+and many large functions contain multiple capabilities.
+
+Run `python pcucp-next/packaging/check_migration_inventory.py` to check the exact
+Git-tracked blob totals, retained locations, and retirement records. The check
+uses canonical index blobs, so Windows checkout line endings do not alter the
+metric. Review and stage PS edits before using `--update` to refresh the inventory.
+Original implementations remain in normal Git history, not a renamed archive or
+embedded copy. No Linguist exclusion or language-statistics padding is used.
+
+## What was actually replaced
+
+- **OCR matching:** four private PS algorithms were retired; the retained matcher
+  delegates to C#. Exact Windows NLS, UTF-16 and legacy tied-candidate ordering
+  were preserved after differential tests exposed real incompatibilities
+- **Win32 declarations:** three runtime-compiled C# definitions moved into a
+  compiled net48 interop library. All 301 public API/PInvoke/marshalling/ABI entries
+  and actual PowerShell 5.1 loaders are checked. This is not a desktop-input test
+- **Safety classification:** rules, category ordering, risk scores, confirmation
+  flags and UTF-16 preview behavior moved into a closed C# operation. Failure
+  remains failure; a missing or malformed runtime reply cannot classify an action
+  as safe
+- **Coordinate math:** clipping, rounding and mapping moved into C#. Original
+  window/hit-test/profile acquisition remains in a small PS adapter
+- **Workflow plan assembly:** allowlists, policy and result construction moved to
+  C#. The exact original PS tokenizer remains. An incomplete literal-parser
+  candidate is excluded from the shipped host
+- **Task presets:** the 17,082-byte builder became a 2,990-byte adapter after its
+  recipe and payload comparison passed. It retains one read-only planning query,
+  timing, errors, formatting and exit behavior. Central bridge overhead is included
+  in the aggregate reduction above
+- **User installer:** implementation moved to Python. The small PS compatibility
+  entry preserves the legacy default and original flags. Explicit core/portable
+  launchers invoke no PowerShell
+
+## Core architecture and evidence
+
+Python owns transport/schema validation, bounded workflows, target selection,
+observations, memory-only audit metadata, cancellation and the optional CDP client.
+C# owns Windows UIA, OCR, guarded input, app lifecycle and the pure compatibility
+kernels. Live authority is fixed at startup; failed or uncertain mutations are
+not automatically retried. Retained compatibility calls carry the caller's culture across their process boundary and restore native request-local culture afterward; this changes no OS locale setting. The preset child query uses the wrapper's documented `--` delimiter so control-like argument values remain data. Both boundaries have Windows fixtures. CDP requires one explicitly configured numeric-loopback
+endpoint and fresh target/document/element references.
+
+Required CI covers Linux contracts, Windows native/protocol contracts, relocated
+portable packaging, and seven real fresh-profile sandboxed Chrome fixture tests.
+It includes 56 OCR, 57 safety and 115 coordinate kernel cases plus actual retained
+adapters; 254 complete original-tokenizer-fed workflow plans; and eight actual
+native parsed-plan dispatch cases. Preset qualification includes 538 exact
+recipe/payload comparisons from 277 inputs, 28 argv/quoting cases, and a new actual
+adapter/formatting comparison. **The current commit's complete CI must pass**;
+an earlier green run is not a substitute.
+
+Two candidates remain deliberately unretired: strategy ranking (including
+cross-culture comparisons) and a net48 image-diff library with 55 generated-file
+and error cases across PNG/BMP/JPEG/GIF/TIFF. Explicit strategy culture currently
+controls its comparers, while alias regex normalization still uses ambient
+culture; that separate compatibility seam must be resolved before retirement.
+
+## What still prevents full completion
+
+Roughly 0.96 MB of PS remains. Major callable groups include smart-click/plan and
+fallback routing; app/profile/probe acquisition; task/form/workflow execution;
+persistent history/recording; legacy CDP/vision adapters; IME/clipboard/drag and
+multi-edit; helper lifecycle, UAC/autostart, and system/process/registry macros.
+
+Hosted protocol and generated-data tests do **not** establish real interactive
+Windows acceptance. Outstanding checks include Korean IME composition, clipboard
+restoration, focus/modal races, held-input cleanup, mixed-DPI/multi-monitor
+coordinates, cross-integrity/UAC behavior, helper restart/crash handling, and
+application-specific task success. No user desktop, account-connected model, or
+personal documents were used to claim these checks.
+
+The next coherent code slice is the roughly 48 KB of task-plan, smart-plan and
+app-profile assembly, separating captured read-only probes from pure decisions.
+The next acceptance milestone needs an authorized, isolated interactive Windows
+fixture environment. Until those boundaries are proved, retiring the remaining
+legacy surface merely to change language percentages would drop behavior. This
+milestone is a reviewable foundation, not a completed rewrite or signed release.

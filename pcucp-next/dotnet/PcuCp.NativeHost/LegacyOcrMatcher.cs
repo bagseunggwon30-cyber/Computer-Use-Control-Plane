@@ -82,7 +82,7 @@ internal static class LegacyOcrMatcher
 
     internal static object Match(JsonElement request)
     {
-        if (request.ValueKind != JsonValueKind.Object || request.EnumerateObject().Any(p => p.Name is not ("schema" or "body" or "needle" or "mode")) ||
+        if (request.ValueKind != JsonValueKind.Object || request.EnumerateObject().Any(p => p.Name is not ("schema" or "body" or "needle" or "mode" or "culture")) ||
             Text(request, "schema") != "cucp.legacy-ocr-match/v1" || !request.TryGetProperty("body", out var body) || body.ValueKind != JsonValueKind.Object)
             throw CommandOptions.Invalid("Expected bounded cucp.legacy-ocr-match/v1 object.");
         var needle = Text(request, "needle");

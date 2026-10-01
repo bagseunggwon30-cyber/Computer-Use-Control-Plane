@@ -434,7 +434,7 @@ function _Match-OcrCandidates {
     $psi.FileName = $native
     $psi.Arguments = 'legacy-ocr-match'
   } else { throw 'CUCP_NATIVE_HOST must be an executable or DLL, never a shell script.' }
-  $payload = @{schema='cucp.legacy-ocr-match/v1'; body=$Body; needle=$Needle; mode=$Mode} | ConvertTo-Json -Depth 24 -Compress
+  $payload = @{schema='cucp.legacy-ocr-match/v1'; body=$Body; needle=$Needle; mode=$Mode; culture=[Globalization.CultureInfo]::CurrentCulture.Name} | ConvertTo-Json -Depth 24 -Compress
   $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
   $bytes = $utf8.GetBytes($payload)
   if ($bytes.Length -gt 1048576) { throw 'Legacy OCR request exceeds 1 MiB.' }

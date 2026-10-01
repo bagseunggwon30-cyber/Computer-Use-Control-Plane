@@ -55,3 +55,9 @@ comparisons use that explicit culture without changing thread/global culture.
 When omitted, current process culture remains the default. Forty additional
 checks deliberately run the managed harness in en-US while supplying the PS
 caller's culture in JSON; original inherited-culture comparisons remain intact.
+
+Retirement limit: explicit `culture` currently controls key/sort/label comparisons,
+but `NormalizeValue` still builds case-insensitive alias regexes under the ambient
+process culture. A caller with a changed thread culture can differ on Unicode
+aliases such as `UİA_PATTERN`. Original PS strategy bodies remain until this
+normalization boundary and the actual transport are separately qualified.

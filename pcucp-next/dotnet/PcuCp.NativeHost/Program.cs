@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -37,7 +38,22 @@ if (command is "legacy-ocr-match" or "legacy-compat")
         // a UTF-8 preamble. Accept exactly one leading BOM, never arbitrary data.
         var prefix = utf8.Length >= 3 && utf8[0] == 0xEF && utf8[1] == 0xBB && utf8[2] == 0xBF ? 3 : 0;
         using var document = JsonDocument.Parse(new UTF8Encoding(false, true).GetString(utf8, prefix, utf8.Length - prefix), new JsonDocumentOptions { MaxDepth = 32 });
-        var data = command == "legacy-ocr-match" ? LegacyOcrMatcher.Match(document.RootElement) : LegacyCompatibilityDispatcher.Execute(document.RootElement);
+        // A legacy caller can have a runspace-specific culture. Preserve it
+        // inside this one pure request, never in OS settings or later requests.
+        var previousCulture = CultureInfo.CurrentCulture;
+        object data;
+        try
+        {
+            if (document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.TryGetProperty("culture", out var culture))
+            {
+                if (document.RootElement.EnumerateObject().Count(p => p.Name == "culture") != 1 || culture.ValueKind != JsonValueKind.String || culture.GetString()!.Length > 128)
+                    throw CommandOptions.Invalid("culture must be one bounded culture-name string.");
+                try { CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture.GetString()!); }
+                catch (CultureNotFoundException) { throw CommandOptions.Invalid("Unsupported compatibility culture."); }
+            }
+            data = command == "legacy-ocr-match" ? LegacyOcrMatcher.Match(document.RootElement) : LegacyCompatibilityDispatcher.Execute(document.RootElement);
+        }
+        finally { CultureInfo.CurrentCulture = previousCulture; }
         Console.WriteLine(JsonSerializer.Serialize(NativeResult.Ok(command, data), NativeDispatcher.JsonOptions));
         return 0;
     }

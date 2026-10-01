@@ -115,3 +115,13 @@ At checkpoint `b6a29f0` / run `36897093256`, actual interop loader and safety cl
 Checkpoint `2d8443d` / run `36898932493` passed all four jobs, including the actual coordinate adapter and the full parsed-plan assembly proof. The qualified workflow builder is now a small exact-tokenizer adapter, removing another **4,541 PS bytes**. Current all-tracked PS total is **973,348 bytes**, an actual reduction of **40,130 bytes**. Run `python pcucp-next/packaging/check_migration_inventory.py` to reproduce and check canonical Git-tracked blob sizes and retained function locations; `--update` updates counts only after reviewed PS changes are staged. This is independent of GitHub Linguist and checkout line-ending conversion.
 
 Strategy retirement still waits for additional en-US/ko-KR/tr-TR/invariant culture comparisons. Image diff has a separate net48/System.Drawing candidate so legacy PNG/BMP/JPEG/GIF/TIFF decoding is not narrowed to the modern PNG-only API; generated-file and exact error fixtures must pass before its PS body changes.
+
+## Bounded milestone
+
+See [the checkpoint report](migration-checkpoint-report.md) for the coherent
+architecture, measured source retirement and explicit remaining acceptance scope.
+The qualified preset body is now a thin planning-query adapter; aggregate tracked
+PS is 959,852 bytes, down 53,626 bytes from baseline including bridge overhead.
+This does not meet the lowest/zero-PowerShell goal. Its actual adapter and output
+formatting are required checks in the current commit's Windows CI. Strategy and
+image PS bodies remain; no further family is retired on candidate-only evidence.

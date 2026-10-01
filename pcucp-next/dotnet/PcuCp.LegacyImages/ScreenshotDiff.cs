@@ -40,11 +40,14 @@ namespace PcuCp.LegacyImages
                 if (value.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
                     return unchecked((int)uint.Parse(value.Substring(2), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture));
                 try { return int.Parse(value, NumberStyles.Integer, CultureInfo.InvariantCulture); }
-                catch (FormatException)
+                catch (FormatException integerSyntaxFailure)
                 {
                     // PS5 string-to-int conversion falls back to invariant Double,
                     // then uses banker's rounding (e.g. 1.5 -> 2 and 2.5 -> 2).
-                    return Convert.ToInt32(double.Parse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture));
+                    double number = double.Parse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture);
+                    // PS rejects nonfinite numeric spellings as syntax, not Int32 overflow.
+                    if (double.IsNaN(number) || double.IsInfinity(number)) throw integerSyntaxFailure;
+                    return Convert.ToInt32(number);
                 }
             }
             catch (Exception ex) when (ex is FormatException || ex is OverflowException)

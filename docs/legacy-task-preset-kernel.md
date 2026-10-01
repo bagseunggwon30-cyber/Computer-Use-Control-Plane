@@ -1,9 +1,13 @@
-# Pure legacy task-preset recipes (qualification candidate)
+# Pure legacy task-preset recipes and retained query adapter
 
-The new `PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs` separates deterministic
-recipes and result assembly from the retained planner-query adapter. It is outside
-the NativeHost project's implicit source glob and has no dispatcher registration.
-No production PowerShell body has been retired for this candidate.
+`PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs` separates deterministic
+recipes and result assembly from the retained planner-query adapter. Independent
+Windows qualification passed at `b4ee39a6d5b545c4ee477e44912717e5a87df0ed`.
+The current `Invoke-MacroTaskPreset` is a 2,990-byte adapter, replacing the original
+17,082-byte recipe body. It calls `task-preset-prepare` and `task-preset-complete`
+through the existing native stdin bridge. The adapter and operation integration
+still require the full current-function differential before this change is
+considered qualified for release.
 
 The immutable reference is tree
 `bf895d3120dd5e145f360cb1c41e1d79a061d048` (published baseline commit
@@ -53,9 +57,14 @@ are retained without filtering. The original status rule depends on
 `safe_to_run`, independently of child exit code. A true status is only a planning
 status; it grants no input authority or sensitive-action approval.
 
-The wrapper should retain the original brief/JSON formatting and derive exit
-code 0 for `status == "ok"`, otherwise 2. Stopwatch measurement belongs to the
-adapter. It should preserve child-query failures before invoking completion.
+The wrapper retains original brief/JSON formatting and derives exit code 0 for
+`status == "ok"`, otherwise 2. Stopwatch measurement remains around the task
+query only. The adapter validates the preparation schema, single-query count,
+mode, argv types, and exact `-Quiet macro task-plan ... --json-only` prefix/suffix
+before obtaining the task result. Workflow mode only calls `_Build-WorkflowPlan`.
+The opt-in `PreserveInvalidArguments` bridge switch preserves original native
+argument-error text; it never changes an error into success. Query errors
+propagate before completion.
 
 Strict transport validation rejects unknown/duplicate fields, non-string rest
 items, more than 4096 rest items or 262144 UTF-16 input units, a captured result
@@ -101,10 +110,40 @@ run. Only nondeterministic stopwatch time is supplied through the elapsed-time
 seam. Original exception messages, preparation data, and complete payloads are
 compared exactly, without dropping errors or diagnostic text.
 
-The corpus currently has 277 preset cases plus 28 helper cases. It covers every family/alias, option precedence and forwarding,
+The corpus currently has 285 preset cases plus 28 helper cases. It covers every family/alias, option precedence and forwarding,
 malformed required arguments/settings fields, special quoting, Unicode/NUL,
 empty/null/nested argv helpers, successful and partial captured plans, absent
 JSON with raw diagnostics, nonzero child exits, and retained safety/error data.
-Windows differential qualification and actual retained-adapter qualification
-must pass before any production task-preset recipe body is retired. Local Linux
-managed/source checks do not establish Windows parity.
+At [Windows run 36901958763, job 110503026946](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36901958763/job/110503026946),
+86 managed checks, 538 exact preparation/payload comparisons from 277 preset
+cases, and 28 exact helper comparisons passed without skips. That run predates
+the retained-adapter replacement. The job subsequently failed in the separate
+image suite; it was not a complete green Windows job.
+
+With `CUCP_NATIVE_TEST_HOST` set, the suite additionally imports the entire current
+`Invoke-MacroTaskPreset`, current bridge, and current workflow adapter. Only the
+nested task-planning acquisition is intercepted. All 285 cases compare exact
+payloads, preparation/query data, captured errors, and return codes against the
+pinned original. Another 16 cases check brief output and `--json-only` precedence
+across successful/partial task and workflow plans. Only stopwatch time is supplied
+through the explicit deterministic seam. Keep this actual-adapter gate enabled
+in Windows CI; local Linux checks cannot establish it.
+
+
+## Child parameter boundary
+
+The task query descriptor still contains the original `-Quiet macro task-plan`
+argv. Inside the retained acquisition helper, the child process receives a fixed
+`-Quiet`, a literal `--`, and a separate array containing the verified macro argv
+(after removing the descriptor's first `-Quiet`). No string evaluation is used.
+This uses the wrapper's existing delimiter convention to keep values such as
+`-AllowLiveControl` and `-CucpArgs` out of script-parameter binding.
+
+A Windows-only characterization extracts the original and current nested child
+helpers but redirects their script path to a generated echo fixture. That fixture
+contains only the pinned parameter block, delimiter handling, and JSON output;
+it cannot dispatch a macro or inspect the desktop. It records the original
+binding and asserts that the actual delimiter adapter preserves ten control-like
+values exactly while the live flag stays false. This new boundary change has not
+been reproduced or qualified on the Linux development host; its Windows result
+is required before release.

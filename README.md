@@ -1,6 +1,6 @@
 # CUCP — Computer Use Control Plane
 
-> **Python + C# 이전 브랜치:** Pi 없이 stdio MCP 또는 JSONL로 연결합니다. [공통 설치·권한·프로토콜](docs/host-neutral-setup.md), [워크플로·작업·폼](docs/workflow-migration.md), [이전 범위와 남은 기능](docs/migration-matrix.md)을 참고하세요. 이 브랜치의 기능은 정확히 같은 커밋에서 빌드한 실행 파일과 함께 사용해야 합니다.
+> **Python + C# 이전 브랜치:** Pi 없이 stdio MCP 또는 JSONL로 연결합니다. [공통 설치·권한·프로토콜](docs/host-neutral-setup.md), [워크플로·작업·폼](docs/workflow-migration.md), [이전 범위와 남은 기능](docs/migration-matrix.md), [검증된 이전 현황과 남은 검증](docs/migration-checkpoint-report.md)을 참고하세요. 이 브랜치의 기능은 정확히 같은 커밋에서 빌드한 실행 파일과 함께 사용해야 합니다.
 
 ## AI 호스트 공통 시작점
 
