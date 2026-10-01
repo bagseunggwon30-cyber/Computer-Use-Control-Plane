@@ -161,7 +161,7 @@ class PresetWindowsParityTests(unittest.TestCase):
             for case, old, new in zip(fixtures, expected, actual):
                 with self.subTest(fixture=case):
                     self.assertEqual(new, old)
-            print(f"Verified {len(fixtures)} exact task-preset/helper comparisons from {len(cases)} original cases")
+            print(f"Compared {len(fixtures)} task-preset/helper results from {len(cases)} original cases; assertions determine success")
             if os.environ.get("CUCP_NATIVE_TEST_HOST") and any(case["operation"] == "preset" for case in cases):
                 # Use the entire current function and current native stdin bridge.
                 # Only the original child planning-query acquisition is stubbed.
@@ -175,7 +175,7 @@ class PresetWindowsParityTests(unittest.TestCase):
                 for case, old, new in zip(cases, baseline, actual_adapter):
                     with self.subTest(actual_adapter=case):
                         self.assertEqual(new, old)
-                print(f"Verified {len(cases)} complete actual PowerShell task-preset adapter results, queries, and exit codes")
+                print(f"Compared {len(cases)} actual PowerShell task-preset adapter results, queries, and exit codes; assertions determine success")
 
     def test_child_script_parameter_binding_characterization(self):
         # This target contains only the original parameter block/delimiter logic
@@ -201,9 +201,9 @@ class PresetWindowsParityTests(unittest.TestCase):
             self.assertEqual(len(observations), 2 * len(values))
             legacy = {item["value"]: item["result"] for item in observations if item["mode"] == "legacy"}
             self.assertTrue(legacy["-AllowLiveControl"]["json"]["live"], "The suspected original binding seam did not reproduce")
-            for item in observations:
-                if item["mode"] != "delimited":
-                    continue
+            typed = [item for item in observations if item["mode"] == "typed"]
+            self.assertEqual(len(typed), len(values))
+            for item in typed:
                 with self.subTest(binding=item["value"]):
                     self.assertNotIn("threw", item["result"], item)
                     self.assertEqual(item["result"]["exit"], 0, item)
@@ -212,7 +212,8 @@ class PresetWindowsParityTests(unittest.TestCase):
                     self.assertFalse(echo["brief"], item)
                     self.assertTrue(echo["quiet"], item)
                     self.assertEqual(echo["args"], ["macro", "task-plan", "--type-text", item["value"], "--json-only"])
-            print("Original native -File binding reproduced live=True for data '-AllowLiveControl'; fixed -Quiet -- preserved all 10 control-like values with live=False")
+            # Assertions above are authoritative; do not print success after a
+            # subTest failure, because unittest continues after such failures.
 
     def test_original_recipe_and_complete_payload_parity(self):
         self.differential(preset_cases())
@@ -244,7 +245,7 @@ $tokens=$null; $errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($SourcePath,[ref]$tokens,[ref]$errors)
 if ($errors.Count) { throw 'Pinned source parse failure' }
 $names=@('_Read-OptValue','_Read-AllOptValues','_Read-Switch','_TaskPlan-QuoteToken','_TaskPlan-StepString','_TaskPlan-UnwrapCommand','_Safety-Truncate','_Classify-SafetyFromText','_Parse-WorkflowStepTokens','_Read-WorkflowStepSpecs','_Build-WorkflowPlan','Invoke-MacroTaskPreset')
-if ($Adapter) { $names=@('_Invoke-LegacyCompatibility')+$names }
+if ($Adapter) { $names=@('_Invoke-LegacyCompatibility','_Read-Switch','_Parse-WorkflowStepTokens','_Read-WorkflowStepSpecs','_Build-WorkflowPlan','Invoke-MacroTaskPreset') }
 foreach ($name in $names) {
   $found=@($ast.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name},$true))
   if ($found.Count -ne 1) { throw "Expected one baseline function: $name" }
@@ -321,11 +322,11 @@ $current=[Management.Automation.Language.Parser]::ParseFile($CurrentPath,[ref]$t
 $currentPreset=@($current.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Invoke-MacroTaskPreset'},$true))
 $currentQuery=@($currentPreset[0].FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq '_PresetInvokeJson'},$true))
 if ($errors.Count -or $currentPreset.Count -ne 1 -or $currentQuery.Count -ne 1) { throw 'Expected exact current query definition' }
-$delimited=$currentQuery[0].Extent.Text.Replace('$PSCommandPath','$script:FixtureTargetPath')
-if (-not $delimited.Contains("-Quiet '--' @macroArgs")) { throw 'Actual adapter is missing the fixed authority delimiter' }
+$typed=$currentQuery[0].Extent.Text.Replace('$PSCommandPath','$script:FixtureTargetPath')
+if (-not $typed.Contains('-EncodedCommand') -or -not $typed.Contains('-CucpArgs ([string[]]$request.argv)') -or -not $typed.Contains('RedirectStandardInput')) { throw 'Actual adapter is missing the typed stdin boundary' }
 $results=New-Object Collections.ArrayList
-foreach ($mode in @('legacy','delimited')) {
-  $definition=if ($mode -eq 'legacy') { $text } else { $delimited }
+foreach ($mode in @('legacy','typed')) {
+  $definition=if ($mode -eq 'legacy') { $text } else { $typed }
   . ([scriptblock]::Create($definition))
   foreach ($value in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json)) {
     try { $result=_PresetInvokeJson -ChildArgs @('-Quiet','macro','task-plan','--type-text',"$value",'--json-only') }

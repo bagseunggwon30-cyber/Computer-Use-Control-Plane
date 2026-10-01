@@ -130,20 +130,6 @@ through the explicit deterministic seam. Keep this actual-adapter gate enabled
 in Windows CI; local Linux checks cannot establish it.
 
 
-## Child parameter boundary
+## Actual Windows child-argument repair
 
-The task query descriptor still contains the original `-Quiet macro task-plan`
-argv. Inside the retained acquisition helper, the child process receives a fixed
-`-Quiet`, a literal `--`, and a separate array containing the verified macro argv
-(after removing the descriptor's first `-Quiet`). No string evaluation is used.
-This uses the wrapper's existing delimiter convention to keep values such as
-`-AllowLiveControl` and `-CucpArgs` out of script-parameter binding.
-
-A Windows-only characterization extracts the original and current nested child
-helpers but redirects their script path to a generated echo fixture. That fixture
-contains only the pinned parameter block, delimiter handling, and JSON output;
-it cannot dispatch a macro or inspect the desktop. It records the original
-binding and asserts that the actual delimiter adapter preserves ten control-like
-values exactly while the live flag stays false. This new boundary change has not
-been reproduced or qualified on the Linux development host; its Windows result
-is required before release.
+Run `36908857566` reproduced the original flaw: a data value `-AllowLiveControl` became a script switch. It also proved that adding `--` to native `powershell -File` does not fix this boundary. The adapter now uses a fixed, encoded bootstrap with no interpolated user code; script path and argv travel as bounded JSON on stdin, and the bootstrap invokes the same script with fixed `-Quiet` and a named `[string[]]` `-CucpArgs` value. Both streams are drained, the original planning exit is captured, and an unfinished owned child is cleaned up. The regression keeps the original live=True reproduction and requires exact argv plus live=False/brief=False for every repaired case. The adapter harness imports only currently retained functions; it no longer requests the retired truncation helper. These repairs require a new exact-commit Windows pass.
