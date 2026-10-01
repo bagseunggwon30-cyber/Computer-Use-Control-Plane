@@ -19,9 +19,9 @@ The baseline is published commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tre
 
 | Canonical tracked PS source | Baseline | This milestone |
 | --- | ---: | ---: |
-| All `.ps1` source and tests | 1,013,478 bytes | 962,348 bytes |
+| All `.ps1` source and tests | 1,013,478 bytes | 962,379 bytes |
 | Three legacy runtime scripts | 858,937 bytes | 811,570 bytes |
-| Actual all-source reduction | — | **51,130 bytes (5.05%)** |
+| Actual all-source reduction | — | **51,099 bytes (5.04%)** |
 
 There are still 291 top-level legacy function entries. Function count is not a
 feature-completion percentage: several retained functions are now thin adapters,
@@ -75,7 +75,7 @@ adapters; 254 complete original-tokenizer-fed workflow plans; and eight actual
 native parsed-plan dispatch cases. Preset qualification includes 554 exact
 recipe/payload comparisons from 285 inputs, 28 argv/quoting cases, and a new actual
 adapter/formatting comparison. **The current commit's complete CI must pass**;
-an earlier green run is not a substitute.
+an earlier green run is not a substitute. The Pester regression suite loads the actual compatibility bridge and needs `CUCP_NATIVE_HOST` set to the matching Release native DLL; CI builds and sets it explicitly. Its workflow safety assertions run against the real migrated kernel.
 
 Two candidates remain deliberately unretired: strategy ranking (including
 cross-culture comparisons) and a net48 image-diff library with 55 generated-file

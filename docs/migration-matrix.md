@@ -121,7 +121,7 @@ Strategy retirement still waits for additional en-US/ko-KR/tr-TR/invariant cultu
 See [the checkpoint report](migration-checkpoint-report.md) for the coherent
 architecture, measured source retirement and explicit remaining acceptance scope.
 The qualified preset body is now a thin planning-query adapter; aggregate tracked
-PS is 962,348 bytes, down 51,130 bytes from baseline including bridge overhead.
+PS is 962,379 bytes, down 51,099 bytes from baseline including bridge overhead.
 This does not meet the lowest/zero-PowerShell goal. Its actual adapter and output
 formatting are required checks in the current commit's Windows CI. Strategy and
 image PS bodies remain; no further family is retired on candidate-only evidence.

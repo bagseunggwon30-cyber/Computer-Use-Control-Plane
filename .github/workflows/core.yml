@@ -120,6 +120,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - shell: pwsh
         run: |
+          $env:CUCP_NATIVE_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
           Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
           Invoke-Pester -Path tests/cucp.LegacyRegression.Tests.ps1 -CI
       # No interactive desktop input tests on hosted runners. See manual Windows checks.

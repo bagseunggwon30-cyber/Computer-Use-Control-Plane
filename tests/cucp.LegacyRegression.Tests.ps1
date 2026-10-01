@@ -19,7 +19,7 @@ function Get-LegacyFunctionText {
   if ($found.Count -ne 1) { throw "Expected one definition of $Name; found $($found.Count)" }
   return $found[0].Extent.Text
 }
-foreach ($name in @("_Read-OptValue", "_Read-Switch", "_Parse-WorkflowStepTokens", "_Read-WorkflowStepSpecs",
+foreach ($name in @("_Invoke-LegacyCompatibility", "_Read-OptValue", "_Read-Switch", "_Parse-WorkflowStepTokens", "_Read-WorkflowStepSpecs",
     "_Build-WorkflowPlan", "Invoke-MacroCdpEval", "Invoke-MacroSafeType", "Invoke-MacroClickPoint",
     "Invoke-MacroBenchmark", "Invoke-MacroPrecisionValidate")) {
   . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $wrapperAst -Name $name)))
