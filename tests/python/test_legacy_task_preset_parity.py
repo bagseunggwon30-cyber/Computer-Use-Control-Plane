@@ -180,7 +180,8 @@ class PresetWindowsParityTests(unittest.TestCase):
     def test_child_script_parameter_binding_characterization(self):
         # This target contains only the original parameter block/delimiter logic
         # and a JSON echo. It cannot query windows, dispatch macros, or act.
-        values = ["plain", "-AllowLiveControl", "-AllowLive", "-CucpArgs", "-Quiet", "-Brief", "-CacheSeconds", "-InvokeTimeoutMs", "--out", "--"]
+        values = ["plain", "-AllowLiveControl", "-AllowLive", "-CucpArgs", "-Quiet", "-Brief", "-CacheSeconds", "-InvokeTimeoutMs", "--out", "--",
+                  "", "a b", "한글 😀", "quo'te\"", "line1\nline2", "\x00", "trailing\\", "x & y", "$(1+1)"]
         with tempfile.TemporaryDirectory(prefix="CUCP binding 한글 ") as temp:
             folder = Path(temp)
             source, target, inputs, runner = (folder / name for name in ("original.ps1", "echo.ps1", "values.json", "binding.ps1"))
@@ -198,13 +199,13 @@ class PresetWindowsParityTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
             observations = json.loads(result.stdout.decode("utf-8-sig"))
             print("SCRIPT_BINDING_OBSERVATIONS: " + json.dumps(observations, ensure_ascii=True))
-            self.assertEqual(len(observations), 2 * len(values))
+            self.assertEqual(len(observations), 4 * len(values) + 4)
             legacy = {item["value"]: item["result"] for item in observations if item["mode"] == "legacy"}
             self.assertTrue(legacy["-AllowLiveControl"]["json"]["live"], "The suspected original binding seam did not reproduce")
             typed = [item for item in observations if item["mode"] == "typed"]
-            self.assertEqual(len(typed), len(values))
+            self.assertEqual(len(typed), 3 * len(values))
             for item in typed:
-                with self.subTest(binding=item["value"]):
+                with self.subTest(query=item["query"], binding=item["value"]):
                     self.assertNotIn("threw", item["result"], item)
                     self.assertEqual(item["result"]["exit"], 0, item)
                     echo = item["result"]["json"]
@@ -212,7 +213,13 @@ class PresetWindowsParityTests(unittest.TestCase):
                     self.assertFalse(echo["live"], item)
                     self.assertFalse(echo["brief"], item)
                     self.assertTrue(echo["quiet"], item)
-                    self.assertEqual(echo["args"], ["macro", "task-plan", "--type-text", item["value"], "--json-only"])
+                    self.assertEqual(echo["args"], ["macro", item["query"], "--type-text", item["value"], "--json-only"])
+            rejected = [item for item in observations if item["mode"] == "rejected"]
+            self.assertEqual(len(rejected), 4)
+            for item in rejected:
+                with self.subTest(rejected_query=item["query"]):
+                    self.assertTrue(item["result"].get("threw"), item)
+                    self.assertEqual(item["result"].get("message"), "Invalid readonly planning query descriptor.", item)
             # Assertions above are authoritative; do not print success after a
             # subTest failure, because unittest continues after such failures.
 
@@ -323,17 +330,27 @@ $current=[Management.Automation.Language.Parser]::ParseFile($CurrentPath,[ref]$t
 $currentPreset=@($current.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Invoke-MacroTaskPreset'},$true))
 $currentQuery=@($currentPreset[0].FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq '_PresetInvokeJson'},$true))
 if ($errors.Count -or $currentPreset.Count -ne 1 -or $currentQuery.Count -ne 1) { throw 'Expected exact current query definition' }
-$typed=$currentQuery[0].Extent.Text.Replace('$PSCommandPath','$script:FixtureTargetPath')
+$transport=@($current.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq '_Invoke-LegacyReadOnlyQuery'},$true))
+if ($transport.Count -ne 1) { throw 'Expected exact shared readonly transport definition' }
+$typed=($transport[0].Extent.Text + "`n" + $currentQuery[0].Extent.Text).Replace('$PSCommandPath','$script:FixtureTargetPath')
 if (-not $typed.Contains('-EncodedCommand') -or -not $typed.Contains('-CucpArgs ([string[]]$request.argv)') -or -not $typed.Contains('RedirectStandardInput')) { throw 'Actual adapter is missing the typed stdin boundary' }
 $results=New-Object Collections.ArrayList
 foreach ($mode in @('legacy','typed')) {
   $definition=if ($mode -eq 'legacy') { $text } else { $typed }
   . ([scriptblock]::Create($definition))
-  foreach ($value in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json)) {
-    try { $result=_PresetInvokeJson -ChildArgs @('-Quiet','macro','task-plan','--type-text',"$value",'--json-only') }
-    catch { $result=@{threw=$true;message=$_.Exception.Message} }
-    [void]$results.Add(@{mode=$mode;value=$value;result=$result})
+  $queryKinds=if ($mode -eq 'legacy') { @('task-plan') } else { @('task-plan','form-plan','smart-plan') }
+  foreach ($queryKind in $queryKinds) {
+    foreach ($value in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json)) {
+      try { $result=_PresetInvokeJson -ChildArgs @('-Quiet','macro',$queryKind,'--type-text',"$value",'--json-only') }
+      catch { $result=@{threw=$true;message=$_.Exception.Message} }
+      [void]$results.Add(@{mode=$mode;query=$queryKind;value=$value;result=$result})
+    }
   }
+}
+foreach ($queryKind in @('workflow-run','cdp-eval','type-native','smart-click')) {
+  try { $result=_PresetInvokeJson -ChildArgs @('-Quiet','macro',$queryKind,'--json-only') }
+  catch { $result=@{threw=$true;message=$_.Exception.Message} }
+  [void]$results.Add(@{mode='rejected';query=$queryKind;result=$result})
 }
 [Console]::Out.WriteLine((ConvertTo-Json -InputObject @($results) -Depth 20 -Compress))
 '''

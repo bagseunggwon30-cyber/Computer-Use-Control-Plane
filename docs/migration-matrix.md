@@ -121,7 +121,15 @@ Strategy retirement still waits for additional en-US/ko-KR/tr-TR/invariant cultu
 See [the checkpoint report](migration-checkpoint-report.md) for the coherent
 architecture, measured source retirement and explicit remaining acceptance scope.
 The qualified preset body is now a thin planning-query adapter; aggregate tracked
-PS is 962,379 bytes, down 51,099 bytes from baseline including bridge overhead.
+PS is 962,100 bytes, down 51,378 bytes from baseline including bridge overhead.
 This does not meet the lowest/zero-PowerShell goal. Its actual adapter and output
 formatting are required checks in the current commit's Windows CI. Strategy and
 image PS bodies remain; no further family is retired on candidate-only evidence.
+
+### Captured planning candidates
+
+Task/form and smart-plan candidates are isolated from the production host. Their
+original builders remain while Windows compares exact captured query order,
+payloads, errors, formatting, and exits. The common read-only child transport
+keeps control-like values inside a named string array and rejects actuator
+routes. See `legacy-task-form-kernel.md` and `legacy-smart-plan-kernel.md`.

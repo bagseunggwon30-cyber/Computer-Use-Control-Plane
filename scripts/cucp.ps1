@@ -12,11 +12,10 @@ param(
   [string[]]$CucpArgs
 )
 
-# If the caller passed "--" as the first token (POSIX stop-parsing convention),
-# strip it. Anything that follows is treated verbatim - this prevents
-# PowerShell from interpreting tokens like "--out" as parameter abbreviations
-# (e.g. -OutVariable). Callers that need to pass --out, --opt-name, etc. to
-# the CUCP CLI should always prefix their args with "--".
+# Strip a leading "--" only if it has already reached the argument array.
+# This cannot protect the native powershell.exe -File parameter-binding boundary.
+# Inside PowerShell, pass option-like data through the named -CucpArgs string array.
+# Internal planning queries use a fixed stdin bootstrap for that typed binding.
 if ($CucpArgs -and $CucpArgs.Count -gt 0 -and $CucpArgs[0] -eq "--") {
   if ($CucpArgs.Count -gt 1) {
     $CucpArgs = $CucpArgs[1..($CucpArgs.Count - 1)]
@@ -10249,6 +10248,59 @@ function Invoke-MacroAppProfile {
   return 0
 }
 
+function _Invoke-LegacyReadOnlyQuery {
+  param([string[]]$ChildArgs)
+  if ($ChildArgs.Count -lt 4 -or $ChildArgs[0] -ne '-Quiet' -or $ChildArgs[1] -ne 'macro' -or
+      $ChildArgs[2] -notin @('task-plan','form-plan','smart-plan') -or $ChildArgs[-1] -ne '--json-only') {
+    throw 'Invalid readonly planning query descriptor.'
+  }
+  # Fixed code receives data on stdin and binds the named array in-process.
+  # Native powershell -File reparses control-like values as script switches.
+  $bootstrap = @'
+$ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
+$utf8=New-Object Text.UTF8Encoding($false,$true)
+[Console]::OutputEncoding=$utf8
+$reader=New-Object IO.StreamReader -ArgumentList @([Console]::OpenStandardInput(),$utf8,$true)
+try { $wire=$reader.ReadToEnd() } finally { $reader.Dispose() }
+if ($wire.Length -gt 0 -and $wire[0] -eq [char]0xfeff) { $wire=$wire.Substring(1) }
+$request=$wire | ConvertFrom-Json
+if ($request.schema -ne 'cucp.readonly-plan-query/v1' -or $request.script_path -isnot [string] -or @($request.argv).Count -lt 2 -or $request.argv[0] -ne 'macro' -or $request.argv[1] -notin @('task-plan','form-plan','smart-plan') -or $request.argv[-1] -ne '--json-only' -or @($request.argv | Where-Object { $_ -isnot [string] }).Count -gt 0) { throw 'Invalid readonly planning query.' }
+$global:LASTEXITCODE=0
+& ([string]$request.script_path) -Quiet -CucpArgs ([string[]]$request.argv)
+exit [int]$LASTEXITCODE
+'@
+  $utf8 = New-Object Text.UTF8Encoding($false,$true)
+  $wire = @{schema='cucp.readonly-plan-query/v1';script_path=$PSCommandPath;argv=@($ChildArgs | Select-Object -Skip 1)} | ConvertTo-Json -Depth 6 -Compress
+  $bytes = $utf8.GetBytes($wire)
+  if ($bytes.Length -gt 1048576) { throw 'Readonly planning query exceeds 1 MiB.' }
+  $psi = New-Object Diagnostics.ProcessStartInfo
+  $psi.FileName = (Get-Command powershell.exe -CommandType Application -ErrorAction Stop).Source
+  $psi.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -InputFormat Text -OutputFormat Text -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($bootstrap))
+  $psi.UseShellExecute = $false
+  $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
+  $psi.StandardOutputEncoding = $utf8; $psi.StandardErrorEncoding = $utf8
+  $process = New-Object Diagnostics.Process
+  $process.StartInfo = $psi
+  $started = $false
+  try {
+    $started = $process.Start()
+    $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
+    $process.StandardInput.BaseStream.Write($bytes,0,$bytes.Length)
+    $process.StandardInput.Close()
+    $process.WaitForExit()
+    $out = $stdout.GetAwaiter().GetResult(); $err = $stderr.GetAwaiter().GetResult()
+    if ($out.Length -gt 16777216 -or $err.Length -gt 1048576) { throw 'Readonly planning response exceeds its budget.' }
+    $raw = (($out + $err) -replace "`r`n", "`n") -replace "`n$", ''
+    $obj = $null
+    try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
+    return [pscustomobject]@{exit=[int]$process.ExitCode;raw=$raw;json=$obj}
+  } finally {
+    if ($started) { try { if (-not $process.HasExited) { $process.Kill() } } catch { } }
+    $process.Dispose()
+  }
+}
+
 function Invoke-MacroTaskPreset {
   param([string[]]$Rest)
   $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
@@ -10259,52 +10311,9 @@ function Invoke-MacroTaskPreset {
   $query = @($preset.queries)[0]
   function _PresetInvokeJson {
     param([string[]]$ChildArgs)
-    # Fixed code receives data on stdin and binds the named array in-process.
-    # Native powershell -File reparses control-like values as script switches.
-    $bootstrap = @'
-$ErrorActionPreference='Stop'
-$ProgressPreference='SilentlyContinue'
-$utf8=New-Object Text.UTF8Encoding($false,$true)
-[Console]::OutputEncoding=$utf8
-$reader=New-Object IO.StreamReader -ArgumentList @([Console]::OpenStandardInput(),$utf8,$true)
-try { $wire=$reader.ReadToEnd() } finally { $reader.Dispose() }
-if ($wire.Length -gt 0 -and $wire[0] -eq [char]0xfeff) { $wire=$wire.Substring(1) }
-$request=$wire | ConvertFrom-Json
-if ($request.schema -ne 'cucp.readonly-plan-query/v1' -or $request.script_path -isnot [string] -or @($request.argv).Count -lt 2 -or $request.argv[0] -ne 'macro' -or $request.argv[1] -ne 'task-plan' -or @($request.argv | Where-Object { $_ -isnot [string] }).Count -gt 0) { throw 'Invalid readonly planning query.' }
-$global:LASTEXITCODE=0
-& ([string]$request.script_path) -Quiet -CucpArgs ([string[]]$request.argv)
-exit [int]$LASTEXITCODE
-'@
-    $utf8 = New-Object Text.UTF8Encoding($false,$true)
-    $wire = @{schema='cucp.readonly-plan-query/v1';script_path=$PSCommandPath;argv=@($ChildArgs | Select-Object -Skip 1)} | ConvertTo-Json -Depth 6 -Compress
-    $bytes = $utf8.GetBytes($wire)
-    if ($bytes.Length -gt 1048576) { throw 'Readonly planning query exceeds 1 MiB.' }
-    $psi = New-Object Diagnostics.ProcessStartInfo
-    $psi.FileName = (Get-Command powershell.exe -CommandType Application -ErrorAction Stop).Source
-    $psi.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -InputFormat Text -OutputFormat Text -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($bootstrap))
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
-    $psi.StandardOutputEncoding = $utf8; $psi.StandardErrorEncoding = $utf8
-    $process = New-Object Diagnostics.Process
-    $process.StartInfo = $psi
-    $started = $false
-    try {
-      $started = $process.Start()
-      $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
-      $process.StandardInput.BaseStream.Write($bytes,0,$bytes.Length)
-      $process.StandardInput.Close()
-      $process.WaitForExit()
-      $out = $stdout.GetAwaiter().GetResult(); $err = $stderr.GetAwaiter().GetResult()
-      if ($out.Length -gt 16777216 -or $err.Length -gt 1048576) { throw 'Readonly planning response exceeds its budget.' }
-      $raw = (($out + $err) -replace "`r`n", "`n") -replace "`n$", ''
-      $obj = $null
-      try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
-      return [pscustomobject]@{exit=[int]$process.ExitCode;raw=$raw;json=$obj}
-    } finally {
-      if ($started) { try { if (-not $process.HasExited) { $process.Kill() } } catch { } }
-      $process.Dispose()
-    }
+    return (_Invoke-LegacyReadOnlyQuery -ChildArgs $ChildArgs)
   }
+
   $elapsed = 0
   if ($preset.mode -eq 'task') {
     $childArgs = @($query.argv)
@@ -10401,12 +10410,7 @@ function Invoke-MacroTaskPlan {
 
   function _InvokeTaskChildJson {
     param([string[]]$ChildArgs)
-    $rawLines = & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @ChildArgs 2>&1
-    $exitCode = $LASTEXITCODE
-    $raw = (($rawLines | ForEach-Object { $_.ToString() }) -join "`n")
-    $obj = $null
-    try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
-    return [pscustomobject]@{ exit=[int]$exitCode; raw=$raw; json=$obj }
+    return (_Invoke-LegacyReadOnlyQuery -ChildArgs $ChildArgs)
   }
 
   $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -10769,17 +10773,7 @@ function Invoke-MacroFormPlan {
 
   function _InvokeChildSmartPlanJson {
     param([string[]]$PlanArgs)
-    $args = @("-Quiet","macro","smart-plan") + $PlanArgs + @("--json-only")
-    $rawLines = & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args 2>&1
-    $exitCode = $LASTEXITCODE
-    $raw = (($rawLines | ForEach-Object { $_.ToString() }) -join "`n")
-    $obj = $null
-    try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
-    return [pscustomobject]@{
-      exit = [int]$exitCode
-      raw = $raw
-      json = $obj
-    }
+    return (_Invoke-LegacyReadOnlyQuery -ChildArgs (@("-Quiet","macro","smart-plan") + $PlanArgs + @("--json-only")))
   }
 
   $sw = [System.Diagnostics.Stopwatch]::StartNew()
