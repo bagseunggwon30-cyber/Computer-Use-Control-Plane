@@ -10263,6 +10263,7 @@ function Invoke-MacroTaskPreset {
     # Native powershell -File reparses control-like values as script switches.
     $bootstrap = @'
 $ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
 $utf8=New-Object Text.UTF8Encoding($false,$true)
 [Console]::OutputEncoding=$utf8
 $reader=New-Object IO.StreamReader -ArgumentList @([Console]::OpenStandardInput(),$utf8,$true)

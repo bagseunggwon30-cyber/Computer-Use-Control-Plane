@@ -208,6 +208,7 @@ class PresetWindowsParityTests(unittest.TestCase):
                     self.assertNotIn("threw", item["result"], item)
                     self.assertEqual(item["result"]["exit"], 0, item)
                     echo = item["result"]["json"]
+                    self.assertIsInstance(echo, dict, item)
                     self.assertFalse(echo["live"], item)
                     self.assertFalse(echo["brief"], item)
                     self.assertTrue(echo["quiet"], item)

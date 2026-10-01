@@ -19,9 +19,9 @@ The baseline is published commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tre
 
 | Canonical tracked PS source | Baseline | This milestone |
 | --- | ---: | ---: |
-| All `.ps1` source and tests | 1,013,478 bytes | 962,309 bytes |
-| Three legacy runtime scripts | 858,937 bytes | 811,531 bytes |
-| Actual all-source reduction | — | **51,169 bytes (5.05%)** |
+| All `.ps1` source and tests | 1,013,478 bytes | 962,348 bytes |
+| Three legacy runtime scripts | 858,937 bytes | 811,570 bytes |
+| Actual all-source reduction | — | **51,130 bytes (5.05%)** |
 
 There are still 291 top-level legacy function entries. Function count is not a
 feature-completion percentage: several retained functions are now thin adapters,
@@ -51,7 +51,7 @@ embedded copy. No Linguist exclusion or language-statistics padding is used.
 - **Workflow plan assembly:** allowlists, policy and result construction moved to
   C#. The exact original PS tokenizer remains. An incomplete literal-parser
   candidate is excluded from the shipped host
-- **Task presets:** the 17,082-byte builder became a 5,447-byte adapter after its
+- **Task presets:** the 17,082-byte builder became a 5,486-byte adapter after its
   recipe and payload comparison passed. It retains one read-only planning query,
   timing, errors, formatting and exit behavior. Central bridge overhead is included
   in the aggregate reduction above
@@ -65,15 +65,15 @@ Python owns transport/schema validation, bounded workflows, target selection,
 observations, memory-only audit metadata, cancellation and the optional CDP client.
 C# owns Windows UIA, OCR, guarded input, app lifecycle and the pure compatibility
 kernels. Live authority is fixed at startup; failed or uncertain mutations are
-not automatically retried. Retained compatibility calls carry the caller's culture across their process boundary and restore native request-local culture afterward; this changes no OS locale setting. The preset child query sends JSON to a fixed bootstrap and binds a named string array, so control-like values remain data. Windows proved that native `-File` binding and a literal `--` do not provide this boundary. Both boundaries have Windows fixtures. CDP requires one explicitly configured numeric-loopback
+not automatically retried. Retained compatibility calls carry the caller's culture across their process boundary and restore native request-local culture afterward; this changes no OS locale setting. The preset child query sends JSON to a fixed bootstrap and binds a named string array, so control-like values remain data. Windows proved that native `-File` binding and a literal `--` do not provide this boundary. The bootstrap suppresses only its progress stream so first-use module loading cannot corrupt the JSON reply; genuine errors remain captured. Both boundaries have Windows fixtures. CDP requires one explicitly configured numeric-loopback
 endpoint and fresh target/document/element references.
 
 Required CI covers Linux contracts, Windows native/protocol contracts, relocated
 portable packaging, and seven real fresh-profile sandboxed Chrome fixture tests.
 It includes 56 OCR, 57 safety and 115 coordinate kernel cases plus actual retained
 adapters; 254 complete original-tokenizer-fed workflow plans; and eight actual
-native parsed-plan dispatch cases. Preset qualification includes 538 exact
-recipe/payload comparisons from 277 inputs, 28 argv/quoting cases, and a new actual
+native parsed-plan dispatch cases. Preset qualification includes 554 exact
+recipe/payload comparisons from 285 inputs, 28 argv/quoting cases, and a new actual
 adapter/formatting comparison. **The current commit's complete CI must pass**;
 an earlier green run is not a substitute.
 
