@@ -68,8 +68,11 @@ class LegacyStrategyParityTests(unittest.TestCase):
             for culture in ('en-US', 'ko-KR', 'tr-TR', ''):
                 with self.subTest(culture=culture):
                     self.compare_cases(cases, culture=culture, fixture_host=host)
+                    self.compare_cases(cases, culture=culture, fixture_host=host, explicit_culture=True)
 
-    def compare_cases(self, cases, culture=None, fixture_host=None):
+    def compare_cases(self, cases, culture=None, fixture_host=None, explicit_culture=False):
+        if explicit_culture:
+            cases = [{**c, 'args': {**c['args'], 'culture': culture}} for c in cases]
         source_data = subprocess.check_output(['git', 'show', f'{BASELINE_TREE}:scripts/cucp.ps1'], cwd=ROOT)
         with tempfile.TemporaryDirectory(prefix='CUCP strategy 한글 ') as temp:
             root = Path(temp)
@@ -109,7 +112,7 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
             native = [str(host)] if host.suffix.lower() == '.exe' else [shutil.which('dotnet'), str(host)]
             for case, before in zip(cases, expected):
                 with self.subTest(case=case):
-                    result = subprocess.run([*native, *( ['legacy-compat'] if culture is None else [culture])], input=json.dumps({'schema': 'cucp.legacy-compat/v1', **case}, ensure_ascii=True).encode(),
+                    result = subprocess.run([*native, *( ['legacy-compat'] if culture is None else [('en-US' if explicit_culture else culture)])], input=json.dumps({'schema': 'cucp.legacy-compat/v1', **case}, ensure_ascii=True).encode(),
                                             capture_output=True, timeout=10)
                     self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8', errors='replace'))
                     after = json.loads(result.stdout.decode('utf-8-sig'))

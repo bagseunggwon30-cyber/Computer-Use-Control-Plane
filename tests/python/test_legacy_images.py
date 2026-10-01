@@ -24,7 +24,10 @@ def image_cases():
                   {'ignore': '0,0,8,6'}, {'ignore': '-2,-2,4,4;1,1,4,3;1,1,4,3'},
                   {'ignore': 'bad;1,2,3;;'}, {'ignore': '0x0,0,0x4,2'},
                   {'ignore': 'oops,0,1,1'}, {'ignore': '2147483648,0,1,1'},
-                  {'ignore': ',,2,2'}, {'ignore': '1.5,0,1,1'},
+                  {'ignore': ',,2,2'}, {'ignore': '1.5,0,1,1'}, {'ignore': '2.5,0,1,1'},
+                  {'ignore': '-1.5,0,3,1'}, {'ignore': '1e0,0,1e0,1'},
+                  {'ignore': '2147483647,0,2147483647,1'},
+                  {'x': 2, 'ignore': '-2147483648,0,2147483647,1'},
                   {'ignore': '0,0,-1,2;99,99,4,4'}, {'x': 2, 'ignore': '0,0,4,6'}):
         cases.append(dict(before='before.png', after='after.png', **extra))
     for before, after in (('before.png', 'small.png'), ('before.png', 'alpha.png'),
@@ -32,6 +35,10 @@ def image_cases():
                           ('directory', 'before.png'), ('missing.png', 'before.png'),
                           ('before.png', 'missing.png'), ('', 'before.png')):
         cases.append(dict(before=before, after=after))
+    for coordinate in ('  +1  ', '-1', '-0x1', '0X4', '1kb', 'NaN', 'Infinity',
+                       '2147483646', '2147483647', '2147483648',
+                       '-2147483647', '-2147483648', '-2147483649'):
+        cases.append(dict(before='before.png', after='after.png', ignore=f'{coordinate},0,4,1'))
     return cases
 
 

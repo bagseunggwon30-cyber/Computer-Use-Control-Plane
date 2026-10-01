@@ -47,3 +47,11 @@ under en-US, ko-KR, tr-TR and invariant cultures against process-local Windows
 PowerShell 5.1 cultures. This checks the historical hashtable comparator rather
 than assuming an en-US success establishes non-English key merging. It changes
 no OS or user settings. The original production 89-case dispatcher check remains.
+
+`strategy-score` also accepts optional `culture` (CultureInfo name, at most 128
+characters; empty means invariant). The legacy adapter must pass the caller's
+CurrentCulture.Name across the process boundary. All key, ordering and label
+comparisons use that explicit culture without changing thread/global culture.
+When omitted, current process culture remains the default. Forty additional
+checks deliberately run the managed harness in en-US while supplying the PS
+caller's culture in JSON; original inherited-culture comparisons remain intact.

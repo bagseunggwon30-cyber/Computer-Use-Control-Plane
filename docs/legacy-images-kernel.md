@@ -27,3 +27,16 @@ Run with CUCP_LEGACY_IMAGES_TEST_DLL pointing to the compiled DLL:
 `python -m unittest discover -s tests/python -p test_legacy_images.py -v`.
 PowerShell integer conversion and localized invocation error strings remain
 explicit parity risks; do not retire the old body on a build-only result.
+
+Initial Windows qualification on 2687ec4/job110497834309 passed 36 of 37
+complete comparisons, including all decoder formats and error envelopes. The
+sole failure was a decimal mask coordinate: PS accepts "1.5" and rounds to 2.
+The candidate now falls back from integer syntax to invariant double parsing
+and ToEven conversion, with additional half-rounding/exponent/overflow-boundary
+fixtures. Mask intermediate arithmetic uses Int64 to preserve PS promotion.
+Requalification is required before retirement.
+
+The 55-case matrix also includes whitespace, signed integers, signed/uppercase
+hex, `1kb`, NaN/Infinity and the immediate Int32 boundaries. These are exact
+differential probes, not claims that every form is accepted. Candidate failures
+remain failures until their full envelopes agree with the pinned PS baseline.

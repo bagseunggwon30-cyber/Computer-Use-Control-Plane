@@ -29,6 +29,12 @@ internal static class StrategyContractChecks
             check(first.GetProperty("score").GetInt32() == 39, "Canonical-equivalent route weights must accumulate");
             check(first.GetProperty("reasons").GetArrayLength() == 2, "Merged route reasons must retain insertion order");
         }
+        var originalCulture = System.Globalization.CultureInfo.CurrentCulture;
+        LegacyStrategyKernel.Score(JsonSerializer.SerializeToElement(new { culture = "tr-TR", route_order = new[] { "I", "ı" } }));
+        check(ReferenceEquals(originalCulture, System.Globalization.CultureInfo.CurrentCulture), "Explicit culture must not alter process culture");
+        var badCulture = false;
+        try { LegacyStrategyKernel.Score(JsonSerializer.SerializeToElement(new { culture = true })); } catch (NativeFailure) { badCulture = true; }
+        check(badCulture, "Non-string culture accepted");
         var failed = false;
         try { LegacyStrategyKernel.Score(JsonSerializer.SerializeToElement(new { browser_like = "false" })); } catch (NativeFailure) { failed = true; }
         check(failed, "Malformed boolean accepted");

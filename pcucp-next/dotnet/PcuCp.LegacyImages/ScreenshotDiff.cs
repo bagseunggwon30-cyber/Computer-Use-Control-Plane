@@ -39,7 +39,13 @@ namespace PcuCp.LegacyImages
             {
                 if (value.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
                     return unchecked((int)uint.Parse(value.Substring(2), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture));
-                return int.Parse(value, NumberStyles.Integer, CultureInfo.InvariantCulture);
+                try { return int.Parse(value, NumberStyles.Integer, CultureInfo.InvariantCulture); }
+                catch (FormatException)
+                {
+                    // PS5 string-to-int conversion falls back to invariant Double,
+                    // then uses banker's rounding (e.g. 1.5 -> 2 and 2.5 -> 2).
+                    return Convert.ToInt32(double.Parse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture));
+                }
             }
             catch (Exception ex) when (ex is FormatException || ex is OverflowException)
             {
@@ -89,15 +95,15 @@ namespace PcuCp.LegacyImages
                 {
                     string spec = raw.Trim(); if (spec.Length == 0) continue;
                     string[] parts = spec.Split(','); if (parts.Length != 4) continue;
-                    int rx = LegacyInt(parts[0].Trim()) - offX, ry = LegacyInt(parts[1].Trim()) - offY;
-                    int rw = LegacyInt(parts[2].Trim()), rh = LegacyInt(parts[3].Trim());
+                    long rx = (long)LegacyInt(parts[0].Trim()) - offX, ry = (long)LegacyInt(parts[1].Trim()) - offY;
+                    long rw = LegacyInt(parts[2].Trim()), rh = LegacyInt(parts[3].Trim());
                     if (rx < 0) { rw += rx; rx = 0; }
                     if (ry < 0) { rh += ry; ry = 0; }
                     if (rw <= 0 || rh <= 0) continue;
                     if ((long)rx + rw > cmpW) rw = cmpW - rx;
                     if ((long)ry + rh > cmpH) rh = cmpH - ry;
                     if (rw <= 0 || rh <= 0) continue;
-                    masks.Add(Map("x", rx, "y", ry, "w", rw, "h", rh));
+                    masks.Add(Map("x", (int)rx, "y", (int)ry, "w", (int)rw, "h", (int)rh));
                 }
                 int changed = 0, ignored = 0, total = checked(cmpW * cmpH);
                 for (int yy = 0; yy < cmpH; yy++) for (int xx = 0; xx < cmpW; xx++)

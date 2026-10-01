@@ -79,16 +79,24 @@ internal static class LegacyStrategyKernel
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern int CompareStringEx(string locale, uint flags, string left, int leftLength,
         string right, int rightLength, IntPtr version, IntPtr reserved, IntPtr parameter);
-    private static int CompareText(string left, string right, bool ignoreCase)
+    private static int CompareText(string left, string right, bool ignoreCase, CultureInfo culture)
     {
-        if (!OperatingSystem.IsWindows()) return CultureInfo.CurrentCulture.CompareInfo.Compare(left, right, (ignoreCase ? CompareOptions.IgnoreCase : CompareOptions.None));
-        var result = CompareStringEx(CultureInfo.CurrentCulture.Name, ignoreCase ? 1u : 0u, left, left.Length, right, right.Length, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+        if (!OperatingSystem.IsWindows()) return culture.CompareInfo.Compare(left, right, (ignoreCase ? CompareOptions.IgnoreCase : CompareOptions.None));
+        var result = CompareStringEx(culture.Name, ignoreCase ? 1u : 0u, left, left.Length, right, right.Length, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
         if (result == 0) throw new NativeFailure("legacy_collation_failed", "Windows NLS route ordering failed.");
         return result - 2;
     }
     internal static object Score(JsonElement args)
     {
-        Fields(args, "app_type", "route_order", "cdp_probe", "uia_probe", "labels", "persisted_strategy", "browser_like", "office_like", "no_probe");
+        Fields(args, "app_type", "route_order", "cdp_probe", "uia_probe", "labels", "persisted_strategy", "browser_like", "office_like", "no_probe", "culture");
+        var culture = CultureInfo.CurrentCulture;
+        if (args.TryGetProperty("culture", out var cultureValue))
+        {
+            if (cultureValue.ValueKind != JsonValueKind.String || cultureValue.GetString()!.Length > 128)
+                throw CommandOptions.Invalid("culture must be a valid culture name of at most 128 characters.");
+            try { culture = CultureInfo.GetCultureInfo(cultureValue.GetString()!); }
+            catch (CultureNotFoundException) { throw CommandOptions.Invalid("Unsupported strategy culture."); }
+        }
         var appType = Text(args, "app_type");
         var routeOrder = Array(args, "route_order");
         var cdp = Object(args, "cdp_probe"); var uia = Object(args, "uia_probe"); var persisted = Object(args, "persisted_strategy");
@@ -102,7 +110,7 @@ internal static class LegacyStrategyKernel
         {
             var key = NormalizeValue(route);
             if (key.Length == 0) return;
-            var item = scores.FirstOrDefault(existing => CompareText(existing.Name, key, true) == 0);
+            var item = scores.FirstOrDefault(existing => CompareText(existing.Name, key, true, culture) == 0);
             if (item is null) { item = new Route(key); scores.Add(item); }
             item.Score += points;
             if (reason.Length > 0) item.Reasons.Add(reason);
@@ -157,12 +165,12 @@ internal static class LegacyStrategyKernel
         System.Array.Sort(ranked, (left, right) =>
         {
             var byScore = right.score.CompareTo(left.score);
-            return byScore != 0 ? byScore : CompareText(left.route, right.route, true);
+            return byScore != 0 ? byScore : CompareText(left.route, right.route, true, culture);
         });
         var best = ranked.FirstOrDefault(); var total = best?.score ?? 0;
         var uniqueLabels = new List<string>();
         foreach (var label in Array(args, "labels").Select(v => String(v)).Where(v => !string.IsNullOrWhiteSpace(v)))
-            if (!uniqueLabels.Any(existing => CompareText(existing, label, false) == 0)) uniqueLabels.Add(label);
+            if (!uniqueLabels.Any(existing => CompareText(existing, label, false, culture) == 0)) uniqueLabels.Add(label);
         var labels = uniqueLabels.Count;
         return new
         {
