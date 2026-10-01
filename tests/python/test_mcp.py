@@ -40,7 +40,7 @@ class McpTests(unittest.TestCase):
         self.assertIn('error', self.request('tools/list'))
         self.assertEqual(self.init()['result']['protocolVersion'], '2025-11-25')
         listing = self.request('tools/list')['result']['tools']
-        self.assertEqual(len(listing), 20)
+        self.assertEqual(len(listing), 40)
         self.assertTrue(all(t['inputSchema']['additionalProperties'] is False for t in listing))
         self.assertNotIn('cucp_enable', [t['name'] for t in listing])
         self.assertIn('error', self.request('initialize'))
@@ -165,7 +165,7 @@ class McpProcessTests(unittest.TestCase):
     def test_real_cli_protocol_and_read_only_default(self):
         self.start()
         self.send({'jsonrpc':'2.0','id':2,'method':'tools/list'})
-        self.assertEqual(len(self.queue.get(timeout=3)['result']['tools']),20)
+        self.assertEqual(len(self.queue.get(timeout=3)['result']['tools']),40)
         self.send({'jsonrpc':'2.0','id':3,'method':'tools/call','params':{'name':'cucp_capabilities'}})
         result=self.queue.get(timeout=3)
         self.assertFalse(json.loads(result['result']['content'][0]['text'])['data']['allow_live_control'])

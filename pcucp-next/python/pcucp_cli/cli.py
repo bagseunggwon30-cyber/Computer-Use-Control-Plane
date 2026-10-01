@@ -52,7 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     ocr_find = sub.add_parser("ocr-find-text", help="find text in an OCR image result")
     ocr_find.add_argument("--path", required=True, help="path to an image file")
     ocr_find.add_argument("--text", required=True, help="text to find")
-    ocr_find.add_argument("--match", default="contains", choices=["contains", "exact", "prefix"], help="text matching mode")
+    ocr_find.add_argument("--match", default="contains", choices=["contains", "exact", "prefix", "fuzzy"], help="text matching mode")
     ocr_find.add_argument("--language", help="optional OCR language tag such as en-US or ko")
     ocr_find.add_argument("--json", action="store_true", help="emit JSON")
 
@@ -70,6 +70,14 @@ def build_parser() -> argparse.ArgumentParser:
     task_plan.add_argument("--click-label", help="label to click as a live step")
     task_plan.add_argument("--json", action="store_true", help="emit JSON")
 
+    for verb in ('workflow-plan', 'workflow-run', 'task-build', 'task-run', 'form-plan', 'form-run'):
+        entry = sub.add_parser(verb, help='declarative Python workflow/form, no PowerShell')
+        entry.add_argument('--file', required=True, help='UTF-8 JSON workflow or form specification')
+        entry.add_argument('--allow-live-control', action='store_true', help='human operator opt-in for this process')
+        entry.add_argument('--json', action='store_true')
+        if verb == 'workflow-run':
+            entry.add_argument('--dry-run', action='store_true')
+
     if not frozen():
         legacy = sub.add_parser("legacy", help="source-only legacy PowerShell compatibility")
         legacy.add_argument("args", nargs=argparse.REMAINDER)
@@ -80,6 +88,29 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     ns = parser.parse_args(argv)
+
+    if ns.verb in {'workflow-plan', 'workflow-run', 'task-build', 'task-run', 'form-plan', 'form-run'}:
+        import json
+        from pathlib import Path
+        from .engine import ComputerSession
+        from .native_session import NativeSession
+        try:
+            with Path(ns.file).open('rb') as stream:
+                raw = stream.read(256 * 1024 + 1)
+            if len(raw) > 256 * 1024:
+                raise ValueError('Specification exceeds 256 KiB')
+            spec = json.loads(raw.decode('utf-8-sig'), parse_constant=lambda x: (_ for _ in ()).throw(ValueError(x)))
+        except (OSError, UnicodeError, ValueError, RecursionError) as exc:
+            parser.error(f'Cannot read specification: {exc}')
+        args = {'workflow': spec} if ns.verb.startswith('workflow-') else spec
+        if ns.verb == 'workflow-run':
+            args['dry_run'] = ns.dry_run
+        with NativeSession(allow_live_control=ns.allow_live_control) as native:
+            session = ComputerSession(allow_live_control=ns.allow_live_control, native=native,
+                                      native_transport='persistent subprocess (stdio-jsonl)')
+            payload = session.handle({'schema': 'cucp.request/v1', 'id': 'cli-workflow', 'command': ns.verb, 'args': args})
+        emit(payload, as_json=bool(ns.json))
+        return 0 if payload['status'] == 'ok' else 2
 
     if ns.verb == "doctor":
         from .doctor import diagnose

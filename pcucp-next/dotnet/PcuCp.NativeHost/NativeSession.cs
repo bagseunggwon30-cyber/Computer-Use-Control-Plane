@@ -40,7 +40,7 @@ internal static class NativeSession
             args.Add(arg);
         }
         // A request's flag can never increase the authority selected by the parent at startup.
-        if (!allowLive && (command is "focus" or "click" or "drag" or "type" or "key" or "scroll" or "app-launch" or "app-close" or "uia-invoke" or "uia-set-value" ||
+        if (!allowLive && (command is "focus" or "click" or "drag" or "type" or "key" or "scroll" or "app-launch" or "app-close" or "uia-invoke" or "uia-set-value" or "uia-toggle" or "uia-select" or "uia-expand-collapse" or "uia-scroll" ||
             args.Any(a => string.Equals(a, "--allow-live-control", StringComparison.OrdinalIgnoreCase))))
             throw new NativeFailure("live_control_required", "This native session was started read-only.", 2);
         return new NativeRequest(id, command, args.ToArray());

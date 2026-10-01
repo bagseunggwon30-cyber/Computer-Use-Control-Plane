@@ -1,6 +1,6 @@
 # Python/C# migration matrix
 
-This is a staged source patch against `8a8426ae5319e71fd9a3655e04a99ef291fbb51e`, not a complete PowerShell rewrite or a newly published release. Existing PowerShell sources remain visible and usable where safe. No Linguist exclusions or file hiding are used to change language percentages.
+This feature branch starts from published `9ffa354b9904235835a7bc6eb78ed8d3d76317c8` (exact tree `bf895d3120dd5e145f360cb1c41e1d79a061d048`). It is not a complete PowerShell rewrite or a signed release. The stages below preserve earlier implementation history. Existing PowerShell sources remain visible and usable where safe. No Linguist exclusions or file hiding are used to change language percentages.
 
 ## Implemented in this stage
 
@@ -54,3 +54,21 @@ Next migration order: UIA action references → Python workflow/recorder state �
 
 The earlier “next work” table describes remaining legacy parity, not a claim these
 new subsets are absent. No PowerShell implementation was removed in this stage.
+
+
+## Stage three: actual orchestration and observation migration
+
+| Family | Python/C# implementation | Legacy parity still outstanding |
+|---|---|---|
+| Workflow plan/run | Typed JSON data, 64 leaf steps, backward-only output references, JSON conditions, schema preflight, deadlines/cancellation, explicit read retries only, no automatic input retry | Legacy command-string format, continue-on-error and user-requested live retries are not mapped |
+| Task and form | PID-bound explicit EXE launch/wait, exact target/focus, fresh observation per field, ambiguity assertion, Unicode/empty ValuePattern, explicit final submit | Friendly app resolution, arbitrary label/coordinate/CDP fallback and app-specific presets |
+| Watch and recovery | Bounded read-only condition polling; safe re-observation recovery plan | Background daemon/event watches and approved modal dismissal |
+| Recording/profile | Bounded memory-only metadata audit, current-observation role/pattern inventory | Disk history, strategy persistence, recorder replay/export |
+| UIA patterns | Toggle exactly once; explicit replace/add/remove SelectionItem; ExpandCollapse state; directional ScrollPattern; observed-state guards and single-use references | Interactive provider conformance, offscreen navigation and long gestures |
+| OCR screen/window | Same captured PNG decoded/recognized in memory by Windows OCR, explicit language, image-pixel geometry, fresh observation and optional UIA tree | Full-desktop/unbounded region capture and live OCR accuracy/language acceptance |
+| OCR matching/fusion and image diff | Deterministic Python normalization/scoring/n-grams, explicit geometry fusion, bounded PNG/pixel differences | All app-specific targeting heuristics, fuzzy auto-actuation and legacy external image formats |
+| Universal host contracts | Same 40 tools over MCP and JSONL, schema-derived preflight, generated checked-in JSON schema, source CLI entry points | Tool-capable host required; this does not retrofit tools into an arbitrary closed chat UI |
+
+This branch adds genuine implementations. It removes **zero** legacy functions: all 298 remain in their original files. This intentionally avoids presenting an incomplete port as a language-statistics success. The new runtime and portable package do not invoke those files; source-only `legacy` remains an explicit compatibility route. CDP/vision providers, true IME/clipboard workflows, broader process/registry/system macros, autostart/helper compatibility, installer/elevation flows and remaining PowerShell tests must still be migrated and validated before full legacy retirement.
+
+Validation of contracts on Linux does not prove interactive Windows behavior. CI's Windows native/portable tests cover builds and protocol/package execution; manual UIA/OCR/input/IME/mixed-DPI/parent-crash acceptance remains required. See [workflow migration](workflow-migration.md), [observation migration](observation-migration.md) and the native contract for exact semantics.

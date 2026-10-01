@@ -1,655 +1,1871 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CUCP local session request",
-  "description": "Host starts serve --allow-live-control; requests cannot grant permission. latest is allowed only after an earlier step in the same batch.",
+  "description": "Generated from pcucp_cli.mcp_server.SCHEMAS. Startup authority is immutable; plans are data and never grant permission.",
   "$defs": {
-    "step": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "command": {
-              "const": "windows"
-            },
-            "args": {
-              "type": "object",
-              "properties": {},
-              "required": [],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "command",
-            "args"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "command": {
-              "const": "privileges"
-            },
-            "args": {
-              "type": "object",
-              "properties": {
-                "pid": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 2147483647
-                }
-              },
-              "required": [],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "command",
-            "args"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "command": {
-              "const": "observe"
-            },
-            "args": {
-              "type": "object",
-              "properties": {
-                "hwnd": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 18
-                },
-                "pid": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 2147483647
-                },
-                "include_ui": {
-                  "type": "boolean"
-                },
-                "max_width": {
-                  "type": "integer",
-                  "minimum": 200,
-                  "maximum": 2000
-                },
-                "max_height": {
-                  "type": "integer",
-                  "minimum": 200,
-                  "maximum": 2000
-                }
-              },
-              "required": [
-                "hwnd"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "command",
-            "args"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "command": {
-              "const": "uia-tree"
-            },
-            "args": {
-              "type": "object",
-              "properties": {
-                "hwnd": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 18
-                },
-                "max_depth": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 4
-                },
-                "max_nodes": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 1000
-                }
-              },
-              "required": [
-                "hwnd"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "command",
-            "args"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "command": {
-              "const": "focus"
-            },
-            "args": {
-              "type": "object",
-              "properties": {
-                "hwnd": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 18
-                },
-                "pid": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 2147483647
-                }
-              },
-              "required": [
-                "hwnd",
-                "pid"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "command",
-            "args"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "command": {
-              "const": "click"
-            },
-            "args": {
-              "type": "object",
-              "properties": {
-                "observation_id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "x": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 1999
-                },
-                "y": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 1999
-                },
-                "button": {
-                  "enum": [
-                    "left",
-                    "right",
-                    "middle"
-                  ]
-                },
-                "count": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 2,
-                  "default": 1
-                }
-              },
-              "required": [
-                "observation_id",
-                "x",
-                "y"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "command",
-            "args"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "command": {
-              "const": "type"
-            },
-            "args": {
-              "type": "object",
-              "properties": {
-                "observation_id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "text": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 4096
-                }
-              },
-              "required": [
-                "observation_id",
-                "text"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "command",
-            "args"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "command": {
-              "const": "key"
-            },
-            "args": {
-              "type": "object",
-              "properties": {
-                "observation_id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "keys": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "observation_id",
-                "keys"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "command",
-            "args"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "command": {
-              "const": "scroll"
-            },
-            "args": {
-              "type": "object",
-              "properties": {
-                "observation_id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "direction": {
-                  "enum": [
-                    "up",
-                    "down",
-                    "left",
-                    "right"
-                  ]
-                },
-                "amount": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 20
-                }
-              },
-              "required": [
-                "observation_id",
-                "direction",
-                "amount"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "command",
-            "args"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "command": {
-              "const": "screenshot"
-            },
-            "args": {
-              "type": "object",
-              "properties": {
-                "hwnd": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 18
-                },
-                "pid": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 2147483647
-                },
-                "include_ui": {
-                  "type": "boolean"
-                },
-                "max_width": {
-                  "type": "integer",
-                  "minimum": 200,
-                  "maximum": 2000
-                },
-                "max_height": {
-                  "type": "integer",
-                  "minimum": 200,
-                  "maximum": 2000
-                }
-              },
-              "required": [
-                "hwnd"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "command",
-            "args"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "command": {
-              "const": "wait-window"
-            },
-            "args": {
-              "type": "object",
-              "properties": {
-                "title": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 256
-                },
-                "pid": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 2147483647
-                },
-                "timeout_ms": {
-                  "type": "integer",
-                  "minimum": 100,
-                  "maximum": 10000
-                },
-                "poll_ms": {
-                  "type": "integer",
-                  "minimum": 100,
-                  "maximum": 1000
-                }
-              },
-              "required": [
-                "title"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "command",
-            "args"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    }
-  },
-  "oneOf": [
-    {
+    "capabilities": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "history": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "windows": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "privileges": {
       "type": "object",
       "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
-        },
-        "id": {
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "observe": {
+      "type": "object",
+      "properties": {
+        "hwnd": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "description": "Exact HWND returned by cucp_windows"
         },
-        "command": {
-          "const": "capabilities"
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
         },
-        "args": {
-          "type": "object",
-          "properties": {},
-          "required": [],
-          "additionalProperties": false
+        "include_ui": {
+          "type": "boolean"
+        },
+        "max_width": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 2000
+        },
+        "max_height": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 2000
         }
       },
       "required": [
-        "schema",
-        "id",
-        "command"
+        "hwnd"
       ],
       "additionalProperties": false
     },
-    {
+    "uia-tree": {
       "type": "object",
       "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
-        },
-        "id": {
+        "hwnd": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "description": "Exact HWND returned by cucp_windows"
         },
-        "command": {
-          "const": "history"
+        "max_depth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
         },
-        "args": {
-          "type": "object",
-          "properties": {},
-          "required": [],
-          "additionalProperties": false
+        "max_nodes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
         }
       },
       "required": [
-        "schema",
-        "id",
-        "command"
+        "hwnd"
       ],
       "additionalProperties": false
     },
-    {
+    "wait-window": {
       "type": "object",
       "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
-        },
-        "id": {
+        "title": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 128
+          "maxLength": 256
         },
-        "command": {
-          "const": "windows"
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
         },
-        "args": {
-          "type": "object",
-          "properties": {},
-          "required": [],
-          "additionalProperties": false
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 10000
+        },
+        "poll_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 1000
         }
       },
       "required": [
-        "schema",
-        "id",
-        "command"
+        "title"
       ],
       "additionalProperties": false
     },
-    {
+    "focus": {
       "type": "object",
       "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
+        "hwnd": {
+          "type": "string",
+          "description": "Exact HWND returned by cucp_windows"
         },
-        "id": {
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "required": [
+        "hwnd",
+        "pid"
+      ],
+      "additionalProperties": false
+    },
+    "click": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "x": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1999
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1999
+        },
+        "button": {
+          "enum": [
+            "left",
+            "right",
+            "middle"
+          ]
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        }
+      },
+      "required": [
+        "observation_id",
+        "x",
+        "y"
+      ],
+      "additionalProperties": false
+    },
+    "drag": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "x": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1999
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1999
+        },
+        "to_x": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1999
+        },
+        "to_y": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1999
+        },
+        "steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      },
+      "required": [
+        "observation_id",
+        "x",
+        "y",
+        "to_x",
+        "to_y"
+      ],
+      "additionalProperties": false
+    },
+    "type": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "text": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 128
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "observation_id",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "key": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
         },
-        "command": {
-          "const": "privileges"
+        "keys": {
+          "type": "string",
+          "enum": [
+            "ALT+F4",
+            "BACKSPACE",
+            "CTRL+A",
+            "CTRL+C",
+            "CTRL+END",
+            "CTRL+F",
+            "CTRL+HOME",
+            "CTRL+L",
+            "CTRL+S",
+            "CTRL+V",
+            "CTRL+X",
+            "CTRL+Y",
+            "CTRL+Z",
+            "DELETE",
+            "DOWN",
+            "END",
+            "ENTER",
+            "ESC",
+            "ESCAPE",
+            "F1",
+            "F10",
+            "F11",
+            "F12",
+            "F2",
+            "F3",
+            "F4",
+            "F5",
+            "F6",
+            "F7",
+            "F8",
+            "F9",
+            "HOME",
+            "LEFT",
+            "PAGEDOWN",
+            "PAGEUP",
+            "RIGHT",
+            "SHIFT+TAB",
+            "SPACE",
+            "TAB",
+            "UP"
+          ]
+        }
+      },
+      "required": [
+        "observation_id",
+        "keys"
+      ],
+      "additionalProperties": false
+    },
+    "scroll": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
         },
-        "args": {
+        "direction": {
+          "enum": [
+            "up",
+            "down",
+            "left",
+            "right"
+          ]
+        },
+        "amount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        }
+      },
+      "required": [
+        "observation_id",
+        "direction",
+        "amount"
+      ],
+      "additionalProperties": false
+    },
+    "uia-find": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "automation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "control_type": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "observation_id"
+      ],
+      "additionalProperties": false
+    },
+    "uia-invoke": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "element_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "observation_id",
+        "element_ref"
+      ],
+      "additionalProperties": false
+    },
+    "uia-set-value": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "element_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "observation_id",
+        "element_ref",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "app-close": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "observation_id"
+      ],
+      "additionalProperties": false
+    },
+    "app-launch": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Absolute existing Windows .exe path; no shell, script, URL or PATH lookup"
+        },
+        "arguments": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "uia-toggle": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "element_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "observation_id",
+        "element_ref"
+      ],
+      "additionalProperties": false
+    },
+    "uia-select": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "element_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selection_mode": {
+          "enum": [
+            "replace",
+            "add",
+            "remove"
+          ]
+        }
+      },
+      "required": [
+        "observation_id",
+        "element_ref"
+      ],
+      "additionalProperties": false
+    },
+    "uia-expand-collapse": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "element_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "expanded",
+            "collapsed"
+          ]
+        }
+      },
+      "required": [
+        "observation_id",
+        "element_ref",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "uia-scroll": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "element_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "horizontal": {
+          "enum": [
+            "none",
+            "small-increment",
+            "large-increment",
+            "small-decrement",
+            "large-decrement"
+          ]
+        },
+        "vertical": {
+          "enum": [
+            "none",
+            "small-increment",
+            "large-increment",
+            "small-decrement",
+            "large-decrement"
+          ]
+        }
+      },
+      "required": [
+        "observation_id",
+        "element_ref"
+      ],
+      "additionalProperties": false
+    },
+    "screenshot": {
+      "type": "object",
+      "properties": {
+        "hwnd": {
+          "type": "string",
+          "description": "Exact HWND returned by cucp_windows"
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "include_ui": {
+          "type": "boolean"
+        },
+        "max_width": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 2000
+        },
+        "max_height": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 2000
+        }
+      },
+      "required": [
+        "hwnd"
+      ],
+      "additionalProperties": false
+    },
+    "ocr-window": {
+      "type": "object",
+      "properties": {
+        "hwnd": {
+          "type": "string",
+          "description": "Exact HWND returned by cucp_windows"
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "include_ui": {
+          "type": "boolean"
+        },
+        "max_width": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 2000
+        },
+        "max_height": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 2000
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "hwnd"
+      ],
+      "additionalProperties": false
+    },
+    "ocr-find": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "match": {
+          "enum": [
+            "exact",
+            "prefix",
+            "contains",
+            "fuzzy"
+          ]
+        },
+        "min_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "max_candidates": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "required": [
+        "observation_id",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "ocr-uia-fuse": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "match": {
+          "enum": [
+            "exact",
+            "prefix",
+            "contains",
+            "fuzzy"
+          ]
+        },
+        "min_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "max_candidates": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "required": [
+        "observation_id",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "screenshot-diff": {
+      "type": "object",
+      "properties": {
+        "before_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "after_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "threshold": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "region": {
           "type": "object",
           "properties": {
-            "pid": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 2147483647
-            }
-          },
-          "required": [],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "schema",
-        "id",
-        "command"
-      ],
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "command": {
-          "const": "observe"
-        },
-        "args": {
-          "type": "object",
-          "properties": {
-            "hwnd": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 18
-            },
-            "pid": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 2147483647
-            },
-            "include_ui": {
-              "type": "boolean"
-            },
-            "max_width": {
-              "type": "integer",
-              "minimum": 200,
-              "maximum": 2000
-            },
-            "max_height": {
-              "type": "integer",
-              "minimum": 200,
-              "maximum": 2000
-            }
-          },
-          "required": [
-            "hwnd"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "schema",
-        "id",
-        "command",
-        "args"
-      ],
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "command": {
-          "const": "uia-tree"
-        },
-        "args": {
-          "type": "object",
-          "properties": {
-            "hwnd": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 18
-            },
-            "max_depth": {
+            "x": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 4
+              "maximum": 1999
             },
-            "max_nodes": {
+            "y": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1999
+            },
+            "width": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1000
+              "maximum": 2000
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2000
             }
           },
           "required": [
-            "hwnd"
+            "x",
+            "y",
+            "width",
+            "height"
           ],
           "additionalProperties": false
+        },
+        "ignore_regions": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1999
+              },
+              "y": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1999
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2000
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2000
+              }
+            },
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "required": [
-        "schema",
-        "id",
-        "command",
-        "args"
+        "before_id",
+        "after_id"
       ],
       "additionalProperties": false
     },
-    {
+    "batch": {
       "type": "object",
       "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "windows"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "privileges"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "pid": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "observe"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "hwnd": {
+                        "type": "string",
+                        "description": "Exact HWND returned by cucp_windows"
+                      },
+                      "pid": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647
+                      },
+                      "include_ui": {
+                        "type": "boolean"
+                      },
+                      "max_width": {
+                        "type": "integer",
+                        "minimum": 200,
+                        "maximum": 2000
+                      },
+                      "max_height": {
+                        "type": "integer",
+                        "minimum": 200,
+                        "maximum": 2000
+                      }
+                    },
+                    "required": [
+                      "hwnd"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "uia-tree"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "hwnd": {
+                        "type": "string",
+                        "description": "Exact HWND returned by cucp_windows"
+                      },
+                      "max_depth": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4
+                      },
+                      "max_nodes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                      }
+                    },
+                    "required": [
+                      "hwnd"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "wait-window"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "pid": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647
+                      },
+                      "timeout_ms": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 10000
+                      },
+                      "poll_ms": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 1000
+                      }
+                    },
+                    "required": [
+                      "title"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "focus"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "hwnd": {
+                        "type": "string",
+                        "description": "Exact HWND returned by cucp_windows"
+                      },
+                      "pid": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "hwnd",
+                      "pid"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "click"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "x": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1999
+                      },
+                      "y": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1999
+                      },
+                      "button": {
+                        "enum": [
+                          "left",
+                          "right",
+                          "middle"
+                        ]
+                      },
+                      "count": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "x",
+                      "y"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "drag"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "x": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1999
+                      },
+                      "y": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1999
+                      },
+                      "to_x": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1999
+                      },
+                      "to_y": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1999
+                      },
+                      "steps": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 64
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "x",
+                      "y",
+                      "to_x",
+                      "to_y"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "type"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "key"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "keys": {
+                        "type": "string",
+                        "enum": [
+                          "ALT+F4",
+                          "BACKSPACE",
+                          "CTRL+A",
+                          "CTRL+C",
+                          "CTRL+END",
+                          "CTRL+F",
+                          "CTRL+HOME",
+                          "CTRL+L",
+                          "CTRL+S",
+                          "CTRL+V",
+                          "CTRL+X",
+                          "CTRL+Y",
+                          "CTRL+Z",
+                          "DELETE",
+                          "DOWN",
+                          "END",
+                          "ENTER",
+                          "ESC",
+                          "ESCAPE",
+                          "F1",
+                          "F10",
+                          "F11",
+                          "F12",
+                          "F2",
+                          "F3",
+                          "F4",
+                          "F5",
+                          "F6",
+                          "F7",
+                          "F8",
+                          "F9",
+                          "HOME",
+                          "LEFT",
+                          "PAGEDOWN",
+                          "PAGEUP",
+                          "RIGHT",
+                          "SHIFT+TAB",
+                          "SPACE",
+                          "TAB",
+                          "UP"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "keys"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "scroll"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "direction": {
+                        "enum": [
+                          "up",
+                          "down",
+                          "left",
+                          "right"
+                        ]
+                      },
+                      "amount": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "direction",
+                      "amount"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "uia-find"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "automation_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "control_type": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "observation_id"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "uia-invoke"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "element_ref": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "element_ref"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "uia-set-value"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "element_ref": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "text": {
+                        "type": "string",
+                        "maxLength": 4096
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "element_ref",
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "app-close"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "timeout_ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      }
+                    },
+                    "required": [
+                      "observation_id"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "app-launch"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "Absolute existing Windows .exe path; no shell, script, URL or PATH lookup"
+                      },
+                      "arguments": {
+                        "type": "array",
+                        "maxItems": 64,
+                        "items": {
+                          "type": "string",
+                          "maxLength": 4096
+                        }
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "uia-toggle"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "element_ref": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "element_ref"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "uia-select"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "element_ref": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "selection_mode": {
+                        "enum": [
+                          "replace",
+                          "add",
+                          "remove"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "element_ref"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "uia-expand-collapse"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "element_ref": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "state": {
+                        "enum": [
+                          "expanded",
+                          "collapsed"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "element_ref",
+                      "state"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "uia-scroll"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "element_ref": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "horizontal": {
+                        "enum": [
+                          "none",
+                          "small-increment",
+                          "large-increment",
+                          "small-decrement",
+                          "large-decrement"
+                        ]
+                      },
+                      "vertical": {
+                        "enum": [
+                          "none",
+                          "small-increment",
+                          "large-increment",
+                          "small-decrement",
+                          "large-decrement"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "element_ref"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "screenshot"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "hwnd": {
+                        "type": "string",
+                        "description": "Exact HWND returned by cucp_windows"
+                      },
+                      "pid": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647
+                      },
+                      "include_ui": {
+                        "type": "boolean"
+                      },
+                      "max_width": {
+                        "type": "integer",
+                        "minimum": 200,
+                        "maximum": 2000
+                      },
+                      "max_height": {
+                        "type": "integer",
+                        "minimum": 200,
+                        "maximum": 2000
+                      }
+                    },
+                    "required": [
+                      "hwnd"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "ocr-window"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "hwnd": {
+                        "type": "string",
+                        "description": "Exact HWND returned by cucp_windows"
+                      },
+                      "pid": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647
+                      },
+                      "include_ui": {
+                        "type": "boolean"
+                      },
+                      "max_width": {
+                        "type": "integer",
+                        "minimum": 200,
+                        "maximum": 2000
+                      },
+                      "max_height": {
+                        "type": "integer",
+                        "minimum": 200,
+                        "maximum": 2000
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "hwnd"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "ocr-find"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "match": {
+                        "enum": [
+                          "exact",
+                          "prefix",
+                          "contains",
+                          "fuzzy"
+                        ]
+                      },
+                      "min_score": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "max_candidates": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "ocr-uia-fuse"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "observation_id": {
+                        "type": "string",
+                        "description": "Latest single-use observation_id; latest is only for later batch steps"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "match": {
+                        "enum": [
+                          "exact",
+                          "prefix",
+                          "contains",
+                          "fuzzy"
+                        ]
+                      },
+                      "min_score": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "max_candidates": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50
+                      }
+                    },
+                    "required": [
+                      "observation_id",
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "screenshot-diff"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "before_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "after_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "threshold": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "region": {
+                        "type": "object",
+                        "properties": {
+                          "x": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1999
+                          },
+                          "y": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1999
+                          },
+                          "width": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 2000
+                          },
+                          "height": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 2000
+                          }
+                        },
+                        "required": [
+                          "x",
+                          "y",
+                          "width",
+                          "height"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "ignore_regions": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1999
+                            },
+                            "y": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1999
+                            },
+                            "width": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 2000
+                            },
+                            "height": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 2000
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "width",
+                            "height"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "before_id",
+                      "after_id"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
         },
-        "id": {
+        "observe_after": {
+          "const": true
+        }
+      },
+      "required": [
+        "actions"
+      ],
+      "additionalProperties": false
+    },
+    "task-build": {
+      "type": "object",
+      "properties": {
+        "name": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "minLength": 1
         },
-        "command": {
-          "const": "focus"
-        },
-        "args": {
+        "target": {
           "type": "object",
           "properties": {
             "hwnd": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 18
+              "description": "Exact HWND returned by cucp_windows"
             },
             "pid": {
               "type": "integer",
@@ -662,323 +1878,29 @@
             "pid"
           ],
           "additionalProperties": false
-        }
-      },
-      "required": [
-        "schema",
-        "id",
-        "command",
-        "args"
-      ],
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
         },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "command": {
-          "const": "click"
-        },
-        "args": {
+        "launch": {
           "type": "object",
           "properties": {
-            "observation_id": {
+            "path": {
               "type": "string",
-              "minLength": 1
+              "description": "Absolute existing Windows .exe path; no shell, script, URL or PATH lookup"
             },
-            "x": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 1999
-            },
-            "y": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 1999
-            },
-            "button": {
-              "enum": [
-                "left",
-                "right",
-                "middle"
-              ]
-            },
-            "count": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 2,
-              "default": 1
-            }
-          },
-          "required": [
-            "observation_id",
-            "x",
-            "y"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "schema",
-        "id",
-        "command",
-        "args"
-      ],
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "command": {
-          "const": "type"
-        },
-        "args": {
-          "type": "object",
-          "properties": {
-            "observation_id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "text": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 4096
-            }
-          },
-          "required": [
-            "observation_id",
-            "text"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "schema",
-        "id",
-        "command",
-        "args"
-      ],
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "command": {
-          "const": "key"
-        },
-        "args": {
-          "type": "object",
-          "properties": {
-            "observation_id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "keys": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "observation_id",
-            "keys"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "schema",
-        "id",
-        "command",
-        "args"
-      ],
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "command": {
-          "const": "scroll"
-        },
-        "args": {
-          "type": "object",
-          "properties": {
-            "observation_id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "direction": {
-              "enum": [
-                "up",
-                "down",
-                "left",
-                "right"
-              ]
-            },
-            "amount": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 20
-            }
-          },
-          "required": [
-            "observation_id",
-            "direction",
-            "amount"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "schema",
-        "id",
-        "command",
-        "args"
-      ],
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "command": {
-          "const": "screenshot"
-        },
-        "args": {
-          "type": "object",
-          "properties": {
-            "hwnd": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 18
-            },
-            "pid": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 2147483647
-            },
-            "include_ui": {
-              "type": "boolean"
-            },
-            "max_width": {
-              "type": "integer",
-              "minimum": 200,
-              "maximum": 2000
-            },
-            "max_height": {
-              "type": "integer",
-              "minimum": 200,
-              "maximum": 2000
-            }
-          },
-          "required": [
-            "hwnd"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "schema",
-        "id",
-        "command",
-        "args"
-      ],
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "command": {
-          "const": "batch"
-        },
-        "args": {
-          "type": "object",
-          "properties": {
-            "actions": {
+            "arguments": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 12,
+              "maxItems": 64,
               "items": {
-                "$ref": "#/$defs/step"
+                "type": "string",
+                "maxLength": 4096
               }
-            },
-            "observe_after": {
-              "const": true
             }
           },
           "required": [
-            "actions"
+            "path"
           ],
           "additionalProperties": false
-        }
-      },
-      "required": [
-        "schema",
-        "id",
-        "command",
-        "args"
-      ],
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "properties": {
-        "schema": {
-          "const": "cucp.request/v1"
         },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "command": {
-          "const": "wait-window"
-        },
-        "args": {
+        "wait": {
           "type": "object",
           "properties": {
             "title": {
@@ -1006,6 +1928,1804 @@
             "title"
           ],
           "additionalProperties": false
+        },
+        "focus": {
+          "type": "boolean"
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 15,
+          "items": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "automation_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "control_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 4096
+              }
+            },
+            "required": [
+              "selector",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "keys": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "enum": [
+              "ALT+F4",
+              "BACKSPACE",
+              "CTRL+A",
+              "CTRL+C",
+              "CTRL+END",
+              "CTRL+F",
+              "CTRL+HOME",
+              "CTRL+L",
+              "CTRL+S",
+              "CTRL+V",
+              "CTRL+X",
+              "CTRL+Y",
+              "CTRL+Z",
+              "DELETE",
+              "DOWN",
+              "END",
+              "ENTER",
+              "ESC",
+              "ESCAPE",
+              "F1",
+              "F10",
+              "F11",
+              "F12",
+              "F2",
+              "F3",
+              "F4",
+              "F5",
+              "F6",
+              "F7",
+              "F8",
+              "F9",
+              "HOME",
+              "LEFT",
+              "PAGEDOWN",
+              "PAGEUP",
+              "RIGHT",
+              "SHIFT+TAB",
+              "SPACE",
+              "TAB",
+              "UP"
+            ]
+          }
+        },
+        "submit": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "automation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "control_type": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 60000
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "task-run": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "object",
+          "properties": {
+            "hwnd": {
+              "type": "string",
+              "description": "Exact HWND returned by cucp_windows"
+            },
+            "pid": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "hwnd",
+            "pid"
+          ],
+          "additionalProperties": false
+        },
+        "launch": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Absolute existing Windows .exe path; no shell, script, URL or PATH lookup"
+            },
+            "arguments": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "type": "string",
+                "maxLength": 4096
+              }
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "additionalProperties": false
+        },
+        "wait": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "pid": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 10000
+            },
+            "poll_ms": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 1000
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "additionalProperties": false
+        },
+        "focus": {
+          "type": "boolean"
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 15,
+          "items": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "automation_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "control_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 4096
+              }
+            },
+            "required": [
+              "selector",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "keys": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "enum": [
+              "ALT+F4",
+              "BACKSPACE",
+              "CTRL+A",
+              "CTRL+C",
+              "CTRL+END",
+              "CTRL+F",
+              "CTRL+HOME",
+              "CTRL+L",
+              "CTRL+S",
+              "CTRL+V",
+              "CTRL+X",
+              "CTRL+Y",
+              "CTRL+Z",
+              "DELETE",
+              "DOWN",
+              "END",
+              "ENTER",
+              "ESC",
+              "ESCAPE",
+              "F1",
+              "F10",
+              "F11",
+              "F12",
+              "F2",
+              "F3",
+              "F4",
+              "F5",
+              "F6",
+              "F7",
+              "F8",
+              "F9",
+              "HOME",
+              "LEFT",
+              "PAGEDOWN",
+              "PAGEUP",
+              "RIGHT",
+              "SHIFT+TAB",
+              "SPACE",
+              "TAB",
+              "UP"
+            ]
+          }
+        },
+        "submit": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "automation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "control_type": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 60000
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "workflow-plan": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "type": "object",
+          "properties": {
+            "schema": {
+              "const": "cucp.workflow/v2"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "steps": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 48
+                  },
+                  "command": {
+                    "type": "string",
+                    "enum": [
+                      "windows",
+                      "privileges",
+                      "observe",
+                      "uia-tree",
+                      "wait-window",
+                      "focus",
+                      "click",
+                      "drag",
+                      "type",
+                      "key",
+                      "scroll",
+                      "uia-find",
+                      "uia-invoke",
+                      "uia-set-value",
+                      "app-close",
+                      "app-launch",
+                      "uia-toggle",
+                      "uia-select",
+                      "uia-expand-collapse",
+                      "uia-scroll",
+                      "screenshot",
+                      "ocr-window",
+                      "ocr-find",
+                      "ocr-uia-fuse",
+                      "screenshot-diff"
+                    ]
+                  },
+                  "args": {
+                    "type": "object"
+                  },
+                  "assert": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 60000
+            },
+            "settle_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2000
+            },
+            "read_retries": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            }
+          },
+          "required": [
+            "steps"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "workflow"
+      ],
+      "additionalProperties": false
+    },
+    "workflow-run": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "type": "object",
+          "properties": {
+            "schema": {
+              "const": "cucp.workflow/v2"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "steps": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 48
+                  },
+                  "command": {
+                    "type": "string",
+                    "enum": [
+                      "windows",
+                      "privileges",
+                      "observe",
+                      "uia-tree",
+                      "wait-window",
+                      "focus",
+                      "click",
+                      "drag",
+                      "type",
+                      "key",
+                      "scroll",
+                      "uia-find",
+                      "uia-invoke",
+                      "uia-set-value",
+                      "app-close",
+                      "app-launch",
+                      "uia-toggle",
+                      "uia-select",
+                      "uia-expand-collapse",
+                      "uia-scroll",
+                      "screenshot",
+                      "ocr-window",
+                      "ocr-find",
+                      "ocr-uia-fuse",
+                      "screenshot-diff"
+                    ]
+                  },
+                  "args": {
+                    "type": "object"
+                  },
+                  "assert": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 60000
+            },
+            "settle_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2000
+            },
+            "read_retries": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            }
+          },
+          "required": [
+            "steps"
+          ],
+          "additionalProperties": false
+        },
+        "dry_run": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "workflow"
+      ],
+      "additionalProperties": false
+    },
+    "form-plan": {
+      "type": "object",
+      "properties": {
+        "hwnd": {
+          "type": "string",
+          "description": "Exact HWND returned by cucp_windows"
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 15,
+          "items": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "automation_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "control_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 4096
+              }
+            },
+            "required": [
+              "selector",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "submit": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "automation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "control_type": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 60000
+        }
+      },
+      "required": [
+        "hwnd",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "form-run": {
+      "type": "object",
+      "properties": {
+        "hwnd": {
+          "type": "string",
+          "description": "Exact HWND returned by cucp_windows"
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 15,
+          "items": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "automation_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "control_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 4096
+              }
+            },
+            "required": [
+              "selector",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "submit": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "automation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "control_type": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 60000
+        }
+      },
+      "required": [
+        "hwnd",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "watch": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "enum": [
+            "windows",
+            "privileges",
+            "observe",
+            "uia-tree",
+            "wait-window",
+            "uia-find",
+            "screenshot",
+            "ocr-window",
+            "ocr-find",
+            "ocr-uia-fuse",
+            "screenshot-diff"
+          ]
+        },
+        "args": {
+          "type": "object"
+        },
+        "until": {
+          "type": "object"
+        },
+        "interval_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 5000
+        },
+        "max_cycles": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    "app-profile": {
+      "type": "object",
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "description": "Latest single-use observation_id; latest is only for later batch steps"
+        }
+      },
+      "required": [
+        "observation_id"
+      ],
+      "additionalProperties": false
+    },
+    "recovery-plan": {
+      "type": "object",
+      "properties": {
+        "failed_reason": {
+          "type": "string",
+          "maxLength": 256
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "record-start": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "record-stop": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "record-read": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "capabilities"
+        },
+        "args": {
+          "$ref": "#/$defs/capabilities"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "history"
+        },
+        "args": {
+          "$ref": "#/$defs/history"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "windows"
+        },
+        "args": {
+          "$ref": "#/$defs/windows"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "privileges"
+        },
+        "args": {
+          "$ref": "#/$defs/privileges"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "observe"
+        },
+        "args": {
+          "$ref": "#/$defs/observe"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "uia-tree"
+        },
+        "args": {
+          "$ref": "#/$defs/uia-tree"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "wait-window"
+        },
+        "args": {
+          "$ref": "#/$defs/wait-window"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "focus"
+        },
+        "args": {
+          "$ref": "#/$defs/focus"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "click"
+        },
+        "args": {
+          "$ref": "#/$defs/click"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "drag"
+        },
+        "args": {
+          "$ref": "#/$defs/drag"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "type"
+        },
+        "args": {
+          "$ref": "#/$defs/type"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "key"
+        },
+        "args": {
+          "$ref": "#/$defs/key"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "scroll"
+        },
+        "args": {
+          "$ref": "#/$defs/scroll"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "uia-find"
+        },
+        "args": {
+          "$ref": "#/$defs/uia-find"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "uia-invoke"
+        },
+        "args": {
+          "$ref": "#/$defs/uia-invoke"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "uia-set-value"
+        },
+        "args": {
+          "$ref": "#/$defs/uia-set-value"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "app-close"
+        },
+        "args": {
+          "$ref": "#/$defs/app-close"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "app-launch"
+        },
+        "args": {
+          "$ref": "#/$defs/app-launch"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "uia-toggle"
+        },
+        "args": {
+          "$ref": "#/$defs/uia-toggle"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "uia-select"
+        },
+        "args": {
+          "$ref": "#/$defs/uia-select"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "uia-expand-collapse"
+        },
+        "args": {
+          "$ref": "#/$defs/uia-expand-collapse"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "uia-scroll"
+        },
+        "args": {
+          "$ref": "#/$defs/uia-scroll"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "screenshot"
+        },
+        "args": {
+          "$ref": "#/$defs/screenshot"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "ocr-window"
+        },
+        "args": {
+          "$ref": "#/$defs/ocr-window"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "ocr-find"
+        },
+        "args": {
+          "$ref": "#/$defs/ocr-find"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "ocr-uia-fuse"
+        },
+        "args": {
+          "$ref": "#/$defs/ocr-uia-fuse"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "screenshot-diff"
+        },
+        "args": {
+          "$ref": "#/$defs/screenshot-diff"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "batch"
+        },
+        "args": {
+          "$ref": "#/$defs/batch"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "task-build"
+        },
+        "args": {
+          "$ref": "#/$defs/task-build"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "task-run"
+        },
+        "args": {
+          "$ref": "#/$defs/task-run"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "workflow-plan"
+        },
+        "args": {
+          "$ref": "#/$defs/workflow-plan"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "workflow-run"
+        },
+        "args": {
+          "$ref": "#/$defs/workflow-run"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "form-plan"
+        },
+        "args": {
+          "$ref": "#/$defs/form-plan"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "form-run"
+        },
+        "args": {
+          "$ref": "#/$defs/form-run"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "watch"
+        },
+        "args": {
+          "$ref": "#/$defs/watch"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "app-profile"
+        },
+        "args": {
+          "$ref": "#/$defs/app-profile"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "recovery-plan"
+        },
+        "args": {
+          "$ref": "#/$defs/recovery-plan"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "record-start"
+        },
+        "args": {
+          "$ref": "#/$defs/record-start"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "record-stop"
+        },
+        "args": {
+          "$ref": "#/$defs/record-stop"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "record-read"
+        },
+        "args": {
+          "$ref": "#/$defs/record-read"
         }
       },
       "required": [

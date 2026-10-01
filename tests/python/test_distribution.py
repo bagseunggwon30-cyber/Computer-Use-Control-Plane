@@ -46,7 +46,7 @@ class DistributionTests(unittest.TestCase):
                 launch.assert_not_called()
 
     def test_doctor_checks_version_without_desktop_claim(self):
-        native = {"status": "ok", "data": {"version": __version__, "process": 123, "parent_lifetime_guard": "inherited-parent-handle/v1"}}
+        native = {"status": "ok", "data": {"version": __version__, "process": 123, "ocr_window": "same-pixels-memory/v1", "uia_patterns": "explicit-pattern-actions/v1", "parent_lifetime_guard": "inherited-parent-handle/v1"}}
         with patch.object(doctor, "_native_argv", return_value=(["native.exe"], "")), \
              patch.object(doctor, "run_native", return_value=(0, native, "")) as run, patch.object(sys, "platform", "win32"):
             result = doctor.diagnose()

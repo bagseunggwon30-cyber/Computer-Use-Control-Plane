@@ -82,7 +82,7 @@ See [migration matrix](migration-matrix.md). Linux tests use native fakes and ex
 
 ## Observation-bound UIA and input additions (local stage two)
 
-The new core exposes 20 tools over stdio MCP and JSONL. The existing Pi extension
+This feature branch exposes 40 tools over stdio MCP and JSONL. The existing Pi extension
 retains its earlier explicit tool subset; no claim is made that its schemas gained
 these new operations. A host can use MCP or map the JSONL contract without Pi.
 
@@ -150,3 +150,8 @@ though the unreleased source still uses the same version number. `doctor` report
 missing guard support as a feature mismatch when a version response is available.
 The parent-liveness contract itself still needs real Windows handle/parent-crash
 validation; Linux tests only verify parsing and adapter wiring.
+
+
+## Expanded Python/C# feature branch
+
+See [workflow migration](workflow-migration.md) for 64-step workflows, PID-bound tasks, fresh-selector forms, bounded read-only watches and memory-only audits. New UIA patterns and exact-pixel window OCR require a native binary built from the same commit. `doctor` checks feature markers as well as the version label. No model API, Pi account, persistent service, PowerShell runtime or shell adapter is required by these tools.

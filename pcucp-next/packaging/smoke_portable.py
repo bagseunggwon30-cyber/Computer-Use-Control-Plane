@@ -68,6 +68,36 @@ def smoke(bundle: Path):
         live = [json.loads(line) for line in invoke([exe, "serve", "--allow-live-control"], source).splitlines()]
         check(live[0]["data"]["allow_live_control"] is True, "Startup authority flag was lost")
         check(live[1]["errors"][0]["code"] == "stale_observation", "Live mode accepted an unobserved target")
+        # New Python orchestration and pure-processing modules must be present in
+        # the frozen package; these probes deliberately issue no desktop action.
+        probes = [
+            {"schema": "cucp.request/v1", "id": "plan", "command": "workflow-plan", "args": {"workflow": {
+                "steps": [{"command": "windows", "args": {}}]}}},
+            {"schema": "cucp.request/v1", "id": "blocked-form", "command": "form-run", "args": {
+                "hwnd": "0x1", "fields": [{"selector": {"name": "Title"}, "text": "한글"}]}},
+            {"schema": "cucp.request/v1", "id": "no-ocr", "command": "ocr-find", "args": {"observation_id": "absent", "text": "text"}},
+            {"schema": "cucp.request/v1", "id": "no-diff", "command": "screenshot-diff", "args": {"before_id": "absent", "after_id": "absent"}},
+            {"schema": "cucp.request/v1", "id": "record", "command": "record-start", "args": {}},
+            {"schema": "cucp.request/v1", "id": "stop", "command": "record-stop", "args": {}},
+        ]
+        probes_wire = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in probes)
+        checks = [json.loads(line) for line in invoke([exe, "serve"], probes_wire).splitlines()]
+        check(len(checks) == len(probes), "Expanded JSONL tools returned missing responses")
+        check(checks[0]["status"] == "ok", "Frozen workflow planner unavailable")
+        check(checks[1]["errors"][0]["code"] == "live_control_required", "Frozen form live gate failed")
+        check(checks[2]["errors"][0]["code"] == "stale_observation", "Frozen OCR processing module unavailable")
+        check(checks[3]["errors"][0]["code"] == "snapshot_unavailable", "Frozen PNG/diff module unavailable")
+        check(checks[4]["status"] == "ok" and checks[5]["data"]["active"] is False, "Frozen audit lifecycle failed")
+        handshake = [
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-11-25",
+                "capabilities": {}, "clientInfo": {"name": "portable-smoke", "version": "1"}}},
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+        ]
+        mcp = [json.loads(line) for line in invoke([exe, "mcp"], "".join(json.dumps(r) + "\n" for r in handshake)).splitlines()]
+        names = {tool["name"] for tool in mcp[-1]["result"]["tools"]}
+        check({"cucp_workflow_run", "cucp_form_run", "cucp_uia_toggle", "cucp_ocr_window", "cucp_screenshot_diff"} <= names,
+              "Frozen MCP capability inventory is incomplete")
         # Prove the published worker starts twice on one connection, with its own .NET runtime.
         native = relocated / "native" / "PcuCp.NativeHost.exe"
         wire = "".join(json.dumps({"schema": "pcucp.native.request/v1", "id": i, "command": "version", "args": []}) + "\n" for i in (1, 2))
@@ -75,7 +105,7 @@ def smoke(bundle: Path):
         check(len(responses) == 2 and all(r["exit_code"] == 0 for r in responses), "Native resident protocol failed")
         check(responses[0]["payload"]["data"]["process"] == responses[1]["payload"]["data"]["process"], "Native worker was not reused")
         invoke([exe, "legacy", "version"], expected=2)
-        print("Portable smoke passed: checksums, relocation, Unicode paths, no runtime PATH, doctor, JSONL, authority gates, resident native worker, legacy exclusion.")
+        print("Portable smoke passed: checksums, relocation, Unicode paths, no runtime PATH, doctor, JSONL, authority gates, resident native worker, expanded workflows/OCR/diff, MCP schemas, legacy exclusion.")
 
 
 if __name__ == "__main__":

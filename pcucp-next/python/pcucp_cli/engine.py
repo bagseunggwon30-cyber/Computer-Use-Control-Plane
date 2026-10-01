@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 from .native_host import run_native, native_host_available
 from .registry import COMMANDS, capabilities
+from .workflows import WorkflowError
+from .validation import ValidationError
 
 MAX_BATCH = 12
 KEYS = set('ENTER TAB ESC ESCAPE BACKSPACE DELETE SPACE LEFT RIGHT UP DOWN HOME END PAGEUP PAGEDOWN SHIFT+TAB ALT+F4'.split())
@@ -71,6 +73,8 @@ class Observation:
     window_geometry: dict
     elements: dict = field(default_factory=dict)
     ui_available: bool = False
+    ocr: dict | None = None
+    ui_nodes: list = field(default_factory=list)
 
 class ComputerSession:
     """One owner per session. Host-side live permission cannot be changed by a request."""
@@ -81,9 +85,12 @@ class ComputerSession:
         self.allow_live_control = bool(allow_live_control)
         self.native, self.clock, self.sleep, self.ttl = native, clock, sleep, observation_ttl_s
         self.observation = None
+        self.snapshots = deque(maxlen=2)
         self.cancelled = threading.Event()
         self.seen, self.order = set(), deque()
         self.events = deque(maxlen=200)
+        from .workflows import Recorder
+        self.recorder = Recorder()
 
     def cancel(self):
         """Terminal cancellation; the host must create a new session and re-observe."""
@@ -113,7 +120,7 @@ class ComputerSession:
             if not isinstance(args, dict):
                 raise EngineError('invalid_argument', 'args must be object')
             status, data, errors = self.execute(command, args, started + 60)
-        except EngineError as exc:
+        except (EngineError, WorkflowError, ValidationError) as exc:
             status, data, errors = exc.status, {}, [{'code': exc.code, 'message': str(exc)}]
         except Exception as exc:
             self.observation = None
@@ -121,6 +128,7 @@ class ComputerSession:
         duration = round((self.clock() - started) * 1000, 3)
         self.events.append({'id': rid, 'command': command, 'status': status, 'duration_ms': duration,
                             'error_codes': [e['code'] for e in errors]})
+        self.recorder.append(self.events[-1])
         return {'schema': 'cucp.response/v1', 'id': rid, 'command': command,
                 'status': status, 'data': data, 'errors': errors, 'duration_ms': duration}
 
@@ -151,6 +159,9 @@ class ComputerSession:
             raise EngineError('unknown_command', f'command not exposed by engine: {command}', 'blocked')
         if spec.effect == 'write' and not self.allow_live_control:
             raise EngineError('live_control_required', 'human operator must enable live control', 'blocked')
+        from .mcp_server import SCHEMAS
+        from .validation import validate
+        validate(args, SCHEMAS[command])
         if command == 'capabilities':
             fields(args, [])
             return 'ok', {'commands': capabilities(), 'allow_live_control': self.allow_live_control,
@@ -159,10 +170,15 @@ class ComputerSession:
                           'request_id_retention': 1024,
                           'coordinate_space': 'returned screenshot image pixels', 'keys': sorted(KEYS),
                           'automatic_retry': False, 'native_transport': self.native_transport,
+                          'workflow': {'max_steps': 64, 'max_duration_ms': 60000, 'stop_on_error': True, 'mutation_retry': False, 'background_execution': False},
+                          'observation_cache': {'snapshots': 2, 'storage': 'session_memory', 'automatic_persistence': False},
+                          'recording': {'storage': 'session_memory', 'max_events': 1000, 'records_text': False, 'replayable': False},
                           'text_input': {'type': 'Unicode SendInput packets; not physical IME composition',
                                          'max_utf16_units': 4096, 'clipboard_used': False,
                                          'uia_set_value': 'writable non-password ValuePattern only'},
                           'drag': {'button': 'left', 'max_steps': 64, 'timed_dwell': False, 'cross_window': False}}, []
+        if command in {'workflow-plan', 'workflow-run', 'task-build', 'task-run', 'form-plan', 'form-run', 'watch', 'record-start', 'record-stop', 'record-read', 'app-profile', 'recovery-plan'}:
+            return self.workflow_command(command, args, deadline)
         if command == 'history':
             fields(args, [])
             return 'ok', {'events': list(self.events)}, []
@@ -175,11 +191,14 @@ class ComputerSession:
             fields(args, ['pid'])
             native_args = ['--pid', str(integer(args['pid'], 'pid', 1, 2**31-1))] if 'pid' in args else []
             return self.call_native(command, native_args, deadline)
-        if command in {'observe', 'screenshot'}:
-            fields(args, ['hwnd', 'pid', 'include_ui', 'max_width', 'max_height'], ['hwnd'])
+        if command in {'ocr-find', 'ocr-uia-fuse', 'screenshot-diff'}:
+            return self.process_observation(command, args, allow_latest=allow_latest)
+        if command in {'observe', 'screenshot', 'ocr-window'}:
+            fields(args, ['hwnd', 'pid', 'include_ui', 'max_width', 'max_height'] + (['language'] if command == 'ocr-window' else []), ['hwnd'])
             if 'include_ui' in args and not isinstance(args['include_ui'], bool):
                 raise EngineError('invalid_argument', 'include_ui must be boolean')
-            return self.observe(args, deadline, include_ui=args.get('include_ui', command == 'observe'))
+            return self.observe(args, deadline, include_ui=args.get('include_ui', command == 'observe'),
+                                capture_command='ocr-window' if command == 'ocr-window' else 'screenshot')
         if command == 'uia-tree':
             if self.observation is not None:
                 self.observation.elements.clear()
@@ -228,14 +247,19 @@ class ComputerSession:
         return 'error', {'windows': [], 'attempts': attempts}, [
             {'code': 'window_wait_timeout', 'message': 'No matching window appeared within the bounded wait.'}]
 
-    def observe(self, args, deadline, *, include_ui=False):
+    def observe(self, args, deadline, *, include_ui=False, capture_command='screenshot'):
         self.observation = None
         hwnd = hwnd_value(args['hwnd'])
         native_args = ['--hwnd', hwnd, '--max-width', str(integer(args.get('max_width', 1600), 'max_width', 200, 2000)),
                        '--max-height', str(integer(args.get('max_height', 1000), 'max_height', 200, 2000))]
         if 'pid' in args:
             native_args += ['--pid', str(integer(args['pid'], 'pid', 1, 2**31-1))]
-        status, data, errors = self.call_native('screenshot', native_args, deadline)
+        if 'language' in args:
+            language = args['language']
+            if not isinstance(language, str) or not 1 <= len(language) <= 64 or any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-' for c in language):
+                raise EngineError('invalid_argument', 'language must be a bounded BCP-47 tag')
+            native_args += ['--language', language]
+        status, data, errors = self.call_native(capture_command, native_args, deadline)
         if status != 'ok':
             return status, data, errors
         image, target, geometry = data.get('image'), data.get('target'), data.get('geometry')
@@ -258,13 +282,23 @@ class ComputerSession:
         if image.get('width') != geometry['image_width'] or image.get('height') != geometry['image_height']:
             raise EngineError('invalid_observation', 'image dimensions differ from coordinate geometry')
         obs = Observation(secrets.token_urlsafe(18), self.clock(), dict(target), dict(geometry), dict(window_geometry))
+        if capture_command == 'ocr-window':
+            ocr = data.get('ocr')
+            if not isinstance(ocr, dict) or not isinstance(ocr.get('words'), list) or not isinstance(ocr.get('lines'), list) or ocr.get('coordinate_space') != 'image_pixels':
+                raise EngineError('invalid_observation', 'Window OCR requires bounded image-pixel words and lines')
+            if len(ocr['words']) > 10000 or len(ocr['lines']) > 10000:
+                raise EngineError('invalid_observation', 'Window OCR exceeds item limit')
+            obs.ocr = ocr
         self.observation = obs
+        self.snapshots.append({'observation_id': obs.id, 'image': dict(image), 'target': dict(target),
+                               'geometry': dict(geometry), 'window_geometry': dict(window_geometry)})
         data = {**data, 'observation_id': obs.id, 'expires_in_ms': int(self.ttl * 1000)}
         if include_ui:
             ui_status, ui, ui_errors = self.call_native('uia-tree', ['--hwnd', hwnd, '--pid', str(target['pid']), '--max-depth', '2', '--max-nodes', '300'], deadline)
             data['ui'] = {'status': ui_status, 'data': ui, 'errors': ui_errors}
             if ui_status == 'ok':
                 obs.ui_available = True
+                obs.ui_nodes = ui.get('nodes', [])
                 pending = list(ui.get('nodes', []))
                 while pending:
                     node = pending.pop()
@@ -289,8 +323,8 @@ class ComputerSession:
             target = {'hwnd': hwnd_value(args['hwnd']), 'pid': integer(args['pid'], 'pid', 1, 2**31-1)}
             native_args = ['--hwnd', target['hwnd'], '--pid', str(target['pid'])]
         else:
-            required = {'click': {'x','y'}, 'drag': {'x','y','to_x','to_y'}, 'type': {'text'}, 'key': {'keys'}, 'scroll': {'direction','amount'}, 'uia-invoke': {'element_ref'}, 'uia-set-value': {'element_ref','text'}}[command]
-            fields(args, required | {'observation_id'} | ({'button', 'count'} if command == 'click' else {'steps'} if command == 'drag' else set()), required | {'observation_id'})
+            required = {'click': {'x','y'}, 'drag': {'x','y','to_x','to_y'}, 'type': {'text'}, 'key': {'keys'}, 'scroll': {'direction','amount'}, 'uia-invoke': {'element_ref'}, 'uia-set-value': {'element_ref','text'}, 'uia-toggle': {'element_ref'}, 'uia-select': {'element_ref'}, 'uia-expand-collapse': {'element_ref', 'state'}, 'uia-scroll': {'element_ref'}}[command]
+            fields(args, required | {'observation_id'} | ({'button', 'count'} if command == 'click' else {'steps'} if command == 'drag' else {'selection_mode'} if command == 'uia-select' else {'horizontal', 'vertical'} if command == 'uia-scroll' else set()), required | {'observation_id'})
             obs = self.observation
             if not isinstance(args['observation_id'], str) or obs is None or (args['observation_id'] != obs.id and not (allow_latest and args['observation_id'] == 'latest')) or self.clock() - obs.created > self.ttl:
                 raise EngineError('stale_observation', 'observe target again before acting', 'blocked')
@@ -298,12 +332,27 @@ class ComputerSession:
             native_args = ['--hwnd', target['hwnd'], '--pid', str(target['pid'])]
             for field in ('x','y','width','height'):
                 native_args += [f'--expected-{field}', str(round(obs.window_geometry[field]))]
-            if command in {'uia-invoke', 'uia-set-value'}:
+            if command in {'uia-invoke', 'uia-set-value', 'uia-toggle', 'uia-select', 'uia-expand-collapse', 'uia-scroll'}:
                 ref = args['element_ref']
                 if not isinstance(ref, str) or ref not in obs.elements:
                     raise EngineError('stale_element_reference', 'Use an element_ref from this observation with include_ui=true', 'blocked')
                 native_args += ['--element-ref', ref]
-                if command == 'uia-set-value':
+                if command == 'uia-select':
+                    mode = args.get('selection_mode', 'replace')
+                    if mode not in ('replace', 'add', 'remove'):
+                        raise EngineError('invalid_argument', 'selection_mode must be replace, add or remove')
+                    native_args += ['--selection-mode', mode]
+                elif command == 'uia-expand-collapse':
+                    if args['state'] not in ('expanded', 'collapsed'):
+                        raise EngineError('invalid_argument', 'state must be expanded or collapsed')
+                    native_args += ['--state', args['state']]
+                elif command == 'uia-scroll':
+                    choices = ('none', 'small-increment', 'large-increment', 'small-decrement', 'large-decrement')
+                    h, v = args.get('horizontal', 'none'), args.get('vertical', 'none')
+                    if h not in choices or v not in choices or (h == v == 'none'):
+                        raise EngineError('invalid_argument', 'Specify supported nonzero UIA scroll amounts')
+                    native_args += ['--horizontal', h, '--vertical', v]
+                elif command == 'uia-set-value':
                     value = input_text(args['text'], allow_empty=True)
                     native_args += ['--text-b64', base64.b64encode(value.encode('utf-8')).decode('ascii')]
             elif command == 'drag':
@@ -418,7 +467,7 @@ class ComputerSession:
             if not isinstance(step, dict) or set(step) != {'command','args'} or not isinstance(step['args'], dict):
                 raise EngineError('invalid_argument', 'each step needs command and args')
             name = step['command']
-            if not isinstance(name, str) or name not in COMMANDS or not COMMANDS[name].available_in_engine or name in {'batch','capabilities','history'}:
+            if not isinstance(name, str) or name not in COMMANDS or not COMMANDS[name].available_in_engine or name in {'batch','capabilities','history','workflow-plan','workflow-run','task-build','task-run','form-plan','form-run','watch','record-start','record-stop','record-read','app-profile','recovery-plan'}:
                 raise EngineError('invalid_argument', 'unsupported batch command')
             if COMMANDS[name].effect == 'write' and not self.allow_live_control:
                 raise EngineError('live_control_required', 'human must enable live control for this batch', 'blocked')
@@ -450,3 +499,91 @@ class ComputerSession:
                 last['image_state'] = 'last_known_before_failure'
         return ('error' if failed else 'ok'), {'steps': steps, **last, 'automatic_retry': False,
                                               'verification': 'observed_not_asserted'}, errors
+
+    def workflow_command(self, command, args, deadline):
+        from .workflows import build_plan, form_plan, run_plan, task_plan, watch
+        if command in {'workflow-plan', 'workflow-run'}:
+            fields(args, ['workflow', 'dry_run'], ['workflow'])
+            if 'dry_run' in args and type(args['dry_run']) is not bool:
+                raise EngineError('invalid_argument', 'dry_run must be boolean')
+            if command == 'workflow-plan':
+                return 'ok', {'plan': build_plan(args['workflow'])}, []
+            return run_plan(self, args['workflow'], deadline, dry_run=args.get('dry_run', False))
+        if command in {'task-build', 'task-run'}:
+            spec = task_plan(args)
+            if command == 'task-build':
+                return 'ok', {'workflow': spec, 'plan': build_plan(spec)}, []
+            return run_plan(self, spec, deadline)
+        if command in {'form-plan', 'form-run'}:
+            spec = form_plan(args)
+            if command == 'form-plan':
+                return 'ok', {'workflow': spec, 'plan': build_plan(spec)}, []
+            return run_plan(self, spec, deadline)
+        if command == 'watch':
+            return watch(self, args, deadline)
+        if command.startswith('record-'):
+            fields(args, [])
+            if command == 'record-start':
+                return 'ok', self.recorder.start(), []
+            if command == 'record-stop':
+                self.recorder.active = False
+            return 'ok', self.recorder.snapshot(), []
+        if command == 'recovery-plan':
+            fields(args, ['failed_reason'])
+            reason = args.get('failed_reason', '')
+            if not isinstance(reason, str) or len(reason) > 256:
+                raise EngineError('invalid_argument', 'failed_reason must be at most 256 characters')
+            return 'ok', {'candidates': [{'command': 'windows', 'args': {}, 'effect': 'read',
+                'reason': 'Re-identify the target and inspect any dialog before choosing another action'}],
+                'failed_reason': reason, 'automatic_retry': False, 'automatic_dismissal': False,
+                'requires_host_decision': True, 'observation_available': self.observation is not None}, []
+        fields(args, ['observation_id'], ['observation_id'])
+        obs = self.observation
+        if obs is None or args['observation_id'] != obs.id or self.clock() - obs.created > self.ttl:
+            raise EngineError('stale_observation', 'Observe the target again', 'blocked')
+        from collections import Counter
+        nodes = list(obs.elements.values())
+        patterns = Counter(p for n in nodes for p in n.get('supported_patterns', n.get('patterns', [])))
+        return 'ok', {'target': obs.target, 'observation_id': obs.id, 'ui_available': obs.ui_available,
+            'element_count': len(nodes), 'control_types': dict(Counter(n.get('control_type', 'Unknown') for n in nodes)),
+            'patterns': dict(patterns), 'routes': ['uia'] if nodes else ['screenshot'],
+            'automatic_fallback': False, 'cdp_probed': False, 'model_provider_required': False}, []
+
+    def process_observation(self, command, args, *, allow_latest=False):
+        from .observation_processing import match_ocr_candidates, fuse_ocr_uia, screenshot_diff
+        try:
+            if command == 'screenshot-diff':
+                before = next((s for s in self.snapshots if s['observation_id'] == args['before_id']), None)
+                after = next((s for s in self.snapshots if s['observation_id'] == args['after_id']), None)
+                if before is None or after is None:
+                    raise EngineError('snapshot_unavailable', 'Only the two most recent snapshots remain in memory', 'blocked')
+                if any(before[k] != after[k] for k in ('target', 'geometry', 'window_geometry')):
+                    raise EngineError('incompatible_snapshots', 'Target and physical/image geometry must match exactly', 'blocked')
+                raw_before = base64.b64decode(before['image']['data'], validate=True)
+                raw_after = base64.b64decode(after['image']['data'], validate=True)
+                report = screenshot_diff(raw_before, raw_after, threshold=args.get('threshold', 16),
+                                         region=args.get('region'), ignore_regions=args.get('ignore_regions', []))
+                diff_status = 'ok' if report.get('comparison_complete') else 'partial'
+                diff_errors = [] if diff_status == 'ok' else [{'code': 'incomplete_comparison', 'message': 'No full comparison evidence is available'}]
+                return diff_status, {**report, 'before_id': args['before_id'], 'after_id': args['after_id'],
+                              'target': after['target'], 'verification': 'pixels_changed_not_task_success'}, diff_errors
+            obs = self.observation
+            if obs is None or (args['observation_id'] != obs.id and not (allow_latest and args['observation_id'] == 'latest')) or self.clock() - obs.created > self.ttl:
+                raise EngineError('stale_observation', 'Capture a fresh window OCR observation', 'blocked')
+            if obs.ocr is None:
+                raise EngineError('ocr_observation_required', 'Use ocr-window before text search or fusion', 'blocked')
+            matches = match_ocr_candidates(obs.ocr, args['text'], args.get('match', 'contains'),
+                min_score=args.get('min_score', 0), limit=args.get('max_candidates', 50))
+            if command == 'ocr-uia-fuse':
+                if not obs.ui_available:
+                    raise EngineError('ui_observation_required', 'ocr-window requires include_ui=true for fusion', 'blocked')
+                report = fuse_ocr_uia(matches, obs.ui_nodes, geometry=obs.geometry,
+                                     target=obs.target, uia_target=obs.target, limit=args.get('max_candidates', 8))
+            else:
+                report = matches
+            result_status = 'partial' if report.get('status') == 'partial' else 'ok'
+            result_errors = [] if result_status == 'ok' else [{'code': 'ambiguous_or_incomplete_observation', 'message': 'Inspect alternatives; no action was selected'}]
+            return result_status, {**report, 'observation_id': obs.id, 'target': obs.target,
+                          'automatic_action': False}, result_errors
+        except ValueError as exc:
+            raise EngineError('invalid_observation_data', str(exc)) from None

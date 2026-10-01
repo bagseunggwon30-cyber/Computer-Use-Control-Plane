@@ -135,4 +135,6 @@ for (var accepted = 1; accepted < dragEvents.Length; accepted++)
 Check(DesktopActions.PendingReleases(dragEvents).Length == 0, "Completed drag retained button");
 foreach (var mutation in new[] { "drag", "uia-invoke", "uia-set-value" })
     Reject(() => NativeSession.Parse(Request(1, mutation), false, 0), "New mutation escaped read-only authority");
+UiaPatternContractChecks.Run(Check);
+OcrWindowContractChecks.Run(Check);
 Console.WriteLine($"PASS: {count} ABI, geometry, lifecycle and command-authority contract checks (no Windows input or apps executed).");

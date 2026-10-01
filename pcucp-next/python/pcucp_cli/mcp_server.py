@@ -11,6 +11,7 @@ import sys
 import threading
 from collections import deque
 from . import __version__
+from .registry import COMMANDS
 from .engine import ComputerSession, KEYS
 from .native_session import NativeSession
 from .server import MAX_REQUEST_BYTES
@@ -53,11 +54,55 @@ SCHEMAS = {
     'app-launch': obj({'path': {'type': 'string', 'description': 'Absolute existing Windows .exe path; no shell, script, URL or PATH lookup'},
                        'arguments': {'type': 'array', 'maxItems': 64, 'items': {'type': 'string', 'maxLength': 4096}}}, ['path']),
 }
+
+SCHEMAS.update({
+    'uia-toggle': obj({'observation_id': TOKEN, 'element_ref': STRING}, ['observation_id', 'element_ref']),
+    'uia-select': obj({'observation_id': TOKEN, 'element_ref': STRING, 'selection_mode': {'enum': ['replace', 'add', 'remove']}}, ['observation_id', 'element_ref']),
+    'uia-expand-collapse': obj({'observation_id': TOKEN, 'element_ref': STRING, 'state': {'enum': ['expanded', 'collapsed']}}, ['observation_id', 'element_ref', 'state']),
+    'uia-scroll': obj({'observation_id': TOKEN, 'element_ref': STRING,
+        'horizontal': {'enum': ['none', 'small-increment', 'large-increment', 'small-decrement', 'large-decrement']},
+        'vertical': {'enum': ['none', 'small-increment', 'large-increment', 'small-decrement', 'large-decrement']}}, ['observation_id', 'element_ref']),
+})
 SCHEMAS['screenshot'] = SCHEMAS['observe']
+SCHEMAS['ocr-window'] = obj({**SCHEMAS['observe']['properties'], 'language': {'type': 'string', 'minLength': 1, 'maxLength': 64}}, ['hwnd'])
+OCR_QUERY = obj({'observation_id': TOKEN, 'text': {'type': 'string', 'minLength': 1, 'maxLength': 1024},
+    'match': {'enum': ['exact', 'prefix', 'contains', 'fuzzy']}, 'min_score': number(0, 100), 'max_candidates': number(1, 50)}, ['observation_id', 'text'])
+SCHEMAS['ocr-find'] = OCR_QUERY
+SCHEMAS['ocr-uia-fuse'] = OCR_QUERY
+RECTANGLE = obj({'x': number(0, 1999), 'y': number(0, 1999), 'width': number(1, 2000), 'height': number(1, 2000)}, ['x', 'y', 'width', 'height'])
+SCHEMAS['screenshot-diff'] = obj({'before_id': STRING, 'after_id': STRING, 'threshold': number(0, 255),
+    'region': RECTANGLE, 'ignore_regions': {'type': 'array', 'maxItems': 32, 'items': RECTANGLE}}, ['before_id', 'after_id'])
+
 SCHEMAS['batch'] = obj({'actions': {'type': 'array', 'minItems': 1, 'maxItems': 12,
     'items': {'oneOf': [obj({'command': {'const': name}, 'args': schema}, ['command', 'args'])
                          for name, schema in SCHEMAS.items() if name not in {'capabilities', 'history'}]}},
     'observe_after': {'const': True}}, ['actions'])
+LEAF_SCHEMAS = dict(SCHEMAS)
+STEP = obj({'id': {'type': 'string', 'minLength': 1, 'maxLength': 48}, 'command': {'type': 'string', 'enum': [k for k in LEAF_SCHEMAS if k not in {'capabilities', 'history', 'batch'}]},
+    'args': {'type': 'object'}, 'assert': {'type': 'object'}}, ['command', 'args'])
+WORKFLOW = obj({'schema': {'const': 'cucp.workflow/v2'}, 'name': {'type': 'string', 'minLength': 1, 'maxLength': 128},
+    'steps': {'type': 'array', 'minItems': 1, 'maxItems': 64, 'items': STEP}, 'timeout_ms': number(100, 60000),
+    'settle_ms': number(0, 2000), 'read_retries': number(0, 3)}, ['steps'])
+SELECTOR = obj({'name': STRING, 'automation_id': STRING, 'control_type': STRING})
+FORM = obj({'hwnd': HWND, 'pid': number(1, 2**31-1), 'fields': {'type': 'array', 'minItems': 1, 'maxItems': 15,
+    'items': obj({'selector': SELECTOR, 'text': {'type': 'string', 'maxLength': 4096}}, ['selector', 'text'])},
+    'submit': SELECTOR, 'timeout_ms': number(100, 60000)}, ['hwnd', 'fields'])
+TASK = obj({'name': STRING, 'target': obj({'hwnd': HWND, 'pid': number(1, 2**31-1)}, ['hwnd', 'pid']),
+    'launch': SCHEMAS['app-launch'], 'wait': SCHEMAS['wait-window'], 'focus': {'type': 'boolean'},
+    'fields': FORM['properties']['fields'], 'text': SCHEMAS['type']['properties']['text'],
+    'keys': {'type': 'array', 'maxItems': 8, 'items': SCHEMAS['key']['properties']['keys']},
+    'submit': SELECTOR, 'timeout_ms': number(100, 60000)})
+SCHEMAS.update({
+    'task-build': TASK, 'task-run': TASK,
+    'workflow-plan': obj({'workflow': WORKFLOW}, ['workflow']),
+    'workflow-run': obj({'workflow': WORKFLOW, 'dry_run': {'type': 'boolean'}}, ['workflow']),
+    'form-plan': FORM, 'form-run': FORM,
+    'watch': obj({'command': {'type': 'string', 'enum': [k for k in LEAF_SCHEMAS if k not in {'batch', 'capabilities', 'history'} and COMMANDS[k].effect == 'read']},
+                  'args': {'type': 'object'}, 'until': {'type': 'object'}, 'interval_ms': number(100, 5000), 'max_cycles': number(1, 100)}, ['command', 'args']),
+    'app-profile': obj({'observation_id': TOKEN}, ['observation_id']),
+    'recovery-plan': obj({'failed_reason': {'type': 'string', 'maxLength': 256}}),
+    'record-start': obj(), 'record-stop': obj(), 'record-read': obj(),
+})
 DESCRIPTIONS = {
     'capabilities': 'Read capabilities, current human-selected live mode, limits and keys.',
     'history': 'Read bounded session metadata only; no typed text or screenshots are persisted.',
@@ -80,7 +125,29 @@ DESCRIPTIONS = {
     'app-launch': 'Launch explicit .exe with an argument vector. Can execute programs: host must approve executable and purpose. No shell expansion; launch is not app readiness.',
     'batch': 'Run at most 12 sequential operations. First failure stops all later steps; no rollback or input retry.',
 }
-WRITES = {'focus', 'click', 'drag', 'type', 'key', 'scroll', 'app-close', 'app-launch', 'uia-invoke', 'uia-set-value', 'batch'}
+DESCRIPTIONS.update({
+    'uia-toggle': 'Toggle exactly once on a fresh visible UIA element; never retries.',
+    'uia-select': 'Select, add or remove a fresh visible UIA selection item.',
+    'uia-expand-collapse': 'Explicitly expand or collapse a fresh visible UIA element.',
+    'uia-scroll': 'Scroll a fresh visible UIA container with bounded pattern amounts.',
+    'ocr-window': 'Capture selected visible window and recognize its exact returned pixels in memory. OCR coordinates are image pixels. May contain occluding windows; language must be installed.',
+    'ocr-find': 'Rank OCR words, lines and 2/3-word phrases from the current OCR observation. Fuzzy matching is explicit and never authorizes an action.',
+    'ocr-uia-fuse': 'Correlate current OCR and same-target UIA geometry; ranked candidates only, no automatic click or invoke.',
+    'screenshot-diff': 'Compare two retained same-target/same-geometry PNG observations with optional region/masks. Pixel change is not task success.',
+    'task-build': 'Compile explicit executable/target, wait, form, text and key intentions into a reviewable workflow. Does not execute it.',
+    'task-run': 'Run a compiled task. Launch wait is bound to the newly created PID; exact selectors and fresh observations are mandatory. No automatic input retry.',
+    'workflow-plan': 'Validate a bounded declarative plan. Planning grants no authority.',
+    'workflow-run': 'Run up to 64 declarative leaf steps, stopping on failure. Never retries mutations; host approval is required for consequences.',
+    'form-plan': 'Build a form workflow with exact selectors and a fresh observation before each value or explicit submit.',
+    'form-run': 'Run explicit form fields through fresh unique UIA matches. No coordinate fallback; submit only if supplied and authorized by host.',
+    'watch': 'Poll a read-only leaf command within bounded cycles/deadline; no background process.',
+    'app-profile': 'Summarize patterns and roles from the current observation; no model or CDP probing.',
+    'recovery-plan': 'Recommend re-observation after failure; never dismisses dialogs or retries input automatically.',
+    'record-start': 'Start bounded memory-only audit metadata recording. No values, images, titles or replay.',
+    'record-stop': 'Stop audit metadata recording and return its bounded summary.',
+    'record-read': 'Read bounded audit metadata recording for this session.',
+})
+WRITES = {'uia-toggle', 'uia-select', 'uia-expand-collapse', 'uia-scroll', 'workflow-run', 'task-run', 'form-run', 'record-start', 'record-stop', 'focus', 'click', 'drag', 'type', 'key', 'scroll', 'app-close', 'app-launch', 'uia-invoke', 'uia-set-value', 'batch'}
 
 
 def tool_list():
