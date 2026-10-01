@@ -19,5 +19,6 @@
     <Compile Include="../PcuCp.NativeHost/UiaPatternRequest.cs" Link="UiaPatternRequest.cs" />
     <Compile Include="../PcuCp.NativeHost/OcrWindowRequest.cs" Link="OcrWindowRequest.cs" />
     <Compile Include="../PcuCp.NativeHost/ScreenshotContracts.cs" Link="ScreenshotContracts.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyOcrMatcher.cs" Link="LegacyOcrMatcher.cs" />
   </ItemGroup>
 </Project>

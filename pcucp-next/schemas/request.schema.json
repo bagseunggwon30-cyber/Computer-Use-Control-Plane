@@ -587,7 +587,7 @@
         },
         "language": {
           "type": "string",
-          "minLength": 1,
+          "minLength": 2,
           "maxLength": 64
         }
       },
@@ -1621,7 +1621,7 @@
                       },
                       "language": {
                         "type": "string",
-                        "minLength": 1,
+                        "minLength": 2,
                         "maxLength": 64
                       }
                     },

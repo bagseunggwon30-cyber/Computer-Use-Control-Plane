@@ -256,7 +256,8 @@ class ComputerSession:
             native_args += ['--pid', str(integer(args['pid'], 'pid', 1, 2**31-1))]
         if 'language' in args:
             language = args['language']
-            if not isinstance(language, str) or not 1 <= len(language) <= 64 or any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-' for c in language):
+            if (not isinstance(language, str) or not 2 <= len(language) <= 64 or any(not part for part in language.split('-')) or
+                any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-' for c in language)):
                 raise EngineError('invalid_argument', 'language must be a bounded BCP-47 tag')
             native_args += ['--language', language]
         status, data, errors = self.call_native(capture_command, native_args, deadline)

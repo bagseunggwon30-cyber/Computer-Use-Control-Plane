@@ -7,6 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -26,6 +28,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
@@ -41,6 +45,10 @@ jobs:
           $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
           python -m unittest discover -s tests/python -p test_native_session.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tests/python -p test_legacy_ocr_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tests/python -p test_install_runtime.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - shell: pwsh
         run: |
           Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
@@ -50,6 +58,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

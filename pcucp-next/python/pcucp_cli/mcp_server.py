@@ -64,7 +64,7 @@ SCHEMAS.update({
         'vertical': {'enum': ['none', 'small-increment', 'large-increment', 'small-decrement', 'large-decrement']}}, ['observation_id', 'element_ref']),
 })
 SCHEMAS['screenshot'] = SCHEMAS['observe']
-SCHEMAS['ocr-window'] = obj({**SCHEMAS['observe']['properties'], 'language': {'type': 'string', 'minLength': 1, 'maxLength': 64}}, ['hwnd'])
+SCHEMAS['ocr-window'] = obj({**SCHEMAS['observe']['properties'], 'language': {'type': 'string', 'minLength': 2, 'maxLength': 64}}, ['hwnd'])
 OCR_QUERY = obj({'observation_id': TOKEN, 'text': {'type': 'string', 'minLength': 1, 'maxLength': 1024},
     'match': {'enum': ['exact', 'prefix', 'contains', 'fuzzy']}, 'min_score': number(0, 100), 'max_candidates': number(1, 50)}, ['observation_id', 'text'])
 SCHEMAS['ocr-find'] = OCR_QUERY

@@ -15,6 +15,34 @@ catch (Exception ex)
     return 2;
 }
 var command = args.Length > 0 ? args[0].ToLowerInvariant() : "version";
+if (command == "legacy-ocr-match")
+{
+    // Pure compatibility entry: bounded stdin JSON, no shell, files or desktop API.
+    try
+    {
+        if (args.Length != 1) throw CommandOptions.Invalid("legacy-ocr-match accepts JSON on stdin only.");
+        using var input = Console.OpenStandardInput();
+        using var buffer = new MemoryStream();
+        var chunk = new byte[8192];
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        while (true)
+        {
+            var count = await input.ReadAsync(chunk, timeout.Token);
+            if (count == 0) break;
+            if (buffer.Length + count > LegacyOcrMatcher.MaximumRequestBytes) throw CommandOptions.Invalid("Legacy OCR request exceeds 1 MiB.");
+            buffer.Write(chunk, 0, count);
+        }
+        using var document = JsonDocument.Parse(new UTF8Encoding(false, true).GetString(buffer.ToArray()), new JsonDocumentOptions { MaxDepth = 32 });
+        Console.WriteLine(JsonSerializer.Serialize(NativeResult.Ok(command, LegacyOcrMatcher.Match(document.RootElement)), NativeDispatcher.JsonOptions));
+        return 0;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine(JsonSerializer.Serialize(NativeResult.Error(command,
+            ex is NativeFailure failure ? failure.Code : "invalid_legacy_ocr_request", ex.Message), NativeDispatcher.JsonOptions));
+        return 2;
+    }
+}
 if (command == "serve")
 {
     try
