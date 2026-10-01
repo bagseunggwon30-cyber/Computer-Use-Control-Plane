@@ -33,12 +33,21 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - run: dotnet build pcucp-next/dotnet/PcuCp.NativeHost/PcuCp.NativeHost.csproj -c Release
+      - id: build_native
+        run: dotnet build pcucp-next/dotnet/PcuCp.NativeHost/PcuCp.NativeHost.csproj -c Release
       - run: dotnet run --project pcucp-next/dotnet/PcuCp.NativeHost.ContractTests -c Release
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Installer Unicode and argv qualification (no actual install)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = Join-Path (Get-Location).Path 'pcucp-next/python'
+          python -m unittest discover -s tests/python -p test_install_runtime.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Native resident transport (no desktop input)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
         shell: pwsh
         run: |
           $env:PYTHONPATH = Join-Path (Get-Location).Path 'pcucp-next/python'
@@ -46,8 +55,6 @@ jobs:
           python -m unittest discover -s tests/python -p test_native_session.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s tests/python -p test_legacy_ocr_parity.py -v
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m unittest discover -s tests/python -p test_install_runtime.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - shell: pwsh
         run: |

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -43,9 +44,9 @@ internal static class LegacyOcrMatcher
         var h = Normalize(hay);
         if (n.Length == 0 || h.Length == 0) return 0;
         // PowerShell's string -eq uses invariant culture, ignoring case.
-        if (CultureInfo.InvariantCulture.CompareInfo.Compare(n, h, CompareOptions.IgnoreCase) == 0) return 100;
+        if (LegacyEqual(n, h)) return 100;
         if (mode == "exact") return 0;
-        if (mode == "prefix") return h.StartsWith(n, StringComparison.CurrentCulture) ? 80 : 0;
+        if (mode == "prefix") return LegacyIndex(h, n) == 0 ? 80 : 0;
         if (mode == "fuzzy")
         {
             budget -= (long)n.Length * h.Length;
@@ -54,7 +55,7 @@ internal static class LegacyOcrMatcher
             if (h.Contains(n, StringComparison.Ordinal)) best = Math.Max(best, 55 + (int)Math.Floor((double)n.Length / h.Length * 30));
             return Math.Clamp(best, 0, 100);
         }
-        var index = h.IndexOf(n, StringComparison.CurrentCulture);
+        var index = LegacyIndex(h, n);
         return index < 0 ? 0 : Math.Min(95, 50 + (int)Math.Floor((double)n.Length / h.Length * 30) + (index == 0 ? 10 : 0));
     }
 
@@ -129,8 +130,90 @@ internal static class LegacyOcrMatcher
                 }
         }
         static int Rank(Dictionary<string, object> item) => (string)item["scope"] switch { "word_ngram" => 0, "word" => 1, _ => 2 };
-        var ordered = results.OrderByDescending(r => (int)r["score"]).ThenBy(Rank)
-            .ThenBy(r => Math.Round(Convert.ToDouble(r["w"], CultureInfo.InvariantCulture)) * Math.Round(Convert.ToDouble(r["h"], CultureInfo.InvariantCulture))).ToArray();
+        int Compare(Dictionary<string, object> a, Dictionary<string, object> b)
+        {
+            var order = ((int)b["score"]).CompareTo((int)a["score"]);
+            if (order == 0) order = Rank(a).CompareTo(Rank(b));
+            if (order == 0) order = (Math.Round(Convert.ToDouble(a["w"])) * Math.Round(Convert.ToDouble(a["h"])))
+                .CompareTo(Math.Round(Convert.ToDouble(b["w"])) * Math.Round(Convert.ToDouble(b["h"])));
+            return order;
+        }
+        var ordered = results.ToArray();
+        LegacySort(ordered, Compare);
         return new { candidates = ordered, candidate_count = ordered.Length, compatibility = "legacy-dotnet-utf16/v1" };
     }
+
+    // Windows PowerShell 5 uses Windows NLS, not the modern runtime's ICU.
+    // The compatibility kernel keeps those linguistic comparisons local.
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern int CompareStringEx(string locale, uint flags, string left, int leftLength,
+        string right, int rightLength, IntPtr version, IntPtr reserved, IntPtr sortHandle);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern int FindNLSStringEx(string locale, uint flags, string source, int sourceLength,
+        string value, int valueLength, IntPtr foundLength, IntPtr version, IntPtr reserved, IntPtr sortHandle);
+
+    private static bool LegacyEqual(string left, string right)
+    {
+        if (!OperatingSystem.IsWindows()) return CultureInfo.InvariantCulture.CompareInfo.Compare(left, right, CompareOptions.IgnoreCase) == 0;
+        var result = CompareStringEx("", 1, left, left.Length, right, right.Length, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+        if (result == 0) throw new NativeFailure("nls_compare_failed", "Windows linguistic comparison failed.");
+        return result == 2;
+    }
+
+    private static int LegacyIndex(string source, string value)
+    {
+        if (!OperatingSystem.IsWindows()) return source.IndexOf(value, StringComparison.CurrentCulture);
+        var result = FindNLSStringEx(CultureInfo.CurrentCulture.Name, 0, source, source.Length, value, value.Length,
+            IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+        if (result < 0 && Marshal.GetLastWin32Error() != 0) throw new NativeFailure("nls_search_failed", "Windows linguistic search failed.");
+        return result;
+    }
+
+    private static void LegacySort<T>(T[] values, Comparison<T> compare)
+    {
+        // Preserve PS5/.NET4 pre-4.5 equal-key ordering, rather than silently
+        // switching first-match behavior to the modern stable LINQ ordering.
+        void Swap(int a, int b) { if (a != b) (values[a], values[b]) = (values[b], values[a]); }
+        void MedianSwap(int a, int b) { if (compare(values[a], values[b]) > 0) Swap(a, b); }
+        void Heap(int begin, int end)
+        {
+            var size = end - begin + 1;
+            void Down(int root, int count)
+            {
+                var kept = values[begin + root - 1];
+                while (root <= count / 2)
+                {
+                    var child = 2 * root;
+                    if (child < count && compare(values[begin + child - 1], values[begin + child]) < 0) child++;
+                    if (compare(kept, values[begin + child - 1]) >= 0) break;
+                    values[begin + root - 1] = values[begin + child - 1]; root = child;
+                }
+                values[begin + root - 1] = kept;
+            }
+            for (var i = size / 2; i >= 1; i--) Down(i, size);
+            for (var i = size; i > 1; i--) { Swap(begin, begin + i - 1); Down(1, i - 1); }
+        }
+        void Sort(int begin, int end, int remaining)
+        {
+            while (begin < end)
+            {
+                if (remaining-- == 0) { Heap(begin, end); return; }
+                var middle = begin + (end - begin) / 2;
+                MedianSwap(begin, middle); MedianSwap(begin, end); MedianSwap(middle, end);
+                var pivot = values[middle];
+                var a = begin; var b = end;
+                while (a <= b)
+                {
+                    while (compare(values[a], pivot) < 0) a++;
+                    while (compare(pivot, values[b]) < 0) b--;
+                    if (a > b) break;
+                    Swap(a++, b--);
+                }
+                if (b - begin <= end - a) { if (begin < b) Sort(begin, b, remaining); begin = a; }
+                else { if (a < end) Sort(a, end, remaining); end = b; }
+            }
+        }
+        if (values.Length > 1) Sort(0, values.Length - 1, 32);
+    }
+
 }
