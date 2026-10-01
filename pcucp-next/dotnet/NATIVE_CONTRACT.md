@@ -23,8 +23,10 @@ Standalone commands retain one JSON document on stdout. Publish once with
 | `type` | Action arguments, `--text-b64 BASE64_UTF8` |
 | `key` | Action arguments, `--key SHORTCUT` |
 | `scroll` | Action arguments, `--direction up/down/left/right`, optional `--amount 1..20` (3) |
+| `app-launch` | `--path ABSOLUTE_EXE --allow-live-control`, optional `--args-b64 BASE64_UTF8_JSON_ARRAY` (empty argument vector) |
+| `app-close` | Action target and authority arguments, optional `--timeout-ms 0..10000` (1500) |
 
-All actions require `--hwnd 0xHEX --pid INT --allow-live-control`. The target must
+All window-targeted actions require `--hwnd 0xHEX --pid INT --allow-live-control`. The target must
 be a top-level window. Optional `--expected-x`, `--expected-y`,
 `--expected-width`, `--expected-height` must appear together and represent the
 **full window rectangle**, not the clipped screenshot rectangle. `focus` rejects
@@ -32,6 +34,45 @@ geometry constraints before any effect because restoring a window changes its
 rectangle; observe again after focusing. Unknown,
 duplicate, missing or malformed arguments fail. There is no implicit authority
 through an environment variable or an automatic fallback executor.
+
+### Application lifecycle
+
+Both lifecycle commands require explicit live-control authority. A native session
+started read-only rejects them even if a request omits or supplies its own live
+flag. Unknown options, including `--force`, are rejected.
+
+`app-launch` accepts only an existing `.exe` at an absolute drive or UNC path.
+Relative paths, PATH/application-name lookup, URLs, `.lnk`, `.cmd`, `.bat`, device
+paths and shell command strings are unsupported. Arguments are a JSON array of
+at most 128 strings encoded as strict UTF-8 and then base64. Empty strings and
+literal quotes, spaces, backslashes and shell punctuation are preserved as
+arguments; they are not interpreted by an intermediate shell. Each string is
+at most 8192 UTF-16 units without NUL. The fully quoted Windows command line is
+limited to 32766 UTF-16 units, excluding its terminating NUL.
+
+Launch calls `CreateProcessW` with the exact executable separately from the
+standard Windows-quoted argument vector. Handle inheritance is disabled and
+console executables receive a new console, preventing child apps from consuming
+requests or writing into the native JSONL protocol streams. GUI apps follow
+their normal GUI startup. No shell, automatic UAC elevation, redirected pipes
+owned by the short-lived host, or fallback launcher is used. The executable
+inherits the host's environment and integrity. Its own argument parser may have
+application-specific conventions. The returned `pid` confirms only successful
+process creation: `verification: "not_verified"` does not assert a visible
+window, completed startup or application readiness. Observe windows afterwards.
+
+`app-close` posts exactly one `WM_CLOSE` to the explicit top-level HWND after
+checking PID, optional expected geometry, privileges and the Default input
+desktop. It does not focus the window, send global input, or terminate a process.
+It polls the original HWND/PID until that window is absent or the bounded timeout
+expires. A zero timeout performs one immediate presence check. Closure returns
+`closed: true`, `still_open: false`, `verification: "window_closed"`. This
+verifies only the selected window, not process exit or any other app windows.
+If it remains open, the result is `partial` with `app_still_open`, `closed: false`,
+`still_open: true` and `verification: "not_verified"`. Save dialogs, refusal to
+close and busy apps are left intact; callers should observe before further
+action. Closing is never retried or escalated to a forced kill. HWND/PID checks
+reduce targeting races but cannot atomically bind an action to a window lifetime.
 
 Allowed shortcuts are case-insensitive: ENTER, TAB, ESC/ESCAPE, BACKSPACE, DELETE,
 SPACE, LEFT, RIGHT, UP, DOWN, HOME, END, PAGEUP, PAGEDOWN, F1..F12,
@@ -123,6 +164,51 @@ dotnet run --project PcuCp.NativeHost.ContractTests
 
 They check Win32 INPUT layout, every pixel in representative negative-origin
 multi-monitor coordinate maps, malformed authority arguments, and machine-readable
-error serialization. They execute no desktop input. Windows publishing, live
+error serialization. Lifecycle contracts additionally check startup ABI layout,
+strict executable/argument validation, argument quoting round-trips, read-only
+session rejection, privilege-refusal paths, one-shot close dispatch and bounded
+still-open outcomes using fake platform operations and a fake clock. They execute
+no desktop input and launch or close no real apps. Windows publishing, live
 UIA/capture/input behavior, IME, DPI changes, UAC and application-specific input
 acceptance require testing on a Windows interactive desktop.
+
+## Stage-two UIA and lifetime contract
+
+- `uia-tree --hwnd` emits optional `element_ref` capabilities for eligible same-PID,
+  non-password elements. A successful bounded observation creates a new generation;
+  partial trees invalidate the generation. References are process-local random
+  values; no external runtime ID can authorize an action
+- `uia-invoke` / `uia-set-value` require live mode, exact target, expected geometry,
+  and an issued reference. Set-value additionally takes UTF-8 `--text-b64`, at most
+  4096 UTF-16 units (empty accepted). No fallback, toggle, selection or password action
+- Before dispatch: reference expiry/consumption, current runtime ID, PID, HWND
+  ancestry, identity fields, element rectangle, visibility/enabled/password state,
+  center hit-test, foreground, input desktop and integrity checks. Partial provider
+  results preserve `may_have_acted`; successful dispatch still needs observation
+- `drag` uses start/end physical coordinates and 1–64 straight-line steps, all in
+  the same selected window. Down/moves/up are one SendInput call; partial acceptance
+  triggers existing pending-input release. There is no sleep while a button is held
+- Python may append startup-only `--parent-handle N` to any native invocation.
+  It is an explicitly inherited SYNCHRONIZE-only parent kernel handle. The native
+  watchdog exits itself on parent death/wait error, including during stalled provider
+  calls. It never enumerates/kills descendants. `app-launch` inherits no handles
+
+Required Windows acceptance checks (not executed on Linux):
+
+1. Observe a WinForms/WPF test window; invoke a button and set a Korean/emoji edit
+   value. Verify actual control state, no duplicate action, and clipboard unchanged
+2. Destroy/recreate the element, change its label/rectangle, move window, reuse HWND,
+   select another PID, cover its center or move focus. Old refs must fail without action
+3. Exercise read-only, disabled, password, offscreen, cross-process, unsupported-pattern
+   and hanging-provider controls. Record partial results and ensure no input fallback
+4. Drag in an expendable canvas at 100/125/150% DPI, including negative-origin monitors.
+   Verify mouse release after injected partial SendInput and normal cancellation.
+   Hard process/OS failures cannot establish unconditional release guarantees
+5. Start through Python, launch an expendable target app, abruptly terminate Python
+   during idle and a blocked request: worker exits, target app stays alive. Check
+   explicit cancellation too, with nested external job environments and x64/ARM64
+6. Check invalid/closed/missing inherited handle fails closed before any live action;
+   verify targets do not inherit the parent handle. Direct human native CLI without
+   `--parent-handle` is intentionally standalone and has no parent-crash guarantee
+7. Repeat the observe/find/action/reobserve workflow from a real generic MCP host
+   and a JSONL client. Unit fixtures are not evidence of external-host GUI success

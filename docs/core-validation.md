@@ -44,8 +44,9 @@ coordinate ranges; they do not represent 12,184 end-to-end application tasks.
 - Verify normal versus elevated application behavior through normal human UAC
   consent. The launcher currently elevates the whole Pi session. UAC secure
   desktop and SYSTEM/protected-integrity targets are outside the supported scope.
-- Verify Windows child-process cleanup; current taskkill tree termination is not
-  the same as Job Object ownership when a parent crashes first.
+- Verify Windows worker-only cleanup and inherited parent-handle watchdog on actual
+  parent crashes. Launched user applications must survive; no taskkill tree termination
+  or Job Object ownership is used by the new core.
 
 The GitHub workflow specifies Linux contract checks and Windows compilation /
 Pester checks. The remote follow-up results are linked above. Hosted CI

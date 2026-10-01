@@ -13,6 +13,19 @@ internal static class NativeMethods
     }
     [StructLayout(LayoutKind.Sequential)] internal struct MOUSEINPUT { public int Dx, Dy; public uint MouseData, Flags, Time; public UIntPtr ExtraInfo; }
     [StructLayout(LayoutKind.Sequential)] internal struct KEYBDINPUT { public ushort Vk, Scan; public uint Flags, Time; public UIntPtr ExtraInfo; }
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] internal struct STARTUPINFO
+    {
+        public int Size;
+        public IntPtr Reserved, Desktop, Title;
+        public uint X, Y, XSize, YSize, XCountChars, YCountChars, FillAttribute, Flags;
+        public ushort ShowWindow, ReservedLength;
+        public IntPtr ReservedBytes, StdInput, StdOutput, StdError;
+    }
+    [StructLayout(LayoutKind.Sequential)] internal struct PROCESS_INFORMATION
+    {
+        public IntPtr Process, Thread;
+        public uint ProcessId, ThreadId;
+    }
     internal delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr state);
 
     [DllImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool SetProcessDpiAwarenessContext(IntPtr context);
@@ -27,6 +40,12 @@ internal static class NativeMethods
     [DllImport("user32.dll")] internal static extern IntPtr WindowFromPoint(POINT point);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool ShowWindow(IntPtr hwnd, int command);
+    [DllImport("user32.dll", EntryPoint = "PostMessageW", ExactSpelling = true, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool PostMessage(IntPtr hwnd, uint message, UIntPtr wParam, IntPtr lParam);
+    [DllImport("kernel32.dll", EntryPoint = "CreateProcessW", ExactSpelling = true, CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool CreateProcess(string applicationName, StringBuilder commandLine, IntPtr processAttributes, IntPtr threadAttributes,
+        [MarshalAs(UnmanagedType.Bool)] bool inheritHandles, uint creationFlags, IntPtr environment, string? currentDirectory,
+        ref STARTUPINFO startupInfo, out PROCESS_INFORMATION processInformation);
+    [DllImport("kernel32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool CloseHandle(IntPtr handle);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int maxCount);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetWindowTextLength(IntPtr hwnd);
     [DllImport("user32.dll")] internal static extern int GetSystemMetrics(int index);

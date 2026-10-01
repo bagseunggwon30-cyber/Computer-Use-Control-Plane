@@ -46,7 +46,7 @@ class DistributionTests(unittest.TestCase):
                 launch.assert_not_called()
 
     def test_doctor_checks_version_without_desktop_claim(self):
-        native = {"status": "ok", "data": {"version": __version__, "process": 123}}
+        native = {"status": "ok", "data": {"version": __version__, "process": 123, "parent_lifetime_guard": "inherited-parent-handle/v1"}}
         with patch.object(doctor, "_native_argv", return_value=(["native.exe"], "")), \
              patch.object(doctor, "run_native", return_value=(0, native, "")) as run, patch.object(sys, "platform", "win32"):
             result = doctor.diagnose()
@@ -61,6 +61,12 @@ class DistributionTests(unittest.TestCase):
         with patch.object(doctor, "_native_argv", return_value=(["native.exe"], "")), \
              patch.object(doctor, "run_native", return_value=(0, {"status": "ok", "data": {"version": "old"}}, "")):
             self.assertIn("version_mismatch", [e["code"] for e in doctor.diagnose()["errors"]])
+
+
+    def test_doctor_rejects_same_version_without_lifetime_feature(self):
+        with patch.object(doctor, "_native_argv", return_value=(["native.exe"], "")), \
+             patch.object(doctor, "run_native", return_value=(0, {"status": "ok", "data": {"version": __version__}}, "")):
+            self.assertIn("native_feature_mismatch", [e["code"] for e in doctor.diagnose()["errors"]])
 
 
 if __name__ == "__main__":

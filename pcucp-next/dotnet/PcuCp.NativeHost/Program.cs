@@ -3,6 +3,17 @@ using System.Text;
 using System.Text.Json;
 
 Console.OutputEncoding = new UTF8Encoding(false);
+try
+{
+    var startup = ParentLifetimeGuard.Extract(args);
+    args = startup.Args;
+    ParentLifetimeGuard.Start(startup.Handle);
+}
+catch (Exception ex)
+{
+    Console.WriteLine(JsonSerializer.Serialize(NativeResult.Error("startup", "parent_guard_failed", ex.Message), NativeDispatcher.JsonOptions));
+    return 2;
+}
 var command = args.Length > 0 ? args[0].ToLowerInvariant() : "version";
 if (command == "serve")
 {

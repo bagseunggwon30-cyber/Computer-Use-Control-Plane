@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Automation;
 
 internal sealed record UiaNode(string Name, string ControlType, string AutomationId, string ClassName, int ProcessId,
-    string NativeWindowHandle, RectInfo? BoundingRectangle, IReadOnlyList<string> Patterns, IReadOnlyList<UiaNode> Children);
+    string NativeWindowHandle, RectInfo? BoundingRectangle, IReadOnlyList<string> Patterns, IReadOnlyList<UiaNode> Children, string? ElementRef);
 
 internal static class UiaTreeObserver
 {
@@ -14,6 +14,7 @@ internal static class UiaTreeObserver
         var maxDepth = options.Integer("--max-depth", 1, 0, 12);
         var maxNodes = options.Integer("--max-nodes", 200, 1, 2000);
         var deadline = options.Integer("--deadline-ms", 1500, 50, 10000);
+        UiaElementActions.BeginObservation();
         var context = new Context(maxDepth, maxNodes, deadline);
         var nodes = new List<UiaNode>();
         WindowTarget? target = null;
@@ -22,6 +23,7 @@ internal static class UiaTreeObserver
             if (options.Has("--hwnd"))
             {
                 target = WindowTarget.Read(options, false);
+                context.Target = target;
                 var root = AutomationElement.FromHandle(target.Hwnd);
                 if (root is null) throw new NativeFailure("uia_target_unavailable", "UIA could not resolve the target window.");
                 var node = context.Read(root, 0);
@@ -42,6 +44,7 @@ internal static class UiaTreeObserver
             }
         }
         catch (Exception ex) when (IsProviderFailure(ex)) { context.Error("uia_provider_error", ex.Message); }
+        if (context.Errors.Count > 0) UiaElementActions.Invalidate();
         return NativeResult.Observation("uia-tree", new
         {
             max_depth = maxDepth, max_nodes = maxNodes, deadline_ms = deadline, nodes, count = nodes.Count,
@@ -55,6 +58,7 @@ internal static class UiaTreeObserver
     private sealed class Context(int maxDepth, int maxNodes, int deadline)
     {
         private readonly Stopwatch clock = Stopwatch.StartNew();
+        public WindowTarget? Target { get; set; }
         public int Count { get; private set; }
         public bool Truncated { get; private set; }
         public List<NativeError> Errors { get; } = [];
@@ -107,7 +111,7 @@ internal static class UiaTreeObserver
                     }
                     catch (Exception ex) when (IsProviderFailure(ex)) { Error("uia_children_unavailable", ex.Message); }
                 }
-                return new UiaNode(name, type, id, className, pid, handle, geometry, patterns, children);
+                return new UiaNode(name, type, id, className, pid, handle, geometry, patterns, children, UiaElementActions.Register(element, Target));
             }
             catch (Exception ex) when (IsProviderFailure(ex)) { Error("uia_element_unavailable", ex.Message); return null; }
         }

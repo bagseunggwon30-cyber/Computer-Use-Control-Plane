@@ -4,9 +4,12 @@ import base64
 import math
 import secrets
 import sys
+import threading
+import json
+from pathlib import PureWindowsPath
 import time
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 from .native_host import run_native, native_host_available
 from .registry import COMMANDS, capabilities
@@ -32,6 +35,17 @@ def integer(value, name, low, high):
         raise EngineError('invalid_argument', f'{name} must be integer [{low}, {high}]')
     return value
 
+def input_text(value, *, allow_empty=False):
+    if not isinstance(value, str) or '\x00' in value:
+        raise EngineError('invalid_argument', 'text must be a Unicode string without NUL')
+    try:
+        units = len(value.encode('utf-16-le')) // 2
+    except UnicodeError:
+        raise EngineError('invalid_argument', 'text must not contain unpaired Unicode surrogates') from None
+    if not (0 if allow_empty else 1) <= units <= 4096:
+        raise EngineError('invalid_argument', 'text exceeds 4096 UTF-16 units or is empty')
+    return value
+
 def hwnd_value(value):
     try:
         if not isinstance(value, str) or len(value) > 18:
@@ -55,6 +69,8 @@ class Observation:
     target: dict
     geometry: dict
     window_geometry: dict
+    elements: dict = field(default_factory=dict)
+    ui_available: bool = False
 
 class ComputerSession:
     """One owner per session. Host-side live permission cannot be changed by a request."""
@@ -65,8 +81,13 @@ class ComputerSession:
         self.allow_live_control = bool(allow_live_control)
         self.native, self.clock, self.sleep, self.ttl = native, clock, sleep, observation_ttl_s
         self.observation = None
+        self.cancelled = threading.Event()
         self.seen, self.order = set(), deque()
         self.events = deque(maxlen=200)
+
+    def cancel(self):
+        """Terminal cancellation; the host must create a new session and re-observe."""
+        self.cancelled.set()
 
     def handle(self, request: Any) -> dict:
         started, rid, command = self.clock(), None, None
@@ -104,6 +125,8 @@ class ComputerSession:
                 'status': status, 'data': data, 'errors': errors, 'duration_ms': duration}
 
     def call_native(self, command, args, deadline):
+        if self.cancelled.is_set():
+            raise EngineError("session_cancelled", "session cancelled; input may have occurred; never retry automatically", "blocked")
         remaining = deadline - self.clock()
         if remaining <= 0:
             raise EngineError('deadline_exceeded', 'deadline reached; next action not started')
@@ -120,6 +143,9 @@ class ComputerSession:
         return status, payload.get('data', {}), errors
 
     def execute(self, command, args, deadline, *, allow_latest=False):
+        if self.cancelled.is_set():
+            self.observation = None
+            raise EngineError("session_cancelled", "restart session and observe again", "blocked")
         spec = COMMANDS.get(command)
         if spec is None or not spec.available_in_engine:
             raise EngineError('unknown_command', f'command not exposed by engine: {command}', 'blocked')
@@ -132,7 +158,11 @@ class ComputerSession:
                           'runtime_platform': sys.platform, 'native_host_configured': native_host_available(),
                           'request_id_retention': 1024,
                           'coordinate_space': 'returned screenshot image pixels', 'keys': sorted(KEYS),
-                          'automatic_retry': False, 'native_transport': self.native_transport}, []
+                          'automatic_retry': False, 'native_transport': self.native_transport,
+                          'text_input': {'type': 'Unicode SendInput packets; not physical IME composition',
+                                         'max_utf16_units': 4096, 'clipboard_used': False,
+                                         'uia_set_value': 'writable non-password ValuePattern only'},
+                          'drag': {'button': 'left', 'max_steps': 64, 'timed_dwell': False, 'cross_window': False}}, []
         if command == 'history':
             fields(args, [])
             return 'ok', {'events': list(self.events)}, []
@@ -151,10 +181,17 @@ class ComputerSession:
                 raise EngineError('invalid_argument', 'include_ui must be boolean')
             return self.observe(args, deadline, include_ui=args.get('include_ui', command == 'observe'))
         if command == 'uia-tree':
+            if self.observation is not None:
+                self.observation.elements.clear()
+                self.observation.ui_available = False
             fields(args, ['hwnd', 'max_depth', 'max_nodes'], ['hwnd'])
             return self.call_native(command, ['--hwnd', hwnd_value(args['hwnd']), '--max-depth',
                 str(integer(args.get('max_depth', 2), 'max_depth', 0, 4)), '--max-nodes',
                 str(integer(args.get('max_nodes', 300), 'max_nodes', 1, 1000))], deadline)
+        if command == 'uia-find':
+            return self.uia_find(args, allow_latest=allow_latest)
+        if command in {'app-close', 'app-launch'}:
+            return self.app_action(command, args, deadline, allow_latest=allow_latest)
         if command == 'batch':
             return self.batch(args, deadline)
         return self.action(command, args, deadline, allow_latest=allow_latest)
@@ -224,9 +261,25 @@ class ComputerSession:
         self.observation = obs
         data = {**data, 'observation_id': obs.id, 'expires_in_ms': int(self.ttl * 1000)}
         if include_ui:
-            ui_status, ui, ui_errors = self.call_native('uia-tree', ['--hwnd', hwnd, '--max-depth', '2', '--max-nodes', '300'], deadline)
+            ui_status, ui, ui_errors = self.call_native('uia-tree', ['--hwnd', hwnd, '--pid', str(target['pid']), '--max-depth', '2', '--max-nodes', '300'], deadline)
             data['ui'] = {'status': ui_status, 'data': ui, 'errors': ui_errors}
-            if ui_status != 'ok':
+            if ui_status == 'ok':
+                obs.ui_available = True
+                pending = list(ui.get('nodes', []))
+                while pending:
+                    node = pending.pop()
+                    if not isinstance(node, dict):
+                        self.observation = None
+                        raise EngineError('invalid_observation', 'UIA node must be an object')
+                    pending.extend(node.get('children', []))
+                    ref = node.get('element_ref')
+                    if ref is not None:
+                        if (not isinstance(ref, str) or len(ref) != 48 or any(c not in '0123456789ABCDEF' for c in ref)
+                            or ref in obs.elements or node.get('process_id') != target['pid']):
+                            self.observation = None
+                            raise EngineError('invalid_observation', 'Invalid or duplicate UIA element reference')
+                        obs.elements[ref] = {k: v for k, v in node.items() if k != 'children'}
+            else:
                 status, errors = 'partial', errors + ui_errors
         return status, data, errors
 
@@ -236,8 +289,8 @@ class ComputerSession:
             target = {'hwnd': hwnd_value(args['hwnd']), 'pid': integer(args['pid'], 'pid', 1, 2**31-1)}
             native_args = ['--hwnd', target['hwnd'], '--pid', str(target['pid'])]
         else:
-            required = {'click': {'x','y'}, 'type': {'text'}, 'key': {'keys'}, 'scroll': {'direction','amount'}}[command]
-            fields(args, required | {'observation_id'} | ({'button', 'count'} if command == 'click' else set()), required | {'observation_id'})
+            required = {'click': {'x','y'}, 'drag': {'x','y','to_x','to_y'}, 'type': {'text'}, 'key': {'keys'}, 'scroll': {'direction','amount'}, 'uia-invoke': {'element_ref'}, 'uia-set-value': {'element_ref','text'}}[command]
+            fields(args, required | {'observation_id'} | ({'button', 'count'} if command == 'click' else {'steps'} if command == 'drag' else set()), required | {'observation_id'})
             obs = self.observation
             if not isinstance(args['observation_id'], str) or obs is None or (args['observation_id'] != obs.id and not (allow_latest and args['observation_id'] == 'latest')) or self.clock() - obs.created > self.ttl:
                 raise EngineError('stale_observation', 'observe target again before acting', 'blocked')
@@ -245,7 +298,23 @@ class ComputerSession:
             native_args = ['--hwnd', target['hwnd'], '--pid', str(target['pid'])]
             for field in ('x','y','width','height'):
                 native_args += [f'--expected-{field}', str(round(obs.window_geometry[field]))]
-            if command == 'click':
+            if command in {'uia-invoke', 'uia-set-value'}:
+                ref = args['element_ref']
+                if not isinstance(ref, str) or ref not in obs.elements:
+                    raise EngineError('stale_element_reference', 'Use an element_ref from this observation with include_ui=true', 'blocked')
+                native_args += ['--element-ref', ref]
+                if command == 'uia-set-value':
+                    value = input_text(args['text'], allow_empty=True)
+                    native_args += ['--text-b64', base64.b64encode(value.encode('utf-8')).decode('ascii')]
+            elif command == 'drag':
+                for field, dimension in [('x', 'image_width'), ('y', 'image_height'), ('to_x', 'image_width'), ('to_y', 'image_height')]:
+                    value = integer(args[field], field, 0, int(obs.geometry[dimension])-1)
+                    axis = 'x' if field.endswith('x') else 'y'
+                    extent = 'width' if axis == 'x' else 'height'
+                    physical = math.floor(obs.geometry[axis] + value * obs.geometry[extent] / obs.geometry[dimension])
+                    native_args += ['--' + field.replace('_', '-'), str(physical)]
+                native_args += ['--steps', str(integer(args.get('steps', 16), 'steps', 1, 64))]
+            elif command == 'click':
                 x = integer(args['x'], 'x', 0, int(obs.geometry['image_width'])-1)
                 y = integer(args['y'], 'y', 0, int(obs.geometry['image_height'])-1)
                 button = args.get('button', 'left')
@@ -257,9 +326,7 @@ class ComputerSession:
                 if 'count' in args:
                     native_args += ['--count', str(integer(args['count'], 'count', 1, 2))]
             elif command == 'type':
-                value = args['text']
-                if not isinstance(value, str) or not 1 <= len(value) <= 4096 or '\x00' in value:
-                    raise EngineError('invalid_argument', 'text must contain 1..4096 characters, no NUL')
+                value = input_text(args['text'])
                 native_args += ['--text-b64', base64.b64encode(value.encode('utf-8')).decode('ascii')]
             elif command == 'key':
                 key = args['keys']
@@ -288,6 +355,57 @@ class ComputerSession:
         if observed != 'ok':
             return 'partial', {**data, 'may_have_acted': True}, errors + observation_errors
         return 'ok', data, errors
+
+    def uia_find(self, args, *, allow_latest=False):
+        fields(args, ['observation_id', 'name', 'automation_id', 'control_type'], ['observation_id'])
+        obs = self.observation
+        if (not isinstance(args['observation_id'], str) or obs is None or
+            (args['observation_id'] != obs.id and not (allow_latest and args['observation_id'] == 'latest')) or
+            self.clock() - obs.created > self.ttl):
+            raise EngineError('stale_observation', 'Observe with include_ui=true before finding elements', 'blocked')
+        if not obs.ui_available:
+            raise EngineError('ui_observation_required', 'Observe with include_ui=true; standalone uia-tree does not authorize element actions', 'blocked')
+        filters = {k: v for k, v in args.items() if k != 'observation_id'}
+        if not filters or any(not isinstance(v, str) or not 1 <= len(v) <= 256 or '\x00' in v for v in filters.values()):
+            raise EngineError('invalid_argument', 'Supply at least one exact name, automation_id or control_type filter (1..256 characters)')
+        matches = [node for node in obs.elements.values() if all(node.get(k) == v for k, v in filters.items())]
+        return 'ok', {'matches': matches, 'count': len(matches), 'ambiguous': len(matches) > 1,
+                      'observation_id': obs.id, 'matching': 'exact_case_sensitive',
+                      'note': 'Choose an explicit element_ref; no implicit first-match action'}, []
+
+    def app_action(self, command, args, deadline, *, allow_latest=False):
+        if command == 'app-launch':
+            fields(args, ['path', 'arguments'], ['path'])
+            path, arguments = args['path'], args.get('arguments', [])
+            if (not isinstance(path, str) or len(path) > 32767 or '\x00' in path or
+                not PureWindowsPath(path).is_absolute() or PureWindowsPath(path).suffix.lower() != '.exe'):
+                raise EngineError('invalid_argument', 'path must be an absolute Windows .exe path')
+            if (not isinstance(arguments, list) or len(arguments) > 64 or
+                any(not isinstance(v, str) or '\x00' in v or len(v) > 4096 for v in arguments)):
+                raise EngineError('invalid_argument', 'arguments must be up to 64 strings, each at most 4096 characters without NUL')
+            encoded = base64.b64encode(json.dumps(arguments, ensure_ascii=False).encode('utf-8')).decode('ascii')
+            if len(encoded) > 48000:
+                raise EngineError('invalid_argument', 'argument vector exceeds size limit')
+            native_args = ['--path', path, '--args-b64', encoded]
+        else:
+            fields(args, ['observation_id', 'timeout_ms'], ['observation_id'])
+            obs = self.observation
+            if (not isinstance(args['observation_id'], str) or obs is None or
+                (args['observation_id'] != obs.id and not (allow_latest and args['observation_id'] == 'latest')) or
+                self.clock() - obs.created > self.ttl):
+                raise EngineError('stale_observation', 'observe the exact window again before closing', 'blocked')
+            native_args = ['--hwnd', obs.target['hwnd'], '--pid', str(obs.target['pid']),
+                           '--timeout-ms', str(integer(args.get('timeout_ms', 1500), 'timeout_ms', 0, 10000))]
+            for field in ('x', 'y', 'width', 'height'):
+                native_args += [f'--expected-{field}', str(round(obs.window_geometry[field]))]
+        self.observation = None
+        try:
+            status, data, errors = self.call_native(command, native_args + ['--allow-live-control'], deadline)
+        except Exception as exc:
+            return 'error', {'may_have_acted': True, 'automatic_retry': False}, [
+                {'code': getattr(exc, 'code', 'native_error'), 'message': str(exc)}]
+        return status, {**data, 'automatic_retry': False, 'may_have_acted': True,
+                        'next': 'list windows and observe before further input'}, errors
 
     def batch(self, args, deadline):
         fields(args, ['actions','observe_after'], ['actions'])

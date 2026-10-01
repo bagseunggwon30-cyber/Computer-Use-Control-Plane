@@ -464,22 +464,21 @@ function Stop-HelperServer {
     return [pscustomobject]@{ status = "ok"; reason = "no_helper_running" }
   }
   $oldPid = [int]$lock.pid
-  if (-not (_Is-StaleLock -Lock $lock)) {
-    # graceful shutdown via pipe
-    try {
-      $resp = Invoke-HelperPipe -Action "shutdown" -ArgsHash @{} -TimeoutMs 1500
-    } catch { }
-    Start-Sleep -Milliseconds 200
+  # A lock PID is not a process identity. Never terminate by an untrusted or
+  # stale PID: it may now belong to an unrelated application.
+  if (_Is-StaleLock -Lock $lock) {
+    _Try-Delete-Lock
+    return [pscustomobject]@{ status = "ok"; reason = "stale_lock_removed"; stopped_pid = $null; forced = $false }
   }
-  if ($Force -or (Get-Process -Id $oldPid -ErrorAction SilentlyContinue)) {
-    try { Stop-Process -Id $oldPid -Force -ErrorAction SilentlyContinue } catch { }
+  try {
+    $resp = Invoke-HelperPipe -Action "shutdown" -ArgsHash @{} -TimeoutMs 1500
+    if (-not $resp -or $resp.exit_code -ne 0) { throw "shutdown_not_acknowledged" }
+  } catch {
+    return [pscustomobject]@{ status = "error"; reason = "shutdown_not_acknowledged_no_pid_kill"; stopped_pid = $null; forced = $false }
   }
   _Try-Delete-Lock
-  return [pscustomobject]@{
-    status = "ok"
-    stopped_pid = $oldPid
-    forced = [bool]$Force
-  }
+  return [pscustomobject]@{ status = "ok"; reason = "shutdown_requested"; stopped_pid = $oldPid; forced = $false }
+
 }
 
 # ============================================================================
@@ -4789,6 +4788,14 @@ function _Find-CodexCli {
   return $null
 }
 
+function _Quote-NativeWindowsArgument {
+  param([AllowEmptyString()][string]$Value)
+  # Windows CRT argv escaping, not cmd.exe shell escaping.
+  $escaped = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
+  $escaped = [regex]::Replace($escaped, '(\\+)$', '$1$1')
+  return '"' + $escaped + '"'
+}
+
 function _Invoke-CodexVision {
   <#
     Send a screenshot + question to codex CLI and parse a {found,x,y,confidence,reasoning}
@@ -4856,21 +4863,18 @@ Do NOT include markdown fences, prose, or explanations outside the JSON object.
     $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
     $psi.StandardErrorEncoding = [System.Text.Encoding]::UTF8
 
-    # codex.cmd / codex.bat must go through cmd.exe on Windows.
-    # codex.exe can run directly. Use cmd.exe wrapper as the safe path either way.
-    $isExe = $codex -match '\.exe$'
-    $promptEscaped = $prompt -replace '"','""'
-    $extraArgs = ""
-    if ($Model) { $extraArgs = ' --model "' + $Model + '"' }
-    $codexQuoted = '"' + $codex + '"'
-    $cmdLine = "$codexQuoted exec --image `"$ScreenshotPath`" --output-schema `"$schemaPath`" --output-last-message `"$outPath`" --skip-git-repo-check$extraArgs `"$promptEscaped`""
-    if ($isExe) {
-      $psi.FileName = $codex
-      $psi.Arguments = "exec --image `"$ScreenshotPath`" --output-schema `"$schemaPath`" --output-last-message `"$outPath`" --skip-git-repo-check$extraArgs `"$promptEscaped`""
-    } else {
-      $psi.FileName = "cmd.exe"
-      $psi.Arguments = "/c " + $cmdLine
+    # Optional provider adapter only. Batch wrappers interpret metacharacters;
+    # require a native executable rather than evaluating untrusted text in cmd.
+    if (-not $codex.EndsWith(".exe", [StringComparison]::OrdinalIgnoreCase)) {
+      return [pscustomobject]@{ status = "error"; reason = "vision provider requires a native codex.exe; .cmd/.bat shell wrappers are disabled" }
     }
+    $nativeArgs = @("exec", "--image", $ScreenshotPath, "--output-schema", $schemaPath,
+      "--output-last-message", $outPath, "--skip-git-repo-check")
+    if ($Model) { $nativeArgs += @("--model", $Model) }
+    $nativeArgs += @($prompt)
+    $psi.FileName = $codex
+    $psi.Arguments = (@($nativeArgs | ForEach-Object { _Quote-NativeWindowsArgument -Value $_ }) -join " ")
+
 
     $proc = [System.Diagnostics.Process]::Start($psi)
     $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
@@ -7088,15 +7092,14 @@ function Invoke-MacroAppClose {
         $t.Kill()
         $closed++
       } else {
-        # Try graceful close first
+        # Never turn a bounded graceful-close wait into an implicit kill.
         if ($t.MainWindowHandle -and $t.MainWindowHandle -ne 0) {
-          $t.CloseMainWindow() | Out-Null
-          $t.WaitForExit(2000) | Out-Null
-          if (-not $t.HasExited) { $t.Kill() }
-        } else {
-          $t.Kill()
+          if ($t.CloseMainWindow()) {
+            [void]$t.WaitForExit(2000)
+            if ($t.HasExited) { $closed++ }
+          }
         }
-        $closed++
+
       }
     } catch { }
   }
@@ -9707,6 +9710,11 @@ function _Build-WorkflowPlan {
     if ($blockedMacros -contains $macroName) {
       $allowed = $false
       $reason = "recursive_workflow_blocked"
+    } elseif ($macroName -eq "session") {
+      $sessionAction = if ($cmd.Count -ge 3) { "$($cmd[2])" } else { "info" }
+      $allowed = $sessionAction -in @("info", "helper-status", "autostart-status")
+      $liveRequired = -not $allowed
+      $reason = if ($allowed) { "read_only_session_action" } else { "mutating_session_action_not_in_workflow_allowlist" }
     } elseif ($readOnlyMacros -contains $macroName) {
       $allowed = $true
       $liveRequired = $false
@@ -13192,13 +13200,13 @@ function Invoke-MacroSession {
       $force = _Read-Switch -Rest $Rest -Name "--force"
       $r = Stop-HelperServer -Force:$force
       if ($Brief) {
-        [Console]::Out.WriteLine("ok session stop-helper stopped_pid=$($r.stopped_pid) forced=$($r.forced)")
+        [Console]::Out.WriteLine("$($r.status) session stop-helper stopped_pid=$($r.stopped_pid) forced=$($r.forced)")
       } else {
         $payload = [ordered]@{ schema = "cucp.helper-server-stop/v1" }
         foreach ($p in $r.PSObject.Properties) { $payload[$p.Name] = $p.Value }
         [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 6))
       }
-      return 0
+      if ($r.status -eq "ok") { return 0 } else { return 1 }
     }
     "helper-status" {
       $r = Get-HelperServerStatus
@@ -13214,6 +13222,7 @@ function Invoke-MacroSession {
       return 0
     }
     "install-autostart" {
+      if (-not $AllowLiveControl) { throw "session install-autostart requires -AllowLiveControl" }
       # v2.2.0: Windows 로그인 시 helper-server 자동 기동 shim 설치 (cold first-call 제거)
       $idleStr = _Read-OptValue -Rest $Rest -Name "--idle-timeout-ms"
       $idleMs = 28800000  # 기본 8시간
@@ -13225,6 +13234,7 @@ function Invoke-MacroSession {
       if ($r.status -eq "ok") { return 0 } else { return 1 }
     }
     "uninstall-autostart" {
+      if (-not $AllowLiveControl) { throw "session uninstall-autostart requires -AllowLiveControl" }
       $r = Uninstall-HelperAutostart
       $payload = [ordered]@{ schema = "cucp.helper-autostart/v1" }
       foreach ($p in $r.PSObject.Properties) { $payload[$p.Name] = $p.Value }

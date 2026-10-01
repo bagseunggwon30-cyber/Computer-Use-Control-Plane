@@ -18,6 +18,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     server = sub.add_parser("serve", help="serve local JSONL computer-use requests")
     server.add_argument("--allow-live-control", action="store_true", help="operator opt-in for this process")
+    mcp = sub.add_parser("mcp", help="provider-neutral MCP server over local stdio")
+    mcp.add_argument("--allow-live-control", action="store_true", help="human operator opt-in for this process")
     caps = sub.add_parser("capabilities", help="show engine tool contract")
     caps.add_argument("--json", action="store_true")
     privileges = sub.add_parser("privileges", help="diagnose Windows input privilege boundaries")
@@ -84,6 +86,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         payload = diagnose()
         emit(payload, as_json=bool(ns.json))
         return 0 if payload["status"] == "ok" else 2
+
+    if ns.verb == "mcp":
+        from .mcp_server import run_mcp
+        return run_mcp(allow_live_control=ns.allow_live_control)
 
     if ns.verb == "serve":
         from .server import run_server

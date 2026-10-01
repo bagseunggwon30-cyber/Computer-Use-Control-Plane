@@ -10,11 +10,7 @@ internal sealed class WindowTarget
 
     public static WindowTarget Read(CommandOptions options, bool requirePid)
     {
-        var raw = options.Required("--hwnd");
-        if (raw.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) raw = raw[2..];
-        if (!long.TryParse(raw, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var number) || number <= 0)
-            throw CommandOptions.Invalid("--hwnd must be a nonzero hexadecimal window handle.");
-        var hwnd = new IntPtr(number);
+        var hwnd = ParseHwnd(options.Required("--hwnd"));
         if (!NativeMethods.IsWindow(hwnd)) throw new NativeFailure("target_not_found", "The target window no longer exists.");
         if (NativeMethods.GetAncestor(hwnd, 2) != hwnd) throw CommandOptions.Invalid("--hwnd must identify a top-level window.");
         NativeMethods.GetWindowThreadProcessId(hwnd, out var actualPid);
@@ -30,6 +26,14 @@ internal sealed class WindowTarget
         var target = new WindowTarget(hwnd, pid, expected);
         target.Validate(false);
         return target;
+    }
+
+    internal static IntPtr ParseHwnd(string raw)
+    {
+        if (raw.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) raw = raw[2..];
+        if (!long.TryParse(raw, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var number) || number <= 0)
+            throw CommandOptions.Invalid("--hwnd must be a nonzero hexadecimal window handle.");
+        return new IntPtr(number);
     }
 
     public PixelRect Rect()

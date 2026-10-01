@@ -203,3 +203,55 @@ Describe "legacy input delivery evidence" {
     { [CucpLegacyInputTestNative]::Check(2) } | Should -Not -Throw
   }
 }
+
+Describe "legacy lifecycle boundary regressions" {
+  BeforeAll {
+    foreach ($name in @("Stop-HelperServer", "Invoke-MacroAppClose", "_Quote-NativeWindowsArgument")) {
+      . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $wrapperAst -Name $name)))
+    }
+    function _Read-LockSafely { return @{ pid=123; owner_user='test' } }
+    function _Is-StaleLock { param($Lock) return $true }
+    function _Try-Delete-Lock { }
+    function Invoke-HelperPipe { param($Action, $ArgsHash, $TimeoutMs) throw 'Must be mocked' }
+  }
+  It "never kills a stale helper PID even with force" {
+    Mock Stop-Process { throw 'Unrelated PID must not be killed' }
+    Mock Invoke-HelperPipe { throw 'Stale pipe must not be contacted' }
+    $result = Stop-HelperServer -Force
+    $result.reason | Should -Be 'stale_lock_removed'
+    Should -Invoke Stop-Process -Times 0
+    Should -Invoke Invoke-HelperPipe -Times 0
+  }
+  It "does not promote graceful app close to kill" {
+    $script:AllowLiveControl = $true
+    $script:Brief = $true
+    $fake = [pscustomobject]@{ MainWindowHandle=123; HasExited=$false; Killed=$false }
+    $fake | Add-Member ScriptMethod CloseMainWindow { return $true }
+    $fake | Add-Member ScriptMethod WaitForExit { param($Timeout) return $false }
+    $fake | Add-Member ScriptMethod Kill { $this.Killed=$true }
+    Mock Get-Process { return $fake }
+    [void](Invoke-MacroAppClose -Rest @('--pid','123'))
+    $fake.Killed | Should -BeFalse
+  }
+  It "rejects autostart changes from a read-only workflow" {
+    $plan = _Build-WorkflowPlan -Rest @('--step','macro session install-autostart')
+    $plan.steps[0].allowed | Should -BeFalse
+    $plan.steps[0].live_required | Should -BeTrue
+  }
+  It "continues to allow read-only session diagnostics" {
+    $plan = _Build-WorkflowPlan -Rest @('--step','macro session info')
+    $plan.steps[0].allowed | Should -BeTrue
+    $plan.steps[0].live_required | Should -BeFalse
+  }
+  It "quotes native argv without shell interpretation" {
+    (_Quote-NativeWindowsArgument -Value '') | Should -Be '""'
+    (_Quote-NativeWindowsArgument -Value 'a"b') | Should -Be '"a\"b"'
+    (_Quote-NativeWindowsArgument -Value 'a\') | Should -Be '"a\\"'
+    (_Quote-NativeWindowsArgument -Value 'x & calc.exe') | Should -Be '"x & calc.exe"'
+  }
+  It "removes cmd.exe from the optional vision launch path" {
+    $text = Get-LegacyFunctionText -Ast $wrapperAst -Name '_Invoke-CodexVision'
+    $text | Should -Not -Match '\$psi\.FileName\s*=\s*"cmd\.exe"'
+    $text | Should -Match 'shell wrappers are disabled'
+  }
+}

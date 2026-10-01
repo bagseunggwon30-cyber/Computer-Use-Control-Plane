@@ -18,6 +18,8 @@ def diagnose() -> dict:
             errors.append({"code": "native_unavailable", "message": error or str(payload)})
         else:
             native = payload.get("data", {})
+            if native.get("parent_lifetime_guard") != "inherited-parent-handle/v1":
+                errors.append({"code": "native_feature_mismatch", "message": "Publish the matching native source: this engine requires the parent-liveness guard; older 0.4.0 binaries are not compatible."})
             if native.get("version") != __version__:
                 errors.append({"code": "version_mismatch", "message": "Engine and native worker must come from the same bundle."})
     if sys.platform != "win32":

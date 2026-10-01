@@ -13,5 +13,8 @@
     <Compile Include="../PcuCp.NativeHost/WindowTarget.cs" Link="WindowTarget.cs" />
     <Compile Include="../PcuCp.NativeHost/PrivilegeInspector.cs" Link="PrivilegeInspector.cs" />
     <Compile Include="../PcuCp.NativeHost/NativeSession.cs" Link="NativeSession.cs" />
+    <Compile Include="../PcuCp.NativeHost/AppLifecycleActions.cs" Link="AppLifecycleActions.cs" />
+    <Compile Include="../PcuCp.NativeHost/ParentLifetimeGuard.cs" Link="ParentLifetimeGuard.cs" />
+    <Compile Include="../PcuCp.NativeHost/UiaReferenceStore.cs" Link="UiaReferenceStore.cs" />
   </ItemGroup>
 </Project>

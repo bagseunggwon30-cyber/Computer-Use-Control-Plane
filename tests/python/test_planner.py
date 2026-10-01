@@ -35,10 +35,10 @@ class PlannerTests(unittest.TestCase):
                 self.assertEqual(result['route']['fallback'], 'none')
 
     def test_legacy_route_never_becomes_implicit_engine_capability(self):
-        result = plan_command('app-launch')
+        result = plan_command('cdp-eval')
         self.assertEqual(result['route']['primary'], 'legacy-powershell')
-        self.assertFalse(COMMANDS['app-launch'].available_in_engine)
-        self.assertNotIn('app-launch', {item['name'] for item in capabilities()})
+        self.assertFalse(COMMANDS['cdp-eval'].available_in_engine)
+        self.assertNotIn('cdp-eval', {item['name'] for item in capabilities()})
 
     def test_normalization_does_not_bypass_mutation_classification(self):
         result = plan_command(' APP_LAUNCH ')

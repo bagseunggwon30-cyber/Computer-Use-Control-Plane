@@ -16,6 +16,7 @@ import threading
 from typing import Any
 
 from .protocol import frozen, repo_root
+from .worker_lifetime import guarded_launch
 
 MAX_STDOUT_BYTES = 32 * 1024 * 1024
 MAX_STDERR_BYTES = 64 * 1024
@@ -52,24 +53,20 @@ def native_host_available() -> bool:
 
 
 def _terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
-    # Children may still hold pipes after the immediate parent exits.
-    if os.name == "nt":
-        try:
-            subprocess.run(
-                ["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
-                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL, check=False, timeout=3.0,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            pass
-    else:
+    """Terminate only the owned worker on Windows; isolated fixture group on POSIX.
+
+    Historical function name is retained for callers. Never restore taskkill /T.
+    """
+    # Own only the control worker. Never taskkill /T: app-launch children are user
+    # applications, and cancellation must not destroy their unsaved work.
+    if os.name != "nt":
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
             pass
     if process.poll() is None:
         try:
-            process.kill()
+            process.kill()  # Windows Popen holds the original process HANDLE.
         except OSError:
             pass
 
@@ -83,14 +80,12 @@ def cancel_all_native() -> None:
 
 
 def _capture(command: list[str], timeout_s: float) -> tuple[int, bytes, bytes, str]:
-    kwargs: dict[str, Any] = {"start_new_session": True} if os.name != "nt" else {
-        "creationflags": subprocess.CREATE_NEW_PROCESS_GROUP,
-    }
     try:
-        process = subprocess.Popen(
-            command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, **kwargs,
-        )
+        with guarded_launch(command) as (guarded_command, kwargs):
+            process = subprocess.Popen(
+                guarded_command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, **kwargs,
+            )
     except (OSError, ValueError) as exc:
         return 2, b"", b"", f"native host launch failed: {exc}"
     with _PROCESS_LOCK:
@@ -126,7 +121,7 @@ def _capture(command: list[str], timeout_s: float) -> tuple[int, bytes, bytes, s
         try:
             code = process.wait(timeout=timeout_s)
         except subprocess.TimeoutExpired:
-            transport_error = f"native host timed out after {timeout_s:g}s; process tree terminated; action not retried"
+            transport_error = f"native host timed out after {timeout_s:g}s; control worker terminated; action not retried"
             _terminate_process_tree(process)
             code = 124
         except BaseException:
@@ -141,10 +136,10 @@ def _capture(command: list[str], timeout_s: float) -> tuple[int, bytes, bytes, s
                 reader.join(timeout=0.5)
             if not transport_error:
                 code = 1
-                transport_error = "native host left protocol streams open; process tree terminated"
+                transport_error = "native host left protocol streams open; control worker terminated"
         if overflow.is_set():
             code = 1
-            transport_error = "native host output exceeded transport size limit; process tree terminated"
+            transport_error = "native host output exceeded transport size limit; control worker terminated"
     finally:
         with _PROCESS_LOCK:
             _PROCESSES.discard(process)

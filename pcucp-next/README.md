@@ -1,10 +1,12 @@
 # PCUCP Next — 범용 Computer Use 실행 코어
 
-Computer Use가 없는 Pi 같은 에이전트 호스트에 **로컬 Windows 관찰·입력 기능**을 연결합니다. 모델 선택, API 자격 증명과 대화 관리는 호스트가 담당합니다. CUCP는 별도 LLM을 호출하지 않습니다.
+> **범용 호스트 연결 · 로컬 개선안:** Pi 없이도 stdio MCP 또는 JSONL로 연결할 수 있습니다. [호스트 공통 설치·권한·프로토콜](../docs/host-neutral-setup.md), [Python/C# 이전 범위와 남은 기능](../docs/migration-matrix.md)을 참고하세요. 새 MCP·앱 수명 기능은 소스 변경이며 기존 배포 ZIP에는 아직 없습니다.
+
+Computer Use가 없는 AI 호스트에 **로컬 Windows 관찰·입력 기능**을 연결합니다. 모델 선택, API 자격 증명과 대화 관리는 호스트가 담당합니다. CUCP는 별도 LLM을 호출하지 않습니다.
 
 이번 구현은 **상주 Python JSONL 세션 + 세션 동안 재사용하는 C# 네이티브 프로세스**입니다. C#은 첫 네이티브 요청 때 시작됩니다. 별도 관리자 브로커와 UIA 참조 캐시는 후속 단계입니다. 기존 PowerShell 명령을 모두 이전한 버전은 아니며, 신규 Pi 도구는 레거시 실행기로 자동 우회하지 않습니다.
 
-개발 범위와 후속 단계는 [개발 방향](../docs/core-modernization.md), Pi 도구 계약은 [Pi 연결 안내](../integrations/pi/README.md)를 참고하세요.
+개발 범위와 후속 단계는 [개발 방향](../docs/core-modernization.md), 선택적 Pi 어댑터 계약은 [Pi 연결 안내](../integrations/pi/README.md)를 참고하세요.
 
 상주 실행기의 오류 처리와 검증은 [상주 세션 계약](../docs/resident-native-session.md)을 참고하세요.
 
@@ -18,7 +20,9 @@ Computer Use가 없는 Pi 같은 에이전트 호스트에 **로컬 Windows 관�
 | `powershell` | 게시·실행 준비와 선택적 관리자 실행 |
 | `../scripts/cucp.ps1` | 기존 PowerShell 기능의 별도 호환 경로 |
 
-새 세션 명령은 `windows`, `observe`, `screenshot`, `uia-tree`, `privileges`, `capabilities`, `history`, `focus`, `click`, `type`, `key`, `scroll`, `batch`입니다. `find-label`, `ocr-image`, `ocr-find-text`, `task-plan` 등의 기존 Python CLI도 남아 있습니다. 이 CLI 전체가 Pi 도구로 노출되는 것은 아닙니다.
+범용 MCP 실행은 `python -u -m pcucp_cli mcp`, 기존 JSONL 실행은 `python -u -m pcucp_cli serve`입니다. 두 방식 모두 기본 읽기 전용이며 Pi는 필요하지 않습니다. Python 모듈 설치 또는 PYTHONPATH 설정, C# 네이티브 게시 준비는 [호스트 공통 설치](../docs/host-neutral-setup.md)를 따릅니다.
+
+새 세션 명령은 `app-launch`, `app-close`, `windows`, `observe`, `screenshot`, `uia-tree`, `privileges`, `capabilities`, `history`, `focus`, `click`, `type`, `key`, `scroll`, `batch`입니다. `find-label`, `ocr-image`, `ocr-find-text`, `task-plan` 등의 기존 Python CLI도 남아 있습니다. 이 CLI 전체가 Pi 도구로 노출되는 것은 아닙니다.
 
 - `observe`는 지정 창의 화면 이미지와 제한된 UIA 트리를 수집합니다. UIA 결과는 관찰 데이터이며, 지속되는 요소 참조로 직접 실행하는 기능은 아직 없습니다.
 - `click`은 `count: 2`로 더블클릭을 지원합니다. `wait-window`는 제목과 선택 PID로 최대 10초 대기하며 다중 후보는 오류와 함께 반환합니다.
@@ -149,3 +153,8 @@ npm run test:engine
 | 실제 Windows GUI 조작 | 미검증 |
 
 로컬 Linux 환경의 MSBuild 제한은 남아 있지만 [Windows CI](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36216294498)에서 표준 .NET 빌드와 실제 네이티브 프로세스 통신을 확인했습니다. 0.4.0 게시 검증은 별도 `windows-portable` 작업이 담당합니다. 실행 파일 시작 검사는 GUI 입력 검증을 대신하지 않습니다. Python·Node의 모의/프로세스 통합 검증 또한 실제 Windows GUI 작동의 증거와 구분합니다. **이번 개발 환경에서는 Windows 화면 캡처·실제 입력·한글 IME·UAC·다중 모니터를 실행 검증하지 못했습니다.** 기존 `pcucp-next.Fast.Tests.ps1`은 일부 Windows 기능을 다루는 별도 테스트이며 새 계약 전체의 합격 기준을 대신하지 않습니다.
+
+Local stage two additionally supplies observation-bound `uia-find`, `uia-invoke`,
+`uia-set-value`, bounded `drag`, and a native parent-liveness watchdog. See the
+[host-neutral contracts and limitations](../docs/host-neutral-setup.md#observation-bound-uia-and-input-additions-local-stage-two).
+Rebuild native and Python together; existing 0.4.0 downloads lack these additions.

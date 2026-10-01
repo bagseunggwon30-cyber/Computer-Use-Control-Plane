@@ -105,4 +105,34 @@ wire = await RunWire(System.Text.Encoding.UTF8.GetBytes(Request(1)));
 Check(wire.Code == 2 && dispatched.Count == 0, "Unterminated frame executed");
 wire = await RunWire(new byte[] { 0xff, 10 });
 Check(wire.Code == 2 && dispatched.Count == 0, "Invalid UTF8 executed");
-Console.WriteLine($"PASS: {count} ABI, geometry and command-authority contract checks (no Windows input executed).");
+await AppLifecycleContractChecks.RunAsync(Check);
+var startup = ParentLifetimeGuard.Extract(["serve", "--parent-handle", "123", "--allow-live-control"]);
+Check(startup.Handle == new IntPtr(123) && startup.Args.SequenceEqual(new[] { "serve", "--allow-live-control" }), "Guard handle extraction failed");
+foreach (var bad in new[] { new[] { "--parent-handle" }, new[] { "--parent-handle", "-1" }, new[] { "--parent-handle", "0" }, new[] { "--parent-handle", "1", "--PARENT-HANDLE", "2" } })
+    Reject(() => ParentLifetimeGuard.Extract(bad), "Malformed parent handle accepted");
+double referenceTime = 0;
+var refs = new UiaReferenceStore<string>(() => referenceTime);
+refs.Begin();
+var firstRef = refs.Add("one");
+var siblingRef = refs.Add("two");
+Check(firstRef.Length == 48 && firstRef != siblingRef, "Opaque refs not unique");
+Check(refs.Consume(firstRef) == "one", "Correct ref failed");
+Reject(() => refs.Consume(siblingRef), "Sibling ref replayed after action");
+refs.Begin(); var expiredRef = refs.Add("old"); referenceTime = 61;
+Reject(() => refs.Consume(expiredRef), "Expired ref accepted");
+refs.Begin(); var wrongRef = refs.Add("wrong");
+Reject(() => refs.Consume("made-up"), "Arbitrary ref accepted");
+Reject(() => refs.Consume(wrongRef), "Failed attempt did not consume generation");
+refs.Begin(); var priorRef = refs.Add("prior"); refs.Begin();
+Reject(() => refs.Consume(priorRef), "New observation kept old ref");
+var path = DesktopActions.DragPoints(-1920, -200, -2, 878, 16);
+Check(path.Length == 17 && path[0] == (-1920, -200) && path[^1] == (-2, 878), "Drag path endpoints changed");
+Reject(() => DesktopActions.DragPoints(0, 0, 10, 10, 65), "Unbounded drag accepted");
+var dragEvents = DesktopActions.DragEvents(path, new PixelRect(-1920, -200, 1920, 1080));
+Check(dragEvents.Length == 18 && dragEvents[0].Data.Mouse.Flags == 2 && dragEvents[^1].Data.Mouse.Flags == 4, "Drag is not one down/move/up batch");
+for (var accepted = 1; accepted < dragEvents.Length; accepted++)
+    Check(DesktopActions.PendingReleases(dragEvents.Take(accepted)).Single().Data.Mouse.Flags == 4, "Partial drag missing release");
+Check(DesktopActions.PendingReleases(dragEvents).Length == 0, "Completed drag retained button");
+foreach (var mutation in new[] { "drag", "uia-invoke", "uia-set-value" })
+    Reject(() => NativeSession.Parse(Request(1, mutation), false, 0), "New mutation escaped read-only authority");
+Console.WriteLine($"PASS: {count} ABI, geometry, lifecycle and command-authority contract checks (no Windows input or apps executed).");

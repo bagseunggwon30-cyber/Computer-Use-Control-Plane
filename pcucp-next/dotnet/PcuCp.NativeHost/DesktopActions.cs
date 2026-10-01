@@ -12,6 +12,7 @@ internal static class DesktopActions
         var extra = command switch
         {
             "click" => new[] { "--x", "--y", "--button", "--count" }, "type" => new[] { "--text-b64" }, "key" => new[] { "--key" },
+            "drag" => new[] { "--x", "--y", "--to-x", "--to-y", "--steps" },
             "scroll" => new[] { "--direction", "--amount" }, _ => Array.Empty<string>()
         };
         // Restoring a minimized window changes its rectangle. Reject geometry constraints
@@ -34,6 +35,7 @@ internal static class DesktopActions
         switch (command)
         {
             case "click": Click(target, options); break;
+            case "drag": Drag(target, options); break;
             case "type": Type(target, options); break;
             case "key": Key(target, options); break;
             case "scroll": Scroll(target, options); break;
@@ -68,6 +70,40 @@ internal static class DesktopActions
         // Keep both clicks together so another input producer cannot interleave
         // an unrelated action between the pair. App-level success still needs observation.
         Dispatch(target, ClickEvents(flags.Item1, flags.Item2, count));
+    }
+
+    private static void Drag(WindowTarget target, CommandOptions options)
+    {
+        var x = options.RequiredInteger("--x");
+        var y = options.RequiredInteger("--y");
+        var toX = options.RequiredInteger("--to-x");
+        var toY = options.RequiredInteger("--to-y");
+        var steps = options.Integer("--steps", 16, 1, 64);
+        var screen = NativeMethods.VirtualScreen;
+        var points = DragPoints(x, y, toX, toY, steps);
+        foreach (var point in points) target.HitTest(point.X, point.Y);
+        Dispatch(target, [Mouse(0x0001 | 0x8000 | 0x4000,
+            dx: InputGeometry.Normalize(x, screen.X, screen.Width), dy: InputGeometry.Normalize(y, screen.Y, screen.Height))]);
+        foreach (var point in points) target.HitTest(point.X, point.Y);
+        if (!NativeMethods.GetCursorPos(out var actual) || actual.X != x || actual.Y != y || NativeMethods.VirtualScreen != screen)
+            throw new NativeFailure("pointer_position_mismatch", "Pointer or desktop changed; no drag button-down was sent.");
+        // One bounded SendInput batch: never sleep/cancel between down and up.
+        Dispatch(target, DragEvents(points, screen));
+    }
+
+    internal static (int X, int Y)[] DragPoints(int x, int y, int toX, int toY, int steps)
+    {
+        if (steps is < 1 or > 64) throw CommandOptions.Invalid("Drag steps must be 1..64.");
+        return Enumerable.Range(0, steps + 1).Select(i =>
+            ((int)(x + ((long)toX - x) * i / steps), (int)(y + ((long)toY - y) * i / steps))).ToArray();
+    }
+
+    internal static NativeMethods.INPUT[] DragEvents((int X, int Y)[] points, PixelRect screen)
+    {
+        if (points.Length is < 2 or > 65) throw CommandOptions.Invalid("Invalid drag point count.");
+        return new[] { Mouse(2) }.Concat(points.Skip(1).Select(p => Mouse(0x0001 | 0x8000 | 0x4000 | 0x2000,
+            dx: InputGeometry.Normalize(p.X, screen.X, screen.Width), dy: InputGeometry.Normalize(p.Y, screen.Y, screen.Height))))
+            .Append(Mouse(4)).ToArray();
     }
 
     internal static NativeMethods.INPUT[] ClickEvents(uint down, uint up, int count)
@@ -146,7 +182,7 @@ internal static class DesktopActions
     }
 
     private static bool IsExtended(ushort key) => key is 0x21 or 0x22 or 0x23 or 0x24 or 0x25 or 0x26 or 0x27 or 0x28 or 0x2D or 0x2E;
-    private static NativeMethods.INPUT[] PendingReleases(IEnumerable<NativeMethods.INPUT> accepted)
+    internal static NativeMethods.INPUT[] PendingReleases(IEnumerable<NativeMethods.INPUT> accepted)
     {
         var pending = new Dictionary<string, NativeMethods.INPUT>();
         foreach (var input in accepted)

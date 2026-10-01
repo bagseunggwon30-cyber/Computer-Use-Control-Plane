@@ -46,10 +46,11 @@ class NativeSession:
         if argv is None:
             self._fail(error)
             return
-        kwargs = {'start_new_session': True} if os.name != 'nt' else {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP}
         try:
-            process = subprocess.Popen([*argv, 'serve', *(['--allow-live-control'] if self.allow_live_control else [])],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+            command = [*argv, 'serve', *(['--allow-live-control'] if self.allow_live_control else [])]
+            with transport.guarded_launch(command) as (guarded_command, kwargs):
+                process = subprocess.Popen(guarded_command,
+                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
         except (OSError, ValueError) as exc:
             self._fail(f'native session launch failed: {exc}')
             return
