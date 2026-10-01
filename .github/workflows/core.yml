@@ -101,3 +101,15 @@ jobs:
             dist/CUCP-0.4.0-win-x64.zip.sha256
           if-no-files-found: error
           retention-days: 30
+  browser-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fresh-profile headless browser protocol fixtures
+        run: python -m unittest discover -s tests/python -p test_cdp_browser.py -v
+        env:
+          PYTHONPATH: pcucp-next/python
+          CUCP_CHROME_TEST: '1'

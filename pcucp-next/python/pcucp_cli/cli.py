@@ -20,6 +20,8 @@ def build_parser() -> argparse.ArgumentParser:
     server.add_argument("--allow-live-control", action="store_true", help="operator opt-in for this process")
     mcp = sub.add_parser("mcp", help="provider-neutral MCP server over local stdio")
     mcp.add_argument("--allow-live-control", action="store_true", help="human operator opt-in for this process")
+    for transport in (server, mcp):
+        transport.add_argument("--cdp-endpoint", help="human-approved existing numeric-loopback HTTP debug endpoint; never auto-enabled")
     caps = sub.add_parser("capabilities", help="show engine tool contract")
     caps.add_argument("--json", action="store_true")
     privileges = sub.add_parser("privileges", help="diagnose Windows input privilege boundaries")
@@ -73,6 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
     for verb in ('workflow-plan', 'workflow-run', 'task-build', 'task-run', 'form-plan', 'form-run'):
         entry = sub.add_parser(verb, help='declarative Python workflow/form, no PowerShell')
         entry.add_argument('--file', required=True, help='UTF-8 JSON workflow or form specification')
+        entry.add_argument('--cdp-endpoint', help='optional human-approved existing numeric-loopback debug endpoint')
         entry.add_argument('--allow-live-control', action='store_true', help='human operator opt-in for this process')
         entry.add_argument('--json', action='store_true')
         if verb == 'workflow-run':
@@ -88,6 +91,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     ns = parser.parse_args(argv)
+    if getattr(ns, "cdp_endpoint", None):
+        from .cdp import CdpAdapter, CdpError
+        try:
+            CdpAdapter(ns.cdp_endpoint).close()  # validates only; never connects
+        except CdpError as exc:
+            parser.error(str(exc))
 
     if ns.verb in {'workflow-plan', 'workflow-run', 'task-build', 'task-run', 'form-plan', 'form-run'}:
         import json
@@ -107,8 +116,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             args['dry_run'] = ns.dry_run
         with NativeSession(allow_live_control=ns.allow_live_control) as native:
             session = ComputerSession(allow_live_control=ns.allow_live_control, native=native,
-                                      native_transport='persistent subprocess (stdio-jsonl)')
-            payload = session.handle({'schema': 'cucp.request/v1', 'id': 'cli-workflow', 'command': ns.verb, 'args': args})
+                                      native_transport='persistent subprocess (stdio-jsonl)', cdp_endpoint=ns.cdp_endpoint)
+            try:
+                payload = session.handle({'schema': 'cucp.request/v1', 'id': 'cli-workflow', 'command': ns.verb, 'args': args})
+            finally:
+                session.cancel()
         emit(payload, as_json=bool(ns.json))
         return 0 if payload['status'] == 'ok' else 2
 
@@ -120,11 +132,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if ns.verb == "mcp":
         from .mcp_server import run_mcp
-        return run_mcp(allow_live_control=ns.allow_live_control)
+        return run_mcp(allow_live_control=ns.allow_live_control, cdp_endpoint=ns.cdp_endpoint)
 
     if ns.verb == "serve":
         from .server import run_server
-        return run_server(allow_live_control=ns.allow_live_control)
+        return run_server(allow_live_control=ns.allow_live_control, cdp_endpoint=ns.cdp_endpoint)
 
     if ns.verb in {"capabilities", "privileges"}:
         from .engine import ComputerSession

@@ -1,7 +1,8 @@
 # User-scope Python installer migration
 
-This source-only installer is the next migration checkpoint. Until its Windows
-launcher tests pass, the original `install.ps1` entrypoint remains unchanged.
+The original installer logic is now implemented in Python. `install.ps1` is a small
+compatibility entrypoint preserving `-BinDir`, `-NoPathShim`, `-Quiet` and the default
+legacy backend; `-Backend`/`-PortableRoot` explicitly select alternatives.
 Nothing here installs software, requests elevation, starts a model or modifies a
 user's real launcher directory during tests.
 
@@ -60,7 +61,7 @@ Legacy health uses the same `-Brief macro health-quick` purpose; core/portable u
 `doctor --json`. Health failures are reported as warnings and remain nonfatal as in
 the original installer, with a new 30-second bound. No live-control flag is added.
 
-## Parity evidence required before replacing PowerShell logic
+## Parity evidence and remaining Windows checks
 
 Pure filesystem fixtures cover backend selection, Unicode templates, no-write plans,
 ownership, refusal of edited files, explicit backend transitions, rollback, bounded
@@ -72,3 +73,16 @@ and exit codes; they do not call a real CUCP action or install to WindowsApps.
 semantics would require additional real Windows parity tests. `cucp-next.ps1` is
 already a small compatibility launcher, so no feature is removed just to change
 language counts.
+
+The legacy/core Unicode launcher and argv fixtures passed on a real Windows runner
+for commit `fc05aa01a0632b36af930a522efe8c623037300b`, Actions run `36886830685`,
+job `110452169750`, installer qualification step. That qualified replacing the
+original installer body. A separate Windows test now copies the compatibility shim
+into a disposable fixture with an argument-recording Python installer to check all
+preserved switches, explicit backends and exit-code propagation.
+
+The PowerShell entrypoint now requires Python 3.10+ for source installation and uses
+`-X utf8`; this is a disclosed new setup dependency, not a change of default backend.
+Its code does not perform installation policy, write files, alter settings or elevate.
+
+Measured installer entrypoint reduction: 5,376 → 1,519 UTF-8 bytes (3,857 bytes removed), 124 → 31 lines. The removed environment/path/shim/health policy now lives in the tested Python module; no legacy backend feature was silently redirected.

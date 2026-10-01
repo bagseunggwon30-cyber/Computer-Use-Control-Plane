@@ -15,6 +15,7 @@ from .native_host import run_native, native_host_available
 from .registry import COMMANDS, capabilities
 from .workflows import WorkflowError
 from .validation import ValidationError
+from .cdp import CdpAdapter, CdpError
 
 MAX_BATCH = 12
 KEYS = set('ENTER TAB ESC ESCAPE BACKSPACE DELETE SPACE LEFT RIGHT UP DOWN HOME END PAGEUP PAGEDOWN SHIFT+TAB ALT+F4'.split())
@@ -80,7 +81,10 @@ class ComputerSession:
     """One owner per session. Host-side live permission cannot be changed by a request."""
     def __init__(self, *, allow_live_control=False, native: Callable=run_native,
                  clock: Callable=time.monotonic, sleep: Callable=time.sleep,
-                 observation_ttl_s=60, native_transport="published executable per call"):
+                 observation_ttl_s=60, native_transport="published executable per call", cdp=None, cdp_endpoint=None):
+        if cdp is not None and cdp_endpoint is not None:
+            raise ValueError("Supply an injected adapter or a startup endpoint, not both")
+        self.cdp = cdp if cdp is not None else CdpAdapter(cdp_endpoint, allow_live_control=allow_live_control) if cdp_endpoint else None
         self.native_transport = native_transport
         self.allow_live_control = bool(allow_live_control)
         self.native, self.clock, self.sleep, self.ttl = native, clock, sleep, observation_ttl_s
@@ -95,6 +99,8 @@ class ComputerSession:
     def cancel(self):
         """Terminal cancellation; the host must create a new session and re-observe."""
         self.cancelled.set()
+        if self.cdp is not None:
+            self.cdp.close()
 
     def handle(self, request: Any) -> dict:
         started, rid, command = self.clock(), None, None
@@ -162,11 +168,16 @@ class ComputerSession:
         from .mcp_server import SCHEMAS
         from .validation import validate
         validate(args, SCHEMAS[command])
+        if command.startswith('cdp-'):
+            return self.cdp_command(command, args, deadline)
+        if spec.effect == 'write' and self.cdp is not None:
+            self.cdp.invalidate_snapshot()
         if command == 'capabilities':
             fields(args, [])
             return 'ok', {'commands': capabilities(), 'allow_live_control': self.allow_live_control,
                           'platform': 'windows', 'max_batch': MAX_BATCH, 'observation_ttl_s': self.ttl,
                           'runtime_platform': sys.platform, 'native_host_configured': native_host_available(),
+                          'cdp': {'configured': self.cdp is not None, 'startup_only': True, 'auto_enable': False, 'endpoint': self.cdp.endpoint if self.cdp else None},
                           'request_id_retention': 1024,
                           'coordinate_space': 'returned screenshot image pixels', 'keys': sorted(KEYS),
                           'automatic_retry': False, 'native_transport': self.native_transport,
@@ -588,3 +599,20 @@ class ComputerSession:
                           'automatic_action': False}, result_errors
         except ValueError as exc:
             raise EngineError('invalid_observation_data', str(exc)) from None
+
+    def cdp_command(self, command, args, deadline):
+        if self.cdp is None:
+            raise EngineError('cdp_not_configured', 'Human must supply an authorized existing numeric-loopback --cdp-endpoint at startup', 'blocked')
+        remaining = deadline - self.clock()
+        if remaining <= 0:
+            raise EngineError('deadline_exceeded', 'Request deadline reached before browser operation', 'blocked')
+        if COMMANDS[command].effect == 'write':
+            self.observation = None
+        try:
+            report = self.cdp.execute(command, args, timeout_s=min(remaining, 30))
+        except CdpError as exc:
+            uncertain = exc.mutation_may_have_occurred
+            return ('partial' if uncertain else exc.status), {'may_have_acted': uncertain, 'automatic_retry': False}, [{'code': exc.code, 'message': str(exc)}]
+        status = 'partial' if report.get('status') == 'partial' else 'ok'
+        errors = [] if status == 'ok' else [{'code': 'incomplete_browser_observation', 'message': 'Inspect candidates or narrow the observation; no automatic choice'}]
+        return status, report, errors

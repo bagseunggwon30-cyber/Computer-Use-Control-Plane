@@ -32,7 +32,11 @@ if (command == "legacy-ocr-match")
             if (buffer.Length + count > LegacyOcrMatcher.MaximumRequestBytes) throw CommandOptions.Invalid("Legacy OCR request exceeds 1 MiB.");
             buffer.Write(chunk, 0, count);
         }
-        using var document = JsonDocument.Parse(new UTF8Encoding(false, true).GetString(buffer.ToArray()), new JsonDocumentOptions { MaxDepth = 32 });
+        var utf8 = buffer.ToArray();
+        // Windows PowerShell/.NET Framework's redirected StreamWriter may emit
+        // a UTF-8 preamble. Accept exactly one leading BOM, never arbitrary data.
+        var prefix = utf8.Length >= 3 && utf8[0] == 0xEF && utf8[1] == 0xBB && utf8[2] == 0xBF ? 3 : 0;
+        using var document = JsonDocument.Parse(new UTF8Encoding(false, true).GetString(utf8, prefix, utf8.Length - prefix), new JsonDocumentOptions { MaxDepth = 32 });
         Console.WriteLine(JsonSerializer.Serialize(NativeResult.Ok(command, LegacyOcrMatcher.Match(document.RootElement)), NativeDispatcher.JsonOptions));
         return 0;
     }

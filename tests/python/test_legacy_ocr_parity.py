@@ -105,6 +105,10 @@ foreach ($case in $cases) {
     def test_kernel_rejects_malformed_and_oversized_stdin(self):
         host = Path(os.environ['CUCP_NATIVE_TEST_HOST'])
         native = [str(host)] if host.suffix.lower() == '.exe' else [shutil.which('dotnet'), str(host)]
+        valid = json.dumps(cases()[0], ensure_ascii=False).encode()
+        result = subprocess.run([*native, 'legacy-ocr-match'], input=b'\xef\xbb\xbf'+valid, capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(json.loads(result.stdout)['status'], 'ok')
         for raw in (b'{}', b'{', b'x'*(1024*1024+1)):
             result = subprocess.run([*native, 'legacy-ocr-match'], input=raw, capture_output=True, timeout=15)
             self.assertNotEqual(result.returncode, 0)

@@ -13,13 +13,16 @@ def protocol_error(code, message):
     return {'schema': 'cucp.response/v1', 'id': None, 'command': None,
             'status': 'error', 'data': {}, 'errors': [{'code': code, 'message': message}], 'duration_ms': 0}
 
-def serve(*, allow_live_control=False, source=None, sink=None):
+def serve(*, allow_live_control=False, source=None, sink=None, cdp_endpoint=None):
     source = source if source is not None else sys.stdin.buffer
     sink = sink if sink is not None else sys.stdout
     with NativeSession(allow_live_control=allow_live_control) as native:
         session = ComputerSession(allow_live_control=allow_live_control, native=native,
-                                  native_transport="persistent subprocess (stdio-jsonl)")
-        return _serve_frames(source, sink, session)
+                                  native_transport="persistent subprocess (stdio-jsonl)", cdp_endpoint=cdp_endpoint)
+        try:
+            return _serve_frames(source, sink, session)
+        finally:
+            session.cancel()
 
 def _serve_frames(source, sink, session):
     while True:
@@ -40,7 +43,7 @@ def _serve_frames(source, sink, session):
         sink.write(json.dumps(response, ensure_ascii=False, separators=(',', ':'), allow_nan=False) + '\n')
         sink.flush()
 
-def run_server(*, allow_live_control=False):
+def run_server(*, allow_live_control=False, cdp_endpoint=None):
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8', errors='strict')
     def stop(signum, frame):
@@ -48,7 +51,7 @@ def run_server(*, allow_live_control=False):
         raise SystemExit(128 + signum)
     old_handlers = {sig: signal.signal(sig, stop) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
-        return serve(allow_live_control=allow_live_control)
+        return serve(allow_live_control=allow_live_control, cdp_endpoint=cdp_endpoint)
     except BrokenPipeError:
         return 1
     finally:

@@ -13,6 +13,8 @@ _CORE += [CommandSpec(n, route="dotnet-native-host") for n in ("windows", "privi
 _CORE += [CommandSpec(n, "write", "dotnet-native-host") for n in ("focus", "click", "drag", "type", "key", "scroll", "app-close", "app-launch", "uia-invoke", "uia-set-value", "uia-toggle", "uia-select", "uia-expand-collapse", "uia-scroll")]
 _CORE += [CommandSpec(n) for n in ("workflow-plan", "task-build", "form-plan", "watch", "app-profile", "recovery-plan", "record-read")]
 _CORE += [CommandSpec(n, "conditional") for n in ("batch", "workflow-run", "task-run", "form-run", "record-start", "record-stop")]
+_CORE += [CommandSpec(n, route="python-cdp-adapter") for n in ("cdp-detect", "cdp-observe", "cdp-query", "cdp-smart-find", "cdp-smart-type-find", "cdp-deep-find")]
+_CORE += [CommandSpec(n, "write", "python-cdp-adapter") for n in ("cdp-click", "cdp-smart-click", "cdp-type", "cdp-smart-type", "cdp-prosemirror-insert", "cdp-eval")]
 COMMANDS = {s.name: s for s in _CORE}
 for name in ("version", "plan", "task-plan", "find-label", "ocr-find-text"):
     COMMANDS[name] = CommandSpec(name, available_in_engine=False)

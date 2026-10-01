@@ -79,6 +79,7 @@ def smoke(bundle: Path):
             {"schema": "cucp.request/v1", "id": "no-diff", "command": "screenshot-diff", "args": {"before_id": "absent", "after_id": "absent"}},
             {"schema": "cucp.request/v1", "id": "record", "command": "record-start", "args": {}},
             {"schema": "cucp.request/v1", "id": "stop", "command": "record-stop", "args": {}},
+            {"schema": "cucp.request/v1", "id": "cdp-disabled", "command": "cdp-detect", "args": {}},
         ]
         probes_wire = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in probes)
         checks = [json.loads(line) for line in invoke([exe, "serve"], probes_wire).splitlines()]
@@ -88,6 +89,7 @@ def smoke(bundle: Path):
         check(checks[2]["errors"][0]["code"] == "stale_observation", "Frozen OCR processing module unavailable")
         check(checks[3]["errors"][0]["code"] == "snapshot_unavailable", "Frozen PNG/diff module unavailable")
         check(checks[4]["status"] == "ok" and checks[5]["data"]["active"] is False, "Frozen audit lifecycle failed")
+        check(checks[6]["errors"][0]["code"] == "cdp_not_configured", "Frozen optional CDP adapter did not fail closed")
         handshake = [
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-11-25",
                 "capabilities": {}, "clientInfo": {"name": "portable-smoke", "version": "1"}}},
@@ -96,7 +98,7 @@ def smoke(bundle: Path):
         ]
         mcp = [json.loads(line) for line in invoke([exe, "mcp"], "".join(json.dumps(r) + "\n" for r in handshake)).splitlines()]
         names = {tool["name"] for tool in mcp[-1]["result"]["tools"]}
-        check({"cucp_workflow_run", "cucp_form_run", "cucp_uia_toggle", "cucp_ocr_window", "cucp_screenshot_diff"} <= names,
+        check({"cucp_workflow_run", "cucp_form_run", "cucp_uia_toggle", "cucp_ocr_window", "cucp_screenshot_diff", "cucp_cdp_observe", "cucp_cdp_eval"} <= names,
               "Frozen MCP capability inventory is incomplete")
         # Prove the published worker starts twice on one connection, with its own .NET runtime.
         native = relocated / "native" / "PcuCp.NativeHost.exe"

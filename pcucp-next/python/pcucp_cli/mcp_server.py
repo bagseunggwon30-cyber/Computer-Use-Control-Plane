@@ -63,6 +63,24 @@ SCHEMAS.update({
         'horizontal': {'enum': ['none', 'small-increment', 'large-increment', 'small-decrement', 'large-decrement']},
         'vertical': {'enum': ['none', 'small-increment', 'large-increment', 'small-decrement', 'large-decrement']}}, ['observation_id', 'element_ref']),
 })
+CDP_SNAPSHOT = {'type': 'string', 'minLength': 1, 'maxLength': 128}
+CDP_ELEMENT = {'type': 'string', 'minLength': 1, 'maxLength': 128}
+CDP_FIND = obj({'snapshot_id': CDP_SNAPSHOT, 'text': {'type': 'string', 'minLength': 1, 'maxLength': 1024},
+    'action': {'enum': ['click', 'type']}, 'limit': number(1, 100)}, ['snapshot_id', 'text'])
+CDP_TYPE = obj({'snapshot_id': CDP_SNAPSHOT, 'element_ref': CDP_ELEMENT, 'text': {'type': 'string', 'maxLength': 16384},
+    'clear': {'type': 'boolean'}, 'press_enter': {'type': 'boolean'}}, ['snapshot_id', 'element_ref'])
+SCHEMAS.update({
+    'cdp-detect': obj(),
+    'cdp-observe': obj({'target_id': {'type': 'string', 'minLength': 1, 'maxLength': 256}, 'max_depth': number(1, 24), 'max_nodes': number(1, 2000)}, ['target_id']),
+    'cdp-query': obj({'snapshot_id': CDP_SNAPSHOT, 'selector': {'type': 'string', 'minLength': 1, 'maxLength': 2048}, 'limit': number(1, 100)}, ['snapshot_id', 'selector']),
+    'cdp-smart-find': CDP_FIND, 'cdp-deep-find': CDP_FIND,
+    'cdp-smart-type-find': obj({k:v for k,v in CDP_FIND['properties'].items() if k != 'action'}, ['snapshot_id', 'text']),
+    'cdp-click': obj({'snapshot_id': CDP_SNAPSHOT, 'element_ref': CDP_ELEMENT}, ['snapshot_id', 'element_ref']),
+    'cdp-smart-click': obj({'snapshot_id': CDP_SNAPSHOT, 'element_ref': CDP_ELEMENT}, ['snapshot_id', 'element_ref']),
+    'cdp-type': CDP_TYPE, 'cdp-smart-type': CDP_TYPE,
+    'cdp-prosemirror-insert': obj({**CDP_TYPE['properties'], 'text': {'type': 'string', 'minLength': 1, 'maxLength': 16384}}, ['snapshot_id', 'element_ref', 'text']),
+    'cdp-eval': obj({'snapshot_id': CDP_SNAPSHOT, 'expression': {'type': 'string', 'minLength': 1, 'maxLength': 32768}}, ['snapshot_id', 'expression']),
+})
 SCHEMAS['screenshot'] = SCHEMAS['observe']
 SCHEMAS['ocr-window'] = obj({**SCHEMAS['observe']['properties'], 'language': {'type': 'string', 'minLength': 2, 'maxLength': 64}}, ['hwnd'])
 OCR_QUERY = obj({'observation_id': TOKEN, 'text': {'type': 'string', 'minLength': 1, 'maxLength': 1024},
@@ -147,7 +165,12 @@ DESCRIPTIONS.update({
     'record-stop': 'Stop audit metadata recording and return its bounded summary.',
     'record-read': 'Read bounded audit metadata recording for this session.',
 })
-WRITES = {'uia-toggle', 'uia-select', 'uia-expand-collapse', 'uia-scroll', 'workflow-run', 'task-run', 'form-run', 'record-start', 'record-stop', 'focus', 'click', 'drag', 'type', 'key', 'scroll', 'app-close', 'app-launch', 'uia-invoke', 'uia-set-value', 'batch'}
+for _name in SCHEMAS:
+    if _name.startswith('cdp-'):
+        DESCRIPTIONS[_name] = ('Optional explicitly configured loopback browser adapter. ' +
+            ('Requires human-started live mode and fresh browser snapshot/reference; never retries; host approval is required for consequences.' if COMMANDS[_name].effect == 'write' else
+             'Read-only DOM protocol observation/search; never evaluates page JavaScript or enables debug access.'))
+WRITES = {name for name, spec in COMMANDS.items() if spec.effect != 'read' and spec.available_in_engine}
 
 
 def tool_list():
@@ -293,12 +316,12 @@ class McpServer:
             self.close_native()
 
 
-def serve_mcp(*, allow_live_control=False, source=None, sink=None):
+def serve_mcp(*, allow_live_control=False, source=None, sink=None, cdp_endpoint=None):
     source = source if source is not None else sys.stdin.buffer
     sink = sink if sink is not None else sys.stdout
     with NativeSession(allow_live_control=allow_live_control) as native:
         session = ComputerSession(allow_live_control=allow_live_control, native=native,
-                                  native_transport='persistent subprocess (stdio-jsonl)')
+                                  native_transport='persistent subprocess (stdio-jsonl)', cdp_endpoint=cdp_endpoint)
         server = McpServer(session, sink, native.close)
         old = {}
         if threading.current_thread() is threading.main_thread():
@@ -330,7 +353,7 @@ def serve_mcp(*, allow_live_control=False, source=None, sink=None):
                 signal.signal(sig, handler)
 
 
-def run_mcp(*, allow_live_control=False):
+def run_mcp(*, allow_live_control=False, cdp_endpoint=None):
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8', errors='strict')
-    return serve_mcp(allow_live_control=allow_live_control)
+    return serve_mcp(allow_live_control=allow_live_control, cdp_endpoint=cdp_endpoint)

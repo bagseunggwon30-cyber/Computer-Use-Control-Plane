@@ -85,3 +85,12 @@ Measured runtime PS reduction at this point: **3,379 bytes**, from `858,937` to 
 Legacy OCR callers now require a matching `PcuCp.NativeHost.exe` published to `pcucp-next/bin/native` or an explicit `CUCP_NATIVE_HOST` executable/DLL. A DLL needs .NET available. A missing/old runtime fails closed; the retired algorithms are not silently restored. New MCP/JSONL OCR tools already use Python/C# directly and do not use this compatibility bridge.
 
 Native NLS semantics follow [Microsoft's comparison/search API](https://learn.microsoft.com/en-us/windows/win32/api/winnls/nf-winnls-findnlsstringex); legacy tie ordering follows the [documented runtime compatibility branch in .NET reference source](https://github.com/microsoft/referencesource/blob/main/mscorlib/system/collections/generic/arraysorthelper.cs). This compatibility kernel deliberately does not replace the safer modern matcher’s explicit ambiguity reporting.
+
+
+The user-scope installer was also migrated to Python after its actual Windows Unicode/argument fixtures passed in run `36886830685` at `fc05aa01a0632b36af930a522efe8c623037300b`. `install.ps1` now only discovers Python and forwards the original flags; its default remains the legacy backend. Core/portable launcher routes do not invoke PowerShell. This removes another **3,857 PS bytes** (5,376 → 1,519). Combined actual source reduction is **7,236 bytes**, before any future retirement. The shim's own forwarding fixture and the OCR bridge BOM handling are checked by the next exact-commit CI.
+
+## Optional browser adapter
+
+The shared interface now has 52 tools, including twelve optional CDP operations. Browser endpoints are configured only by the human at startup, numeric-loopback and exact-origin restricted; no scan or debugging enablement is performed. Read discovery/query/search uses DOM protocol methods; eval/click/type/ProseMirror require immutable live authority and fresh target/document/element references. Cancellation interrupts owned sockets, and native/browser mutations invalidate the other route's snapshots. No browser account or model provider is required.
+
+Local mock-network/adapter tests pass. A separate opt-in CI suite launches an owned fresh headless browser profile against local fixture pages with the sandbox enabled; no existing profile or user desktop is used. The dot Linux workspace's browser launch was blocked by its AF_UNIX restriction before assertions, so no local real-browser pass is claimed. CDP legacy wrappers remain until compatibility and real-browser evidence justify their removal.

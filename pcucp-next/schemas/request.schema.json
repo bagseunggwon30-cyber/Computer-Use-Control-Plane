@@ -529,6 +529,300 @@
       ],
       "additionalProperties": false
     },
+    "cdp-detect": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "cdp-observe": {
+      "type": "object",
+      "properties": {
+        "target_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "max_depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24
+        },
+        "max_nodes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000
+        }
+      },
+      "required": [
+        "target_id"
+      ],
+      "additionalProperties": false
+    },
+    "cdp-query": {
+      "type": "object",
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "selector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "selector"
+      ],
+      "additionalProperties": false
+    },
+    "cdp-smart-find": {
+      "type": "object",
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "action": {
+          "enum": [
+            "click",
+            "type"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "cdp-deep-find": {
+      "type": "object",
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "action": {
+          "enum": [
+            "click",
+            "type"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "cdp-smart-type-find": {
+      "type": "object",
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "cdp-click": {
+      "type": "object",
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "element_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "element_ref"
+      ],
+      "additionalProperties": false
+    },
+    "cdp-smart-click": {
+      "type": "object",
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "element_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "element_ref"
+      ],
+      "additionalProperties": false
+    },
+    "cdp-type": {
+      "type": "object",
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "element_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "clear": {
+          "type": "boolean"
+        },
+        "press_enter": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "element_ref"
+      ],
+      "additionalProperties": false
+    },
+    "cdp-smart-type": {
+      "type": "object",
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "element_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "clear": {
+          "type": "boolean"
+        },
+        "press_enter": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "element_ref"
+      ],
+      "additionalProperties": false
+    },
+    "cdp-prosemirror-insert": {
+      "type": "object",
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "element_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "clear": {
+          "type": "boolean"
+        },
+        "press_enter": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "element_ref",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "cdp-eval": {
+      "type": "object",
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "expression": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32768
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "expression"
+      ],
+      "additionalProperties": false
+    },
     "screenshot": {
       "type": "object",
       "properties": {
@@ -1548,6 +1842,456 @@
                 "type": "object",
                 "properties": {
                   "command": {
+                    "const": "cdp-detect"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "cdp-observe"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "target_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "max_depth": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 24
+                      },
+                      "max_nodes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2000
+                      }
+                    },
+                    "required": [
+                      "target_id"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "cdp-query"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "snapshot_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "selector": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      }
+                    },
+                    "required": [
+                      "snapshot_id",
+                      "selector"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "cdp-smart-find"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "snapshot_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "action": {
+                        "enum": [
+                          "click",
+                          "type"
+                        ]
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      }
+                    },
+                    "required": [
+                      "snapshot_id",
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "cdp-deep-find"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "snapshot_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "action": {
+                        "enum": [
+                          "click",
+                          "type"
+                        ]
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      }
+                    },
+                    "required": [
+                      "snapshot_id",
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "cdp-smart-type-find"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "snapshot_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      }
+                    },
+                    "required": [
+                      "snapshot_id",
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "cdp-click"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "snapshot_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "element_ref": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    },
+                    "required": [
+                      "snapshot_id",
+                      "element_ref"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "cdp-smart-click"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "snapshot_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "element_ref": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    },
+                    "required": [
+                      "snapshot_id",
+                      "element_ref"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "cdp-type"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "snapshot_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "element_ref": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "text": {
+                        "type": "string",
+                        "maxLength": 16384
+                      },
+                      "clear": {
+                        "type": "boolean"
+                      },
+                      "press_enter": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "snapshot_id",
+                      "element_ref"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "cdp-smart-type"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "snapshot_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "element_ref": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "text": {
+                        "type": "string",
+                        "maxLength": 16384
+                      },
+                      "clear": {
+                        "type": "boolean"
+                      },
+                      "press_enter": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "snapshot_id",
+                      "element_ref"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "cdp-prosemirror-insert"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "snapshot_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "element_ref": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 16384
+                      },
+                      "clear": {
+                        "type": "boolean"
+                      },
+                      "press_enter": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "snapshot_id",
+                      "element_ref",
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "const": "cdp-eval"
+                  },
+                  "args": {
+                    "type": "object",
+                    "properties": {
+                      "snapshot_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "expression": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32768
+                      }
+                    },
+                    "required": [
+                      "snapshot_id",
+                      "expression"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "command",
+                  "args"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "command": {
                     "const": "screenshot"
                   },
                   "args": {
@@ -2300,6 +3044,18 @@
                       "uia-select",
                       "uia-expand-collapse",
                       "uia-scroll",
+                      "cdp-detect",
+                      "cdp-observe",
+                      "cdp-query",
+                      "cdp-smart-find",
+                      "cdp-deep-find",
+                      "cdp-smart-type-find",
+                      "cdp-click",
+                      "cdp-smart-click",
+                      "cdp-type",
+                      "cdp-smart-type",
+                      "cdp-prosemirror-insert",
+                      "cdp-eval",
                       "screenshot",
                       "ocr-window",
                       "ocr-find",
@@ -2397,6 +3153,18 @@
                       "uia-select",
                       "uia-expand-collapse",
                       "uia-scroll",
+                      "cdp-detect",
+                      "cdp-observe",
+                      "cdp-query",
+                      "cdp-smart-find",
+                      "cdp-deep-find",
+                      "cdp-smart-type-find",
+                      "cdp-click",
+                      "cdp-smart-click",
+                      "cdp-type",
+                      "cdp-smart-type",
+                      "cdp-prosemirror-insert",
+                      "cdp-eval",
                       "screenshot",
                       "ocr-window",
                       "ocr-find",
@@ -2622,6 +3390,12 @@
             "uia-tree",
             "wait-window",
             "uia-find",
+            "cdp-detect",
+            "cdp-observe",
+            "cdp-query",
+            "cdp-smart-find",
+            "cdp-deep-find",
+            "cdp-smart-type-find",
             "screenshot",
             "ocr-window",
             "ocr-find",
@@ -3258,6 +4032,318 @@
         },
         "args": {
           "$ref": "#/$defs/uia-scroll"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "cdp-detect"
+        },
+        "args": {
+          "$ref": "#/$defs/cdp-detect"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "cdp-observe"
+        },
+        "args": {
+          "$ref": "#/$defs/cdp-observe"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "cdp-query"
+        },
+        "args": {
+          "$ref": "#/$defs/cdp-query"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "cdp-smart-find"
+        },
+        "args": {
+          "$ref": "#/$defs/cdp-smart-find"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "cdp-deep-find"
+        },
+        "args": {
+          "$ref": "#/$defs/cdp-deep-find"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "cdp-smart-type-find"
+        },
+        "args": {
+          "$ref": "#/$defs/cdp-smart-type-find"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "cdp-click"
+        },
+        "args": {
+          "$ref": "#/$defs/cdp-click"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "cdp-smart-click"
+        },
+        "args": {
+          "$ref": "#/$defs/cdp-smart-click"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "cdp-type"
+        },
+        "args": {
+          "$ref": "#/$defs/cdp-type"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "cdp-smart-type"
+        },
+        "args": {
+          "$ref": "#/$defs/cdp-smart-type"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "cdp-prosemirror-insert"
+        },
+        "args": {
+          "$ref": "#/$defs/cdp-prosemirror-insert"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "command",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "cucp.request/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "command": {
+          "const": "cdp-eval"
+        },
+        "args": {
+          "$ref": "#/$defs/cdp-eval"
         }
       },
       "required": [

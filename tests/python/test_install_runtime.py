@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -152,3 +153,30 @@ class InstallerTests(unittest.TestCase):
         result = subprocess.run('"' + os.environ.get('COMSPEC', r'C:\Windows\System32\cmd.exe') + '" /d /s /c "' + command + '"', capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=15)
         self.assertEqual(result.returncode, 37, result.stderr)
         self.assertEqual(json.loads(result.stdout), args)
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Requires actual PowerShell shim parameter binding')
+    def test_windows_installer_compatibility_entrypoint_uses_exact_selected_backend(self):
+        # Copy only the compatibility entrypoint, then substitute a harmless Python
+        # argument recorder. Nothing runs the real installer or a CUCP backend.
+        shutil.copy2(SOURCE.parents[2] / 'install.ps1', self.root / 'install.ps1')
+        packaging = self.root / 'pcucp-next/packaging'
+        packaging.mkdir(parents=True)
+        (packaging / 'install_runtime.py').write_text(
+            'import json,sys; print(json.dumps(sys.argv[1:],ensure_ascii=True)); sys.exit(37)\n', encoding='utf-8')
+        for backend in (None, 'core', 'portable'):
+            command = ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(self.root / 'install.ps1'),
+                       '-PythonExe', sys.executable, '-BinDir', str(self.bin), '-NoPathShim', '-Quiet']
+            if backend:
+                command += ['-Backend', backend]
+            if backend == 'portable':
+                command += ['-PortableRoot', str(self.bundle)]
+            result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', timeout=15)
+            self.assertEqual(result.returncode, 37, result.stderr)
+            forwarded = json.loads(result.stdout)
+            self.assertEqual(forwarded[:5], ['--root', str(self.root), '--backend', backend or 'legacy', '--apply'])
+            self.assertIn('--no-path-shim', forwarded)
+            self.assertIn('--quiet', forwarded)
+            self.assertEqual(forwarded[forwarded.index('--bin-dir') + 1], str(self.bin))
+            if backend == 'portable':
+                self.assertEqual(forwarded[forwarded.index('--portable-root') + 1], str(self.bundle))
+            self.assertFalse(self.bin.exists(), 'Shim fixture must not install anything')
