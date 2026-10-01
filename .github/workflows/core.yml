@@ -84,10 +84,11 @@ jobs:
           $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
           python -m unittest discover -s tests/python -p test_legacy_strategy_parity.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Workflow literal and policy candidate qualification (parser retained)
+      - name: Workflow exact parsed-plan and candidate qualification (parser retained)
         if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
         shell: pwsh
         run: |
+          $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
           python -m unittest discover -s tests/python -p test_legacy_workflow_parity.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compiled legacy interop API and ABI qualification

@@ -93,12 +93,17 @@ internal static class LegacyStrategyKernel
         var routeOrder = Array(args, "route_order");
         var cdp = Object(args, "cdp_probe"); var uia = Object(args, "uia_probe"); var persisted = Object(args, "persisted_strategy");
         var browser = Boolean(args, "browser_like"); var office = Boolean(args, "office_like"); var noProbe = Boolean(args, "no_probe");
-        var scores = new Dictionary<string, Route>(StringComparer.OrdinalIgnoreCase);
+        // Windows PowerShell 5.1 literal hashtables use linguistic, case-insensitive
+        // keys, unlike modern PowerShell's OrdinalIgnoreCase. Use the same NLS
+        // comparison as route sorting. A bounded linear map avoids mixing an ICU
+        // hash with NLS equality (at most 1000 supplied routes plus fixed defaults).
+        var scores = new List<Route>();
         void Add(string route, int points, string reason)
         {
             var key = NormalizeValue(route);
             if (key.Length == 0) return;
-            if (!scores.TryGetValue(key, out var item)) scores.Add(key, item = new Route(key));
+            var item = scores.FirstOrDefault(existing => CompareText(existing.Name, key, true) == 0);
+            if (item is null) { item = new Route(key); scores.Add(item); }
             item.Score += points;
             if (reason.Length > 0) item.Reasons.Add(reason);
         }
@@ -148,7 +153,7 @@ internal static class LegacyStrategyKernel
             Add("ocr", 8, "generic_visual_text_fallback");
         }
         if (persisted is JsonElement p) Add(Text(p, "strategy"), 18, "persisted_last_good_strategy");
-        var ranked = scores.Values.Select(r => new Ranked(r.Name, Math.Clamp(r.Score, 0, 100), r.Reasons)).ToArray();
+        var ranked = scores.Select(r => new Ranked(r.Name, Math.Clamp(r.Score, 0, 100), r.Reasons)).ToArray();
         System.Array.Sort(ranked, (left, right) =>
         {
             var byScore = right.score.CompareTo(left.score);

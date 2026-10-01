@@ -34,7 +34,7 @@ def strategy_cases():
         cases.append({'operation': 'strategy-score', 'args': {'route_order': ['cdp_dom', 'uia_pattern', 'uia_click', 'ocr'],
                        'cdp_probe': cdp, 'uia_probe': uia, 'persisted_strategy': persisted,
                        'labels': ['é', 'e\u0301', 'É', '가', '가', ' save ', 'save']}})
-    for order in (['uia_pattern'] * 40, ['', None, 'ocr_text', 'fusion_coord', 'uia_coord', 'uia_click'],
+    for order in (['é', 'e\u0301'], ['e\u0301', 'é'], ['가', '가'], ['가', '가'], ['uia_pattern'] * 40, ['', None, 'ocr_text', 'fusion_coord', 'uia_coord', 'uia_click'],
                   ['z', 'ä', 'a', 'é', 'e\u0301', '가', '가', 'I', 'İ', 'ı', 'i'],
                   ['a0'] * 8 + ['é', 'e\u0301', '가', '가', 'z'],
                   ['z'] * 8 + ['가', '가', 'e\u0301', 'é', 'a']):
@@ -51,6 +51,7 @@ class StrategyFixtureTests(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform == 'win32' and os.environ.get('CUCP_NATIVE_TEST_HOST'), 'Requires Windows legacy compatibility dispatcher')
 class LegacyStrategyParityTests(unittest.TestCase):
+    maxDiff = None
     def test_whole_strategy_results_match_pinned_powershell(self):
         cases = strategy_cases()
         source_data = subprocess.check_output(['git', 'show', f'{BASELINE_TREE}:scripts/cucp.ps1'], cwd=ROOT)

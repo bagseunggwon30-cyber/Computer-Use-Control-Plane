@@ -10,6 +10,6 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="LegacyWorkflowKernel.cs" />
+    <Compile Remove="LegacyWorkflowLiteralParser.cs" />
   </ItemGroup>
 </Project>

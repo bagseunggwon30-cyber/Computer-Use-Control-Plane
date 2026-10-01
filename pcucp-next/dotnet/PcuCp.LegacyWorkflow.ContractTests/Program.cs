@@ -24,6 +24,10 @@ if (args.SequenceEqual(new[] { "--fixtures" }))
                 "parse" => LegacyWorkflowKernel.ParseStep(fixture.GetProperty("step").GetString()!),
                 "specs" => new { specs = LegacyWorkflowKernel.ReadStepSpecs(fixture.GetProperty("rest").EnumerateArray().Select(v => v.GetString()!).ToArray()) },
                 "plan" => LegacyWorkflowKernel.Plan(JsonSerializer.SerializeToElement(new { rest = fixture.GetProperty("rest") })),
+                "plan-from-parsed" => LegacyWorkflowKernel.PlanFromParsed(JsonSerializer.SerializeToElement(new
+                {
+                    rest = fixture.GetProperty("rest"), parsed_steps = fixture.GetProperty("parsed_steps")
+                })),
                 _ => throw CommandOptions.Invalid("Unsupported test fixture kind.")
             });
         }
@@ -71,6 +75,9 @@ Reject("macro windows; macro registry", "unsupported_token");
 Reject("macro windows | anything", "unsupported_token");
 Reject("macro windows > file", "unsupported_token");
 Reject("macro windows -Name value", "unsupported_token");
+Reject("macro windows --", "unsupported_token");
+Check(LegacyWorkflowKernel.ParseStep("macro windows '--'").Tokens.Last() == "--", "Quoted double dash stays literal");
+Check(LegacyWorkflowKernel.ParseStep("macro windows `--").Tokens.Last() == "--", "Escaped double dash stays literal");
 Reject("macro windows $env:PATH", "unsupported_token");
 Reject("macro windows $(anything)", "unsupported_token");
 Reject("macro type-native --text \"unterminated", "parse_error");
@@ -79,5 +86,44 @@ var empty = Plan("--step", "", "--step", "macro windows");
 Check(empty.GetProperty("step_count").GetInt32() == 1 && empty.GetProperty("errors")[0].GetProperty("index").GetInt32() == 1, "Preserve raw indices after rejected step");
 Check(!empty.GetProperty("safe_to_run").GetBoolean(), "Rejected parse invalidates plan");
 try { Plan(); throw new Exception("Missing --step accepted"); } catch (NativeFailure) { checks++; }
+JsonElement FromParsed(object value) => JsonSerializer.SerializeToElement(LegacyWorkflowKernel.PlanFromParsed(JsonSerializer.SerializeToElement(value)), options);
+var originalDetail = "원래 오류: '$name'\nline 1, character 20";
+var fromParsed = FromParsed(new
+{
+    rest = new[] { "--name", "actual parser", "--step", "broken original", "--step", "macro type-native --text \"hello $name\"" },
+    parsed_steps = new object[]
+    {
+        new { ok = false, error = "parse_error", detail = originalDetail, tokens = Array.Empty<string>() },
+        new { ok = true, error = "", detail = "", tokens = new[] { "macro", "type-native", "--text", "hello $name" } }
+    }
+});
+Check(fromParsed.GetProperty("errors")[0].GetProperty("message").GetString() == originalDetail, "Preserve exact original parser diagnostic");
+Check(fromParsed.GetProperty("errors")[0].GetProperty("code").GetString() == "parse_error", "Preserve parser error code");
+Check(fromParsed.GetProperty("steps")[0].GetProperty("index").GetInt32() == 2, "Preserve actual parser index");
+Check(fromParsed.GetProperty("steps")[0].GetProperty("command")[3].GetString() == "hello $name", "Use actual parser tokens without candidate reinterpretation");
+Check(!fromParsed.GetProperty("safe_to_run").GetBoolean(), "Parser failure still blocks plan");
+void RejectParsed(string json)
+{
+    using var doc = JsonDocument.Parse(json);
+    try { LegacyWorkflowKernel.PlanFromParsed(doc.RootElement); throw new Exception("Malformed parsed result accepted: " + json); }
+    catch (NativeFailure failure) { Check(failure.Code == "invalid_arguments", "Malformed parsed code"); }
+}
+foreach (var json in new[]
+{
+    "{}", "[]", "{\"rest\":[],\"parsed_steps\":[]}",
+    "{\"rest\":[\"--step\",\"macro windows\"],\"parsed_steps\":[]}",
+    "{\"rest\":[\"--step\",\"macro windows\"],\"parsed_steps\":[{\"ok\":true,\"ok\":false,\"error\":\"\",\"detail\":\"\",\"tokens\":[\"windows\"]}]}",
+    "{\"rest\":[\"--step\",\"macro windows\"],\"parsed_steps\":[{\"ok\":true,\"error\":\"\",\"detail\":\"\",\"tokens\":[]}]}",
+    "{\"rest\":[\"--step\",\"macro windows\"],\"parsed_steps\":[{\"ok\":true,\"error\":\"\",\"detail\":\"\",\"tokens\":[\"\"]}]}",
+    "{\"rest\":[\"--step\",\"macro windows\"],\"parsed_steps\":[{\"ok\":false,\"error\":\"not_in_baseline\",\"detail\":\"\",\"tokens\":[]}]}",
+    "{\"rest\":[\"--step\",\"macro windows\"],\"parsed_steps\":[{\"ok\":false,\"error\":\"parse_error\",\"detail\":\"\",\"tokens\":[\"windows\"]}]}",
+    "{\"rest\":[\"--step\",\"macro windows\"],\"parsed_steps\":[{\"ok\":1,\"error\":\"\",\"detail\":\"\",\"tokens\":[\"windows\"]}]}",
+    "{\"rest\":[\"--step\",\"macro windows\"],\"parsed_steps\":[{\"ok\":true,\"error\":\"parse_error\",\"detail\":\"\",\"tokens\":[\"windows\"]}]}",
+    "{\"rest\":[\"--step\",\"macro windows\"],\"parsed_steps\":[{\"ok\":true,\"error\":\"\",\"detail\":\"\",\"tokens\":[3]}]}"
+}) RejectParsed(json);
+RejectParsed(JsonSerializer.Serialize(new { rest = new[] { "--step", "macro windows" },
+    parsed_steps = new[] { new { ok = true, error = "", detail = "", tokens = new[] { new string('x', 65537) } } } }));
+RejectParsed(JsonSerializer.Serialize(new { rest = new[] { "--step", "macro windows" },
+    parsed_steps = new[] { new { ok = true, error = "", detail = "", tokens = Enumerable.Repeat("x", 4097).ToArray() } } }));
 Console.WriteLine($"PASS: {checks} pure workflow candidate checks; no plan was executed. Full PowerShell parser parity is not established.");
 return 0;

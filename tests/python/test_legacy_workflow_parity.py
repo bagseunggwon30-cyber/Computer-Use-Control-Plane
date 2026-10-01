@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 BASELINE_TREE = "bf895d3120dd5e145f360cb1c41e1d79a061d048"
 PROJECT = ROOT / "pcucp-next/dotnet/PcuCp.LegacyWorkflow.ContractTests"
 KERNEL = ROOT / "pcucp-next/dotnet/PcuCp.NativeHost/LegacyWorkflowKernel.cs"
+LITERAL_PARSER = KERNEL.with_name("LegacyWorkflowLiteralParser.cs")
 
 
 def original_source():
@@ -117,9 +118,16 @@ class WorkflowFixtureTests(unittest.TestCase):
         self.assertTrue(any("@'" in fixture["step"] for fixture in syntax_probe_cases()))
 
     def test_no_powershell_runtime_or_command_execution_dependency(self):
-        source = KERNEL.read_text(encoding="utf-8")
+        source = KERNEL.read_text(encoding="utf-8") + LITERAL_PARSER.read_text(encoding="utf-8")
         for forbidden in ("Process.Start", "ProcessStartInfo", "System.Management.Automation", "DllImport", "Invoke-Expression"):
             self.assertNotIn(forbidden, source)
+
+    def test_plan_assembly_has_no_candidate_lexer_dependency(self):
+        kernel = KERNEL.read_text(encoding="utf-8")
+        self.assertIn("PlanFromParsed(JsonElement args)", kernel)
+        self.assertNotIn("ParseStep(", kernel)
+        self.assertNotIn("Plan(string[] rest)", kernel)
+        self.assertIn("ParseStep(string step)", LITERAL_PARSER.read_text(encoding="utf-8"))
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows PowerShell 5.1 differential qualification")
@@ -135,7 +143,7 @@ class WorkflowWindowsParityTests(unittest.TestCase):
             raise RuntimeError(result.stdout.decode(errors="replace") + result.stderr.decode(errors="replace"))
         cls.runner = PROJECT / "bin/Release/net8.0/PcuCp.LegacyWorkflow.ContractTests.dll"
 
-    def differential(self, cases):
+    def differential(self, cases, *, parsed_feed=False):
         with tempfile.TemporaryDirectory(prefix="CUCP workflow 한글 ") as temp:
             root = Path(temp)
             source, inputs, runner = root / "original.ps1", root / "cases.json", root / "runner.ps1"
@@ -157,7 +165,16 @@ foreach ($name in @('_Read-OptValue','_Safety-Truncate','_Classify-SafetyFromTex
 $results=New-Object Collections.ArrayList
 foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json)) {
   try {
-    if ($case.kind -eq 'parse') { $value=_Parse-WorkflowStepTokens -Step $case.step }
+    if ($case.kind -eq 'plan-from-parsed-input') {
+      $parsed=New-Object Collections.ArrayList
+      foreach ($spec in @(_Read-WorkflowStepSpecs -Rest $case.rest)) {
+        [void]$parsed.Add((_Parse-WorkflowStepTokens -Step "$spec"))
+      }
+      try { $plan=_Build-WorkflowPlan -Rest $case.rest }
+      catch { $plan=@{threw=$true;error='invalid_arguments'} }
+      $value=@{input=@{rest=@($case.rest);parsed_steps=@($parsed)};expected=$plan}
+    }
+    elseif ($case.kind -eq 'parse') { $value=_Parse-WorkflowStepTokens -Step $case.step }
     elseif ($case.kind -eq 'specs') { $value=@{specs=@(_Read-WorkflowStepSpecs -Rest $case.rest)} }
     else { $value=_Build-WorkflowPlan -Rest $case.rest }
   } catch { $value=@{threw=$true;error='invalid_arguments'} }
@@ -170,13 +187,64 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
             before = subprocess.run([self.powershell, "-NoProfile", "-NonInteractive", "-File", str(runner),
                                      "-SourcePath", str(source), "-InputPath", str(inputs)], capture_output=True, timeout=60)
             self.assertEqual(before.returncode, 0, before.stderr.decode(errors="replace"))
-            after = subprocess.run([self.dotnet, str(self.runner), "--fixtures"], input=json.dumps(cases, ensure_ascii=True).encode(),
+            expected = json.loads(before.stdout.decode("utf-8-sig"))
+            actual_inputs = cases
+            if parsed_feed:
+                actual_inputs = [{"kind": "plan-from-parsed", **value["input"]} for value in expected]
+                expected = [value["expected"] for value in expected]
+            after = subprocess.run([self.dotnet, str(self.runner), "--fixtures"], input=json.dumps(actual_inputs, ensure_ascii=True).encode(),
                                     capture_output=True, timeout=30)
             self.assertEqual(after.returncode, 0, after.stderr.decode(errors="replace"))
-            expected, actual = json.loads(before.stdout.decode("utf-8-sig")), json.loads(after.stdout.decode("utf-8-sig"))
+            actual = json.loads(after.stdout.decode("utf-8-sig"))
             self.assertEqual(len(expected), len(cases))
             self.assertEqual(len(actual), len(cases))
+            if parsed_feed and os.environ.get("CUCP_NATIVE_TEST_HOST"):
+                self.check_native_parsed_dispatch(actual_inputs, expected)
             return list(zip(cases, expected, actual))
+
+    def check_native_parsed_dispatch(self, fixtures, expected):
+        """Additional real-dispatch evidence; never replace the 254-case pure proof."""
+        host = Path(os.environ["CUCP_NATIVE_TEST_HOST"]).resolve()
+        self.assertTrue(host.is_file(), f"Configured native test host missing: {host}")
+        command = [self.dotnet, str(host)] if host.suffix.lower() == ".dll" else [str(host)]
+        selectors = {
+            "valid_readonly": lambda f, p: p.get("safe_to_run") and p.get("live_step_count") == 0,
+            "sensitive": lambda f, p: p.get("safe_to_run") and p.get("requires_sensitive_confirmation"),
+            "recursive_block": lambda f, p: any(e.get("code") == "recursive_workflow_blocked" for e in p.get("errors", [])),
+            "parse_error": lambda f, p: any(e.get("code") == "parse_error" for e in p.get("errors", [])),
+            "variable_literal": lambda f, p: any('"hello $name"' in value for value in f["rest"]),
+            "here_string": lambda f, p: any("@'\nhello\n'@" in value for value in f["rest"]),
+            "unicode": lambda f, p: any("한글" in value for value in f["rest"]),
+            "nul_literal": lambda f, p: any("\x00" in value for value in f["rest"]),
+        }
+        checked = []
+        for label, select in selectors.items():
+            matches = [(fixture, plan) for fixture, plan in zip(fixtures, expected) if select(fixture, plan)]
+            self.assertTrue(matches, f"Missing native dispatch fixture category: {label}")
+            fixture, plan = matches[0]
+            body = {"schema": "cucp.legacy-compat/v1", "operation": "workflow-plan-from-parsed",
+                    "args": {key: fixture[key] for key in ("rest", "parsed_steps")}}
+            with self.subTest(native_dispatch=label):
+                result = subprocess.run([*command, "legacy-compat"], input=json.dumps(body, ensure_ascii=True).encode(),
+                                        capture_output=True, timeout=15)
+                self.assertEqual(result.returncode, 0, result.stdout.decode(errors="replace") + result.stderr.decode(errors="replace"))
+                envelope = json.loads(result.stdout.decode("utf-8-sig"))
+                self.assertEqual(envelope["status"], "ok", envelope)
+                self.assertEqual(envelope["data"], plan)
+                checked.append(label)
+        print("Verified real native parsed-plan dispatch: " + ", ".join(checked))
+
+    def test_actual_psparser_results_preserve_complete_original_plans(self):
+        # This proof bypasses the unqualified C# lexer entirely. Both ordinary
+        # literals and every broad syntax probe use actual PSParser results.
+        cases = [{"kind": "plan-from-parsed-input",
+                  "rest": ["--step", fixture["step"]] if fixture["kind"] == "parse" else fixture["rest"]}
+                 for fixture in supported_cases() + syntax_probe_cases()]
+        for fixture, expected, actual in self.differential(cases, parsed_feed=True):
+            with self.subTest(fixture=fixture):
+                # Unlike candidate lexer comparisons, original diagnostic text
+                # is supplied as data and must be preserved exactly as well.
+                self.assertEqual(actual, expected)
 
     def test_supported_literal_and_policy_cases_match(self):
         for fixture, expected, actual in self.differential(supported_cases()):

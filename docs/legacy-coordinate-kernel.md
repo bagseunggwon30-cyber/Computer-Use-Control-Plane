@@ -42,3 +42,7 @@ windows, zero dimensions, all five modes, exclusive edges, half-pixel rounding,
 explicit normalization, missing targets and high-risk profiles. No real OS input or
 window enumeration is performed. Do not retire the original arithmetic before these
 Windows comparisons pass.
+
+## Qualified body retirement
+
+All 115 deterministic Windows cases passed at `b6a29f05ec270f49172bafb06b91fac82710a004`, run `36897093256`. That run remained red for unrelated, unretired strategy/parser candidates. The legacy adapter now retains window/virtual-screen/hit-test/profile acquisition but delegates all coordinate math to this kernel. Three private rectangle/clip/rounding helpers are retired. This removes another **6,246 PS bytes** including bridge overhead. The suite now also compares the actual retained adapter against the pinned original using the same captured fixtures; its next-commit Windows result is still required. No live desktop acquisition is asserted by these tests.

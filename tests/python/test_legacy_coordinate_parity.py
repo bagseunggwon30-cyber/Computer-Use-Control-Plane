@@ -56,7 +56,7 @@ class LegacyCoordinateParityTests(unittest.TestCase):
             source.write_bytes(original)
             inputs.write_text(json.dumps(cases, ensure_ascii=True), encoding='utf-8-sig')
             runner.write_text(r'''
-param([string]$SourcePath,[string]$InputPath)
+param([string]$SourcePath,[string]$InputPath,[switch]$Bridge)
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 class CucpWin32 {
@@ -71,7 +71,9 @@ function _Build-CoordProfile { return $script:Fixture.coordinate_profile }
 $tokens=$null; $errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($SourcePath,[ref]$tokens,[ref]$errors)
 if ($errors.Count) { throw 'Pinned source did not parse' }
-foreach ($name in @('_CoordMap-Rect','_CoordMap-ClipRect','_CoordMap-MakePoint','_Build-CoordMap')) {
+$names=@('_CoordMap-Rect','_CoordMap-ClipRect','_CoordMap-MakePoint','_Build-CoordMap')
+if ($Bridge) { $names=@('_Invoke-LegacyCompatibility','_Build-CoordMap') }
+foreach ($name in $names) {
   $functions=@($ast.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name},$true))
   if ($functions.Count -ne 1) { throw "Expected one exact baseline function: $name" }
   . ([scriptblock]::Create($functions[0].Extent.Text))
@@ -104,3 +106,9 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
                     after = body['data']
                     after.pop('elapsed_ms', None)
                     self.assertEqual(after, before)
+
+            bridge = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-File', str(runner),
+                '-SourcePath', str(ROOT/'scripts/cucp.ps1'), '-InputPath', str(inputs), '-Bridge'],
+                env={**os.environ, 'CUCP_NATIVE_HOST': str(host)}, capture_output=True, timeout=120)
+            self.assertEqual(bridge.returncode, 0, bridge.stderr.decode('utf-8', errors='replace'))
+            self.assertEqual(json.loads(bridge.stdout.decode('utf-8-sig')), expected)

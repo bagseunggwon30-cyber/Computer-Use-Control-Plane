@@ -1,10 +1,57 @@
 # Legacy workflow planning candidate
 
-Status: **not qualified to replace the PowerShell parser**. Keep
-`_Parse-WorkflowStepTokens`, `_Read-WorkflowStepSpecs` and `_Build-WorkflowPlan`
-until strict Windows differential qualification is complete. This change adds
-no agent tool, performs no live command, and does not register the candidate
-in the production compatibility dispatcher.
+Status: **not qualified to replace the PowerShell parser**. The parsed-result
+assembly path below can be qualified independently; keep the exact
+`_Parse-WorkflowStepTokens` and `_Read-WorkflowStepSpecs` adapters. Replace the
+large `_Build-WorkflowPlan` construction body only after its independent Windows
+proof passes. This change adds no agent tool and performs no live command.
+
+## Independent parsed-result assembly
+
+`LegacyWorkflowKernel.PlanFromParsed(JsonElement)` accepts:
+
+```json
+{
+  "rest": ["--step", "macro windows"],
+  "parsed_steps": [{"ok": true, "error": "", "detail": "", "tokens": ["macro", "windows"]}]
+}
+```
+
+The retained PowerShell adapter obtains each result by calling the exact
+original parser on each `_Read-WorkflowStepSpecs` string. C# derives the same
+raw specifications and name from `rest`, requires one parsed result per
+specification, then assembles the plan. It does not call or reference the
+candidate lexer. Raw text, token text and original parse diagnostics are data;
+none are evaluated or interpolated.
+
+Validation rejects duplicate/unknown fields, missing fields, wrong types,
+count mismatches, unknown parser error codes and inconsistent success/failure
+shapes. Successful results require nonempty string tokens and empty error/detail;
+failed results require an empty token array and one of `parse_error`,
+`unsupported_token` or `empty_step`. The original error detail is preserved
+exactly, including Unicode, quoting and newlines. Parsed NUL characters remain
+literal data rather than being reinterpreted or discarded.
+
+Bounds are 4,096 rest items, 262,144 total rest UTF-16 units, 256 derived
+steps, 4,096 tokens per parsed step, 65,536 units per token or diagnostic,
+and 262,144 total units across all parsed tokens/errors/details. Existing
+safety-classifier input limits also apply. These are explicit compatibility
+boundaries, not additional authority to run the plan.
+
+The shared assembler provides both parsed-result planning and the standalone
+lexer candidate; there is only one allowlist, safety and result-construction
+implementation. `LegacyWorkflowKernel.cs` contains only the parsed-input API
+and shared policy/assembly. The unqualified lexer and its `Plan(rest)` entry
+live separately in `LegacyWorkflowLiteralParser.cs`. A production build can
+compile the former and exclude the latter entirely.
+
+The pinned `_Build-WorkflowPlan` function occupies 114 non-trailing-blank
+lines and 5,307 UTF-8 bytes including its following separator. Its 34-line
+tokenizer and 20-line step reader can remain while the roughly 5.3 KB builder
+becomes a small parsed-data forwarding adapter. This does not remove the
+remaining PowerShell parser dependency or change its accepted language.
+
+## Standalone literal-parser candidate
 
 `LegacyWorkflowKernel.Plan(JsonElement)` accepts `{ "rest": ["--step", "macro windows"] }`
 and constructs the legacy `cucp.workflow-plan/v1` result. The policy portion
@@ -86,3 +133,37 @@ ordinary test success must not be advertised as full parser parity.
 Neither Linux-only checks nor a passing non-strict probe authorizes replacing
 the old parser. Additional real-world literal fixtures may be needed even
 after this bounded corpus passes.
+
+### Separate proof for parsed-result assembly
+
+`test_actual_psparser_results_preserve_complete_original_plans` takes all
+199 literal/policy fixtures plus all 55 broad syntax probes through the actual
+retained PowerShell tokenizer. It supplies those exact parsed results to C#
+and compares complete plans against original `_Build-WorkflowPlan` output,
+including original diagnostic messages. It does not call the candidate lexer
+or relax comparisons because of the candidate's unresolved grammar gaps.
+
+This test can qualify plan construction independently. Its success cannot
+qualify the standalone C# lexer, and until it actually runs on Windows its
+presence alone is not evidence of .NET Framework/PowerShell parity.
+
+When `CUCP_NATIVE_TEST_HOST` is configured, the same test additionally checks
+eight representative parsed-fed cases through the actual `legacy-compat`
+`workflow-plan-from-parsed` operation: read-only success, sensitive live plan,
+recursive-workflow block, parser error, quoted variable text, here-string,
+Unicode and NUL-containing literal data. It compares complete original plans,
+including error messages. These real-dispatch checks supplement the full
+independent 254-case assembler comparison; they do not replace it.
+
+### Observed candidate qualification
+
+The Windows run for checkpoint `b6a29f05ec270f49172bafb06b91fac82710a004`
+passed all 199 ordinary literal/policy fixtures. Its broad non-relaxation probe
+found one defect: unquoted standalone `--` was accepted by the candidate even
+though PSParser rejected it. The candidate now rejects that operator form;
+quoted and backtick-escaped `--` remain literal. Assertions were not relaxed.
+The fix and new parsed-feed path require a subsequent Windows run.
+
+The same run confirmed the separately reported conservative grammar gaps.
+The candidate remains excluded from production and is still not a qualified
+replacement for the PowerShell parser.

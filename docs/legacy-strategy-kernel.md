@@ -30,3 +30,13 @@ Do not retire the original functions until exact Windows differential passes.
 Linguistically equivalent distinct custom routes can expose the original PS
 hashtable enumeration and unstable-sort behavior; that is a material parity risk,
 not permission to weaken assertions or silently impose a new tie-break rule.
+
+The first Windows run (b6a29f0, job 110486690519) passed 82 of 85 cases.
+The three failures exposed a key-comparison mismatch: Windows PowerShell 5.1
+merges composed é and decomposed e+accent as one route, whereas an ordinal
+map did not. The candidate now uses a bounded linear map with explicit Windows
+NLS current-culture case-insensitive equality, preserving the first spelling,
+accumulated weight and reason order. Hashing with .NET 8 ICU is avoided.
+Four isolated canonical-variant cases and complete failure diffs were added;
+all original exact assertions remain. This correction still needs Windows
+differential qualification before the PowerShell bodies can be retired.

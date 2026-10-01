@@ -10,5 +10,6 @@
     <Compile Include="../PcuCp.NativeHost/Contracts.cs" Link="Contracts.cs" />
     <Compile Include="../PcuCp.NativeHost/LegacySafetyKernel.cs" Link="LegacySafetyKernel.cs" />
     <Compile Include="../PcuCp.NativeHost/LegacyWorkflowKernel.cs" Link="LegacyWorkflowKernel.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyWorkflowLiteralParser.cs" Link="LegacyWorkflowLiteralParser.cs" />
   </ItemGroup>
 </Project>

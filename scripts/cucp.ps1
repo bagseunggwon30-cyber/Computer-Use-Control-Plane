@@ -2890,28 +2890,6 @@ function _CoordMap-ResolveWindow {
   return $null
 }
 
-function _CoordMap-Rect {
-  param([int]$X, [int]$Y, [int]$Width, [int]$Height)
-  return [pscustomobject]@{ x=$X; y=$Y; width=$Width; height=$Height }
-}
-
-function _CoordMap-ClipRect {
-  param($Rect, $Virtual)
-  if (-not $Rect -or -not $Virtual) { return $null }
-  $left = [Math]::Max([int]$Rect.x, [int]$Virtual.x)
-  $top = [Math]::Max([int]$Rect.y, [int]$Virtual.y)
-  $right = [Math]::Min(([int]$Rect.x + [int]$Rect.width), [int]$Virtual.right)
-  $bottom = [Math]::Min(([int]$Rect.y + [int]$Rect.height), [int]$Virtual.bottom)
-  $width = [Math]::Max(0, $right - $left)
-  $height = [Math]::Max(0, $bottom - $top)
-  return (_CoordMap-Rect -X $left -Y $top -Width $width -Height $height)
-}
-
-function _CoordMap-MakePoint {
-  param([double]$X, [double]$Y)
-  return [pscustomobject]@{ x=[int][Math]::Round($X); y=[int][Math]::Round($Y) }
-}
-
 function _Build-CoordMap {
   param(
     [string]$From,
@@ -2948,120 +2926,25 @@ function _Build-CoordMap {
       if ($hit -and [int64]$hit.root_hwnd -gt 0) { $win = _CoordProfile-WindowFromPrecheck -Precheck $hit }
     } catch { }
   }
-  if (-not $win) {
-    $sw.Stop()
-    return [pscustomobject]@{
-      schema = "cucp.coord-map/v1"
-      status = "partial"
-      reason = "target_window_not_found"
-      from = $From
-      target_hwnd = $TargetHwnd
-      target_match = $TargetMatch
-      virtual_screen = $virtual
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      next_step = "Provide --target-match or --target-hwnd, or use --from screen with a point inside the target window."
-    }
+  $result = _Invoke-LegacyCompatibility -Operation 'coord-map' -Arguments @{
+    from=$From; x=$X; y=$Y; norm_x=$NormX; norm_y=$NormY; has_norm=$HasNorm
+    target_hwnd=$TargetHwnd; target_match=$TargetMatch; virtual_screen=$virtual; selected_window=$win
   }
-
-  $rect = $win.rect
-  $visible = _CoordMap-ClipRect -Rect $rect -Virtual $virtual
-  $screenPoint = $null
-  $windowPoint = $null
-  $visibleWindowPoint = $null
-  $normalizedPoint = $null
-  $insideWindow = $false
-  $insideVisibleClip = $false
-  $roundingWarning = $false
-
-  switch ($From) {
-    "screen" {
-      $screenPoint = _CoordMap-MakePoint -X $X -Y $Y
-      $windowPoint = _CoordMap-MakePoint -X ($screenPoint.x - [int]$rect.x) -Y ($screenPoint.y - [int]$rect.y)
-      $visibleWindowPoint = if ($visible) { _CoordMap-MakePoint -X ($screenPoint.x - [int]$visible.x) -Y ($screenPoint.y - [int]$visible.y) } else { $null }
-    }
-    "window" {
-      $windowPoint = _CoordMap-MakePoint -X $X -Y $Y
-      $screenPoint = _CoordMap-MakePoint -X ([int]$rect.x + $windowPoint.x) -Y ([int]$rect.y + $windowPoint.y)
-      $visibleWindowPoint = if ($visible) { _CoordMap-MakePoint -X ($screenPoint.x - [int]$visible.x) -Y ($screenPoint.y - [int]$visible.y) } else { $null }
-    }
-    "visible-window" {
-      $visibleWindowPoint = _CoordMap-MakePoint -X $X -Y $Y
-      if (-not $visible -or [int]$visible.width -le 0 -or [int]$visible.height -le 0) {
-        $sw.Stop()
-        return [pscustomobject]@{ schema="cucp.coord-map/v1"; status="partial"; reason="window_not_visible_in_virtual_screen"; from=$From; selected_window=$win; virtual_screen=$virtual; elapsed_ms=[int]$sw.Elapsed.TotalMilliseconds }
-      }
-      $screenPoint = _CoordMap-MakePoint -X ([int]$visible.x + $visibleWindowPoint.x) -Y ([int]$visible.y + $visibleWindowPoint.y)
-      $windowPoint = _CoordMap-MakePoint -X ($screenPoint.x - [int]$rect.x) -Y ($screenPoint.y - [int]$rect.y)
-    }
-    "normalized" {
-      if (-not $HasNorm) { $NormX = $X; $NormY = $Y }
-      $normalizedPoint = [pscustomobject]@{ x=[Math]::Round($NormX, 6); y=[Math]::Round($NormY, 6) }
-      $screenPoint = _CoordMap-MakePoint -X ([int]$rect.x + ($NormX * [int]$rect.width)) -Y ([int]$rect.y + ($NormY * [int]$rect.height))
-      $windowPoint = _CoordMap-MakePoint -X ($screenPoint.x - [int]$rect.x) -Y ($screenPoint.y - [int]$rect.y)
-      $visibleWindowPoint = if ($visible) { _CoordMap-MakePoint -X ($screenPoint.x - [int]$visible.x) -Y ($screenPoint.y - [int]$visible.y) } else { $null }
-      $roundingWarning = $true
-    }
-    "visible-normalized" {
-      if (-not $HasNorm) { $NormX = $X; $NormY = $Y }
-      if (-not $visible -or [int]$visible.width -le 0 -or [int]$visible.height -le 0) {
-        $sw.Stop()
-        return [pscustomobject]@{ schema="cucp.coord-map/v1"; status="partial"; reason="window_not_visible_in_virtual_screen"; from=$From; selected_window=$win; virtual_screen=$virtual; elapsed_ms=[int]$sw.Elapsed.TotalMilliseconds }
-      }
-      $normalizedPoint = [pscustomobject]@{ x=[Math]::Round($NormX, 6); y=[Math]::Round($NormY, 6) }
-      $screenPoint = _CoordMap-MakePoint -X ([int]$visible.x + ($NormX * [int]$visible.width)) -Y ([int]$visible.y + ($NormY * [int]$visible.height))
-      $visibleWindowPoint = _CoordMap-MakePoint -X ($screenPoint.x - [int]$visible.x) -Y ($screenPoint.y - [int]$visible.y)
-      $windowPoint = _CoordMap-MakePoint -X ($screenPoint.x - [int]$rect.x) -Y ($screenPoint.y - [int]$rect.y)
-      $roundingWarning = $true
-    }
-    default {
-      $sw.Stop()
-      return [pscustomobject]@{ schema="cucp.coord-map/v1"; status="partial"; reason="unsupported_from"; from=$From; supported_from=@("screen","window","visible-window","normalized","visible-normalized"); elapsed_ms=[int]$sw.Elapsed.TotalMilliseconds }
-    }
+  if ($result.schema -ne 'cucp.coord-map/v1' -or $result.status -notin @('ok','partial')) {
+    throw 'Invalid coordinate mapping response; no action was attempted.'
   }
-
-  if (-not $normalizedPoint -and $windowPoint -and [int]$rect.width -gt 0 -and [int]$rect.height -gt 0) {
-    $normalizedPoint = [pscustomobject]@{
-      x = [Math]::Round(([double]$windowPoint.x / [double]$rect.width), 6)
-      y = [Math]::Round(([double]$windowPoint.y / [double]$rect.height), 6)
-    }
-  }
-  if ($screenPoint) {
-    $insideWindow = ($screenPoint.x -ge [int]$rect.x -and $screenPoint.x -lt ([int]$rect.x + [int]$rect.width) -and $screenPoint.y -ge [int]$rect.y -and $screenPoint.y -lt ([int]$rect.y + [int]$rect.height))
-    if ($visible) {
-      $insideVisibleClip = ($screenPoint.x -ge [int]$visible.x -and $screenPoint.x -lt ([int]$visible.x + [int]$visible.width) -and $screenPoint.y -ge [int]$visible.y -and $screenPoint.y -lt ([int]$visible.y + [int]$visible.height))
-    }
-  }
-  $profile = if ($screenPoint) { _Build-CoordProfile -HasPoint $true -X $screenPoint.x -Y $screenPoint.y -TargetHwnd ([int64]$win.hwnd) -TargetMatch $null } else { $null }
-  $warnings = New-Object System.Collections.ArrayList
-  if (-not $insideWindow) { [void]$warnings.Add("mapped_point_outside_window") }
-  if (-not $insideVisibleClip) { [void]$warnings.Add("mapped_point_outside_visible_clip") }
-  if ($roundingWarning) { [void]$warnings.Add("normalized_point_rounded_to_integer_screen_pixel") }
-  if ($profile -and $profile.coordinate_risk -eq "high") {
-    [void]$warnings.Add("coordinate_profile_high_risk")
-    foreach ($pw in @($profile.warnings)) {
-      if ($pw) { [void]$warnings.Add("$pw") }
+  # Discovery remains local to the compatibility adapter; pure pixel math is C#.
+  if ($result.status -eq 'ok' -and $result.screen_point) {
+    $profile = _Build-CoordProfile -HasPoint $true -X $result.screen_point.x -Y $result.screen_point.y -TargetHwnd ([int64]$win.hwnd) -TargetMatch $null
+    $result.coordinate_profile = $profile
+    if ($profile -and $profile.coordinate_risk -eq 'high') {
+      $result.warnings += 'coordinate_profile_high_risk'
+      foreach ($warning in @($profile.warnings)) { if ($warning) { $result.warnings += "$warning" } }
     }
   }
   $sw.Stop()
-  return [pscustomobject]@{
-    schema = "cucp.coord-map/v1"
-    status = "ok"
-    from = $From
-    input = [pscustomobject]@{ x=$X; y=$Y; norm_x=if ($HasNorm) { $NormX } else { $null }; norm_y=if ($HasNorm) { $NormY } else { $null } }
-    selected_window = [pscustomobject]@{ hwnd=[int64]$win.hwnd; title="$($win.title)"; process="$($win.process)"; class="$($win.class)"; rect=$rect }
-    virtual_screen = $virtual
-    visible_window_clip = $visible
-    screen_point = $screenPoint
-    window_point = $windowPoint
-    visible_window_point = $visibleWindowPoint
-    normalized_window_point = $normalizedPoint
-    inside_window = [bool]$insideWindow
-    inside_visible_clip = [bool]$insideVisibleClip
-    coordinate_profile = $profile
-    warnings = @($warnings)
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    next_step = "Use screen_point with point-plan or click-point after read-only verification; use normalized_window_point to persist a layout-relative target."
-  }
+  $result.elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
+  return $result
 }
 
 function Invoke-MacroCoordMap {

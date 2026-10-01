@@ -21,6 +21,7 @@ internal static class LegacyCompatibilityDispatcher
             "coord-map" => LegacyCoordinateKernel.Map(args),
             "strategy-score" => LegacyStrategyKernel.Score(args),
             "strategy-normalize" => LegacyStrategyKernel.Normalize(args),
+            "workflow-plan-from-parsed" => LegacyWorkflowKernel.PlanFromParsed(args),
             _ => throw CommandOptions.Invalid("Unsupported pure compatibility operation.")
         };
     }
