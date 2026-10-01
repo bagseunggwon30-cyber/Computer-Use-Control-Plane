@@ -6,5 +6,7 @@
   <ItemGroup>
     <Compile Include="../PcuCp.NativeHost/Contracts.cs" Link="Contracts.cs" />
     <Compile Include="../PcuCp.NativeHost/LegacySafetyKernel.cs" Link="LegacySafetyKernel.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyCoordinateKernel.cs" Link="LegacyCoordinateKernel.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyStrategyKernel.cs" Link="LegacyStrategyKernel.cs" />
   </ItemGroup>
 </Project>

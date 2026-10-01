@@ -83,3 +83,10 @@ cannot mistake a skip for Windows qualification.
 This extraction preserves existing API behavior; it neither adds new privilege
 boundaries nor claims to repair legacy input races. Interactive application,
 clipboard, mixed-DPI, privilege and real input acceptance tests remain separate.
+
+
+## Qualified loader retirement
+
+Windows qualification passed on commit `293464549f93411f02c8f409822157b9a8cd87b7`, run `36890543863`: exact source identity, 301 reflected API/PInvoke/marshalling/ABI entries and actual PowerShell 5.1 load all matched. The three PowerShell C# literals/runtime compilation calls are now replaced together by small explicit loaders. They use the default published DLL above or the human-configured `CUCP_LEGACY_INTEROP_DLL`; no compile/download fallback exists. A type from a different already-loaded assembly fails closed and asks for a fresh process.
+
+This removes **20,786 bytes of actual PowerShell source** across the three runtimes (11,553 native helper, 8,846 wrapper, 387 helper server), retaining the real C# implementations in the separately compiled library. Surrounding exception/log/load-flag behavior and native-helper DPI initialization remain. The production wrapper/server loader definitions are exercised in separate PowerShell 5.1 processes by the next exact-commit CI, without invoking desktop methods.

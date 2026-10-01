@@ -27,3 +27,5 @@ Cases cover English/Korean keywords, macro casing, multiple categories, force,
 null/empty input, NUL and UTF-16/emoji truncation boundaries. Exact whole-result
 comparison is required before removing any old PS function body. Linux pure tests
 are useful but cannot establish Windows PowerShell/.NET serialization parity.
+
+The 57 exact differential cases passed on Windows at checkpoint `2934645`, run `36890543863`. The current PS classifier is a checked compatibility bridge, and its private truncation helper has been removed. The same suite now compares the retained bridge against the pinned original and verifies a missing native host throws without producing a low-risk result. This new bridge still requires its own exact-commit Windows qualification.

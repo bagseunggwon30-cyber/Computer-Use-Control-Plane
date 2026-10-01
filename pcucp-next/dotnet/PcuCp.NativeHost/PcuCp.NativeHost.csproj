@@ -9,4 +9,7 @@
     <AssemblyName>PcuCp.NativeHost</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="LegacyWorkflowKernel.cs" />
+  </ItemGroup>
 </Project>

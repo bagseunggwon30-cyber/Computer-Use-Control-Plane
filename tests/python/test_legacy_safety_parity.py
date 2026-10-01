@@ -86,6 +86,47 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
                     self.assertEqual(after['status'], 'ok', after)
                     self.assertEqual(after['data'], before)
 
+    def test_retained_powershell_classifier_bridge_matches_pinned(self):
+        cases = [case for case in safety_cases() if case['operation'] == 'safety-classify']
+        original = subprocess.check_output(['git', 'show', f'{BASELINE_TREE}:scripts/cucp.ps1'], cwd=ROOT)
+        with tempfile.TemporaryDirectory(prefix='CUCP classifier bridge 한글 ') as temp:
+            root = Path(temp)
+            source, inputs, runner = root / 'original.ps1', root / 'cases.json', root / 'runner.ps1'
+            source.write_bytes(original)
+            inputs.write_text(json.dumps(cases, ensure_ascii=True), encoding='utf-8-sig')
+            runner.write_text(r"""
+param([string]$SourcePath, [string]$InputPath, [switch]$Bridge)
+$ErrorActionPreference='Stop'
+[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+$tokens=$null; $errors=$null
+$ast=[Management.Automation.Language.Parser]::ParseFile($SourcePath,[ref]$tokens,[ref]$errors)
+if ($errors.Count) { throw 'Source did not parse' }
+$names=@('_Safety-Truncate','_Classify-SafetyFromText')
+if ($Bridge) { $names=@('_Invoke-LegacyCompatibility','_Classify-SafetyFromText') }
+foreach ($name in $names) {
+  $function=@($ast.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name},$true))
+  if ($function.Count -ne 1) { throw "Expected one exact function: $name" }
+  . ([scriptblock]::Create($function[0].Extent.Text))
+}
+$results=New-Object Collections.ArrayList
+foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json)) {
+  [void]$results.Add((_Classify-SafetyFromText -Text $case.args.text -MacroName $case.args.macro))
+}
+[Console]::Out.WriteLine((ConvertTo-Json -InputObject @($results) -Depth 32 -Compress))
+""", encoding='utf-8-sig')
+            command = ['powershell.exe', '-NoProfile', '-NonInteractive', '-File', str(runner), '-InputPath', str(inputs)]
+            before = subprocess.run([*command, '-SourcePath', str(source)], capture_output=True, timeout=30)
+            self.assertEqual(before.returncode, 0, before.stderr.decode(errors='replace'))
+            after = subprocess.run([*command, '-SourcePath', str(ROOT/'scripts/cucp.ps1'), '-Bridge'],
+                env={**os.environ, 'CUCP_NATIVE_HOST': os.environ['CUCP_NATIVE_TEST_HOST']}, capture_output=True, timeout=90)
+            self.assertEqual(after.returncode, 0, after.stderr.decode(errors='replace'))
+            self.assertEqual(json.loads(after.stdout.decode('utf-8-sig')), json.loads(before.stdout.decode('utf-8-sig')))
+            # A missing matching host must throw, never manufacture a low-risk reply.
+            failed = subprocess.run([*command, '-SourcePath', str(ROOT/'scripts/cucp.ps1'), '-Bridge'],
+                env={**os.environ, 'CUCP_NATIVE_HOST': str(root/'missing.dll')}, capture_output=True, timeout=10)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertEqual(failed.stdout, b'')
+
     def test_malformed_safety_input_does_not_return_low_risk(self):
         for args in ({'text': 1}, {'text': 'password', 'bypass': True}, {'macro': 'x' * 129}):
             request = {'schema': 'cucp.legacy-compat/v1', 'operation': 'safety-classify', 'args': args}

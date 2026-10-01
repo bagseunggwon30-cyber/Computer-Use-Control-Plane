@@ -18,6 +18,9 @@ internal static class LegacyCompatibilityDispatcher
         {
             "safety-classify" => LegacySafetyKernel.Classify(args),
             "safety-truncate" => LegacySafetyKernel.Truncate(args),
+            "coord-map" => LegacyCoordinateKernel.Map(args),
+            "strategy-score" => LegacyStrategyKernel.Score(args),
+            "strategy-normalize" => LegacyStrategyKernel.Normalize(args),
             _ => throw CommandOptions.Invalid("Unsupported pure compatibility operation.")
         };
     }

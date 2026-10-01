@@ -16,7 +16,7 @@ This feature branch starts from published `9ffa354b9904235835a7bc6eb78ed8d3d7631
 
 ## Retained legacy families and next work
 
-[Machine-readable function inventory](legacy-function-inventory.json) enumerates all 298 retained top-level PowerShell functions across the three runtime scripts, with source locations. It is a navigation inventory, not a claim every helper is an externally exposed feature. Embedded C# and helper-server dispatch remain in those files until migrated and verified.
+[Machine-readable function inventory](legacy-function-inventory.json) enumerates the retained top-level PowerShell functions across the three runtime scripts, with source locations. It is a navigation inventory, not a claim every helper is an externally exposed feature. The inventory also records qualified retirements; remaining helper-server dispatch is still legacy.
 
 | Legacy family | Current route | Missing before parity / next ownership |
 |---|---|---|
@@ -69,7 +69,7 @@ new subsets are absent. No PowerShell implementation was removed in this stage.
 | OCR matching/fusion and image diff | Deterministic Python normalization/scoring/n-grams, explicit geometry fusion, bounded PNG/pixel differences | All app-specific targeting heuristics, fuzzy auto-actuation and legacy external image formats |
 | Universal host contracts | Same 40 tools over MCP and JSONL, schema-derived preflight, generated checked-in JSON schema, source CLI entry points | Tool-capable host required; this does not retrofit tools into an arbitrary closed chat UI |
 
-This branch adds genuine implementations. It removes **zero** legacy functions: all 298 remain in their original files. This intentionally avoids presenting an incomplete port as a language-statistics success. The new runtime and portable package do not invoke those files; source-only `legacy` remains an explicit compatibility route. CDP/vision providers, true IME/clipboard workflows, broader process/registry/system macros, autostart/helper compatibility, installer/elevation flows and remaining PowerShell tests must still be migrated and validated before full legacy retirement.
+At this historical stage the branch had added implementations but removed **zero** legacy functions: all 298 still remained. Later retirement is recorded below. This intentionally avoids presenting an incomplete port as a language-statistics success. The new runtime and portable package do not invoke those files; source-only `legacy` remains an explicit compatibility route. CDP/vision providers, true IME/clipboard workflows, broader process/registry/system macros, autostart/helper compatibility, installer/elevation flows and remaining PowerShell tests must still be migrated and validated before full legacy retirement.
 
 Validation of contracts on Linux does not prove interactive Windows behavior. CI's Windows native/portable tests cover builds and protocol/package execution; manual UIA/OCR/input/IME/mixed-DPI/parent-crash acceptance remains required. See [workflow migration](workflow-migration.md), [observation migration](observation-migration.md) and the native contract for exact semantics.
 
@@ -94,3 +94,16 @@ The user-scope installer was also migrated to Python after its actual Windows Un
 The shared interface now has 52 tools, including twelve optional CDP operations. Browser endpoints are configured only by the human at startup, numeric-loopback and exact-origin restricted; no scan or debugging enablement is performed. Read discovery/query/search uses DOM protocol methods; eval/click/type/ProseMirror require immutable live authority and fresh target/document/element references. Cancellation interrupts owned sockets, and native/browser mutations invalidate the other route's snapshots. No browser account or model provider is required.
 
 Local mock-network/adapter tests pass. A separate opt-in CI suite launches an owned fresh headless browser profile against local fixture pages with the sandbox enabled; no existing profile or user desktop is used. The dot Linux workspace's browser launch was blocked by its AF_UNIX restriction before assertions, so no local real-browser pass is claimed. CDP legacy wrappers remain until compatibility and real-browser evidence justify their removal.
+
+
+## Stage five: compiled interop and safety body retirement
+
+Checkpoint `293464549f93411f02c8f409822157b9a8cd87b7`, run `36890543863`, passed all four jobs: core, Windows native/contracts, relocated portable, and seven fresh-profile sandboxed Chrome fixture tests. This includes exact 57-case safety classifier parity and the compiled interop's 301 public API/PInvoke/marshalling/ABI entries plus PowerShell 5.1 load qualification. No desktop method was invoked by the interop comparison.
+
+After that qualification, all three embedded C# interop definitions move out of the PS runtimes into the compiled `PcuCp.LegacyInterop` net48 library. The remaining PS loader functions preserve surrounding initialization behavior, load only the explicit matching DLL, and reject a previously loaded conflicting definition. This removes **20,786 further PS bytes**. Actual retained wrapper/server loader fixtures are added for the next exact-commit Windows run; interactive DPI/input effects are still not claimed.
+
+The qualified safety classifier body now delegates to the closed native compatibility registry; its private truncation helper is retired. Missing, old, failed or malformed native replies throw rather than classifying an action as safe. An actual retained-PS-bridge differential is added alongside the original 57 kernel cases. The new source legacy route needs the matching native host and compiled interop DLL. Core/portable routes remain direct Python/C#.
+
+Current all-tracked-PS measurement: **29,343 bytes removed**, `1,013,478` → `984,135`. This is actual source replacement, including bridge overhead, not denominator growth. No source is hidden, renamed to influence statistics, or copied into an archive in the current tree. These figures do not imply full feature parity or zero PowerShell.
+
+The next qualification-only candidates are captured-input coordinate math and literal workflow planning. Original coordinate acquisition/math remains until its 115 Windows differential fixtures pass. The workflow candidate is excluded from the shipped native host: broad PowerShell parser-language parity is explicitly unresolved, and its original parser/production dispatcher remain intact. Full parser qualification must pass before any replacement.

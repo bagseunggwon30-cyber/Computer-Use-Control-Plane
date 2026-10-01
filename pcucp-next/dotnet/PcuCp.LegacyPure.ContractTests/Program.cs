@@ -33,4 +33,6 @@ Reject(() => LegacySafetyKernel.Classify(Args(new { text = 1 })), "Non-string sa
 Reject(() => LegacySafetyKernel.Classify(Args(new { text = new string('x', 262145) })), "Unbounded input accepted");
 Reject(() => LegacySafetyKernel.Classify(Args(new { text = "password", disable = true })), "Unknown safety bypass accepted");
 Reject(() => LegacySafetyKernel.TruncateValue("x", -1), "Negative truncate accepted");
-Console.WriteLine($"PASS: {count} pure legacy safety checks; no PowerShell or OS actions executed.");
+CoordinateContractChecks.Run(Check);
+StrategyContractChecks.Run(Check);
+Console.WriteLine($"PASS: {count} pure legacy safety/coordinate/strategy checks; no PowerShell or OS actions executed.");

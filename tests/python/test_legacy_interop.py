@@ -153,5 +153,35 @@ if ($target -ne '.NETFramework,Version=v4.8') { throw "Wrong framework: $target"
             self.assertIn("PASS: PowerShell 5.1", text)
 
 
+    def test_production_loader_definitions_load_compiled_types_without_runtime_compilation(self):
+        candidate = Path(os.environ["CUCP_LEGACY_INTEROP_TEST_DLL"]).resolve()
+        powershell = shutil.which("powershell.exe")
+        for relative, type_name in (("scripts/cucp.ps1", "CucpWin32"), ("scripts/cucp-helper-server.ps1", "HelperWin32")):
+            with self.subTest(source=relative):
+                script = r'''
+$ErrorActionPreference = 'Stop'
+$tokens=$null; $errors=$null
+$ast=[Management.Automation.Language.Parser]::ParseFile($env:CUCP_LOADER_SOURCE,[ref]$tokens,[ref]$errors)
+if ($errors.Count) { throw 'Production script did not parse' }
+$found=@($ast.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq '_Ensure-Win32Loaded'},$true))
+if ($found.Count -ne 1) { throw 'Expected one exact loader' }
+if ($found[0].Extent.Text -match 'Add-Type.*TypeDefinition|public (static )?class') { throw 'Runtime compilation was not retired' }
+function Write-WrapperLog { param([string]$Message) throw $Message }
+function _Log { param([string]$Msg) throw $Msg }
+. ([scriptblock]::Create($found[0].Extent.Text))
+$script:_Win32Loaded=$false
+if (-not (_Ensure-Win32Loaded)) { throw 'Compiled loader failed' }
+$type=$env:CUCP_EXPECT_TYPE -as [type]
+if ($null -eq $type -or $type.Assembly.GetName().Name -ne 'PcuCp.LegacyInterop') { throw 'Wrong compiled assembly binding' }
+if (-not (_Ensure-Win32Loaded)) { throw 'Repeated loader failed' }
+[Console]::Out.WriteLine('PASS: production compiled loader, no desktop APIs called.')
+'''
+                encoded=base64.b64encode(script.encode("utf-16le")).decode("ascii")
+                text=self.run_checked([powershell,"-NoProfile","-NonInteractive","-EncodedCommand",encoded],
+                    env={**os.environ,"CUCP_LEGACY_INTEROP_DLL":str(candidate),"CUCP_LOADER_SOURCE":str(ROOT/relative),"CUCP_EXPECT_TYPE":type_name})
+                self.assertIn("PASS: production compiled loader",text)
+
+
+
 if __name__ == "__main__":
     unittest.main()

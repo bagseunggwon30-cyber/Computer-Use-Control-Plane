@@ -1791,271 +1791,16 @@ $Script:_Win32Loaded = $false
 function _Ensure-Win32Loaded {
   if ($Script:_Win32Loaded) { return $true }
   try {
-    $sig = @"
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Text;
-
-public static class CucpWin32 {
-  public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
-
-  [DllImport("user32.dll")]
-  public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-
-  [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-  public static extern int GetWindowTextLength(IntPtr hWnd);
-
-  [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-  public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
-
-  [DllImport("user32.dll")]
-  public static extern bool IsWindowVisible(IntPtr hWnd);
-
-  [DllImport("user32.dll")]
-  public static extern bool IsIconic(IntPtr hWnd);
-
-  [DllImport("user32.dll", SetLastError = true)]
-  public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-
-  [DllImport("user32.dll")]
-  public static extern IntPtr GetForegroundWindow();
-
-  public const uint GA_ROOT = 2;
-
-  [StructLayout(LayoutKind.Sequential)]
-  public struct POINT { public int X; public int Y; }
-
-  [DllImport("user32.dll")]
-  public static extern IntPtr WindowFromPoint(POINT point);
-
-  [DllImport("user32.dll")]
-  public static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
-
-  [DllImport("user32.dll", CharSet = CharSet.Auto)]
-  public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
-
-  [StructLayout(LayoutKind.Sequential)]
-  public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
-
-  [DllImport("user32.dll")]
-  public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-
-  public class WindowInfo {
-    public IntPtr Hwnd;
-    public IntPtr ChildHwnd;
-    public string Title;
-    public string ClassName;
-    public uint Pid;
-    public string ProcessName;
-    public bool Visible;
-    public bool Minimized;
-    public bool Foreground;
-    public int X; public int Y; public int Width; public int Height;
-  }
-
-  public class MonitorInfo {
-    public string DeviceName;
-    public bool Primary;
-    public int X; public int Y; public int Width; public int Height;
-    public int WorkX; public int WorkY; public int WorkWidth; public int WorkHeight;
-    public uint DpiX; public uint DpiY;
-    public double ScaleX; public double ScaleY;
-  }
-
-  public class VirtualScreenInfo {
-    public int X; public int Y; public int Width; public int Height;
-    public int MonitorCount;
-    public bool SameDisplayFormat;
-  }
-
-  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-  public struct MONITORINFOEX {
-    public int cbSize;
-    public RECT rcMonitor;
-    public RECT rcWork;
-    public uint dwFlags;
-    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
-    public string szDevice;
-  }
-
-  public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
-
-  [DllImport("user32.dll")]
-  public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
-
-  [DllImport("user32.dll", CharSet = CharSet.Auto)]
-  public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFOEX lpmi);
-
-  [DllImport("user32.dll")]
-  public static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
-
-  [DllImport("user32.dll")]
-  public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
-
-  [DllImport("user32.dll")]
-  public static extern int GetSystemMetrics(int nIndex);
-
-  [DllImport("shcore.dll")]
-  public static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
-
-  [DllImport("user32.dll")]
-  public static extern uint GetDpiForWindow(IntPtr hwnd);
-
-  public static MonitorInfo BuildMonitorInfo(IntPtr hMonitor) {
-    var mi = new MONITORINFOEX();
-    mi.cbSize = Marshal.SizeOf(typeof(MONITORINFOEX));
-    if (!GetMonitorInfo(hMonitor, ref mi)) return null;
-    uint dx = 96, dy = 96;
-    try { GetDpiForMonitor(hMonitor, 0, out dx, out dy); } catch { dx = 96; dy = 96; }
-    return new MonitorInfo {
-      DeviceName = mi.szDevice,
-      Primary = ((mi.dwFlags & 1) == 1),
-      X = mi.rcMonitor.Left,
-      Y = mi.rcMonitor.Top,
-      Width = mi.rcMonitor.Right - mi.rcMonitor.Left,
-      Height = mi.rcMonitor.Bottom - mi.rcMonitor.Top,
-      WorkX = mi.rcWork.Left,
-      WorkY = mi.rcWork.Top,
-      WorkWidth = mi.rcWork.Right - mi.rcWork.Left,
-      WorkHeight = mi.rcWork.Bottom - mi.rcWork.Top,
-      DpiX = dx,
-      DpiY = dy,
-      ScaleX = Math.Round(dx / 96.0, 4),
-      ScaleY = Math.Round(dy / 96.0, 4)
-    };
-  }
-
-  public static List<MonitorInfo> EnumerateMonitors() {
-    var result = new List<MonitorInfo>();
-    EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, delegate (IntPtr hMonitor, IntPtr hdc, ref RECT rc, IntPtr data) {
-      try {
-        var info = BuildMonitorInfo(hMonitor);
-        if (info != null) result.Add(info);
-      } catch { }
-      return true;
-    }, IntPtr.Zero);
-    return result;
-  }
-
-  public static MonitorInfo MonitorFromScreenPointInfo(int x, int y) {
-    POINT pt = new POINT { X = x, Y = y };
-    IntPtr h = MonitorFromPoint(pt, 2);
-    if (h == IntPtr.Zero) return null;
-    return BuildMonitorInfo(h);
-  }
-
-  public static MonitorInfo MonitorFromWindowInfo(IntPtr hwnd) {
-    IntPtr h = MonitorFromWindow(hwnd, 2);
-    if (h == IntPtr.Zero) return null;
-    return BuildMonitorInfo(h);
-  }
-
-  public static uint GetWindowDpiValue(IntPtr hwnd) {
-    try { return GetDpiForWindow(hwnd); } catch { return 0; }
-  }
-
-  public static VirtualScreenInfo GetVirtualScreenInfo() {
-    return new VirtualScreenInfo {
-      X = GetSystemMetrics(76),
-      Y = GetSystemMetrics(77),
-      Width = GetSystemMetrics(78),
-      Height = GetSystemMetrics(79),
-      MonitorCount = GetSystemMetrics(80),
-      SameDisplayFormat = (GetSystemMetrics(81) != 0)
-    };
-  }
-
-  public static WindowInfo GetWindowInfo(IntPtr root, IntPtr child) {
-    if (root == IntPtr.Zero) return null;
-    int len = GetWindowTextLength(root);
-    var sb = new StringBuilder(Math.Max(256, len + 4));
-    GetWindowText(root, sb, sb.Capacity);
-    var title = sb.ToString();
-    var cb = new StringBuilder(256);
-    GetClassName(root, cb, cb.Capacity);
-    var cls = cb.ToString();
-    uint pid; GetWindowThreadProcessId(root, out pid);
-    string pname = "";
-    try { pname = Process.GetProcessById((int)pid).ProcessName; } catch { }
-    RECT r; GetWindowRect(root, out r);
-    return new WindowInfo {
-      Hwnd = root,
-      ChildHwnd = child,
-      Title = title,
-      ClassName = cls,
-      Pid = pid,
-      ProcessName = pname,
-      Visible = IsWindowVisible(root),
-      Minimized = IsIconic(root),
-      Foreground = (root == GetForegroundWindow()),
-      X = r.Left, Y = r.Top, Width = r.Right - r.Left, Height = r.Bottom - r.Top
-    };
-  }
-
-  public static WindowInfo WindowFromScreenPoint(int x, int y) {
-    POINT pt = new POINT { X = x, Y = y };
-    IntPtr child = WindowFromPoint(pt);
-    if (child == IntPtr.Zero) return null;
-    IntPtr root = GetAncestor(child, GA_ROOT);
-    if (root == IntPtr.Zero) root = child;
-    return GetWindowInfo(root, child);
-  }
-
-  public static List<WindowInfo> EnumerateTopLevel() {
-    var result = new List<WindowInfo>();
-    IntPtr fg = GetForegroundWindow();
-    EnumWindows(delegate (IntPtr hwnd, IntPtr lParam) {
-      try {
-        bool vis = IsWindowVisible(hwnd);
-        // skip non-visible windows for the default fast path. Caller can
-        // still enumerate hidden windows separately if needed.
-        if (!vis) return true;
-        int len = GetWindowTextLength(hwnd);
-        if (len <= 0) return true;
-        var sb = new StringBuilder(len + 4);
-        GetWindowText(hwnd, sb, sb.Capacity);
-        var title = sb.ToString();
-        if (string.IsNullOrWhiteSpace(title)) return true;
-        var cb = new StringBuilder(256);
-        GetClassName(hwnd, cb, cb.Capacity);
-        var cls = cb.ToString();
-        // skip well-known shell/system windows that pollute the list.
-        if (cls == "Progman" || cls == "WorkerW" || cls == "Shell_TrayWnd" ||
-            cls == "Shell_SecondaryTrayWnd" || cls == "TaskListThumbnailWnd" ||
-            cls == "ApplicationFrameWindow" && (title == "Settings" || title == "Microsoft Store") == false) {
-          // ApplicationFrameWindow는 UWP 컨테이너인데 진짜 사용자 창인 경우가 많아서
-          // title 기준으로만 제외하지 않음. Progman/WorkerW/Shell_TrayWnd만 hard skip.
-          if (cls == "Progman" || cls == "WorkerW" || cls == "Shell_TrayWnd" || cls == "Shell_SecondaryTrayWnd" || cls == "TaskListThumbnailWnd") {
-            return true;
-          }
-        }
-        uint pid; GetWindowThreadProcessId(hwnd, out pid);
-        string pname = "";
-        try { pname = Process.GetProcessById((int)pid).ProcessName; } catch { }
-        RECT r; GetWindowRect(hwnd, out r);
-        var info = new WindowInfo {
-          Hwnd = hwnd,
-          ChildHwnd = hwnd,
-          Title = title,
-          ClassName = cls,
-          Pid = pid,
-          ProcessName = pname,
-          Visible = vis,
-          Minimized = IsIconic(hwnd),
-          Foreground = (hwnd == fg),
-          X = r.Left, Y = r.Top, Width = r.Right - r.Left, Height = r.Bottom - r.Top
-        };
-        result.Add(info);
-      } catch { }
-      return true;
-    }, IntPtr.Zero);
-    return result;
-  }
-}
-"@
-    Add-Type -TypeDefinition $sig -Language CSharp -ErrorAction Stop
+    $interopPath = $env:CUCP_LEGACY_INTEROP_DLL
+    if (-not $interopPath) { $interopPath = Join-Path $PSScriptRoot '..\pcucp-next\bin\legacy\PcuCp.LegacyInterop.dll' }
+    $existing = 'CucpWin32' -as [type]
+    if ($existing -and $existing.Assembly.GetName().Name -ne 'PcuCp.LegacyInterop') {
+      throw 'A different legacy interop type is already loaded. Restart this PowerShell process with the matching runtime.'
+    }
+    if (-not $existing) {
+      if (-not (Test-Path -LiteralPath $interopPath -PathType Leaf)) { throw 'Legacy interop DLL missing. Run python pcucp-next/packaging/publish_legacy_interop.py or set CUCP_LEGACY_INTEROP_DLL.' }
+      Add-Type -LiteralPath $interopPath -ErrorAction Stop
+    }
     $Script:_Win32Loaded = $true
     return $true
   } catch {
@@ -2641,98 +2386,67 @@ function _Macro-NotImplemented {
   return 1
 }
 
-function _Safety-Truncate {
-  param([string]$Value, [int]$Max = 180)
-  if ($null -eq $Value) { return "" }
-  $s = "$Value"
-  if ($s.Length -le $Max) { return $s }
-  return $s.Substring(0, $Max) + "..."
+function _Invoke-LegacyCompatibility {
+  param([ValidateSet('safety-classify','coord-map')][string]$Operation, [hashtable]$Arguments)
+  # Compatibility only: pure logic now lives in bounded C# kernels. No shell or desktop calls.
+  $native = $env:CUCP_NATIVE_HOST
+  if (-not $native) { $native = Join-Path $PSScriptRoot '..\pcucp-next\bin\native\PcuCp.NativeHost.exe' }
+  $native = [System.IO.Path]::GetFullPath($native)
+  if (-not (Test-Path -LiteralPath $native -PathType Leaf)) {
+    throw 'Matching native runtime missing. Publish pcucp-next/packaging/publish_native.py or set CUCP_NATIVE_HOST to the matching executable/DLL.'
+  }
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $extension = [System.IO.Path]::GetExtension($native).ToLowerInvariant()
+  if ($extension -eq '.dll') {
+    $dotnet = Get-Command dotnet.exe -CommandType Application -ErrorAction Stop
+    if ($native.Contains('"') -or $native.Contains("`r") -or $native.Contains("`n")) { throw 'Invalid native DLL path' }
+    $psi.FileName = $dotnet.Source
+    $psi.Arguments = '"' + $native + '" legacy-compat'
+  } elseif ($extension -eq '.exe') {
+    $psi.FileName = $native
+    $psi.Arguments = 'legacy-compat'
+  } else { throw 'CUCP_NATIVE_HOST must be an executable or DLL, never a shell script.' }
+  $payload = @{schema='cucp.legacy-compat/v1'; operation=$Operation; args=$Arguments} | ConvertTo-Json -Depth 24 -Compress
+  $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
+  $bytes = $utf8.GetBytes($payload)
+  if ($bytes.Length -gt 1048576) { throw 'Legacy compatibility request exceeds 1 MiB.' }
+  $psi.UseShellExecute = $false
+  $psi.CreateNoWindow = $true
+  $psi.RedirectStandardInput = $true
+  $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError = $true
+  $psi.StandardOutputEncoding = $utf8
+  $psi.StandardErrorEncoding = $utf8
+  $process = New-Object System.Diagnostics.Process
+  $process.StartInfo = $psi
+  try {
+    [void]$process.Start()
+    $stdout = $process.StandardOutput.ReadToEndAsync()
+    $stderr = $process.StandardError.ReadToEndAsync()
+    $process.StandardInput.BaseStream.Write($bytes, 0, $bytes.Length)
+    $process.StandardInput.Close()
+    if (-not $process.WaitForExit(15000)) {
+      try { $process.Kill() } catch { }
+      throw 'Legacy compatibility operation timed out; no retry was attempted.'
+    }
+    $out = $stdout.GetAwaiter().GetResult()
+    $err = $stderr.GetAwaiter().GetResult()
+    if ($out.Length -gt 16777216 -or $err.Length -gt 65536) { throw 'Legacy compatibility response exceeds the protocol budget.' }
+    $response = $out | ConvertFrom-Json -ErrorAction Stop
+    if ($process.ExitCode -ne 0 -or $response.status -ne 'ok' -or $null -eq $response.data) {
+      throw ('Legacy compatibility operation failed; rebuild matching native runtime. ' + ($response.errors | ConvertTo-Json -Compress))
+    }
+    return $response.data
+  } finally { $process.Dispose() }
 }
 
 function _Classify-SafetyFromText {
   param([string]$Text, [string]$MacroName)
-
-  $raw = if ($Text) { "$Text" } else { "" }
-  $hay = ("$MacroName $raw").ToLowerInvariant()
-  $categories = New-Object System.Collections.ArrayList
-  $evidenceMatches = New-Object System.Collections.ArrayList
-  $score = 0
-
-  function _SafetyAdd {
-    param([string]$Category, [int]$Weight, [string]$Pattern, [string]$Reason)
-    if (-not $Category) { return }
-    $exists = $false
-    foreach ($c in @($categories)) {
-      if ("$($c.category)" -eq $Category) { $exists = $true; break }
-    }
-    if (-not $exists) {
-      [void]$categories.Add([pscustomobject]@{
-        category = $Category
-        weight = [int]$Weight
-        reason = $Reason
-      })
-    }
-    [void]$evidenceMatches.Add([pscustomobject]@{
-      category = $Category
-      pattern = $Pattern
-      reason = $Reason
-    })
-    $script:__cucpSafetyScore = [Math]::Max([int]$script:__cucpSafetyScore, [int]$Weight)
+  $result = _Invoke-LegacyCompatibility -Operation 'safety-classify' -Arguments @{text=$Text; macro=$MacroName}
+  if ($result.schema -ne 'cucp.safety-classify/v1' -or $result.status -ne 'ok' -or $result.requires_explicit_confirmation -isnot [bool] -or $result.blocked_by_default -isnot [bool]) {
+    throw 'Invalid safety classification response; live control remains blocked.'
   }
-
-  $script:__cucpSafetyScore = 0
-  $rules = @(
-    @{ category="credentials"; weight=85; pattern="password|passcode|otp|2fa|mfa|api[-_ ]?key|secret|token|private key|비밀번호|암호|인증번호|일회용|토큰|시크릿|api키|api 키"; reason="credential_or_secret_entry" },
-    @{ category="payment"; weight=80; pattern="payment|pay now|checkout|purchase|buy|subscribe|billing|credit card|card number|결제|구매|구독|카드|청구|계좌|입금|출금"; reason="payment_or_billing_action" },
-    @{ category="destructive"; weight=85; pattern="delete|remove|uninstall|format|wipe|factory reset|reset account|close account|deactivate|cancel subscription|drop database|삭제|제거|초기화|포맷|탈퇴|해지|폐기|영구|복구 불가"; reason="destructive_or_irreversible_action" },
-    @{ category="external_send"; weight=55; pattern="send|submit|post|publish|email|mail|telegram|slack|discord|dm|upload|share|발송|전송|제출|게시|공개|업로드|공유|메일|문자|카톡|텔레그램"; reason="external_send_or_publish_action" },
-    @{ category="identity_or_privacy"; weight=80; pattern="ssn|social security|passport|driver.?license|id card|resident registration|주민등록|여권|운전면허|신분증|개인정보|민감정보"; reason="identity_or_private_data" },
-    @{ category="system_change"; weight=70; pattern="registry|regedit|firewall|permission|admin|administrator|environment variable|system settings|레지스트리|방화벽|권한|관리자|환경변수"; reason="system_or_permission_change" },
-    @{ category="app_settings"; weight=50; pattern="settings|preferences|configuration|설정|환경설정|구성"; reason="application_settings_change" }
-  )
-  foreach ($rule in $rules) {
-    if ($hay -match $rule.pattern) {
-      _SafetyAdd -Category $rule.category -Weight ([int]$rule.weight) -Pattern "$($rule.pattern)" -Reason "$($rule.reason)"
-    }
-  }
-
-  switch ($MacroName) {
-    "registry" { _SafetyAdd -Category "system_change" -Weight 80 -Pattern "macro:registry" -Reason "registry_macro" }
-    "process" { _SafetyAdd -Category "system_change" -Weight 65 -Pattern "macro:process" -Reason "process_control_macro" }
-    "app-close" {
-      if ($hay -match "--force|force") { _SafetyAdd -Category "destructive" -Weight 70 -Pattern "macro:app-close --force" -Reason "forced_app_close" }
-    }
-    "notify" { _SafetyAdd -Category "external_send" -Weight 45 -Pattern "macro:notify" -Reason "notification_macro" }
-  }
-
-  foreach ($c in @($categories)) {
-    $score += [int]$c.weight
-  }
-  if ($score -gt 100) { $score = 100 }
-  if ($script:__cucpSafetyScore -gt $score) { $score = [int]$script:__cucpSafetyScore }
-  Remove-Variable -Name __cucpSafetyScore -Scope Script -ErrorAction SilentlyContinue
-
-  $risk = "none"
-  if ($score -ge 80) { $risk = "critical" }
-  elseif ($score -ge 65) { $risk = "high" }
-  elseif ($score -ge 45) { $risk = "medium" }
-  elseif ($score -gt 0) { $risk = "low" }
-
-  $requires = ($score -ge 45)
-  return [pscustomobject]@{
-    schema = "cucp.safety-classify/v1"
-    status = "ok"
-    macro = $MacroName
-    risk_level = $risk
-    risk_score = [int]$score
-    requires_explicit_confirmation = [bool]$requires
-    blocked_by_default = [bool]$requires
-    confirmation_flag = "--confirm-sensitive"
-    categories = @($categories)
-    matches = @($evidenceMatches)
-    input_preview = (_Safety-Truncate -Value $raw -Max 180)
-    recommended_action = if ($requires) { "Require explicit user confirmation before live control; prefer --dry-run/read-only planning first." } else { "No sensitive-action confirmation required by the local classifier." }
-  }
+  return $result
 }
 
 function Invoke-MacroSafetyClassify {

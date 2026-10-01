@@ -40,7 +40,8 @@ function Invoke-CapturedLegacy {
 }
 
 # Exercise the production SendInput check with an injected native API stub.
-$helperSource = Get-Content -LiteralPath $helperPath -Raw -Encoding UTF8
+$interopSource = Join-Path $repoRoot "pcucp-next/dotnet/PcuCp.LegacyInterop/CucpNative.cs"
+$helperSource = Get-Content -LiteralPath $interopSource -Raw -Encoding UTF8
 $checkedMethod = [regex]::Match($helperSource, '(?s)  private static void SendInputChecked\(INPUT\[\] inputs\) \{.*?\n  \}').Value
 if (-not $checkedMethod) { throw "SendInputChecked implementation missing" }
 if (-not ("CucpLegacyInputTestNative" -as [type])) {

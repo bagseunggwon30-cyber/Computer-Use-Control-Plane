@@ -69,23 +69,16 @@ $Script:_Win32Loaded = $false
 function _Ensure-Win32Loaded {
   if ($Script:_Win32Loaded) { return $true }
   try {
-    Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-using System.Text;
-public class HelperWin32 {
-  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-  [DllImport("user32.dll")] public static extern int GetWindowTextLength(IntPtr hWnd);
-  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
-  [DllImport("user32.dll")] public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
-  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
-  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-  public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
-  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
-}
-"@
+    $interopPath = $env:CUCP_LEGACY_INTEROP_DLL
+    if (-not $interopPath) { $interopPath = Join-Path $PSScriptRoot '..\pcucp-next\bin\legacy\PcuCp.LegacyInterop.dll' }
+    $existing = 'HelperWin32' -as [type]
+    if ($existing -and $existing.Assembly.GetName().Name -ne 'PcuCp.LegacyInterop') {
+      throw 'A different legacy interop type is already loaded. Restart this PowerShell process with the matching runtime.'
+    }
+    if (-not $existing) {
+      if (-not (Test-Path -LiteralPath $interopPath -PathType Leaf)) { throw 'Legacy interop DLL missing. Run python pcucp-next/packaging/publish_legacy_interop.py or set CUCP_LEGACY_INTEROP_DLL.' }
+      Add-Type -LiteralPath $interopPath -ErrorAction Stop
+    }
     $Script:_Win32Loaded = $true
     return $true
   } catch {
