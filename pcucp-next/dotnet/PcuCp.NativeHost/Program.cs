@@ -15,12 +15,12 @@ catch (Exception ex)
     return 2;
 }
 var command = args.Length > 0 ? args[0].ToLowerInvariant() : "version";
-if (command == "legacy-ocr-match")
+if (command is "legacy-ocr-match" or "legacy-compat")
 {
     // Pure compatibility entry: bounded stdin JSON, no shell, files or desktop API.
     try
     {
-        if (args.Length != 1) throw CommandOptions.Invalid("legacy-ocr-match accepts JSON on stdin only.");
+        if (args.Length != 1) throw CommandOptions.Invalid("Pure compatibility commands accept JSON on stdin only.");
         using var input = Console.OpenStandardInput();
         using var buffer = new MemoryStream();
         var chunk = new byte[8192];
@@ -37,7 +37,8 @@ if (command == "legacy-ocr-match")
         // a UTF-8 preamble. Accept exactly one leading BOM, never arbitrary data.
         var prefix = utf8.Length >= 3 && utf8[0] == 0xEF && utf8[1] == 0xBB && utf8[2] == 0xBF ? 3 : 0;
         using var document = JsonDocument.Parse(new UTF8Encoding(false, true).GetString(utf8, prefix, utf8.Length - prefix), new JsonDocumentOptions { MaxDepth = 32 });
-        Console.WriteLine(JsonSerializer.Serialize(NativeResult.Ok(command, LegacyOcrMatcher.Match(document.RootElement)), NativeDispatcher.JsonOptions));
+        var data = command == "legacy-ocr-match" ? LegacyOcrMatcher.Match(document.RootElement) : LegacyCompatibilityDispatcher.Execute(document.RootElement);
+        Console.WriteLine(JsonSerializer.Serialize(NativeResult.Ok(command, data), NativeDispatcher.JsonOptions));
         return 0;
     }
     catch (Exception ex)

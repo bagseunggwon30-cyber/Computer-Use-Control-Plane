@@ -167,7 +167,8 @@ def check_health(plan, *, run=subprocess.run):
         if plan['backend'] == 'legacy':
             healthy = 'ok health' in result.stdout or 'passed=' in result.stdout
         else:
-            healthy = result.returncode == 0 and json.loads(result.stdout).get('status') == 'ok'
+            payload = json.loads(result.stdout)
+            healthy = result.returncode == 0 and isinstance(payload, dict) and payload.get('status') == 'ok'
         return healthy, 'health check passed' if healthy else 'health check did not confirm readiness'
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return False, 'health check unavailable or timed out; inspect the selected backend'

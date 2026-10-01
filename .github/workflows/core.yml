@@ -54,7 +54,30 @@ jobs:
           $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
           python -m unittest discover -s tests/python -p test_native_session.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Legacy OCR pure algorithm and bridge differential
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
           python -m unittest discover -s tests/python -p test_legacy_ocr_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Legacy safety confirmation-policy differential
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          dotnet run --project pcucp-next/dotnet/PcuCp.LegacyPure.ContractTests -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          python -m unittest discover -s tests/python -p test_legacy_safety_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compiled legacy interop API and ABI qualification
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          python pcucp-next/packaging/publish_legacy_interop.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CUCP_LEGACY_INTEROP_TEST_DLL = (Resolve-Path 'pcucp-next/bin/legacy/PcuCp.LegacyInterop.dll').Path
+          python -m unittest discover -s tests/python -p test_legacy_interop.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - shell: pwsh
         run: |

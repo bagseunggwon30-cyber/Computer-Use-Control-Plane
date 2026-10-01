@@ -144,7 +144,8 @@ class CdpBrowserTests(unittest.TestCase):
                                    env=env, close_fds=True)
         self.resources.callback(_stop_owned_browser, process)
         self.endpoint = None
-        deadline = time.monotonic() + 20
+        deadline = time.monotonic() + 60
+        phase = "waiting for owned browser DevToolsActivePort"
         last_error = None
         while time.monotonic() < deadline:
             if process.poll() is not None:
@@ -157,11 +158,13 @@ class CdpBrowserTests(unittest.TestCase):
                 if lines and lines[0].isdigit() and 1 <= int(lines[0]) <= 65535:
                     self.endpoint = 'http://127.0.0.1:' + lines[0]
             if self.endpoint:
+                phase = "waiting for exact local fixture target"
                 probe = CdpAdapter(self.endpoint, timeout_s=2)
                 try:
                     targets = probe.execute('cdp-detect')['targets']
                     matching = [item for item in targets if item['url'] == self.fixture_url]
                     if len(matching) == 1:
+                        phase = "waiting for fixture readiness sentinel"
                         observed = probe.execute('cdp-observe', {'target_id': matching[0]['id']})
                         if any(node['attributes'].get('id') == 'fixture-ready' for node in observed['nodes']):
                             self.target_id = matching[0]['id']
@@ -172,7 +175,7 @@ class CdpBrowserTests(unittest.TestCase):
                     probe.close()
             time.sleep(.05)  # Only startup reads are retried; never a browser mutation.
         log.seek(0)
-        raise RuntimeError(f'Owned sandboxed Chrome was not ready in 20 seconds ({last_error}): ' +
+        raise RuntimeError(f'Owned sandboxed Chrome was not ready in 60 seconds (phase={phase}, endpoint_present={self.endpoint is not None}, child_exit={process.poll()}, last_error={last_error}): ' +
                            log.read(8192).decode('utf-8', errors='replace'))
 
     def adapter(self, live=False):

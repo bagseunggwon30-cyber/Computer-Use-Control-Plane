@@ -127,6 +127,12 @@ class InstallerTests(unittest.TestCase):
         def failed(*args, **kwargs): raise OSError('not installed')
         self.assertFalse(installer.check_health(self.plan(), run=failed)[0])
 
+    def test_nonobject_doctor_json_is_nonfatal_warning(self):
+        for output in ('[]', 'null', 'true', '"unexpected"', '42'):
+            def run(argv, **kwargs):
+                return subprocess.CompletedProcess(argv, 0, stdout=output, stderr='')
+            self.assertFalse(installer.check_health(self.plan('core'), run=run)[0])
+
     def test_cli_no_apply_never_installs_or_runs_health(self):
         with patch('sys.stdout'), patch.object(installer.sys, 'platform', 'win32'), patch.object(installer, 'install') as install, patch.object(installer, 'check_health') as health:
             result = installer.main(['--root', str(self.root), '--bin-dir', str(self.bin)])
@@ -173,7 +179,10 @@ class InstallerTests(unittest.TestCase):
             result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', timeout=15)
             self.assertEqual(result.returncode, 37, result.stderr)
             forwarded = json.loads(result.stdout)
-            self.assertEqual(forwarded[:5], ['--root', str(self.root), '--backend', backend or 'legacy', '--apply'])
+            self.assertEqual(forwarded[0], '--root')
+            # PSScriptRoot expands RUNNER~1 TEMP aliases; verify filesystem identity.
+            self.assertTrue(Path(forwarded[1]).samefile(self.root))
+            self.assertEqual(forwarded[2:5], ['--backend', backend or 'legacy', '--apply'])
             self.assertIn('--no-path-shim', forwarded)
             self.assertIn('--quiet', forwarded)
             self.assertEqual(forwarded[forwarded.index('--bin-dir') + 1], str(self.bin))
