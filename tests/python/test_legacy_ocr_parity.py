@@ -89,6 +89,18 @@ foreach ($case in $cases) {
                     self.assertEqual(response['status'], 'ok', response)
                     self.assertEqual(response['data']['candidates'], before['candidates'])
                     self.assertEqual(response['data']['candidate_count'], before['candidate_count'])
+            # The retained PS entry point must actually route through the new
+            # stdin bridge, preserving arrays/UTF-8 and native output shape.
+            bridge_runner = root/'bridge.ps1'
+            bridge_runner.write_text(runner.read_text(encoding='utf-8-sig').replace(
+                "@('_Normalize-OcrText','_Levenshtein-Distance','_Similarity-Percent','_Score-OcrText','_Match-OcrCandidates')",
+                "@('_Match-OcrCandidates')"), encoding='utf-8-sig')
+            bridged = subprocess.run([powershell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(bridge_runner),
+                '-SourcePath', str(ROOT/'scripts/cucp-native-helper.ps1'), '-InputPath', str(inputs)],
+                env={**os.environ, 'CUCP_NATIVE_HOST': str(host)}, capture_output=True, timeout=90)
+            self.assertEqual(bridged.returncode, 0, bridged.stderr.decode('utf-8', errors='replace'))
+            self.assertEqual(json.loads(bridged.stdout.decode('utf-8-sig')), expected)
+
 
     def test_kernel_rejects_malformed_and_oversized_stdin(self):
         host = Path(os.environ['CUCP_NATIVE_TEST_HOST'])

@@ -72,3 +72,16 @@ new subsets are absent. No PowerShell implementation was removed in this stage.
 This branch adds genuine implementations. It removes **zero** legacy functions: all 298 remain in their original files. This intentionally avoids presenting an incomplete port as a language-statistics success. The new runtime and portable package do not invoke those files; source-only `legacy` remains an explicit compatibility route. CDP/vision providers, true IME/clipboard workflows, broader process/registry/system macros, autostart/helper compatibility, installer/elevation flows and remaining PowerShell tests must still be migrated and validated before full legacy retirement.
 
 Validation of contracts on Linux does not prove interactive Windows behavior. CI's Windows native/portable tests cover builds and protocol/package execution; manual UIA/OCR/input/IME/mixed-DPI/parent-crash acceptance remains required. See [workflow migration](workflow-migration.md), [observation migration](observation-migration.md) and the native contract for exact semantics.
+
+
+## Stage four: qualified legacy logic retirement
+
+The five original pure OCR matching helpers were compared on Windows PowerShell 5.1 against a bounded C# kernel using 56 ASCII/Korean/Unicode, fuzzy, phrase and equal-score cases. The first comparison caught real differences in Windows NLS versus modern ICU and pre-.NET4.5 quicksort tie ordering. Those semantics were preserved; the original strict differential assertions passed in run `36885457144` on commit `1eba388f3f8774ac02564fa526307a425bf07f95`. That run's separate installer fixture failed, so the run as a whole was **not** green.
+
+After that proof, `_Normalize-OcrText`, `_Levenshtein-Distance`, `_Similarity-Percent` and `_Score-OcrText` are retired from the current PS helper source. `_Match-OcrCandidates` delegates bounded JSON over stdin to the matching native runtime, with no shell, evaluation, model or desktop call. All geometry keys and candidate order are preserved for legacy callers. The new actual bridge is covered by the same Windows differential suite before merge.
+
+Measured runtime PS reduction at this point: **3,379 bytes**, from `858,937` to `855,558` across the three runtime scripts; current retained top-level functions: **294**. The original algorithms remain only in normal Git history, which the differential test reads temporarily. Nothing is hidden from language statistics.
+
+Legacy OCR callers now require a matching `PcuCp.NativeHost.exe` published to `pcucp-next/bin/native` or an explicit `CUCP_NATIVE_HOST` executable/DLL. A DLL needs .NET available. A missing/old runtime fails closed; the retired algorithms are not silently restored. New MCP/JSONL OCR tools already use Python/C# directly and do not use this compatibility bridge.
+
+Native NLS semantics follow [Microsoft's comparison/search API](https://learn.microsoft.com/en-us/windows/win32/api/winnls/nf-winnls-findnlsstringex); legacy tie ordering follows the [documented runtime compatibility branch in .NET reference source](https://github.com/microsoft/referencesource/blob/main/mscorlib/system/collections/generic/arraysorthelper.cs). This compatibility kernel deliberately does not replace the safer modern matcher’s explicit ambiguity reporting.

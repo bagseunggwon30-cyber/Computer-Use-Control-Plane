@@ -1,6 +1,6 @@
 {
   "baseline_commit": "8a8426ae5319e71fd9a3655e04a99ef291fbb51e",
-  "note": "Inventory of retained legacy sources after safety fixes. Function names and source lines are navigation aids, not parity claims. See migration-matrix.md for replacement scope.",
+  "note": "Current retained legacy functions, after validated retirement of four pure OCR helpers and replacement of matching body by a bounded native bridge. Baseline source remains in normal Git history.",
   "files": [
     {
       "path": "scripts/cucp-helper-server.ps1",
@@ -54,7 +54,7 @@
     },
     {
       "path": "scripts/cucp-native-helper.ps1",
-      "lines": 4560,
+      "lines": 4442,
       "functions": [
         {
           "name": "_Ensure-Win32Native",
@@ -81,248 +81,232 @@
           "line": 634
         },
         {
-          "name": "_Normalize-OcrText",
+          "name": "_Capture-ScreenRegionToTempPng",
           "line": 685
         },
         {
-          "name": "_Levenshtein-Distance",
-          "line": 696
-        },
-        {
-          "name": "_Similarity-Percent",
-          "line": 722
-        },
-        {
-          "name": "_Score-OcrText",
-          "line": 734
-        },
-        {
-          "name": "_Capture-ScreenRegionToTempPng",
-          "line": 778
-        },
-        {
           "name": "_Match-OcrCandidates",
-          "line": 831
+          "line": 738
         },
         {
           "name": "_Get-UiaSupportedPatternName",
-          "line": 910
+          "line": 792
         },
         {
           "name": "_New-UiaMatchPayload",
-          "line": 928
+          "line": 810
         },
         {
           "name": "_Get-RoleWeight",
-          "line": 956
+          "line": 838
         },
         {
           "name": "_Clamp-UiaPointToRect",
-          "line": 966
+          "line": 848
         },
         {
           "name": "_Get-UiaPreferredClickPoint",
-          "line": 995
+          "line": 877
         },
         {
           "name": "_Resolve-UiaPointRefinement",
-          "line": 1016
+          "line": 898
         },
         {
           "name": "_Find-SmallestUiaElementAtPoint",
-          "line": 1085
+          "line": 967
         },
         {
           "name": "_Resolve-OcrUiaFusionCandidate",
-          "line": 1109
+          "line": 991
         },
         {
           "name": "_Cdp-HttpGet",
-          "line": 1186
+          "line": 1068
         },
         {
           "name": "_Cdp-WsCall",
-          "line": 1210
+          "line": 1092
         },
         {
           "name": "_Cdp-PortOpen",
-          "line": 1272
+          "line": 1154
         },
         {
           "name": "_Cdp-NewDomBridgePlan",
-          "line": 1291
+          "line": 1173
         },
         {
           "name": "_Cdp-Detect",
-          "line": 1358
+          "line": 1240
         },
         {
           "name": "_Emit",
-          "line": 1409
+          "line": 1291
         },
         {
           "name": "_Action-Health",
-          "line": 1431
+          "line": 1313
         },
         {
           "name": "_Action-Windows",
-          "line": 1462
+          "line": 1344
         },
         {
           "name": "_Action-Focused",
-          "line": 1496
+          "line": 1378
         },
         {
           "name": "_Action-Focus",
-          "line": 1517
+          "line": 1399
         },
         {
           "name": "_Action-Screenshot",
-          "line": 1552
+          "line": 1434
         },
         {
           "name": "_Test-CoordsInTarget",
-          "line": 1622
+          "line": 1504
         },
         {
           "name": "_Action-HitTest",
-          "line": 1675
+          "line": 1557
         },
         {
           "name": "_Action-HitScan",
-          "line": 1755
+          "line": 1637
         },
         {
           "name": "_Cdp-ScorePages",
-          "line": 1924
+          "line": 1806
         },
         {
           "name": "_Cdp-FindPage",
-          "line": 1991
+          "line": 1873
         },
         {
           "name": "_Js-StringLiteral",
-          "line": 2023
+          "line": 1905
         },
         {
           "name": "_Cdp-RunSmartDomAction",
-          "line": 2029
+          "line": 1911
         },
         {
           "name": "_Action-CdpDetect",
-          "line": 2432
+          "line": 2314
         },
         {
           "name": "_Action-CdpEval",
-          "line": 2461
+          "line": 2343
         },
         {
           "name": "_Action-CdpType",
-          "line": 2533
+          "line": 2415
         },
         {
           "name": "_Action-CdpClick",
-          "line": 2644
+          "line": 2526
         },
         {
           "name": "_Action-CdpSmartClick",
-          "line": 2686
+          "line": 2568
         },
         {
           "name": "_Action-CdpSmartFind",
-          "line": 2690
+          "line": 2572
         },
         {
           "name": "_Action-CdpSmartTypeFind",
-          "line": 2694
+          "line": 2576
         },
         {
           "name": "_Action-CdpSmartType",
-          "line": 2698
+          "line": 2580
         },
         {
           "name": "_Action-Click",
-          "line": 2708
+          "line": 2590
         },
         {
           "name": "_Assert-ForegroundTarget",
-          "line": 2808
+          "line": 2690
         },
         {
           "name": "_Action-Type",
-          "line": 2840
+          "line": 2722
         },
         {
           "name": "_Action-Shortcut",
-          "line": 2871
+          "line": 2753
         },
         {
           "name": "_Action-UiaTree",
-          "line": 2920
+          "line": 2802
         },
         {
           "name": "_Action-UiaFind",
-          "line": 3002
+          "line": 2884
         },
         {
           "name": "_Action-UiaClick",
-          "line": 3121
+          "line": 3003
         },
         {
           "name": "_Resolve-UiaElement",
-          "line": 3154
+          "line": 3036
         },
         {
           "name": "_Action-UiaInvoke",
-          "line": 3254
+          "line": 3136
         },
         {
           "name": "_Action-UiaSetValue",
-          "line": 3345
+          "line": 3227
         },
         {
           "name": "_Action-UiaToggle",
-          "line": 3377
+          "line": 3259
         },
         {
           "name": "_Action-OcrImage",
-          "line": 3409
+          "line": 3291
         },
         {
           "name": "_Action-OcrScreen",
-          "line": 3440
+          "line": 3322
         },
         {
           "name": "_Action-OcrFindText",
-          "line": 3505
+          "line": 3387
         },
         {
           "name": "_Action-OcrUiaFuse",
-          "line": 3630
+          "line": 3512
         },
         {
           "name": "_Action-OcrUiaInvoke",
-          "line": 3771
+          "line": 3653
         },
         {
           "name": "_Action-ScreenshotDiff",
-          "line": 3959
+          "line": 3841
         },
         {
           "name": "_Action-CdpDeepFind",
-          "line": 4109
+          "line": 3991
         },
         {
           "name": "_Action-ImePaste",
-          "line": 4234
+          "line": 4116
         },
         {
           "name": "_Action-CdpProseMirrorInsert",
-          "line": 4323
+          "line": 4205
         },
         {
           "name": "_Action-ModalDetect",
-          "line": 4424
+          "line": 4306
         }
       ]
     },
@@ -1211,6 +1195,33 @@
           "line": 14447
         }
       ]
+    }
+  ],
+  "baseline_function_count": 298,
+  "retired_functions": [
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Normalize-OcrText",
+      "replacement": "pcucp-next/dotnet/PcuCp.NativeHost/LegacyOcrMatcher.cs",
+      "evidence": "Windows differential suite on 1eba388f3f8774ac02564fa526307a425bf07f95, run36885457144"
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Levenshtein-Distance",
+      "replacement": "pcucp-next/dotnet/PcuCp.NativeHost/LegacyOcrMatcher.cs",
+      "evidence": "Windows differential suite on 1eba388f3f8774ac02564fa526307a425bf07f95, run36885457144"
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Similarity-Percent",
+      "replacement": "pcucp-next/dotnet/PcuCp.NativeHost/LegacyOcrMatcher.cs",
+      "evidence": "Windows differential suite on 1eba388f3f8774ac02564fa526307a425bf07f95, run36885457144"
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Score-OcrText",
+      "replacement": "pcucp-next/dotnet/PcuCp.NativeHost/LegacyOcrMatcher.cs",
+      "evidence": "Windows differential suite on 1eba388f3f8774ac02564fa526307a425bf07f95, run36885457144"
     }
   ]
 }

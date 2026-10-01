@@ -682,99 +682,6 @@ function _Convert-OcrResult {
 
 # ocr-find-text matching score. 0..100.
 # exact/prefix/contains stay deterministic; fuzzy is opt-in to avoid unsafe clicks.
-function _Normalize-OcrText {
-  param([string]$Text)
-  if (-not $Text) { return "" }
-  $s = $Text
-  try { $s = $s.Normalize([System.Text.NormalizationForm]::FormKC) } catch { }
-  $s = $s.ToLowerInvariant()
-  $s = $s -replace '[^\p{L}\p{Nd}\s]+', ' '
-  $s = $s -replace '\s+', ' '
-  return $s.Trim()
-}
-
-function _Levenshtein-Distance {
-  param([string]$A, [string]$B)
-  if ($null -eq $A) { $A = "" }
-  if ($null -eq $B) { $B = "" }
-  $n = $A.Length
-  $m = $B.Length
-  if ($n -eq 0) { return $m }
-  if ($m -eq 0) { return $n }
-  $prev = New-Object 'int[]' ($m + 1)
-  $curr = New-Object 'int[]' ($m + 1)
-  for ($j = 0; $j -le $m; $j++) { $prev[$j] = $j }
-  for ($i = 1; $i -le $n; $i++) {
-    $curr[0] = $i
-    for ($j = 1; $j -le $m; $j++) {
-      $cost = 1
-      if ($A[$i - 1] -eq $B[$j - 1]) { $cost = 0 }
-      $del = $prev[$j] + 1
-      $ins = $curr[$j - 1] + 1
-      $sub = $prev[$j - 1] + $cost
-      $curr[$j] = [math]::Min([math]::Min($del, $ins), $sub)
-    }
-    $tmp = $prev; $prev = $curr; $curr = $tmp
-  }
-  return $prev[$m]
-}
-
-function _Similarity-Percent {
-  param([string]$A, [string]$B)
-  if (-not $A -or -not $B) { return 0 }
-  $maxLen = [math]::Max($A.Length, $B.Length)
-  if ($maxLen -le 0) { return 0 }
-  $dist = _Levenshtein-Distance -A $A -B $B
-  $score = [int][math]::Round((1.0 - ($dist / [double]$maxLen)) * 100)
-  if ($score -lt 0) { return 0 }
-  if ($score -gt 100) { return 100 }
-  return $score
-}
-
-function _Score-OcrText {
-  param([string]$Needle, [string]$Hay, [string]$Mode)
-  if (-not $Needle -or -not $Hay) { return 0 }
-  $n = _Normalize-OcrText $Needle
-  $h = _Normalize-OcrText $Hay
-  if (-not $n -or -not $h) { return 0 }
-  if ($n -eq $h) { return 100 }
-  switch ($Mode) {
-    "exact"  { if ($n -eq $h) { return 100 } else { return 0 } }
-    "prefix" { if ($h.StartsWith($n)) { return 80 } else { return 0 } }
-    "fuzzy"  {
-      $best = _Similarity-Percent -A $n -B $h
-      if ($h.Contains($n)) {
-        $ratio = [math]::Min(1.0, $n.Length / [math]::Max(1, $h.Length))
-        $containsScore = 55 + [int]([math]::Floor($ratio * 30))
-        if ($containsScore -gt $best) { $best = $containsScore }
-      }
-      return $best
-    }
-    default {
-      $idx = $h.IndexOf($n)
-      if ($idx -lt 0) { return 0 }
-      $ratio = [math]::Min(1.0, $n.Length / [math]::Max(1, $h.Length))
-      $bonus = [int]([math]::Floor($ratio * 30))
-      $score = 50 + $bonus
-      if ($idx -eq 0) { $score += 10 }
-      if ($score -gt 95) { $score = 95 }
-      return $score
-    }
-  }
-  return 0
-}
-
-# ============================================================================
-# v1.0.0 리팩토링: 공통 OCR 헬퍼들
-# ============================================================================
-# OCR 관련 action 들 (_Action-OcrFindText / _Action-OcrUiaFuse / _Action-OcrUiaInvoke)
-# 이 같은 캡처 + OCR + 매칭 흐름을 반복하므로 헬퍼로 추출. 호출 측은
-# region 결정 + capture + OCR + score 매칭의 4단계가 모두 이 헬퍼들을 통해 일어난다.
-# ============================================================================
-
-# 화면 영역을 캡처해서 임시 PNG 경로를 반환. 호출자가 사용 후 직접 삭제 책임.
-# region 인자가 모두 0/-1 이면 전체 가상 데스크톱.
-# OcrEngine.MaxImageDimension(보통 10000) 초과 시 $null 반환 (호출자가 에러 처리).
 function _Capture-ScreenRegionToTempPng {
   param(
     [int]$RegionX,
@@ -829,82 +736,57 @@ function _Capture-ScreenRegionToTempPng {
 # Includes line, word, and adjacent 2/3-word n-grams so labels like
 # "Save As" or "Send Message" get a tighter center than the whole line.
 function _Match-OcrCandidates {
-  param(
-    $Body,        # _Convert-OcrResult 결과 (lines 배열 포함)
-    [string]$Needle,
-    [string]$Mode # exact / contains / prefix / fuzzy
-  )
-  $cands = New-Object System.Collections.ArrayList
-  $normalizedNeedle = _Normalize-OcrText $Needle
-  $needleTokenCount = 0
-  if ($normalizedNeedle) {
-    $needleTokenCount = @($normalizedNeedle -split '\s+' | Where-Object { $_ }).Count
+  param($Body, [string]$Needle, [string]$Mode)
+  # Compatibility only: matching now lives in the bounded C# kernel. No shell or desktop calls.
+  $native = $env:CUCP_NATIVE_HOST
+  if (-not $native) { $native = Join-Path $PSScriptRoot '..\pcucp-next\bin\native\PcuCp.NativeHost.exe' }
+  $native = [System.IO.Path]::GetFullPath($native)
+  if (-not (Test-Path -LiteralPath $native -PathType Leaf)) {
+    throw 'Matching native runtime missing. Publish pcucp-next/packaging/publish_native.py or set CUCP_NATIVE_HOST to the matching executable/DLL.'
   }
-  $needsNgrams = ($needleTokenCount -ge 2)
-  foreach ($line in $Body.lines) {
-    $ls = _Score-OcrText -Needle $Needle -Hay $line.text -Mode $Mode
-    if ($ls -gt 0) {
-      [void]$cands.Add([ordered]@{
-        scope="line"; score=$ls; text=$line.text
-        x=$line.x; y=$line.y; w=$line.w; h=$line.h
-        cx=$line.cx; cy=$line.cy
-      })
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $extension = [System.IO.Path]::GetExtension($native).ToLowerInvariant()
+  if ($extension -eq '.dll') {
+    $dotnet = Get-Command dotnet.exe -CommandType Application -ErrorAction Stop
+    if ($native.Contains('"') -or $native.Contains("`r") -or $native.Contains("`n")) { throw 'Invalid native DLL path' }
+    $psi.FileName = $dotnet.Source
+    $psi.Arguments = '"' + $native + '" legacy-ocr-match'
+  } elseif ($extension -eq '.exe') {
+    $psi.FileName = $native
+    $psi.Arguments = 'legacy-ocr-match'
+  } else { throw 'CUCP_NATIVE_HOST must be an executable or DLL, never a shell script.' }
+  $payload = @{schema='cucp.legacy-ocr-match/v1'; body=$Body; needle=$Needle; mode=$Mode} | ConvertTo-Json -Depth 24 -Compress
+  $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
+  $bytes = $utf8.GetBytes($payload)
+  if ($bytes.Length -gt 1048576) { throw 'Legacy OCR request exceeds 1 MiB.' }
+  $psi.UseShellExecute = $false
+  $psi.CreateNoWindow = $true
+  $psi.RedirectStandardInput = $true
+  $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError = $true
+  $psi.StandardOutputEncoding = $utf8
+  $psi.StandardErrorEncoding = $utf8
+  $process = New-Object System.Diagnostics.Process
+  $process.StartInfo = $psi
+  try {
+    [void]$process.Start()
+    $stdout = $process.StandardOutput.ReadToEndAsync()
+    $stderr = $process.StandardError.ReadToEndAsync()
+    $process.StandardInput.BaseStream.Write($bytes, 0, $bytes.Length)
+    $process.StandardInput.Close()
+    if (-not $process.WaitForExit(15000)) {
+      try { $process.Kill() } catch { }
+      throw 'Legacy OCR matching timed out; no retry was attempted.'
     }
-    foreach ($w in $line.words) {
-      $ws = _Score-OcrText -Needle $Needle -Hay $w.text -Mode $Mode
-      if ($ws -gt 0) {
-        [void]$cands.Add([ordered]@{
-          scope="word"; score=$ws; text=$w.text
-          x=$w.x; y=$w.y; w=$w.w; h=$w.h
-          cx=$w.cx; cy=$w.cy
-        })
-      }
+    $out = $stdout.GetAwaiter().GetResult()
+    $err = $stderr.GetAwaiter().GetResult()
+    if ($out.Length -gt 16777216 -or $err.Length -gt 65536) { throw 'Legacy OCR response exceeds the protocol budget.' }
+    $response = $out | ConvertFrom-Json -ErrorAction Stop
+    if ($process.ExitCode -ne 0 -or $response.status -ne 'ok' -or $response.data.compatibility -ne 'legacy-dotnet-utf16/v1') {
+      throw ('Legacy OCR matching failed; rebuild matching native runtime. ' + ($response.errors | ConvertTo-Json -Compress))
     }
-    if (-not $needsNgrams) { continue }
-    $words = @($line.words)
-    for ($n = 2; $n -le 3; $n++) {
-      if ($words.Count -lt $n) { continue }
-      for ($i = 0; $i -le ($words.Count - $n); $i++) {
-        $slice = @($words[$i..($i + $n - 1)])
-        $text = (($slice | ForEach-Object { $_.text }) -join " ")
-        $score = _Score-OcrText -Needle $Needle -Hay $text -Mode $Mode
-        if ($score -le 0) { continue }
-        $x1 = [double]::MaxValue
-        $y1 = [double]::MaxValue
-        $x2 = [double]::MinValue
-        $y2 = [double]::MinValue
-        foreach ($w in $slice) {
-          if ([double]$w.x -lt $x1) { $x1 = [double]$w.x }
-          if ([double]$w.y -lt $y1) { $y1 = [double]$w.y }
-          if (([double]$w.x + [double]$w.w) -gt $x2) { $x2 = [double]$w.x + [double]$w.w }
-          if (([double]$w.y + [double]$w.h) -gt $y2) { $y2 = [double]$w.y + [double]$w.h }
-        }
-        $ww = [int]($x2 - $x1)
-        $hh = [int]($y2 - $y1)
-        [void]$cands.Add([ordered]@{
-          scope="word_ngram"; n=$n; score=$score; text=$text
-          x=[int]$x1; y=[int]$y1; w=$ww; h=$hh
-          cx=[int]($x1 + ($ww / 2)); cy=[int]($y1 + ($hh / 2))
-        })
-      }
-    }
-  }
-  # PS 5.x 함정: single ordered-hashtable 의 [0] 은 첫 entry value 반환.
-  # @() 로 강제 array 화 후 인덱싱.
-  return @($cands | Sort-Object -Property `
-    @{ Expression={ [int]$_["score"] }; Descending=$true },
-    @{ Expression={
-        $scope = "$($_["scope"])"
-        if ($scope -eq "word_ngram") { return 0 }
-        if ($scope -eq "word") { return 1 }
-        return 2
-      }; Ascending=$true },
-    @{ Expression={
-        $w = 0; $h = 0
-        try { $w = [int]$_["w"] } catch { }
-        try { $h = [int]$_["h"] } catch { }
-        return ($w * $h)
-      }; Ascending=$true })
+    return @($response.data.candidates)
+  } finally { $process.Dispose() }
 }
 
 function _Get-UiaSupportedPatternName {

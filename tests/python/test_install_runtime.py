@@ -137,8 +137,10 @@ class InstallerTests(unittest.TestCase):
         installer.install(self.plan('core'))
         args = ['space value', '한글😀', 'a&b', '100%literal', '!bang!', '--allow-live-control']
         # Run only the disposable fixture Python entry, never the actual CUCP backend.
+        # cmd.exe parses its /c tail itself. A Python argv list would apply CRT
+        # backslash-quote escaping, which is not cmd escaping and breaks &/paths.
         command = '"' + str(self.bin / 'cucp.cmd') + '" ' + ' '.join(chr(34) + arg + chr(34) for arg in args)
-        result = subprocess.run(['cmd.exe', '/d', '/s', '/c', '"'+command+'"'], capture_output=True, text=True, encoding='utf-8', timeout=15)
+        result = subprocess.run('"' + os.environ.get('COMSPEC', r'C:\Windows\System32\cmd.exe') + '" /d /s /c "' + command + '"', capture_output=True, text=True, encoding='utf-8', timeout=15)
         self.assertEqual(result.returncode, 37, result.stderr)
         self.assertEqual(json.loads(result.stdout), args)
 
@@ -147,6 +149,6 @@ class InstallerTests(unittest.TestCase):
         installer.install(self.plan())
         args = ['space value', '한글', '--allow-live-control']
         command = '"' + str(self.bin / 'cucp.cmd') + '" ' + ' '.join(chr(34) + arg + chr(34) for arg in args)
-        result = subprocess.run(['cmd.exe', '/d', '/s', '/c', '"'+command+'"'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=15)
+        result = subprocess.run('"' + os.environ.get('COMSPEC', r'C:\Windows\System32\cmd.exe') + '" /d /s /c "' + command + '"', capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=15)
         self.assertEqual(result.returncode, 37, result.stderr)
         self.assertEqual(json.loads(result.stdout), args)
