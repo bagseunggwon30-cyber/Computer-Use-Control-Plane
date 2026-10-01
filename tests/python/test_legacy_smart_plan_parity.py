@@ -37,7 +37,7 @@ def fixtures():
     for extras in (['--allow-cdp'],['--cdp-port','0'],['--allow-cdp','--no-cdp'],['--point-plan','--window',"한글 O'Brien",'--point-radius','99','--point-step','0','--cache-ttl','-4'],
                    ['--label','Other'],['--LABEL','Other','--json-only'],['--precision-radius','bad'],['--cdp-port','bad']):
         f=copy.deepcopy(base);f['rest']+=extras;result.append(f)
-    for history in (None,{},dict(strategy='old',nested=dict(labels=['a',None,3])),['first','second']):
+    for history in (None,{},dict(strategy='old',nested=dict(labels=['a',None,3])),['first','second'],[],['single'],[None],[['nested','values']]):
         f=copy.deepcopy(base);f['history']=history;result.append(f)
     for top_override in ({'score':-40},{'score':60},{'score':100},{'score':'bad'},{'ambiguous':True}):
         f=copy.deepcopy(base);f['uia']['Json']['top'].update(top_override);result.append(f)

@@ -134,7 +134,9 @@ jobs:
           $env:CUCP_LEGACY_IMAGES_TEST_DLL = (Resolve-Path 'pcucp-next/bin/legacy/PcuCp.LegacyImages.dll').Path
           python -m unittest discover -s tests/python -p test_legacy_images.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - shell: pwsh
+      - name: Legacy boundary regressions (no live input)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
         run: |
           $env:CUCP_NATIVE_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
           Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop

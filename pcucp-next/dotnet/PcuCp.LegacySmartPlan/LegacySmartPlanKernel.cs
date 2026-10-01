@@ -42,11 +42,11 @@ internal static class LegacySmartPlanKernel
     };
     private static int I(object? value)
     {
-        if (value is JsonElement j && j.ValueKind == JsonValueKind.Number) return Convert.ToInt32(j.GetDouble());
         if (value is JsonElement jb && jb.ValueKind is JsonValueKind.True or JsonValueKind.False) return T(value) ? 1 : 0;
         string s = S(value); if (s.Length == 0) return 0;
         try
         {
+            if (value is JsonElement number && number.ValueKind == JsonValueKind.Number) return Convert.ToInt32(number.GetDouble());
             if (s.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) return unchecked((int)uint.Parse(s[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture));
             return Convert.ToInt32(double.Parse(s, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture));
         }
@@ -128,6 +128,10 @@ internal static class LegacySmartPlanKernel
         try
         {
             var history = Query("history", label!, match ?? "", "5");
+            // PS5 ConvertTo-Json retains the Count ETS property on an array
+            // returned as one pipeline object by the history query boundary.
+            if (history is JsonElement historyArray && historyArray.ValueKind == JsonValueKind.Array)
+                history = D("value", historyArray.Clone(), "Count", historyArray.GetArrayLength());
             if (cdpEnabled)
             {
                 if (T(Query("cdp_port", port.ToString(CultureInfo.InvariantCulture), "120")))

@@ -88,8 +88,8 @@ culture; that separate compatibility seam must be resolved before retirement.
 
 Task/form plan assembly (22,380 bytes in the pinned baseline) and smart-plan
 composition (17,025 bytes) now have isolated C# candidates. Their PowerShell
-bodies are retained. Local managed checks cover 88 task/form contracts and 19
-smart-plan contracts; Windows corpora contain 317 task/form cases and 197
+bodies are retained. Local managed checks cover 105 task/form contracts and 21
+smart-plan contracts; Windows corpora contain 367 task/form cases and 201
 smart-plan cases, plus each captured-prefix query trace. Exact numeric errors,
 null binding, ordered queries, unsafe-child accumulation, and full outputs remain
 qualification gates. No candidate is registered in the production host yet.

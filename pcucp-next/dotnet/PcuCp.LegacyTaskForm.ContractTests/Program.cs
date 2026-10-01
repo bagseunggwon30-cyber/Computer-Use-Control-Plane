@@ -125,9 +125,23 @@ var nullTask = Complete("task", noSteps, [], null);
 Check(nullTask.GetProperty("recommended_command").ValueKind == JsonValueKind.Null && nullTask.GetProperty("step_count").GetInt32() == 0, "No generated steps retains null commands");
 var nullTextRest = new[] { "--type-text", null!, "--text", "ignored" };
 var nullText = Json(LegacyTaskFormKernel.AssembleTask(Json(new { rest = nullTextRest, captured_query_results = Array.Empty<object>() })));
-Check(nullText.GetProperty("items").GetArrayLength() == 0 && !nullText.GetProperty("workflow_required").GetBoolean(), "Null type-text is skipped but its presence still suppresses text fallback");
+Check(nullText.GetProperty("items").GetArrayLength() == 1 && nullText.GetProperty("items")[0].GetProperty("command")[3].GetString() == "", "PS string-array binder normalizes null type-text to empty and suppresses text fallback");
 var nullFieldRest = new[] { "--field", null! };
 var nullField = Complete("form", nullFieldRest, []);
 Check(nullField.GetProperty("field_count").GetInt32() == 1 && nullField.GetProperty("errors")[0].GetProperty("field").GetString() == "", "Null field interpolates to empty malformed field");
-Check(Prepare("task", nullFieldRest).GetProperty("queries")[0].GetProperty("argv")[4].ValueKind == JsonValueKind.Null, "Null forwarded field preserved");
+Check(Prepare("task", nullFieldRest).GetProperty("queries")[0].GetProperty("argv")[4].GetString() == "", "Null field normalizes before descriptor construction");
+var emptyObserveRest = new[] { "--type-text", "x", "--observe-match", "" };
+Check(Complete("task", emptyObserveRest, [], null).GetProperty("run_options").GetProperty("observe_match").GetString() == "", "Empty observe-match survives absent verify-match");
+foreach (var (source, reason) in new[] { (" ", "Index was outside the bounds of the array."), ("2147483647.5", "Input string was not in a correct format."), ("1e400", "Input string was not in a correct format."), ("2147483648", "Value was either too large or too small for an Int32.") })
+{
+    var failed = Prepare("task", ["--wait-timeout-ms", source]);
+    Check(failed.GetProperty("message").GetString() == $"Cannot convert value \"{source}\" to type \"System.Int32\". Error: \"{reason}\"", "Exact observed PS5.1 numeric exception");
+}
+foreach (var (command, expected) in new (object?, object?)[] { (Array.Empty<object>(), new { }), (new object?[] { null }, null), (new[] { "" }, ""), (new object[] { new[] { "macro", "windows" } }, new[] { "macro", "windows" }) })
+{
+    var value = Complete("form", captureRest, Captures("form", captureRest, new { safe_to_act = true, best_route = command, recommended_command = command }));
+    Check(value.GetProperty("command_plan")[0].GetProperty("command").GetRawText() == Json(expected).GetRawText(), "Form conditional command output");
+    Check(value.GetProperty("steps")[0].GetProperty("best_route").GetRawText() == Json(expected).GetRawText(), "Form conditional route output");
+    Check(value.GetProperty("steps")[0].GetProperty("plan").GetProperty("recommended_command").GetRawText() == Json(command).GetRawText(), "Embedded source command remains unchanged");
+}
 Console.WriteLine($"Passed {checks} pure task/form contract checks; no child query or desktop action executed.");

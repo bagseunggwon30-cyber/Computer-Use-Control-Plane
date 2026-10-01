@@ -6,6 +6,7 @@ internal static class LegacyTaskFormKernel
 {
     private static readonly StringComparer OptionComparer = StringComparer.InvariantCultureIgnoreCase;
     private static readonly JsonElement Null = JsonSerializer.SerializeToElement<object?>(null);
+    private static readonly JsonElement EmptyOutput = JsonSerializer.SerializeToElement(new { });
     private sealed record Query(string kind, string[] argv);
     private sealed record Capture(int Exit, string Raw, JsonElement Plan);
     private sealed record Field(int Index, string Label, string Value);
@@ -32,7 +33,7 @@ internal static class LegacyTaskFormKernel
         internal string? App => Fallback(Value("--app"), Value("--open-app"));
         internal string? WaitTitle => Fallback(Value("--wait-title"), Value("--verify-window"));
         internal string? CacheTtl => Fallback(Value("--point-cache-ttl"), Value("--cache-ttl"));
-        internal string? ObserveMatch => Fallback(Value("--observe-match"), Value("--verify-match"));
+        internal string? ObserveMatch => string.IsNullOrEmpty(Value("--observe-match")) && !string.IsNullOrEmpty(Value("--verify-match")) ? Value("--verify-match") : Value("--observe-match");
         internal string? VerifyAfterLabel => Fallback(Value("--verify-label-after-step"), Value("--verify-after-label"));
         internal bool Observe => Flag("--observe-after-step") || Flag("--verify-after-step");
         internal string[] TypeTexts => Values("--type-text") is { Length: > 0 } values ? values : Values("--text");
@@ -110,8 +111,8 @@ internal static class LegacyTaskFormKernel
         {
             var r = captures[captureIndex++]; var plan = r.Plan;
             var safe = Truth(plan) && Truth(Property(plan, "safe_to_act"));
-            var route = Truth(plan) ? Property(plan, "best_route") : Null;
-            var command = Truth(plan) ? Property(plan, "recommended_command") : Null;
+            var route = Truth(plan) ? ConditionalOutput(Property(plan, "best_route")) : Null;
+            var command = Truth(plan) ? ConditionalOutput(Property(plan, "recommended_command")) : Null;
             steps.Add(new { index, kind, label, value_length = length, exit = r.Exit, safe_to_act = safe, best_route = route,
                 recommended_command = command, plan, raw = Truth(plan) ? null : r.Raw });
             commands.Add(new { index, kind, label, safe_to_act = safe, route, command });
@@ -287,6 +288,12 @@ internal static class LegacyTaskFormKernel
             foreach (var property in value.EnumerateObject()) if (OptionComparer.Equals(property.Name, name)) return property.Value.Clone();
         return Null;
     }
+    // A property emitted from an if statement is collected as pipeline output:
+    // one item becomes a scalar, while zero items are AutomationNull.Value.
+    // Windows PowerShell 5.1 serializes that empty output sentinel as {}.
+    private static JsonElement ConditionalOutput(JsonElement value) => value.ValueKind == JsonValueKind.Array
+        ? value.GetArrayLength() switch { 0 => EmptyOutput, 1 => value[0].Clone(), _ => value }
+        : value;
     private static IEnumerable<JsonElement> Enumerate(JsonElement value) => value.ValueKind == JsonValueKind.Array ? value.EnumerateArray() : value.ValueKind == JsonValueKind.Null ? [] : new[] { value };
     private static bool Truth(JsonElement value) => value.ValueKind switch
     {
@@ -297,8 +304,9 @@ internal static class LegacyTaskFormKernel
 
     private static int LegacyInt(string? source)
     {
-        if (source is null || source.Trim().Length == 0) return 0;
+        if (string.IsNullOrEmpty(source)) return 0;
         var value = source.Trim();
+        if (value.Length == 0) throw CommandOptions.Invalid($"Cannot convert value \"{source}\" to type \"System.Int32\". Error: \"Index was outside the bounds of the array.\"");
         const string format = "Input string was not in a correct format.";
         const string overflow = "Value was either too large or too small for an Int32.";
         string failure;
@@ -312,15 +320,15 @@ internal static class LegacyTaskFormKernel
             try { return int.Parse(value, NumberStyles.Integer, CultureInfo.InvariantCulture); }
             catch (FormatException)
             {
-                var number = double.Parse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture);
-                if (!double.IsFinite(number))
+                try
                 {
-                    if (value.Equals("NaN", StringComparison.OrdinalIgnoreCase) || value.Equals("Infinity", StringComparison.OrdinalIgnoreCase) || value.Equals("+Infinity", StringComparison.OrdinalIgnoreCase) || value.Equals("-Infinity", StringComparison.OrdinalIgnoreCase)) throw new FormatException();
-                    // Framework Double.Parse throws for an overflowing finite
-                    // spelling, whereas modern .NET returns infinity.
-                    throw CommandOptions.Invalid($"Cannot convert value \"{source}\" to type \"System.Int32\". Error: \"Value was either too large or too small for a Double.\"");
+                    var number = double.Parse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture);
+                    if (!double.IsFinite(number)) throw new FormatException();
+                    return Convert.ToInt32(number);
                 }
-                return Convert.ToInt32(number);
+                // PS5.1 retains the first integer-format failure if its
+                // floating-point fallback fails, including overflow.
+                catch (Exception fallbackError) when (fallbackError is FormatException or OverflowException) { throw new FormatException(); }
             }
         }
         catch (FormatException) { failure = format; }
@@ -353,9 +361,9 @@ internal static class LegacyTaskFormKernel
         var result = new List<string>(); var size = 0;
         foreach (var value in rest.EnumerateArray())
         {
-            // A programmatic [string[]] Rest can carry null members. They are
-            // distinct from empty type-text values in the original function.
-            if (value.ValueKind == JsonValueKind.Null) { result.Add(null!); continue; }
+            // The original [string[]] parameter binder normalizes null members
+            // to empty before option readers run (Windows oracle, 11 cases).
+            if (value.ValueKind == JsonValueKind.Null) { result.Add(""); continue; }
             if (value.ValueKind != JsonValueKind.String) throw CommandOptions.Invalid("rest items must be strings or null.");
             var text = value.GetString()!; size += text.Length;
             if (size > 262144) throw CommandOptions.Invalid("rest exceeds 262144 UTF-16 units.");
@@ -386,7 +394,7 @@ internal static class LegacyTaskFormKernel
             Fields(result, "kind", "argv", "exit", "raw", "json"); var query = queries[index++];
             if (!result.TryGetProperty("kind", out var kind) || kind.ValueKind != JsonValueKind.String || kind.GetString() != query.kind ||
                 !result.TryGetProperty("argv", out var argv) || argv.ValueKind != JsonValueKind.Array || argv.GetArrayLength() != query.argv.Length ||
-                argv.EnumerateArray().Any(v => v.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)) || !argv.EnumerateArray().Select(v => v.GetString()).SequenceEqual(query.argv))
+                argv.EnumerateArray().Any(v => v.ValueKind != JsonValueKind.String) || !argv.EnumerateArray().Select(v => v.GetString()).SequenceEqual(query.argv))
                 throw CommandOptions.Invalid("Captured query kind and argv must match preparation in exact order.");
             if (!result.TryGetProperty("exit", out var exit) || exit.ValueKind != JsonValueKind.Number || !exit.TryGetInt32(out var code) ||
                 !result.TryGetProperty("raw", out var raw) || raw.ValueKind != JsonValueKind.String)

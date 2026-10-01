@@ -61,3 +61,12 @@ option cases. Score arithmetic is promoted before the nested helper's Int32 bind
 rank remains wide because the original rank expression has no Int32 cast.
 Exact numeric exception text remains subject to the strict Windows oracle; no
 assertion is narrowed to accommodate a candidate exception.
+
+First Windows qualification (3af7ada/job110617296559) matched 188/197 complete
+cases. Eight out-of-Int32 captured numeric scores lacked PowerShell's conversion
+error wrapper; one history array lacked the PS5 serialized `value`/`Count` ETS
+shape. Both candidate boundaries are corrected without changing expected output.
+Four additional empty/singleton/nested history-array cases bring the matrix to
+201; these new shapes still require the Windows oracle. Promoted rank values,
+Score parameter overflow binding, fractional options and tied selection matched
+in that first run. The original PS implementation remains authoritative.

@@ -24,9 +24,9 @@ prepared state to trust, or authority to run generated commands.
 - `PrepareForm({rest})` returns
   `{schema:"cucp.form-plan-preparation/v1",queries:[...]}`
 - Each ordered descriptor is `{kind,argv}`. `kind` is `form_plan` or `smart_plan`;
-  `argv` is the original exact `-Quiet macro ... --json-only` array. Null members
-  are preserved by the pure kernel; their actual PS5.1 binding behavior is a
-  separate explicit qualification fixture, described below
+  `argv` is the original exact `-Quiet macro ... --json-only` string array.
+  Nullable input Rest members normalize to empty strings before assembly,
+  matching the observed original PS5.1 parameter binder
 - A captured reply is `{kind,argv,exit,raw,json}`. Its kind and argv must echo
   the corresponding rebuilt descriptor exactly; exit is Int32, raw is a string,
   and json is an object or null. Capture count, kind, argv, and order must all
@@ -57,8 +57,11 @@ Options retain original case-insensitive scanning, first-value precedence,
 all-values order, duplicate flags, switches appearing as values, aliases, and
 null/empty distinctions. Task timeout casts occur before required-input checks,
 even when their values are unused. Nonpositive timeouts default to 8000/3000;
-fractional spellings round to even, numeric parsing is invariant, and original
-Framework error text is retained for net8 qualification.
+fractional spellings round to even and numeric parsing is invariant. Empty
+numeric strings become zero, but whitespace-only strings throw the original
+index-bound error. If the floating fallback fails, including overflow, PS5.1
+retains the first integer-format failure; integer overflow retains its distinct
+overflow error. These exact error strings are tested across four cultures.
 
 Task steps preserve app/wait, pre-shortcuts, type text, form, clicks,
 post-shortcuts, and verification order. All `--shortcut` values precede all
@@ -76,7 +79,10 @@ its original flags: OCR, precision, radius, step, and cache settings are sent
 to the final send query, but not field queries. The send query follows all
 fields. `command_plan` retains unsafe commands and `unsafe_steps` retains their
 original index, label, route and exit. A nonzero child exit does not override a
-truthy `safe_to_act`.
+truthy `safe_to_act`. The original form's conditional property output collapses
+one-element route/command arrays to a scalar and serializes empty output as
+`{}`. This transformation affects copied step/command fields; the embedded
+captured plan retains its original arrays.
 
 The linked, already-qualified `LegacyTaskPresetKernel` provides literal quoting
 and JSON argv helpers. No shared helper changes are required. Captured task
@@ -108,9 +114,9 @@ dotnet run --project pcucp-next/dotnet/PcuCp.LegacyTaskForm.ContractTests -c Rel
 python -m unittest discover -s tests/python -p test_legacy_task_form_parity.py -v
 ```
 
-The initial local result is 88 passing managed checks and three passing Python
+The current local result is 105 passing managed checks and three passing Python
 source/corpus checks. The Windows PowerShell 5.1 differential is skipped on
-Linux and remains required. The corpus has 317 cases covering both families,
+Linux and remains required. The corpus has 367 cases covering both families,
 all query/step phases, malformed input, exact order, accumulated errors,
 truth conversions, nested commands, quoting/Unicode/NUL, null/empty options,
 nonzero child exits, numeric boundaries, and en-US/ko-KR/tr-TR/invariant cultures.
@@ -124,11 +130,21 @@ assembly, full payloads, error strings, return codes, brief output and PS5.1
 JSON presentation, retaining every error and diagnostic field. Acquisition
 exception fixtures verify immediate abort without querying later steps.
 The oracle also records the exact bound `[string[]] Rest`, including fixtures
-with literal null members. The pure kernel implements the original body's null
-checks for type-text (skip a null entry but still suppress the `--text` fallback),
-field interpolation to an empty malformed field, and forwarded argv members.
-Windows qualification establishes the actual parameter binder behavior rather
-than assuming null and empty are interchangeable.
+with literal null members. Windows run
+[36936314485, job 110617296559](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36936314485/job/110617296559)
+established that all 11 null-member fixtures become empty strings at the
+original `[string[]] Rest` parameter binder, before option readers run. Every
+emitted descriptor argv member was a string. The kernel applies the same
+normalization; capture argv validation remains string-only. The oracle asserts
+the observed bound array and tests preparation from both raw nullable input
+and bound input.
+
+That first Windows checkpoint compared 725 staged results from 317 cases and
+reported 26 failed assertions: empty observe-match preservation, three numeric
+edge cases in four cultures, conditional form command output, and repeated
+console mismatches. The corresponding repairs and 50 added boundary cases
+require a new exact-commit Windows pass. No original task/form body is retired
+on that failed candidate run.
 
 After the candidate is registered and adapters are implemented,
 `CUCP_TASK_FORM_TEST_HOST` enables the separate actual-adapter comparison using

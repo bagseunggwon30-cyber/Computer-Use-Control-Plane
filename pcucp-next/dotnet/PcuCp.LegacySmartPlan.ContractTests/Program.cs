@@ -38,6 +38,12 @@ if (args.SequenceEqual(new[] { "--self-test" }))
     Check(Run(new { rest, captured_replies = new object[] { failedHistory, uia } }).GetProperty("exit").GetInt32() == 2, "History exception must remain swallowed");
     var failedUia = new { kind = "native", argv = new[] { "-Action", "uia-find", "-Label", "Save" }, error = "fixture_uia" };
     Check(Run(new { rest, captured_replies = new object[] { history, failedUia } }).GetProperty("error").GetString() == "fixture_uia", "Native exception must propagate");
+    var historyArray = new { kind = "history", argv = new[] { "Save", "", "5" }, result = new[] { "first", "second" } };
+    var arrayPlan = Run(new { rest, captured_replies = new object[] { historyArray, uia } });
+    Check(arrayPlan.GetProperty("payload").GetProperty("history_hint").GetProperty("Count").GetInt32() == 2, "History array ETS shape changed");
+    var overflowUia = new { kind = "native", argv = new[] { "-Action", "uia-find", "-Label", "Save" }, result = new { Json = new { status = "ok", top = new { score = 2147483648L, invoke_pattern = "Invoke" } } } };
+    var overflow = Run(new { rest, captured_replies = new object[] { history, overflowUia } });
+    Check(overflow.GetProperty("error").GetString() == "Cannot convert value \"2147483648\" to type \"System.Int32\". Error: \"Value was either too large or too small for an Int32.\"", "Numeric conversion must preserve PS wrapper");
     Console.WriteLine($"PASS: {checks} isolated SmartPlan captured-reply contracts; no probes executed.");
     return;
 }

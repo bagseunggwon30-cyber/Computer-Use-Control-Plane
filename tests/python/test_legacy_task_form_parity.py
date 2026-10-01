@@ -68,7 +68,7 @@ def plan_cases():
         add("task", ["--type-text", text, "--name", text, "--click-label", text])
         add("form", ["--field", "Label=" + text, "--send-label", text])
     for culture in ("en-US", "ko-KR", "tr-TR", ""):
-        for number in ("", " ", "0", "-1", "+1", "  2  ", "1.5", "2.5", "-1.5", "1e2", "1,000", "1,5", "0x10", "0xffffffff", "0x100000000", "-0x1", "1kb", "NaN", "Infinity", "2147483647", "2147483648", "-2147483648", "-2147483649", "2147483647.4", "2147483647.5", "1e400", "bad", "--verify-label"):
+        for number in ("", " ", "\t", "\r\n", "\u00a0", "0", "-1", "+1", "  2  ", "1.5", "2.5", "-1.5", "1e2", "1,000", "1,5", "0x10", "0xffffffff", "0x100000000", "-0x1", "1kb", "NaN", "Infinity", "2147483647", "2147483648", "-2147483648", "-2147483649", "2147483647.4", "2147483647.5", "2147483648.0", "-2147483648.6", "1e400", "bad", "--verify-label"):
             add("task", ["--wait-title", "title", "--wait-timeout-ms", number, "--verify-label", "done", "--verify-timeout-ms", number], culture=culture)
         for rest in (["--wait-timeout-ms", "bad"], ["--verify-timeout-ms", "bad"], ["--app", "app", "--verify-timeout-ms", "bad"]):
             add("task", rest, culture=culture)
@@ -80,13 +80,17 @@ def plan_cases():
         add("task", ["--field", "A=x", "--click-label", "one", "--click-label", "two"], replies=[reply, reply, reply])
     commands = [None, [], [None], [""], "singleton", "", ["macro", "windows"], [["macro", "windows"]], [[[]]],
                 ["macro", [None, "", "a b"]], [["macro", [["a", "b"], ["c"]]]], ["macro", True, False, 0, -1, 1.5],
-                ["macro", [["a", None, "b"], []]], ["macro", "a'b", "한글😀", "line\nnext"]]
+                ["macro", [["a", None, "b"], []]], ["macro", "a'b", "한글😀", "line\nnext"],
+                [[], []], [None, None], ["single"], [1], [False], [[None]], [[], "x"], [["a"], ["b"]]]
     for command in commands:
         reply = {"exit": 5, "raw": "unused", "json": {"safe_to_act": True, "best_route": "captured", "recommended_command": command}}
         add("form", ["--send-label", "Send"], replies=[reply])
         add("task", ["--click-label", "Click"], replies=[reply])
         form_reply = {"exit": 7, "raw": "unused", "json": {"safe_to_act": True, "command_plan": [{"label": "Name", "route": "captured", "command": command}]}}
         add("task", ["--field", "Name=x"], replies=[form_reply])
+    for route in ([], [None], ["route"], [[]], [["route"]], ["first", "second"]):
+        reply = {"exit": 7, "raw": "unused", "json": {"safe_to_act": True, "best_route": route, "recommended_command": ["macro", "windows"]}}
+        add("form", ["--send-label", "Send"], replies=[reply])
     for plan in (None, {}, {"safe_to_run": False}, {"safe_to_run": True, "step_count": "2.5", "live_step_count": "1e1", "sensitive_step_count": None, "requires_sensitive_confirmation": "false"}, {"safe_to_run": [False, False], "step_count": 1, "errors": ["kept"], "safety": {"risk": "high"}}):
         add("task", ["--type-text", "x"], workflow_result=plan)
     for kind, rest in (("task", ["--field", "A=x", "--click-label", "one", "--click-label", "two"]), ("form", ["--field", "A=x", "--field", "B=y", "--send-label", "Send"])):
@@ -124,6 +128,7 @@ class TaskFormFixtureTests(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform == "win32", "Requires original Windows PowerShell 5.1 behavior")
 class TaskFormWindowsParityTests(unittest.TestCase):
+    maxDiff = None
     @classmethod
     def setUpClass(cls):
         cls.dotnet = shutil.which("dotnet")
@@ -147,6 +152,10 @@ class TaskFormWindowsParityTests(unittest.TestCase):
             self.assertEqual(before.returncode, 0, before.stderr.decode(errors="replace"))
             baseline = json.loads(before.stdout.decode("utf-8-sig"))
             self.assertEqual(len(baseline), len(cases))
+            for case, original in zip(cases, baseline):
+                if None in case["rest"]:
+                    self.assertEqual(original["bound_rest"], ["" if item is None else item for item in case["rest"]], case)
+                    self.assertTrue(all(isinstance(item, str) for query in original["queries"] for item in query["argv"]), case)
             print("TASK_FORM_NULL_REST_BINDING_OBSERVATIONS: " + json.dumps([
                 {"kind": case["kind"], "input_rest": case["rest"], "bound_rest": original["bound_rest"], "queries": original["queries"]}
                 for case, original in zip(cases, baseline) if None in case["rest"]
@@ -168,6 +177,9 @@ class TaskFormWindowsParityTests(unittest.TestCase):
                     expected.append({key: original[key] for key in ("threw", "error", "message")})
                     continue
                 expected.append({"schema": "cucp." + case["kind"] + "-plan-preparation/v1", "queries": original["queries"]})
+                if None in case["rest"]:
+                    fixtures.append({"operation": "prepare-" + case["kind"], "args": {"rest": case["rest"]}})
+                    origins.append(case); expected.append(expected[-1])
                 args = {"rest": original["bound_rest"], "captured_query_results": original["captured"]}
                 if case["kind"] == "task":
                     fixtures.append({"operation": "assemble-task", "args": args}); origins.append(case); expected.append(original["assembly"])
