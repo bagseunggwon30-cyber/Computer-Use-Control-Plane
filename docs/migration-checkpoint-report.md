@@ -17,16 +17,20 @@ replaces every old macro.
 The baseline is published commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tree
 `bf895d3120dd5e145f360cb1c41e1d79a061d048`.
 
-| Canonical tracked PS source | Baseline | This milestone |
+| Canonical tracked PS source | Baseline | Accepted checkpoint `27400c98` |
 | --- | ---: | ---: |
 | All `.ps1` source and tests | 1,013,478 bytes | 921,614 bytes |
 | Three legacy runtime scripts | 858,937 bytes | 770,805 bytes |
 | Actual all-source reduction | — | **91,864 bytes (9.06%)** |
 
 The earlier 78,544-byte planner reduction is qualified at aadbc58 / run
-36957910828. The additional 13,320-byte app-profile replacement in this source
-is release-gated by its exact-commit 523-case actual-bridge suite. Physical source
-retirement and verified behavior are separate evidence.
+36957910828. The additional 13,320-byte app-profile replacement passed its 523-case actual-bridge
+suite at `27400c98`, with all five jobs green in
+[run 36973181910](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36973181910).
+The next candidate batch retains the originals while qualifying three exact
+adapters as real `.ps1` fixtures. Its current inventory is 982,825 bytes, including
+61,211 bytes of temporary fixture/guard overhead above the accepted checkpoint.
+No new family retirement is claimed until those fixtures pass and are promoted.
 
 There are still 291 top-level legacy function entries. Function count is not a
 feature-completion percentage: several retained functions are now thin adapters,

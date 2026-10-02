@@ -120,8 +120,10 @@ Strategy retirement still waits for additional en-US/ko-KR/tr-TR/invariant cultu
 
 See [the checkpoint report](migration-checkpoint-report.md) for the coherent
 architecture, measured source retirement and explicit remaining acceptance scope.
-The qualified preset body is now a thin planning-query adapter; aggregate tracked
-PS is 921,614 bytes, down 91,864 bytes from baseline including bridge overhead.
+At accepted checkpoint `27400c98`, aggregate tracked PS is 921,614 bytes, down
+91,864 bytes from baseline including bridge overhead. The new candidate batch
+retains original bodies plus exact adapter fixtures and consent guards, temporarily
+leaving 982,825 bytes; no new family retirement is claimed.
 This does not meet the lowest/zero-PowerShell goal. Actual planner adapters and
 output formatting passed at aadbc58 / run 36957910828. The app-profile builder and its sole-use score helper are now replaced under
 the separate actual-bridge gate below. Image diff remains a candidate.
@@ -147,9 +149,9 @@ App-profile selection, classification, scoring, command construction and result
 assembly now run in C#. Its 496-case candidate and shared Unicode/culture gates
 passed at 0d5fa6bb / run 36963644280. The original builder and sole-use private
 score helper are replaced by a 6,643-byte acquisition adapter, removing 13,320
-net PS bytes including registry overhead. Current-source release requires all
-523 pure and actual-adapter comparisons, exact Console/query/error/exit evidence,
-and 63 controller checks. The pure controller validates the acquisition sequence,
+net PS bytes including registry overhead. All 523 pure and actual-adapter
+comparisons, exact Console/query/error/exit evidence, and 63 controller checks
+passed at `27400c98` / run `36973181910`. The pure controller validates the acquisition sequence,
 target and full score before one explicitly requested history append. The shim
 then updates only the original record/recorded fields, with no post-Append
 transport or result reconstruction. The shim retains real acquisition, the fixed

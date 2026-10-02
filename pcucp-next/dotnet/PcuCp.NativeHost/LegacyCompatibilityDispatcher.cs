@@ -16,6 +16,7 @@ internal static class LegacyCompatibilityDispatcher
             throw CommandOptions.Invalid("Expected schema, operation and args under cucp.legacy-compat/v1.");
         return operation.GetString() switch
         {
+            "execution-confirmation" => LegacyExecutionStartup.Confirmation(args),
             "safety-classify" => LegacySafetyKernel.Classify(args),
             "safety-truncate" => LegacySafetyKernel.Truncate(args),
             "coord-map" => LegacyCoordinateKernel.Map(args),

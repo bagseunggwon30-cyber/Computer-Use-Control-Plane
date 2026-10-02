@@ -79,9 +79,8 @@ per-culture oracle processes, exact Console/payload/error/exit comparisons and
 elapsed-only normalization. Every recorded case
 asserts that the final facade-call counter equals the counter captured when the
 Append stub was entered, including returned error objects and thrown failures.
-The wrapper also refuses any attempted post-Append transport. These added gates
-are pending Windows qualification; the earlier 496-case proof does not imply they
-already passed.
+The wrapper also refuses any attempted post-Append transport. These gates passed at `27400c98ea9f460e243240be0f27d39e69ca348c` in
+[run 36973181910](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36973181910), with all five jobs green.
 
 The initial kernel qualification was isolated. Central integration now links the
 kernel/controller and registers only the closed compatibility operation. The
@@ -213,7 +212,7 @@ comparisons also used inconsistent serialization depths, although their exact
 actual-bridge/Console comparisons passed. The typed capture adjustment and
 separate raw/public payload observations preserve every existing fixture,
 error/exit/query comparison, Console assertion and no-post-Append call check.
-Their corrected Windows qualification is still pending.
+Their corrected Windows qualification passed at `27400c98` / run `36973181910`.
 
 Early candidate runs exposed a PowerShell case-insensitive `$Brief` capture-name
 collision, first-seen UIA group-order ties, legacy versus modern regex casing,
@@ -233,5 +232,5 @@ buffer sizing and casing flags follow the [LCMapStringEx contract](https://learn
 The successful `0d5fa6bb` gate covered 496 profiles, 344 scores, 144 quote/step
 pairs, 144 casing triples and 34 managed checks. It proves that earlier kernel
 checkpoint only. Canonical helper extraction, controller guards, the compact
-score-digest receipt, and the retained shim need the current source's own Windows
-523-case qualification before claiming actual-adapter parity.
+score-digest receipt, and the retained shim subsequently passed the full 523-case
+actual-adapter qualification at `27400c98` / run `36973181910`.

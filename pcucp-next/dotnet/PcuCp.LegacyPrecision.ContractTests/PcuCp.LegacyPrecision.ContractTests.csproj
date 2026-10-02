@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../PcuCp.LegacyExecution/LegacyExecutionWire.cs" Link="LegacyExecutionWire.cs" />
+    <Compile Include="../PcuCp.LegacyPrecision/*.cs" Link="%(Filename)%(Extension)" />
+    <Compile Include="../PcuCp.NativeHost/LegacyTextKernel.cs" Link="LegacyTextKernel.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyCoordinateKernel.cs" Link="LegacyCoordinateKernel.cs" />
+    <Compile Include="../PcuCp.NativeHost/Contracts.cs" Link="Contracts.cs" />
+  </ItemGroup>
+</Project>

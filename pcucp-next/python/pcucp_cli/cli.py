@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from typing import Sequence
 
 from .find_label import find_label
@@ -89,8 +90,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    original_argv = list(sys.argv[1:] if argv is None else argv)
+    if original_argv and original_argv[0] == "legacy-cdp-bridge":
+        # Internal source/frozen bridge uses the same strict process entry. Its
+        # live ceiling stays in fixed startup arguments, outside request JSON.
+        from .legacy_cdp_bridge import main as bridge_main
+        return bridge_main(original_argv[1:])
     parser = build_parser()
-    ns = parser.parse_args(argv)
+    ns = parser.parse_args(original_argv)
     if getattr(ns, "cdp_endpoint", None):
         from .cdp import CdpAdapter, CdpError
         try:

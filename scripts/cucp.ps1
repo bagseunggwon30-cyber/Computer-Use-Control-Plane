@@ -2188,7 +2188,7 @@ function Invoke-Macro {
     "mouse-verify","cdp-prosemirror-insert","ime-paste","safe-type-ime",
     "recovery-run"
   )
-  if ($AllowLiveControl -and ($directSafetyLiveMacros -contains $sub) -and -not (_Read-Switch -Rest $rest -Name "--confirm-sensitive")) {
+  if ($AllowLiveControl -and ($directSafetyLiveMacros -contains $sub) -and -not (_Read-StandaloneConfirmation -Rest $rest)) {
     $directSafety = _Classify-SafetyFromText -Text ((@($sub) + @($rest)) -join " ") -MacroName $sub
     if ($directSafety.requires_explicit_confirmation) {
       $payload = [pscustomobject]@{
@@ -2354,6 +2354,14 @@ function _Read-AllOptValues { param([string[]]$Rest, [string]$Name)
 }
 
 function _Read-Switch { param([string[]]$Rest, [string]$Name)
+  # cucp.execution-sensitive-ceiling/v1: trusted child context never comes from argv.
+  if ($Name -eq '--confirm-sensitive') {
+    $ceiling = Get-Variable -Name 'CUCP_EXECUTION_SENSITIVE_CEILING' -Scope Global -ErrorAction SilentlyContinue
+    if ($null -ne $ceiling -and ($ceiling.Value -isnot [bool] -or -not $ceiling.Value -or
+        -not ($ceiling.Options -band [System.Management.Automation.ScopedItemOptions]::Constant))) {
+      return $false
+    }
+  }
   return ($Rest -contains $Name)
 }
 
@@ -2385,8 +2393,20 @@ function _Macro-NotImplemented {
   return 1
 }
 
+function _Read-StandaloneConfirmation {
+  param([string[]]$Rest)
+  # Arity-aware consent is evaluated from this invocation's original argv.
+  # An immutable parent ceiling can restrict it, never grant it by itself.
+  $ceiling = Get-Variable -Name 'CUCP_EXECUTION_SENSITIVE_CEILING' -Scope Global -ErrorAction SilentlyContinue
+  if ($null -ne $ceiling -and ($ceiling.Value -isnot [bool] -or -not $ceiling.Value -or
+      -not ($ceiling.Options -band [System.Management.Automation.ScopedItemOptions]::Constant))) { return $false }
+  $result = _Invoke-LegacyCompatibility -Operation 'execution-confirmation' -Arguments @{original_argv=@($Rest)}
+  if ($null -eq $result -or $result.confirmed -isnot [bool]) { throw 'Invalid startup confirmation result.' }
+  return [bool]$result.confirmed
+}
+
 function _Invoke-LegacyCompatibility {
-  param([ValidateSet('safety-classify','coord-map','workflow-plan-from-parsed','task-preset-prepare','task-preset-complete','task-plan-prepare','task-plan-assemble','task-plan-complete','form-plan-prepare','form-plan-complete','smart-plan-advance','app-profile-advance')][string]$Operation, [hashtable]$Arguments, [switch]$PreserveInvalidArguments)
+  param([ValidateSet('execution-confirmation','safety-classify','coord-map','workflow-plan-from-parsed','task-preset-prepare','task-preset-complete','task-plan-prepare','task-plan-assemble','task-plan-complete','form-plan-prepare','form-plan-complete','smart-plan-advance','app-profile-advance')][string]$Operation, [hashtable]$Arguments, [switch]$PreserveInvalidArguments)
   # Compatibility only: pure logic now lives in bounded C# kernels. No shell or desktop calls.
   $native = $env:CUCP_NATIVE_HOST
   if (-not $native) { $native = Join-Path $PSScriptRoot '..\pcucp-next\bin\native\PcuCp.NativeHost.exe' }

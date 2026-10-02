@@ -37,6 +37,13 @@ def smoke(bundle: Path):
             digest, name = line.split("  ", 1)
             check(hashlib.sha256((relocated / name).read_bytes()).hexdigest() == digest, f"Checksum mismatch: {name}")
         check(not list(relocated.rglob("*.ps1")), "PowerShell script leaked into the portable bundle")
+        asset_roots = [p for p in relocated.rglob("legacy_cdp_assets") if p.is_dir()]
+        check(len(asset_roots) == 1, "Frozen legacy CDP asset directory is missing or ambiguous")
+        source_assets = Path(__file__).resolve().parents[1] / "python/pcucp_cli/legacy_cdp_assets"
+        for source_asset in source_assets.glob("*.js"):
+            bundled = asset_roots[0] / source_asset.name
+            check(bundled.is_file() and bundled.read_bytes() == source_asset.read_bytes(),
+                  f"Frozen legacy CDP asset differs: {source_asset.name}")
         env = isolated_environment()
         exe = relocated / "CUCP.exe"
 
@@ -55,6 +62,12 @@ def smoke(bundle: Path):
         expected_native = relocated / "native" / "PcuCp.NativeHost.exe"
         check(Path(diagnostic["native_command"][0]).samefile(expected_native),
               f"Native path did not follow relocated executable: {diagnostic['native_command']}")
+        bridge = json.loads(invoke([exe, "legacy-cdp-bridge", "--operation", "native",
+                                    "--endpoint", "http://127.0.0.1:9"],
+                                   json.dumps({"action": "cdp-click", "args": {"selector": "#never-click"}}) + "\n"))
+        check(bridge["status"] == "ok" and bridge["data"]["payload"]["reason"] == "live_control_required",
+              "Frozen legacy CDP bridge did not reject input before network access")
+        check(bridge["data"]["exit_code"] == 3, "Frozen legacy CDP authority exit changed")
         requests = [
             {"schema": "cucp.request/v1", "id": "caps-한글", "command": "capabilities", "args": {}},
             {"schema": "cucp.request/v1", "id": "no-input", "command": "click", "args": {"observation_id": "bad", "x": 0, "y": 0}},

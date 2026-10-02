@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../PcuCp.NativeHost/Contracts.cs" Link="Contracts.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyExecutionStartup.cs" Link="LegacyExecutionStartup.cs" />
+    <Compile Include="../PcuCp.LegacyExecution/LegacyExecutionConsent.cs" Link="LegacyExecutionConsent.cs" />
+    <Compile Include="../PcuCp.LegacyExecution/LegacyExecutionEffects.cs" Link="LegacyExecutionEffects.cs" />
+  </ItemGroup>
+</Project>

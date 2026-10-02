@@ -7,10 +7,12 @@ feature branch; merging into main needs separate approval.
 
 At the qualified planner checkpoint `aadbc58aa9dcc2254a3361cf8963429197859f22`,
 78,544 of the original 1,013,478 tracked PowerShell bytes were actually retired.
-That checkpoint left 934,934 bytes. The current app-profile source replacement
+That checkpoint left 934,934 bytes. The accepted app-profile checkpoint `27400c98`
 removes another 13,320 bytes, bringing the total reduction to 91,864 bytes and
-remaining source to 921,614 bytes. Its exact-commit actual-adapter CI gate is
-required before claiming that replacement qualified. Current source groups are:
+remaining source to 921,614 bytes. Its exact-commit actual-adapter gate passed in run `36973181910`.
+The next candidate batch retains original bodies and adds exact adapter fixtures
+and consent guards, temporarily leaving 982,825 bytes. Those fixtures are counted
+and will be removed when their glue is promoted. Accepted checkpoint source groups are:
 
 | Remaining source group | Bytes |
 | --- | ---: |

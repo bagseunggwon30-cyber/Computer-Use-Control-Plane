@@ -85,6 +85,9 @@ def main(argv=None):
         work = Path(work)
         run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--console",
              "--noupx", "--name", "CUCP", "--distpath", work / "dist", "--workpath", work / "build",
+             "--collect-data", "pcucp_cli", "--hidden-import", "pcucp_cli.legacy_cdp",
+             "--hidden-import", "pcucp_cli.legacy_cdp_entry",
+             "--hidden-import", "pcucp_cli.legacy_cdp_bridge",
              "--specpath", work, "--paths", ROOT / "pcucp-next" / "python", PACKAGING / "entry.py"])
         bundle = work / "dist" / "CUCP"
         run([dotnet, "publish", ROOT / "pcucp-next/dotnet/PcuCp.NativeHost/PcuCp.NativeHost.csproj",

@@ -16,6 +16,44 @@ catch (Exception ex)
     return 2;
 }
 var command = args.Length > 0 ? args[0].ToLowerInvariant() : "version";
+if (command is "legacy-precision-session" or "legacy-precision-storage")
+{
+    try
+    {
+        if (args.Length != 1) throw CommandOptions.Invalid("Precision sessions accept only a typed startup frame.");
+        var startup = LegacyPrecisionSession.ReadStartup(Console.In);
+        var session = new LegacyPrecisionSession(Console.In, Console.Out);
+        return command == "legacy-precision-session" ? session.Run(startup) : session.RunStorage(startup);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine(JsonSerializer.Serialize(NativeResult.Error(command,
+            ex is NativeFailure failure ? failure.Code : "invalid_precision_startup", ex.Message), NativeDispatcher.JsonOptions));
+        return 2;
+    }
+}
+if (command == "legacy-execution-session")
+{
+    try
+    {
+        var startup = LegacyExecutionStartup.Read(args.Skip(1).ToArray(), Console.In);
+        var previousCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = startup.Culture;
+            return new LegacyExecutionSession(Console.In, Console.Out).Run(startup.Operation, startup.Rest,
+                startup.Authority, startup.Brief, startup.CacheSeconds, startup.VisionAvailable);
+        }
+        finally { CultureInfo.CurrentCulture = previousCulture; }
+    }
+    catch (Exception ex)
+    {
+        // Startup failed before any effect. No partially accepted authority is used.
+        Console.WriteLine(JsonSerializer.Serialize(NativeResult.Error(command,
+            ex is NativeFailure failure ? failure.Code : "invalid_execution_startup", ex.Message), NativeDispatcher.JsonOptions));
+        return 2;
+    }
+}
 if (command is "legacy-ocr-match" or "legacy-compat")
 {
     // Pure compatibility entry: bounded stdin JSON, no shell, files or desktop API.

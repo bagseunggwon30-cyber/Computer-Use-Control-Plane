@@ -302,7 +302,7 @@ internal static class LegacyTaskFormKernel
         JsonValueKind.Array => value.GetArrayLength() > 1 || (value.GetArrayLength() == 1 && Truth(value[0])), _ => false
     };
 
-    private static int LegacyInt(string? source)
+    internal static int LegacyInt(string? source)
     {
         if (string.IsNullOrEmpty(source)) return 0;
         var value = source.Trim();
@@ -335,7 +335,7 @@ internal static class LegacyTaskFormKernel
         catch (OverflowException) { failure = overflow; }
         throw CommandOptions.Invalid($"Cannot convert value \"{source}\" to type \"System.Int32\". Error: \"{failure}\"");
     }
-    private static int LegacyInt(JsonElement value) => value.ValueKind switch
+    internal static int LegacyInt(JsonElement value) => value.ValueKind switch
     {
         JsonValueKind.Null => 0, JsonValueKind.String => LegacyInt(value.GetString()), JsonValueKind.True => 1, JsonValueKind.False => 0,
         JsonValueKind.Number => NumericInt(value),

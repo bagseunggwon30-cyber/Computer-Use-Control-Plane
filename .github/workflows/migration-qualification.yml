@@ -1,0 +1,90 @@
+name: Migration focused qualification
+on:
+  push:
+    branches:
+      - migration/python-csharp-runtime
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Qualification scope (full includes the complete regression suite)
+        type: choice
+        default: all
+        options: [all, foundation, execution, precision, cdp, full]
+permissions:
+  contents: read
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      families: ${{ steps.select.outputs.families }}
+      full: ${{ steps.select.outputs.full }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - id: select
+        run: python pcucp-next/packaging/migration_qualification.py scope
+        env:
+          MIGRATION_SCOPE: ${{ inputs.scope }}
+          MIGRATION_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+  fast-contracts:
+    needs: scope
+    if: needs.scope.outputs.full != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m unittest discover -s tests/python -v
+        env:
+          PYTHONPATH: pcucp-next/python
+  windows-family:
+    needs: scope
+    if: needs.scope.outputs.full != 'true'
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        family: ${{ fromJSON(needs.scope.outputs.families) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Qualify the selected family
+        run: python pcucp-next/packaging/migration_qualification.py run --family "${{ matrix.family }}"
+  cdp-browser:
+    needs: scope
+    if: needs.scope.outputs.full != 'true' && contains(fromJSON(needs.scope.outputs.families), 'cdp')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python pcucp-next/packaging/migration_qualification.py run --family cdp --browser
+        env:
+          PYTHONPATH: pcucp-next/python
+          CUCP_CHROME_TEST: '1'
+          CUCP_LEGACY_CDP_BROWSER_TEST: '1'
+  full-regression:
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
+    uses: ./.github/workflows/core.yml

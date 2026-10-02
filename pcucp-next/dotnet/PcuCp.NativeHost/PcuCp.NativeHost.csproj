@@ -11,6 +11,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="LegacyWorkflowLiteralParser.cs" />
+    <Compile Include="../PcuCp.LegacyExecution/*.cs" Link="LegacyExecution/%(Filename)%(Extension)" />
+    <Compile Include="../PcuCp.LegacyPrecision/*.cs" Link="LegacyPrecision/%(Filename)%(Extension)" />
     <Compile Include="../PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs" Link="LegacyTaskPresetKernel.cs" />
     <Compile Include="../PcuCp.LegacyTaskForm/LegacyTaskFormKernel.cs" Link="LegacyTaskFormKernel.cs" />
     <Compile Include="../PcuCp.LegacySmartPlan/LegacySmartPlanKernel.cs" Link="LegacySmartPlanKernel.cs" />
