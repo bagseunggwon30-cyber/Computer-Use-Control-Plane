@@ -24,7 +24,24 @@ internal static class LegacyCompatibilityDispatcher
             "workflow-plan-from-parsed" => LegacyWorkflowKernel.PlanFromParsed(args),
             "task-preset-prepare" => LegacyTaskPresetKernel.PreparePreset(args),
             "task-preset-complete" => LegacyTaskPresetKernel.CompletePreset(args),
+            "task-plan-prepare" => LegacyTaskFormKernel.PrepareTask(args),
+            "task-plan-assemble" => LegacyTaskFormKernel.AssembleTask(args),
+            "task-plan-complete" => LegacyTaskFormKernel.CompleteTask(args),
+            "form-plan-prepare" => LegacyTaskFormKernel.PrepareForm(args),
+            "form-plan-complete" => LegacyTaskFormKernel.CompleteForm(args),
+            "smart-plan-advance" => EvaluateSmartPlan(args),
             _ => throw CommandOptions.Invalid("Unsupported pure compatibility operation.")
         };
+    }
+
+    private static object EvaluateSmartPlan(JsonElement args)
+    {
+        // Preserve the qualified planner's semantic-error boundary before replay
+        // begins. Errors during replay already carry the exact acquired trace.
+        try { return LegacySmartPlanKernel.Advance(args); }
+        catch (Exception error)
+        {
+            return new { state = "error", error = error.Message, queries = Array.Empty<object>() };
+        }
     }
 }

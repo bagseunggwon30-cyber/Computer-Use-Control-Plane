@@ -248,7 +248,9 @@ function Import-Definition {
     $offset=$query[0].Extent.StartOffset-$found[0].Extent.StartOffset
     $text=$text.Remove($offset,$query[0].Extent.Text.Length).Insert($offset,$replacement)
     if ($text.Contains('& powershell')) { throw 'Child invocation survived acquisition interception' }
-    $text=$text.Replace('[Console]::Out.WriteLine(', 'Write-TaskFormConsole (')
+    # Supply only elapsed time before the original formatting expression runs.
+    # The intercepted Console boundary must retain the actual emitted string.
+    $text=$text.Replace('[Console]::Out.WriteLine(', '$payload.elapsed_ms=[int]$script:Case.elapsed_ms; Write-TaskFormConsole (')
     $text=$text.Replace('param([string[]]$Rest)', 'param([string[]]$Rest); $script:BoundRest=@($Rest)')
   }
   return $text
@@ -257,12 +259,14 @@ foreach ($name in @('_Read-OptValue','_Read-AllOptValues','_Read-Switch','_TaskP
   . ([scriptblock]::Create((Import-Definition -Tree $ast -Name $name)))
 }
 $script:OriginalWorkflow=(Get-Command _Build-WorkflowPlan).ScriptBlock
+$script:CurrentWorkflow=$null
 if ($AdapterPath) {
   $current=[Management.Automation.Language.Parser]::ParseFile($AdapterPath,[ref]$tokens,[ref]$errors)
   if ($errors.Count) { throw 'Current adapter parse failure' }
-  foreach ($name in @('_Invoke-LegacyCompatibility','Invoke-MacroTaskPlan','Invoke-MacroFormPlan')) {
+  foreach ($name in @('_Invoke-LegacyCompatibility','_Read-OptValue','_Read-AllOptValues','_Read-Switch','_Read-WorkflowStepSpecs','_Parse-WorkflowStepTokens','_Build-WorkflowPlan','Invoke-MacroTaskPlan','Invoke-MacroFormPlan')) {
     . ([scriptblock]::Create((Import-Definition -Tree $current -Name $name)))
   }
+  $script:CurrentWorkflow=(Get-Command _Build-WorkflowPlan).ScriptBlock
 }
 function Capture-PlanReply {
   param([string[]]$Argv)
@@ -278,35 +282,33 @@ function Capture-PlanReply {
 }
 function _Build-WorkflowPlan {
   param([string[]]$Rest)
-  $result=if ($script:Case.PSObject.Properties.Name -contains 'workflow_result') { $script:Case.workflow_result } else { & $script:OriginalWorkflow -Rest $Rest }
+  [void]$script:WorkflowQueries.Add([pscustomobject]@{rest=@($Rest)})
+  $result=if ($script:Case.PSObject.Properties.Name -contains 'workflow_result') { $script:Case.workflow_result }
+    elseif ($AdapterPath) { & $script:CurrentWorkflow -Rest $Rest }
+    else { & $script:OriginalWorkflow -Rest $Rest }
   $script:WorkflowPlan=$result
   return $result
 }
 function Write-TaskFormConsole {
   param([string]$Line)
   $script:Payload=$payload
-  $script:Payload.elapsed_ms=[int]$script:Case.elapsed_ms
   if ($script:Case.kind -eq 'task') {
     $script:Assembly=[pscustomobject]@{schema='cucp.task-plan-assembly/v1';workflow_required=($workflowSteps.Count -gt 0);workflow_rest=@($wfArgs);items=@($items);errors=@($errors);form_plan=$formPlan}
   }
-  if ($Brief -and -not (_Read-Switch -Rest $script:Case.rest -Name '--json-only')) {
-    $script:Output=[regex]::Replace($Line,'elapsed_ms=\d+',('elapsed_ms='+$script:Case.elapsed_ms))+[Environment]::NewLine
-  } else {
-    $depth=if ($script:Case.kind -eq 'task') {18} else {16}
-    $script:Output=($script:Payload | ConvertTo-Json -Depth $depth)+[Environment]::NewLine
-  }
+  $script:Output=$Line+[Environment]::NewLine
 }
 $results=New-Object Collections.ArrayList
 $savedCulture=[Threading.Thread]::CurrentThread.CurrentCulture
 foreach ($script:Case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json)) {
   $script:Queries=New-Object Collections.ArrayList; $script:Captured=New-Object Collections.ArrayList
+  $script:WorkflowQueries=New-Object Collections.ArrayList
   $script:Payload=$null; $script:WorkflowPlan=$null; $script:Assembly=$null; $script:Output=$null; $script:BoundRest=@()
   $Brief=[bool]$script:Case.brief
   [Threading.Thread]::CurrentThread.CurrentCulture=if ($script:Case.PSObject.Properties.Name -contains 'culture') { [Globalization.CultureInfo]::GetCultureInfo([string]$script:Case.culture) } else {$savedCulture}
   try {
     $exit=if ($script:Case.kind -eq 'task') { Invoke-MacroTaskPlan -Rest $script:Case.rest } else { Invoke-MacroFormPlan -Rest $script:Case.rest }
-    $value=[pscustomobject]@{bound_rest=@($script:BoundRest);queries=@($script:Queries);captured=@($script:Captured);workflow_plan=$script:WorkflowPlan;assembly=$script:Assembly;payload=$script:Payload;output=$script:Output;return_code=[int]$exit}
-  } catch { $value=[pscustomobject]@{threw=$true;error='invalid_arguments';message=$_.Exception.Message;bound_rest=@($script:BoundRest);queries=@($script:Queries)} }
+    $value=[pscustomobject]@{bound_rest=@($script:BoundRest);queries=@($script:Queries);captured=@($script:Captured);workflow_query_count=$script:WorkflowQueries.Count;workflow_queries=@($script:WorkflowQueries);workflow_plan=$script:WorkflowPlan;assembly=$script:Assembly;payload=$script:Payload;output=$script:Output;return_code=[int]$exit}
+  } catch { $value=[pscustomobject]@{threw=$true;error='invalid_arguments';message=$_.Exception.Message;bound_rest=@($script:BoundRest);queries=@($script:Queries);workflow_query_count=$script:WorkflowQueries.Count;workflow_queries=@($script:WorkflowQueries)} }
   [void]$results.Add($value)
 }
 [Threading.Thread]::CurrentThread.CurrentCulture=$savedCulture

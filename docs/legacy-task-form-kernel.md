@@ -1,12 +1,13 @@
-# Pure legacy task/form planning candidate
+# Pure legacy task/form planning migration
 
 `PcuCp.LegacyTaskForm/LegacyTaskFormKernel.cs` extracts deterministic task/form
-recipe and result assembly. It is outside the NativeHost wildcard compile and
-is linked only by the independent `PcuCp.LegacyTaskForm.ContractTests` project.
-This is a qualification candidate: original `Invoke-MacroTaskPlan` and
-`Invoke-MacroFormPlan` bodies must remain until exact Windows differential and
-actual retained-adapter tests qualify their replacements. No query, child
-process, generated command, GUI action, or desktop API runs in the kernel.
+recipe and result assembly. It remains outside the NativeHost wildcard compile
+and is explicitly linked by NativeHost and its independent contract project.
+The kernel passed 832 staged comparisons from 367 original cases at a03d2788 /
+run 36938195037. The feature branch now integrates read-only acquisition adapters;
+their current-commit actual-adapter checks must pass before this replacement is
+qualified. No query, child process, generated command, GUI action, or desktop API
+runs in the kernel.
 
 The immutable oracle is tree
 `bf895d3120dd5e145f360cb1c41e1d79a061d048`, `scripts/cucp.ps1`. That tree contains
@@ -129,6 +130,11 @@ classifier remain the workflow oracle. It compares exact preparation,
 assembly, full payloads, error strings, return codes, brief output and PS5.1
 JSON presentation, retaining every error and diagnostic field. Acquisition
 exception fixtures verify immediate abort without querying later steps.
+The elapsed-time seam sets only the root payload's elapsed value immediately
+before each original Console formatting expression. The harness records that
+actual emitted line unchanged; it does not regenerate JSON from the payload,
+so wrong serialization depth, property order, or Brief formatting cannot be
+hidden by the test boundary.
 The oracle also records the exact bound `[string[]] Rest`, including fixtures
 with literal null members. Windows run
 [36936314485, job 110617296559](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36936314485/job/110617296559)
@@ -146,11 +152,19 @@ console mismatches. The corresponding repairs and 50 added boundary cases
 require a new exact-commit Windows pass. No original task/form body is retired
 on that failed candidate run.
 
-After the candidate is registered and adapters are implemented,
 `CUCP_TASK_FORM_TEST_HOST` enables the separate actual-adapter comparison using
-the current native bridge. It imports the entire current task/form functions
-and intercepts only their nested acquisition helpers. The helpers must retain
+the current native bridge. It imports the entire current task/form functions,
+current option readers, retained workflow tokenizer, and current workflow
+adapter. The workflow wrapper executes that current adapter only in adapter
+mode; the pinned original remains the independent oracle. Explicit captured
+workflow-result fixtures remain data. A separate record compares exact workflow
+query count and Rest even for those captured-result cases, so a wrong workflow
+name, reordered arguments, omitted call, or repeated call cannot hide behind
+an otherwise identical captured plan. The harness intercepts the task/form
+nested acquisition helpers, which must retain
 their `_InvokeTaskChildJson` and `_InvokeChildSmartPlanJson` contracts; the
 independently qualified fixed stdin/bootstrap transport belongs beneath that
 boundary. Child-script switch binding and transport are separate adapter
 qualification requirements, not proven by captured-query fixtures.
+
+The native closed registry exposes task-plan-prepare, task-plan-assemble, task-plan-complete, form-plan-prepare and form-plan-complete. The adapters retain query acquisition, the original workflow tokenizer, and Console formatting. Semantic errors remain errors; failed read-only probes are never silently retried.

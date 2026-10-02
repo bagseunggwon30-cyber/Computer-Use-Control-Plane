@@ -19,9 +19,9 @@ The baseline is published commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tre
 
 | Canonical tracked PS source | Baseline | This milestone |
 | --- | ---: | ---: |
-| All `.ps1` source and tests | 1,013,478 bytes | 962,100 bytes |
-| Three legacy runtime scripts | 858,937 bytes | 811,291 bytes |
-| Actual all-source reduction | — | **51,378 bytes (5.07%)** |
+| All `.ps1` source and tests | 1,013,478 bytes | 934,934 bytes |
+| Three legacy runtime scripts | 858,937 bytes | 784,125 bytes |
+| Actual all-source reduction | — | **78,544 bytes (7.75%)** |
 
 There are still 292 top-level legacy function entries. Function count is not a
 feature-completion percentage: several retained functions are now thin adapters,
@@ -84,19 +84,22 @@ and error cases across PNG/BMP/JPEG/GIF/TIFF. Explicit strategy culture currentl
 controls its comparers, while alias regex normalization still uses ambient
 culture; that separate compatibility seam must be resolved before retirement.
 
-## Next planning qualification
+## Planning integration
 
 Task/form plan assembly (22,380 bytes in the pinned baseline) and smart-plan
-composition (17,025 bytes) now have isolated C# candidates. Their PowerShell
-bodies are retained. Local managed checks cover 105 task/form contracts and 21
+composition (17,025 bytes) passed independent Windows qualification and now use C# builders with retained
+read-only PowerShell acquisition adapters. Local managed checks cover 105 task/form contracts and 21
 smart-plan contracts; Windows corpora contain 367 task/form cases and 201
 smart-plan cases, plus each captured-prefix query trace. Exact numeric errors,
 null binding, ordered queries, unsafe-child accumulation, and full outputs remain
-qualification gates. No candidate is registered in the production host yet.
+qualification gates. The pure operations are explicitly registered in the production host. Strengthened
+actual-adapter checks must pass for the current commit before this integration is
+qualified. They compare real Console output, exact query traces and the current
+workflow bridge, not reconstructed output from a test payload.
 
 ## What still prevents full completion
 
-Roughly 0.96 MB of PS remains. Major callable groups include smart-click/plan and
+Roughly 0.96 MB of PS remains. Major callable groups include smart-click and live
 fallback routing; app/profile/probe acquisition; task/form/workflow execution;
 persistent history/recording; legacy CDP/vision adapters; IME/clipboard/drag and
 multi-edit; helper lifecycle, UAC/autostart, and system/process/registry macros.
@@ -108,8 +111,8 @@ coordinates, cross-integrity/UAC behavior, helper restart/crash handling, and
 application-specific task success. No user desktop, account-connected model, or
 personal documents were used to claim these checks.
 
-The next coherent code slice is the roughly 48 KB of task-plan, smart-plan and
-app-profile assembly, separating captured read-only probes from pure decisions.
+The next coherent code slice is app-profile assembly and its strategy helpers,
+continuing to separate captured read-only probes from pure decisions.
 The next acceptance milestone needs an authorized, isolated interactive Windows
 fixture environment. Until those boundaries are proved, retiring the remaining
 legacy surface merely to change language percentages would drop behavior. This

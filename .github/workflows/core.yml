@@ -106,6 +106,7 @@ jobs:
         run: |
           dotnet run --project pcucp-next/dotnet/PcuCp.LegacyTaskForm.ContractTests -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CUCP_TASK_FORM_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
           python -m unittest discover -s tests/python -p test_legacy_task_form_parity.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Smart-plan qualification (captured read-only probes)
@@ -114,6 +115,7 @@ jobs:
         run: |
           dotnet run --project pcucp-next/dotnet/PcuCp.LegacySmartPlan.ContractTests -c Release -- --self-test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CUCP_SMART_PLAN_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
           python -m unittest discover -s tests/python -p test_legacy_smart_plan_parity.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compiled legacy interop API and ABI qualification

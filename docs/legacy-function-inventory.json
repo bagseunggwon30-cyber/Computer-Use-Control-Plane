@@ -1,6 +1,6 @@
 {
   "baseline_commit": "9ffa354b9904235835a7bc6eb78ed8d3d76317c8",
-  "note": "Current retained legacy function navigation after qualified OCR, safety, coordinate, workflow and preset-body retirement and compiled interop extraction. Original tokenization, probes, execution and unqualified families remain. Git history holds the baseline.",
+  "note": "Current retained legacy function navigation after qualified pure-builder retirement and compiled interop extraction. Original tokenization, acquisition and execution remain where required. Current task/form/smart adapters require exact Windows qualification; Git history holds the baseline.",
   "files": [
     {
       "path": "scripts/cucp-helper-server.ps1",
@@ -312,7 +312,7 @@
     },
     {
       "path": "scripts/cucp.ps1",
-      "lines": 13911,
+      "lines": 13316,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -968,223 +968,223 @@
         },
         {
           "name": "_Parse-WorkflowStepTokens",
-          "line": 9202
+          "line": 8965
         },
         {
           "name": "_Read-WorkflowStepSpecs",
-          "line": 9237
+          "line": 9000
         },
         {
           "name": "_Build-WorkflowPlan",
-          "line": 9258
+          "line": 9021
         },
         {
           "name": "Invoke-MacroWorkflowPlan",
-          "line": 9272
+          "line": 9035
         },
         {
           "name": "Invoke-MacroWorkflowRun",
-          "line": 9285
+          "line": 9048
         },
         {
           "name": "_TaskPlan-QuoteToken",
-          "line": 9671
+          "line": 9434
         },
         {
           "name": "_TaskPlan-StepString",
-          "line": 9679
+          "line": 9442
         },
         {
           "name": "_TaskPlan-UnwrapCommand",
-          "line": 9695
+          "line": 9458
         },
         {
           "name": "_AppStrategy-NormalizeRoute",
-          "line": 9703
+          "line": 9466
         },
         {
           "name": "_AppStrategy-Key",
-          "line": 9722
+          "line": 9485
         },
         {
           "name": "_AppStrategy-Read",
-          "line": 9731
+          "line": 9494
         },
         {
           "name": "_AppStrategy-LastGood",
-          "line": 9744
+          "line": 9507
         },
         {
           "name": "_AppStrategy-Append",
-          "line": 9754
+          "line": 9517
         },
         {
           "name": "_AppProfile-StrategyScore",
-          "line": 9797
+          "line": 9560
         },
         {
           "name": "Invoke-MacroAppProfile",
-          "line": 9900
+          "line": 9663
         },
         {
           "name": "_Invoke-LegacyReadOnlyQuery",
-          "line": 10251
+          "line": 10014
         },
         {
           "name": "Invoke-MacroTaskPreset",
-          "line": 10304
+          "line": 10067
         },
         {
           "name": "Invoke-MacroTaskPlan",
-          "line": 10354
+          "line": 10117
         },
         {
           "name": "Invoke-MacroTaskRun",
-          "line": 10612
+          "line": 10150
         },
         {
           "name": "Invoke-MacroFormPlan",
-          "line": 10753
+          "line": 10291
         },
         {
           "name": "Invoke-MacroFormRun",
-          "line": 10915
+          "line": 10320
         },
         {
           "name": "Invoke-MacroSmartClick",
-          "line": 11155
+          "line": 10560
         },
         {
           "name": "Invoke-MacroWatch",
-          "line": 11659
+          "line": 11064
         },
         {
           "name": "Invoke-MacroOcrScreen",
-          "line": 11732
+          "line": 11137
         },
         {
           "name": "Invoke-MacroOcrImage",
-          "line": 11761
+          "line": 11166
         },
         {
           "name": "Invoke-MacroOcrFindText",
-          "line": 11785
+          "line": 11190
         },
         {
           "name": "Invoke-MacroOcrClick",
-          "line": 11828
+          "line": 11233
         },
         {
           "name": "Invoke-MacroOcrUiaFuse",
-          "line": 11902
+          "line": 11307
         },
         {
           "name": "Invoke-MacroOcrUiaInvoke",
-          "line": 11945
+          "line": 11350
         },
         {
           "name": "Invoke-MacroScreenshotDiff",
-          "line": 11987
+          "line": 11392
         },
         {
           "name": "Invoke-MacroClickAndVerifyScreen",
-          "line": 12026
+          "line": 11431
         },
         {
           "name": "Invoke-MacroAutoDo",
-          "line": 12123
+          "line": 11528
         },
         {
           "name": "_Trajectory-Append",
-          "line": 12232
+          "line": 11637
         },
         {
           "name": "_Trajectory-Read",
-          "line": 12256
+          "line": 11661
         },
         {
           "name": "_Trajectory-Clear",
-          "line": 12270
+          "line": 11675
         },
         {
           "name": "_History-Append",
-          "line": 12294
+          "line": 11699
         },
         {
           "name": "_History-PickBestStrategy",
-          "line": 12333
+          "line": 11738
         },
         {
           "name": "_History-Stats",
-          "line": 12380
+          "line": 11785
         },
         {
           "name": "_Helper-IsUp",
-          "line": 12417
+          "line": 11822
         },
         {
           "name": "_Helper-Ensure",
-          "line": 12422
+          "line": 11827
         },
         {
           "name": "Invoke-MacroSession",
-          "line": 12443
+          "line": 11848
         },
         {
           "name": "_Cucp-RedactSecrets",
-          "line": 12661
+          "line": 12066
         },
         {
           "name": "Invoke-MacroCdpDeepFind",
-          "line": 12685
+          "line": 12090
         },
         {
           "name": "Invoke-MacroImePaste",
-          "line": 12738
+          "line": 12143
         },
         {
           "name": "Invoke-MacroSafeTypeIme",
-          "line": 12790
+          "line": 12195
         },
         {
           "name": "Invoke-MacroModalDetect",
-          "line": 12870
+          "line": 12275
         },
         {
           "name": "Invoke-MacroRecoveryPlan",
-          "line": 12903
+          "line": 12308
         },
         {
           "name": "Invoke-MacroRecoveryRun",
-          "line": 13008
+          "line": 12413
         },
         {
           "name": "Invoke-MacroPrecisionValidate",
-          "line": 13107
+          "line": 12512
         },
         {
           "name": "Invoke-MacroBenchmark",
-          "line": 13203
+          "line": 12608
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 13344
+          "line": 12749
         },
         {
           "name": "Invoke-MacroCdpProseMirrorInsert",
-          "line": 13458
+          "line": 12863
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 13532
+          "line": 12937
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 13647
+          "line": 13052
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 13743
+          "line": 13148
         }
       ]
     }
@@ -1253,8 +1253,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 962100,
-    "removed": 51378,
+    "current": 934934,
+    "removed": 78544,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
@@ -1286,6 +1286,27 @@
       "replacement": "pcucp-next/dotnet/PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs",
       "adapter": "one original readonly planning query, formatting, timing and captured failure retained",
       "evidence": "554 exact recipe/payload comparisons from 285 presets, 28 argv helpers, 285 actual adapter results, 16 formatting cases, and 10 typed authority probes passed at 6021fe54321340659bbd4adfb089f5895a86f093 / run 36931815957."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroTaskPlan",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyTaskForm/LegacyTaskFormKernel.cs",
+      "adapter": "ordered form/smart child queries and original workflow tokenizer retained",
+      "evidence": "832 task/form results from 367 cases and 201 smart-plan cases with captured-prefix checks passed at a03d2788a6b3aa9f206d89ac139fb07b040ec4b4 / run 36938195037. Current retained adapters require the strengthened exact Windows checks."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroFormPlan",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyTaskForm/LegacyTaskFormKernel.cs",
+      "adapter": "ordered smart-plan child queries and output boundary retained",
+      "evidence": "832 task/form results from 367 cases and 201 smart-plan cases with captured-prefix checks passed at a03d2788a6b3aa9f206d89ac139fb07b040ec4b4 / run 36938195037. Current retained adapters require the strengthened exact Windows checks."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroSmartPlan",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacySmartPlan/LegacySmartPlanKernel.cs",
+      "adapter": "original history, port and native read-only acquisition retained under exact descriptor and trace checks",
+      "evidence": "832 task/form results from 367 cases and 201 smart-plan cases with captured-prefix checks passed at a03d2788a6b3aa9f206d89ac139fb07b040ec4b4 / run 36938195037. Current retained adapters require the strengthened exact Windows checks."
     }
   ]
 }

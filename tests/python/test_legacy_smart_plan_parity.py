@@ -69,33 +69,27 @@ def fixtures():
     return result
 
 
-class SmartPlanSourceTests(unittest.TestCase):
-    def test_isolated_and_fixture_matrix(self):
-        source=(ROOT/'pcucp-next/dotnet/PcuCp.LegacySmartPlan/LegacySmartPlanKernel.cs').read_text()
-        for forbidden in ('Process.Start','System.Management.Automation','HttpClient','File.Read','SendInput'):
-            self.assertNotIn(forbidden,source)
-        self.assertGreaterEqual(len(fixtures()),100)
-        native=(ROOT/'pcucp-next/dotnet/PcuCp.NativeHost/PcuCp.NativeHost.csproj').read_text()
-        self.assertNotIn('LegacySmartPlan',native)
-
-
-@unittest.skipUnless(sys.platform=='win32','Requires Windows PowerShell 5.1 captured-reply differential')
-class SmartPlanWindowsTests(unittest.TestCase):
-    maxDiff=None
-    def test_exact_payload_query_order_errors_brief_and_exit(self):
-        cases=fixtures()
-        with tempfile.TemporaryDirectory(prefix='CUCP smart-plan 한글 ') as tmp:
-            root=Path(tmp);source=root/'original.ps1';source.write_bytes(subprocess.check_output(['git','show',f'{BASELINE_TREE}:scripts/cucp.ps1'],cwd=ROOT))
-            data=root/'fixtures.json';data.write_text(json.dumps(cases,ensure_ascii=True),encoding='utf-8-sig')
-            runner=root/'capture.ps1'
-            runner.write_text(r'''
-param([string]$Source,[string]$InputPath)
+CAPTURE_RUNNER = r'''
+param([string]$Source,[string]$InputPath,[switch]$CurrentBridge,[switch]$ExactConsole)
 $ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[ref]$errors)
-foreach($name in @('_Read-OptValue','_Read-Switch','_TaskPlan-QuoteToken','_TaskPlan-StepString','Invoke-MacroSmartPlan')) {
+$names=@('_Read-OptValue','_Read-Switch','_TaskPlan-QuoteToken','_TaskPlan-StepString','Invoke-MacroSmartPlan')
+if($CurrentBridge){$names=@('_Invoke-LegacyCompatibility')+$names}
+foreach($name in $names) {
  $fn=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
- if($fn.Count -ne 1){throw "Expected exact pinned function $name"};. ([scriptblock]::Create($fn[0].Extent.Text))
+ if($fn.Count -ne 1){throw "Expected exact source function $name"}
+ $body=$fn[0].Extent.Text
+ if($ExactConsole -and $name -eq 'Invoke-MacroSmartPlan') {
+   $pattern='(?m)^[ \t]*if \(\$Brief'
+   $matches=[regex]::Matches($body,$pattern)
+   if($matches.Count -ne 1){throw 'Expected one SmartPlan pre-format elapsed seam'}
+   # Only elapsed changes, immediately before the original formatting branch.
+   # Both original $payload and retained-adapter $state.payload are supported.
+   $seam='$elapsed=0; if (Get-Variable payload -Scope Local -ErrorAction SilentlyContinue) { $payload.elapsed_ms=0 }; if (Get-Variable state -Scope Local -ErrorAction SilentlyContinue) { $state.payload.elapsed_ms=0 };' + "`n"
+   $body=$body.Insert($matches[0].Index,$seam)
+ }
+ . ([scriptblock]::Create($body))
 }
 function Capture-Reply($kind,$argv,$stage,$result) {
  [void]$script:queries.Add([ordered]@{kind=$kind;argv=@($argv)})
@@ -116,16 +110,39 @@ foreach($fixture in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Con
  $writer=New-Object IO.StringWriter;$previous=[Console]::Out;[Console]::SetOut($writer)
  try {
   $exitCode=Invoke-MacroSmartPlan -Rest $fixture.rest
-  $raw=$writer.ToString().TrimEnd([char[]]"`r`n")
+  $console=$writer.ToString()
+  $raw=$console.TrimEnd([char[]]"`r`n")
   if($Brief -and -not ($fixture.rest -contains '--json-only')) {$payload=$null;$brief=$raw -replace 'elapsed_ms=\d+','elapsed_ms=0'}
   else {$payload=$raw|ConvertFrom-Json;$payload.elapsed_ms=0;$brief=$null}
   $expected=@{state='complete';payload=$payload;exit=[int]$exitCode;brief=$brief;queries=@($script:queries)}
  }catch{$expected=@{state='error';error=$_.Exception.Message;queries=@($script:queries)}}
- finally{[Console]::SetOut($previous);$writer.Dispose()}
+ finally{[Console]::SetOut($previous);if($ExactConsole){$expected['console']=$writer.ToString()};$writer.Dispose()}
  [void]$all.Add(@{expected=$expected;args=@{rest=@($fixture.rest);cache_seconds=$CacheSeconds;brief=$Brief;elapsed_ms=0;captured_replies=@($script:replies)}})
 }
 [Console]::Out.WriteLine((ConvertTo-Json -InputObject @($all) -Depth 64 -Compress))
-''',encoding='utf-8-sig')
+'''
+
+
+class SmartPlanSourceTests(unittest.TestCase):
+    def test_isolated_and_fixture_matrix(self):
+        source=(ROOT/'pcucp-next/dotnet/PcuCp.LegacySmartPlan/LegacySmartPlanKernel.cs').read_text()
+        for forbidden in ('Process.Start','System.Management.Automation','HttpClient','File.Read','SendInput'):
+            self.assertNotIn(forbidden,source)
+        self.assertGreaterEqual(len(fixtures()),100)
+        self.assertTrue((PROJECT/'PcuCp.LegacySmartPlan.ContractTests.csproj').is_file())
+        self.assertNotEqual((ROOT/'pcucp-next/dotnet/PcuCp.LegacySmartPlan').parent.name,'PcuCp.NativeHost')
+
+
+@unittest.skipUnless(sys.platform=='win32','Requires Windows PowerShell 5.1 captured-reply differential')
+class SmartPlanWindowsTests(unittest.TestCase):
+    maxDiff=None
+    def test_exact_payload_query_order_errors_brief_and_exit(self):
+        cases=fixtures()
+        with tempfile.TemporaryDirectory(prefix='CUCP smart-plan 한글 ') as tmp:
+            root=Path(tmp);source=root/'original.ps1';source.write_bytes(subprocess.check_output(['git','show',f'{BASELINE_TREE}:scripts/cucp.ps1'],cwd=ROOT))
+            data=root/'fixtures.json';data.write_text(json.dumps(cases,ensure_ascii=True),encoding='utf-8-sig')
+            runner=root/'capture.ps1'
+            runner.write_text(CAPTURE_RUNNER,encoding='utf-8-sig')
             original=subprocess.run(['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',str(runner),'-Source',str(source),'-InputPath',str(data)],capture_output=True,timeout=90)
             self.assertEqual(original.returncode,0,original.stderr.decode('utf-8',errors='replace'))
             captured=json.loads(original.stdout.decode('utf-8-sig'))
@@ -156,3 +173,33 @@ foreach($fixture in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Con
             self.assertEqual(len(prefix_results),len(expected_queries))
             for new,trace in zip(prefix_results,expected_queries):
                 self.assertEqual(new,dict(state='query',query=trace[-1],queries=trace))
+
+
+@unittest.skipUnless(sys.platform=='win32' and os.environ.get('CUCP_SMART_PLAN_TEST_HOST'),
+                     'Requires Windows retained SmartPlan adapter and matching native host')
+class SmartPlanAdapterWindowsTests(unittest.TestCase):
+    maxDiff=None
+
+    def test_actual_adapter_payload_console_errors_exit_and_queries(self):
+        cases=fixtures()
+        with tempfile.TemporaryDirectory(prefix='CUCP smart adapter 한글 ') as temp:
+            root=Path(temp)
+            original=root/'original.ps1'
+            original.write_bytes(subprocess.check_output(['git','show',f'{BASELINE_TREE}:scripts/cucp.ps1'],cwd=ROOT))
+            inputs=root/'fixtures.json'
+            inputs.write_text(json.dumps(cases,ensure_ascii=True),encoding='utf-8-sig')
+            runner=root/'capture.ps1';runner.write_text(CAPTURE_RUNNER,encoding='utf-8-sig')
+            command=['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',str(runner),'-InputPath',str(inputs),'-ExactConsole']
+            env={**os.environ,'CUCP_NATIVE_HOST':os.environ['CUCP_SMART_PLAN_TEST_HOST']}
+            before=subprocess.run([*command,'-Source',str(original)],capture_output=True,timeout=90,env=env)
+            after=subprocess.run([*command,'-Source',str(ROOT/'scripts/cucp.ps1'),'-CurrentBridge'],capture_output=True,timeout=600,env=env)
+            self.assertEqual(before.returncode,0,before.stderr.decode('utf-8',errors='replace'))
+            self.assertEqual(after.returncode,0,after.stderr.decode('utf-8',errors='replace'))
+            old=json.loads(before.stdout.decode('utf-8-sig'));new=json.loads(after.stdout.decode('utf-8-sig'))
+            self.assertEqual(len(old),len(cases));self.assertEqual(len(new),len(cases))
+            for fixture,left,right in zip(cases,old,new):
+                with self.subTest(fixture=fixture):
+                    # Console is the actual StringWriter output including CRLF,
+                    # indentation, property order and ConvertTo-Json depth behavior.
+                    # Do not reserialize payloads or normalize emitted Console text.
+                    self.assertEqual(right['expected'],left['expected'])

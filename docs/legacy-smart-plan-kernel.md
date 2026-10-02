@@ -1,10 +1,13 @@
-# SmartPlan captured-reply qualification candidate
+# SmartPlan captured-reply migration
 
 The isolated source `pcucp-next/dotnet/PcuCp.LegacySmartPlan/LegacySmartPlanKernel.cs`
 is outside NativeHost's compile wildcard. Its independent net8 harness is
 `pcucp-next/dotnet/PcuCp.LegacySmartPlan.ContractTests`. It has no PowerShell SDK,
-process, filesystem, network, desktop or model dependency. No production
-registration or PowerShell retirement is part of this checkpoint.
+process, filesystem, network, desktop or model dependency. The 201-case Windows
+oracle and captured-prefix checks passed at a03d2788 / run 36938195037. NativeHost
+now explicitly links the kernel and registers smart-plan-advance. The feature
+branch adapter preserves read-only acquisition; current-commit actual-adapter
+qualification remains required.
 
 `Advance({rest, cache_seconds, brief, elapsed_ms, captured_replies})` deterministically
 replays a bounded planning sequence. A missing capture returns
@@ -48,8 +51,9 @@ The Windows test builds the isolated harness and uses generated reply fixtures
 only. It never loads user windows or starts authenticated applications.
 
 No Linux build or fixture-source check establishes PowerShell semantic parity.
-Do not retire the original 17,025-byte/334-line function until exact Windows
-qualification and the later actual adapter comparison pass. Numeric conversion,
+The original 17,025-byte/334-line builder has an independently qualified C#
+equivalent. Full replacement qualification additionally requires the actual
+retained-adapter comparison. Numeric conversion,
 PowerShell object/string coercion and tied first-candidate selection remain
 explicit qualification concerns.
 
@@ -70,3 +74,22 @@ Four additional empty/singleton/nested history-array cases bring the matrix to
 201; these new shapes still require the Windows oracle. Promoted rank values,
 Score parameter overflow binding, fractional options and tied selection matched
 in that first run. The original PS implementation remains authoritative.
+
+Actual retained-adapter qualification is additionally gated by
+`CUCP_SMART_PLAN_TEST_HOST`, the absolute matching NativeHost DLL or EXE path.
+The test imports current `_Invoke-LegacyCompatibility`, option/quoting readers,
+and `Invoke-MacroSmartPlan`; only history/port/native acquisition is stubbed.
+All 201 cases compare complete emitted payload/error/exit, exact acquisition trace
+and the actual Console output captured in a StringWriter, including CRLF,
+indentation, JSON property order and serialization depth. Console output is never
+reconstructed from a parsed payload.
+
+The single test seam inserts elapsed=0 immediately before each implementation's
+existing Brief/JSON formatting branch, updating original `$payload.elapsed_ms`
+or retained `$state.payload.elapsed_ms` as applicable. No other field or emitted
+text is normalized. Original 201 isolated-kernel and prefix checks remain.
+Semantic errors before any query (missing label, invalid numeric options) exercise
+the production evaluation wrapper as well as replay-time errors. This adapter
+suite must pass before claiming equivalence of the source replacement.
+
+The registered evaluation wrapper preserves the harness semantic-error boundary before replay. The adapter independently validates exact query order and argv, permits at most five probes and six pure replay calls, and checks completion status/boolean/exit consistency. It never executes recommended commands.
