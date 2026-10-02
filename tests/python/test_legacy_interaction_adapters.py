@@ -27,6 +27,18 @@ OWNED_STATE_EFFECTS = {'Native', 'Appshot', 'Vision', 'PointCacheWrite', 'Anchor
                        'TrajectoryAppend', 'Notice', 'Cucp'}
 
 
+def adapter_public_source(root=ROOT):
+    """The checked manifest explicitly chooses draft or promoted delegates."""
+    data=json.loads((root/'.github/migration-adapters.json').read_text(encoding='utf-8'))
+    known={'execution','precision','cdp','interaction','diagnostics','file-images'}
+    if not isinstance(data,dict) or set(data)!={'test_adapters'}:
+        raise ValueError('Expected the exact migration adapter manifest schema.')
+    families=data['test_adapters']
+    if not isinstance(families,list) or any(type(v) is not str or v not in known for v in families) or len(families)!=len(set(families)):
+        raise ValueError('Adapter families must be unique known names.')
+    return root/('scripts/cucp.ps1' if 'interaction' in families else 'scripts/cucp-legacy-interaction-adapter.ps1')
+
+
 def powershell(*, required=False, portable=False):
     configured = os.environ.get('CUCP_INTERACTION_POWERSHELL')
     executable = configured or shutil.which('pwsh' if portable else 'powershell.exe')
@@ -69,6 +81,7 @@ def run_adapter(fixtures, *, descriptors=False, startup_clone=False, portable=Fa
         command = [ps, '-NoProfile', '-NonInteractive', '-File', str(RUNNER),
                    '-Source', str(accepted), '-BaselineSource', str(baseline),
                    '-SharedSource', str(SHARED), '-AdapterSource', str(ADAPTER),
+                   '-PublicSource', str(adapter_public_source()),
                    '-OracleSource', str(ORACLE), '-InputPath', str(inputs)]
         if descriptors:
             command.append('-ValidateDescriptors')
@@ -237,6 +250,18 @@ def ordinary_results():
 
 
 class InteractionAdapterHarnessTests(unittest.TestCase):
+    def test_manifest_explicitly_selects_public_delegate_source(self):
+        with tempfile.TemporaryDirectory(prefix='CUCP interaction manifest ') as folder:
+            root=Path(folder);(root/'.github').mkdir();manifest=root/'.github/migration-adapters.json'
+            for families,expected in ((['execution'],'scripts/cucp-legacy-interaction-adapter.ps1'),
+                                      (['execution','interaction'],'scripts/cucp.ps1')):
+                manifest.write_text(json.dumps({'test_adapters':families}),encoding='utf-8')
+                self.assertEqual(adapter_public_source(root),root/expected)
+            for malformed in ({}, {'test_adapters':'interaction'}, {'test_adapters':['interaction','interaction']},
+                              {'test_adapters':['unknown']}, {'test_adapters':[],'fallback':True}):
+                manifest.write_text(json.dumps(malformed),encoding='utf-8')
+                with self.assertRaises(ValueError):adapter_public_source(root)
+
     def test_shared_corpus_stays_exactly_870_plus_12(self):
         self.assertEqual(len(cases()), 870)
         self.assertEqual(len(boundary_cases()), 12)
@@ -290,6 +315,26 @@ class InteractionAdapterHarnessTests(unittest.TestCase):
 
 
 class InteractionDecodedDescriptorTests(unittest.TestCase):
+    def test_selected_public_delegates_preserve_their_source_script_path(self):
+        fixtures=[dict(case=operation,family='interaction',public=name,rest=['--label','literal 한글'])
+                  for operation,name in (
+                    ('find-label','Invoke-MacroFindLabel'),('click-point','Invoke-MacroClickPoint'),
+                    ('click-label','Invoke-MacroClickLabel'),('safe-type','Invoke-MacroSafeType'),
+                    ('icon-find','Invoke-MacroIconFind'),('icon-click','Invoke-MacroIconClick'),
+                    ('ocr-click','Invoke-MacroOcrClick'),('precision-validate','Invoke-MacroPrecisionValidate'))]
+        results=run_adapter(fixtures,startup_clone=True)
+        self.assertEqual(len(results),8)
+        expected=adapter_public_source().resolve()
+        for fixture,result in zip(fixtures,results):
+            with self.subTest(public=fixture['public']):
+                self.assertEqual(result['host_calls'],1)
+                self.assertEqual(result['entry'],'legacy-interaction-session')
+                self.assertEqual(result['operation'],fixture['case'])
+                self.assertEqual(Path(result['script_path']).resolve(),expected)
+                self.assertEqual(result['caller_after'],result['caller_before'])
+                self.assertEqual(result['startup_after'],result['startup_before'])
+                self.assertEqual(result['exit'],7)
+
     def test_wrapper_host_state_rest_cannot_mutate_caller_or_startup(self):
         fixtures=[dict(case=name,rest=rest,family=family) for family in ('interaction','execution') for name,rest in (
             ('null-argv',None),('empty-argv',[]),('null-element',[None]),
@@ -302,6 +347,9 @@ class InteractionDecodedDescriptorTests(unittest.TestCase):
                 self.assertEqual(result['case'],fixture['case'])
                 self.assertEqual(result['family'],fixture['family'])
                 self.assertEqual(result['host_calls'],1)
+                self.assertEqual(result['compatibility_calls'],0)
+                self.assertIs(result['live'],False)
+                self.assertIs(result['sensitive'],False)
                 self.assertEqual(result['entry'],f"legacy-{fixture['family']}-session")
                 self.assertEqual(result['exit'],7)
                 self.assertEqual(result['state_type'],'System.String[]')

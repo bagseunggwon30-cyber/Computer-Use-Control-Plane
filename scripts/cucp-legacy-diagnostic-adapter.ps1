@@ -1,6 +1,6 @@
-﻿# Candidate diagnostic acquisition adapter. Shared _Execution-* functions own
+﻿# Diagnostic acquisition adapter. Shared _Execution-* functions own
 # framing, process lifetime, immutable authority and mutation uncertainty.
-# This file defines functions only; production routing remains unchanged.
+# Main routes seven public delegates here; benchmark/audit bodies remain there.
 function _Diagnostic-Require($Condition,[string]$Message) { _Execution-Require $Condition $Message }
 function _Diagnostic-Fields($Value,[string[]]$Names) { _Execution-Fields $Value $Names }
 function _Diagnostic-ArgvEquals($Actual,[string[]]$Expected) {

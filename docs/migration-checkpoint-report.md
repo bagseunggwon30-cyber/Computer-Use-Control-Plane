@@ -31,6 +31,36 @@ to reproduce the current [inventory](legacy-function-inventory.json). Canonical
 index blobs avoid checkout line-ending differences. Review and stage PS changes
 before using `--update`.
 
+## Current integration awaiting the full gate
+
+The subsequent batch replaces 21 more original bodies: eight interaction macros,
+seven diagnostic macros and six image/OCR helpers. Benchmark and audit-summary
+retain their original bodies because unusual JSON conversion cases are not fully
+matched. The exact source/adapter comparisons passed at `7fb6c2f6`; its one failed
+job was a new clone-test setup error before assertions. That fixture is repaired
+without removing assertions, and remains part of the required bundled full gate.
+
+| Canonical Git source | Accepted `56be343c` | Published `7fb6c2f6` | Current integration |
+| --- | ---: | ---: | ---: |
+| All tracked `.ps1` source/tests | 823,078 | 930,801 | 849,829 |
+| Runtime files under `scripts/` | 667,770 | 711,375 | 611,370 |
+| Other PS source/tests | 155,308 | 219,426 | 238,459 |
+
+The integration removes 80,972 net PS bytes relative to `7fb6c2f6`. Relative to
+the prior fully accepted batch, runtime PS decreases by 56,400 bytes, while new
+reference and startup fixtures add 83,151 other PS bytes. Therefore total PS is
+currently **26,751 bytes higher** than that accepted milestone, despite genuine
+runtime migration. These fixtures remain visible, counted PowerShell; they must
+also be migrated or retired with equivalent regression coverage before zero is
+reached. Current total reduction from the original baseline is 163,649 bytes.
+
+New production-entry checks run a disposable copied main script with real module
+loading and public dispatch. Hash-checked copied acquisition leaves stop before
+any provider/native action, and only the final family entry is captured. The
+original 21 Pester assertions remain unchanged. The integrated checkpoint needs
+the complete Windows, browser, portable and regression gate; none of this is
+interactive desktop, clipboard or IME acceptance.
+
 ## Qualification and integration
 
 All focused jobs passed at `e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe` in

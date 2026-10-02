@@ -96,3 +96,24 @@ unchanged caller argv and unchanged serialized startup, preserving the existing
 PowerShell conversion of null and empty values. This check executes no process
 or acquisition and does not claim that malformed startup argv is accepted by
 NativeHost. It leaves the 870 source cases and 12 uncertainty cases intact.
+The clone-only disposable PowerShell process fixes the global sensitive ceiling
+to Constant=false and places a throwing guard at the compatibility subprocess
+boundary. It requires zero compatibility calls and false live/sensitive state;
+the existing confirmation gate itself is retained.
+
+
+## Manifest-selected public delegates
+
+The existing `.github/migration-adapters.json` manifest explicitly selects the
+public loader: without `interaction`, its eight draft delegates come from the
+support module; with `interaction`, they come from `scripts/cucp.ps1`. The family
+hooks continue to come from the support module. A promoted support module that
+still defines any of the public delegates is rejected, as are missing/duplicate
+selected definitions. There is no inferred fallback from missing main delegates.
+
+The loader compiles each selected public definition with its original filename
+using the Windows PowerShell 5.1 `Parser.ParseInput` filename overload, preserving
+`PSCommandPath`. Eight inert host checks assert each operation and ScriptPath;
+after promotion the path must be the main `scripts/cucp.ps1` wrapper. The source
+entry points are never executed. Draft support, all 870 ordinary comparisons,
+all 12 uncertainty cases, exact Console comparisons and descriptor guards remain.

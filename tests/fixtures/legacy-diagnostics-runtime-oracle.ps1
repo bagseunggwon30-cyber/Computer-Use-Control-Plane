@@ -1,4 +1,4 @@
-﻿param([string]$Source,[string]$InputPath,[string]$AdapterSource,[string]$BridgeSource)
+﻿param([string]$Source,[string]$InputPath,[string]$AdapterSource,[string]$BridgeSource,[switch]$ProductionEntry)
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 if($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1){throw 'Expected Windows PowerShell 5.1'}
@@ -8,7 +8,18 @@ $sourceText=[IO.File]::ReadAllText($Source)
 $fixtures=ConvertFrom-Json ([IO.File]::ReadAllText($InputPath))
 $tokens=$null;$parseErrors=$null
 $ast=[Management.Automation.Language.Parser]::ParseInput($sourceText,[ref]$tokens,[ref]$parseErrors)
-if($parseErrors.Count){throw 'Pinned source parse failed'}
+if($parseErrors.Count){throw 'Selected source parse failed'}
+if($ProductionEntry -and (-not $AdapterSource -or [IO.Path]::GetFullPath($Source) -cne [IO.Path]::GetFullPath($BridgeSource))){throw 'Production entries must come from current main with support hooks'}
+if($ProductionEntry){
+ # Import only the inert AST validator; never execute the guard driver's body.
+ $guardTokens=$null;$guardErrors=$null
+ $guardAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'legacy-diagnostics-adapter-guards.ps1'),[ref]$guardTokens,[ref]$guardErrors)
+ if($guardErrors.Count){throw 'Public delegate validator failed to parse'}
+ $validator=@($guardAst.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Fixture-ValidatePublicDelegate'},$true))
+ if($validator.Count -ne 1){throw 'Expected one inert public delegate validator'}
+ . ([scriptblock]::Create($validator[0].Extent.Text))
+}
+
 function Encode-Wire($Value){
  if($null -eq $Value){return @{kind='scalar';value=$null}}
  if($Value -is [string] -or $Value -is [ValueType]){return @{kind='scalar';value=$Value}}
@@ -116,6 +127,13 @@ foreach($name in $names){
  $nodes=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
  if($nodes.Count -ne 1){throw "Expected unique original definition $name"}
  $body=$nodes[0].Extent.Text
+ # Production loads current public delegates byte-for-byte. Benchmark remains
+ # the current original body and still receives the exact acquisition seams.
+ if($ProductionEntry -and $name -cin @('Invoke-MacroPerf','Invoke-MacroDiagnoseLag','Invoke-MacroHealthQuick','Invoke-MacroHealthDetail','Invoke-MacroSelfTest')){
+  $operation=switch($name){'Invoke-MacroPerf'{'perf'};'Invoke-MacroDiagnoseLag'{'diagnose-lag'};'Invoke-MacroHealthQuick'{'health-quick'};'Invoke-MacroHealthDetail'{'health-detail'};'Invoke-MacroSelfTest'{'self-test'}}
+  Fixture-ValidatePublicDelegate $nodes[0] $operation
+  $definitions[$name]=$body;continue
+ }
  $scope=switch($name){'Invoke-MacroPerf'{'perf-sample'};'Invoke-MacroBenchmark'{'benchmark-sample'};'Invoke-MacroHealthQuick'{'health-quick'};'Invoke-MacroDiagnoseLag'{'diagnose-lag'};default{$null}}
  if($scope){$body=Replace-Once $body '[System.Diagnostics.Stopwatch]::StartNew()' "(Start-CapturedClock '$scope')"}
  if($name -in @('Invoke-MacroHealthQuick','Invoke-MacroHealthDetail')){
@@ -207,7 +225,7 @@ foreach($f in $fixtures){
  $old=[Console]::Out;$writer=New-Object IO.StringWriter;[Console]::SetOut($writer)
  try {
   $fn=switch($f.operation){'perf'{'Invoke-MacroPerf'};'benchmark'{'Invoke-MacroBenchmark'};'health-quick'{'Invoke-MacroHealthQuick'};'health-detail'{'Invoke-MacroHealthDetail'};'self-test'{'Invoke-MacroSelfTest'};'diagnose-lag'{'Invoke-MacroDiagnoseLag'};default{throw 'Unknown runtime diagnostic fixture'}}
-  $rc=if($AdapterSource){_Invoke-LegacyDiagnosticFamily -Operation ([string]$f.operation) -Rest @($f.rest)}else{& $fn -Rest @($f.rest)}
+  $rc=if($ProductionEntry){& $fn -Rest @($f.rest)}elseif($AdapterSource){_Invoke-LegacyDiagnosticFamily -Operation ([string]$f.operation) -Rest @($f.rest)}else{& $fn -Rest @($f.rest)}
   $record=[ordered]@{state='complete';payload=$script:payload;exit=[int]$rc;console=$writer.ToString();effects=(Encode-Wire @($script:trace));consumed=$script:cursor}
  }catch{$record=[ordered]@{state='error';error=$_.Exception.Message;console=$writer.ToString();effects=(Encode-Wire @($script:trace));consumed=$script:cursor}}
  finally{[Console]::SetOut($old);$writer.Dispose()}

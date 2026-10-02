@@ -2,8 +2,24 @@
 
 This isolated C# candidate covers `find-label`, `click-label` (including its
 right/double switch modes), `click-point`, `safe-type`, `icon-find`, `icon-click`,
-`ocr-click`, and `precision-validate`. The original PowerShell functions remain
-in production. No source retirement or zero-PowerShell completion is claimed.
+`ocr-click`, and `precision-validate`. Their exact qualified delegates now live
+in the main wrapper; the support module retains closed acquisition hooks. The
+integrated production and full-regression gate is pending. This does not complete
+zero-PowerShell migration.
+
+At `7fb6c2f68688ef3b414e2edc00a40d700ac15ea2`, [run 37054089596](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37054089596)
+passed all 870 candidate and 870 actual-adapter comparisons, all 12 uncertainty
+cases, the sentinel serialization probe, forged-descriptor rejection and positive
+controls. The sole failure was a new clone-only test setup trying to resolve a
+native host before installing its inert context. That fixture now fixes a false
+sensitive ceiling and forbids any compatibility call; its assertions remain and
+must pass in the full gate. The failed job is not described as a green checkpoint.
+
+Verified AST extents and body hashes were used to copy the eight delegates,
+remove their duplicate support-module definitions, and add the actual main
+module import. Manifest-selected adapter tests now load the public definitions
+from main. New inert delegate and whole-script startup checks cover source-path
+identity and module loading; they do not imply live GUI or IME evidence.
 
 The accepted behavior oracle is `scripts/cucp.ps1` at tree
 `c0d15371b60ebf62be45bfa68b90282405f07273`, reachable from published commit

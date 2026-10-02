@@ -240,7 +240,7 @@
     },
     {
       "path": "scripts/cucp.ps1",
-      "lines": 10921,
+      "lines": 8570,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -376,807 +376,807 @@
         },
         {
           "name": "Invoke-NativeHelper",
-          "line": 1161
+          "line": 1163
         },
         {
           "name": "Write-Notice",
-          "line": 1412
+          "line": 1414
         },
         {
           "name": "ConvertTo-ProcessArgumentString",
-          "line": 1426
+          "line": 1428
         },
         {
           "name": "Test-Tool",
-          "line": 1443
+          "line": 1445
         },
         {
           "name": "Invoke-Cucp",
-          "line": 1457
+          "line": 1459
         },
         {
           "name": "Test-LiveControlRequest",
-          "line": 1592
+          "line": 1594
         },
         {
           "name": "Test-CoordinateMissingObservation",
-          "line": 1626
+          "line": 1628
         },
         {
           "name": "Assert-Authorized",
-          "line": 1638
+          "line": 1640
         },
         {
           "name": "Get-CacheKey",
-          "line": 1659
+          "line": 1661
         },
         {
           "name": "Get-CachedAppshot",
-          "line": 1667
+          "line": 1669
         },
         {
           "name": "Save-AppshotCache",
-          "line": 1683
+          "line": 1685
         },
         {
           "name": "Invoke-Appshot",
-          "line": 1691
+          "line": 1693
         },
         {
           "name": "_Build-AppshotResult",
-          "line": 1738
+          "line": 1740
         },
         {
           "name": "_Ensure-Win32Loaded",
-          "line": 1801
+          "line": 1803
         },
         {
           "name": "_Enumerate-Win32Windows",
-          "line": 1822
+          "line": 1824
         },
         {
           "name": "_Ensure-UIALoaded",
-          "line": 1864
+          "line": 1866
         },
         {
           "name": "_Slug",
-          "line": 1877
+          "line": 1879
         },
         {
           "name": "_Get-UIAffordances",
-          "line": 1887
+          "line": 1889
         },
         {
           "name": "Find-Element",
-          "line": 2060
+          "line": 2062
         },
         {
           "name": "Find-AffordanceById",
-          "line": 2164
+          "line": 2166
         },
         {
           "name": "Get-ElementCenter",
-          "line": 2172
+          "line": 2174
         },
         {
           "name": "Invoke-Macro",
-          "line": 2181
+          "line": 2183
         },
         {
           "name": "_Read-OptValue",
-          "line": 2349
+          "line": 2351
         },
         {
           "name": "_Read-AllOptValues",
-          "line": 2356
+          "line": 2358
         },
         {
           "name": "_Read-Switch",
-          "line": 2367
+          "line": 2369
         },
         {
           "name": "_Macro-NotImplemented",
-          "line": 2389
+          "line": 2391
         },
         {
           "name": "_Read-StandaloneConfirmation",
-          "line": 2407
+          "line": 2409
         },
         {
           "name": "_Invoke-LegacyCompatibility",
-          "line": 2419
+          "line": 2421
         },
         {
           "name": "_Classify-SafetyFromText",
-          "line": 2482
+          "line": 2484
         },
         {
           "name": "Invoke-MacroSafetyClassify",
-          "line": 2491
+          "line": 2493
         },
         {
           "name": "_Ensure-NativeDesktopTypes",
-          "line": 2524
+          "line": 2526
         },
         {
           "name": "_Native-FindWindow",
-          "line": 2544
+          "line": 2546
         },
         {
           "name": "_Native-FocusWindow",
-          "line": 2556
+          "line": 2558
         },
         {
           "name": "_Native-SendShortcut",
-          "line": 2574
+          "line": 2576
         },
         {
           "name": "_Native-SetClipboard",
-          "line": 2599
+          "line": 2601
         },
         {
           "name": "_Native-ClickPoint",
-          "line": 2605
+          "line": 2607
         },
         {
           "name": "_Native-HitTestPoint",
-          "line": 2621
+          "line": 2623
         },
         {
           "name": "_CoordProfile-MonitorObject",
-          "line": 2687
+          "line": 2689
         },
         {
           "name": "_CoordProfile-WindowFromPrecheck",
-          "line": 2714
+          "line": 2716
         },
         {
           "name": "_Build-CoordProfile",
-          "line": 2734
+          "line": 2736
         },
         {
           "name": "Invoke-MacroCoordProfile",
-          "line": 2898
+          "line": 2900
         },
         {
           "name": "_CoordMap-ResolveWindow",
-          "line": 2921
+          "line": 2923
         },
         {
           "name": "_Build-CoordMap",
-          "line": 2932
+          "line": 2934
         },
         {
           "name": "Invoke-MacroCoordMap",
-          "line": 2989
+          "line": 2991
         },
         {
           "name": "_Precision-EncodeWire($Value)",
-          "line": 3020
+          "line": 3022
         },
         {
           "name": "_Precision-Require($Condition,[string]$Message)",
-          "line": 3028
+          "line": 3030
         },
         {
           "name": "_Precision-Fields($Value,[string[]]$Names)",
-          "line": 3032
+          "line": 3034
         },
         {
           "name": "_Precision-DecodeWire($Wire)",
-          "line": 3038
+          "line": 3040
         },
         {
           "name": "_Precision-WriteChunks($Writer,[long]$Id,[string]$Target,$Value)",
-          "line": 3065
+          "line": 3067
         },
         {
           "name": "_Precision-StartProcess",
-          "line": 3078
+          "line": 3080
         },
         {
           "name": "_Precision-ReadMessage($Reader,[long]$ExpectedId)",
-          "line": 3099
+          "line": 3101
         },
         {
           "name": "_Precision-Reply($Writer,[long]$Id,$Value,$ErrorMessage)",
-          "line": 3120
+          "line": 3122
         },
         {
           "name": "_Precision-AssertArgv($Actual,[string[]]$Expected)",
-          "line": 3125
+          "line": 3127
         },
         {
           "name": "_Precision-ReadEffect($Effect,$State)",
-          "line": 3130
+          "line": 3132
         },
         {
           "name": "_Invoke-LegacyPrecisionSession",
-          "line": 3195
+          "line": 3197
         },
         {
           "name": "_Invoke-LegacyPrecision",
-          "line": 3265
+          "line": 3267
         },
         {
           "name": "_Invoke-LegacyPrecisionValue",
-          "line": 3273
+          "line": 3275
         },
         {
           "name": "_Precision-HistoryLines",
-          "line": 3279
-        },
-        {
-          "name": "_AnchorHistory-Read",
           "line": 3281
         },
         {
-          "name": "_AnchorHistory-NormDistance",
+          "name": "_AnchorHistory-Read",
           "line": 3283
         },
         {
-          "name": "_AnchorHistory-Append",
+          "name": "_AnchorHistory-NormDistance",
           "line": 3285
         },
         {
-          "name": "_AnchorHistory-Score",
-          "line": 3291
+          "name": "_AnchorHistory-Append",
+          "line": 3287
         },
         {
-          "name": "Invoke-MacroCoordAnchor",
+          "name": "_AnchorHistory-Score",
           "line": 3293
         },
         {
-          "name": "_Native-Screenshot",
+          "name": "Invoke-MacroCoordAnchor",
           "line": 3295
         },
         {
+          "name": "_Native-Screenshot",
+          "line": 3297
+        },
+        {
           "name": "Invoke-MacroScreenshot",
-          "line": 3326
+          "line": 3328
         },
         {
           "name": "Invoke-MacroListAffordances",
-          "line": 3338
+          "line": 3340
         },
         {
           "name": "Invoke-MacroClickId",
-          "line": 3446
+          "line": 3448
         },
         {
           "name": "Invoke-MacroWaitLabel",
-          "line": 3473
+          "line": 3475
         },
         {
           "name": "Invoke-MacroFindLabel",
-          "line": 3506
+          "line": 3508
         },
         {
           "name": "Invoke-MacroClickLabel",
-          "line": 3814
+          "line": 3510
         },
         {
           "name": "Invoke-MacroFillLabel",
-          "line": 3953
+          "line": 3512
         },
         {
           "name": "Invoke-MacroFocusWindow",
-          "line": 3986
+          "line": 3545
         },
         {
           "name": "Invoke-MacroWaitWindow",
-          "line": 4012
+          "line": 3571
         },
         {
           "name": "Invoke-MacroShortcut",
-          "line": 4061
+          "line": 3620
         },
         {
           "name": "Invoke-MacroClipboard",
-          "line": 4079
+          "line": 3638
         },
         {
           "name": "Invoke-MacroGoal",
-          "line": 4103
+          "line": 3662
         },
         {
           "name": "Invoke-MacroSelfTest",
-          "line": 4157
+          "line": 3716
         },
         {
           "name": "_Iif",
-          "line": 4308
+          "line": 3718
         },
         {
           "name": "Invoke-MacroTrajectory",
-          "line": 4310
+          "line": 3720
         },
         {
           "name": "Invoke-MacroEnsureHelper",
-          "line": 4354
+          "line": 3764
         },
         {
           "name": "_Get-VisionWorkDir",
-          "line": 4381
+          "line": 3791
         },
         {
           "name": "_Find-CodexCli",
-          "line": 4389
+          "line": 3799
         },
         {
           "name": "_Quote-NativeWindowsArgument",
-          "line": 4410
+          "line": 3820
         },
         {
           "name": "_Invoke-CodexVision",
-          "line": 4418
+          "line": 3828
         },
         {
           "name": "Invoke-MacroVisionFind",
-          "line": 4543
+          "line": 3953
         },
         {
           "name": "Invoke-MacroVisionClick",
-          "line": 4600
+          "line": 4010
         },
         {
           "name": "Invoke-MacroMetrics",
-          "line": 4684
+          "line": 4094
         },
         {
           "name": "_New-ObservationEnvelope",
-          "line": 4745
+          "line": 4155
         },
         {
           "name": "_Get-DesktopSize",
-          "line": 4822
+          "line": 4232
         },
         {
           "name": "Invoke-MacroWindows",
-          "line": 4837
+          "line": 4247
         },
         {
           "name": "Invoke-MacroFocusVerify",
-          "line": 5004
+          "line": 4414
         },
         {
           "name": "Invoke-MacroHealthQuick",
-          "line": 5085
+          "line": 4495
         },
         {
           "name": "Invoke-MacroLogTail",
-          "line": 5197
+          "line": 4497
         },
         {
           "name": "Invoke-MacroDiagnoseLag",
-          "line": 5359
+          "line": 4499
         },
         {
           "name": "Invoke-MacroCleanup",
-          "line": 5616
+          "line": 4501
         },
         {
           "name": "Invoke-MacroIconFind",
-          "line": 5818
+          "line": 4703
         },
         {
           "name": "Invoke-MacroIconClick",
-          "line": 6021
+          "line": 4705
         },
         {
           "name": "_Crop-Bitmap",
-          "line": 6083
+          "line": 4707
         },
         {
           "name": "Invoke-MacroVisionClickPrecise",
-          "line": 6116
+          "line": 4740
         },
         {
           "name": "Invoke-MacroPerf",
-          "line": 6222
+          "line": 4846
         },
         {
           "name": "Invoke-MacroHealthDetail",
-          "line": 6467
+          "line": 4848
         },
         {
           "name": "_Resolve-AppPath",
-          "line": 6553
+          "line": 4858
         },
         {
           "name": "Invoke-MacroAppLaunch",
-          "line": 6611
+          "line": 4916
         },
         {
           "name": "Invoke-MacroAppClose",
-          "line": 6684
+          "line": 4989
         },
         {
           "name": "Invoke-MacroWithApp",
-          "line": 6737
+          "line": 5042
         },
         {
           "name": "_Compute-ImageHash",
-          "line": 6865
+          "line": 5170
         },
         {
           "name": "Invoke-MacroClickAndVerify",
-          "line": 6876
+          "line": 5181
         },
         {
           "name": "Invoke-MacroNativeHealth",
-          "line": 6961
+          "line": 5266
         },
         {
           "name": "Invoke-MacroNativeWindows",
-          "line": 6979
+          "line": 5284
         },
         {
           "name": "Invoke-MacroNativeScreenshot",
-          "line": 6997
+          "line": 5302
         },
         {
           "name": "Invoke-MacroClickPoint",
-          "line": 7027
+          "line": 5332
         },
         {
           "name": "Invoke-MacroTypeNative",
-          "line": 7336
+          "line": 5334
         },
         {
           "name": "Invoke-MacroShortcutNative",
-          "line": 7362
+          "line": 5360
         },
         {
           "name": "Invoke-MacroUiaClickLabel",
-          "line": 7382
+          "line": 5380
         },
         {
           "name": "Invoke-MacroUiaInvoke",
-          "line": 7429
+          "line": 5427
         },
         {
           "name": "Invoke-MacroUiaSetValue",
-          "line": 7461
+          "line": 5459
         },
         {
           "name": "Invoke-MacroUiaToggle",
-          "line": 7488
+          "line": 5486
         },
         {
           "name": "Invoke-MacroHitTest",
-          "line": 7524
+          "line": 5522
         },
         {
           "name": "Invoke-MacroHitTestBatch",
-          "line": 7581
+          "line": 5579
         },
         {
           "name": "Invoke-MacroHitScan",
-          "line": 7663
+          "line": 5661
         },
         {
           "name": "_Set-ObjectProperty",
-          "line": 7704
+          "line": 5702
         },
         {
           "name": "_PointPlan-CacheKey",
-          "line": 7711
+          "line": 5709
         },
         {
           "name": "_PointPlan-CachePath",
-          "line": 7716
+          "line": 5714
         },
         {
           "name": "_PointPlan-ReadCache",
-          "line": 7718
+          "line": 5716
         },
         {
           "name": "_PointPlan-WriteCache",
-          "line": 7720
+          "line": 5718
         },
         {
           "name": "Invoke-MacroPointPlan",
-          "line": 7722
+          "line": 5720
         },
         {
           "name": "_TargetValidate-ConfidenceRank",
-          "line": 7724
+          "line": 5722
         },
         {
           "name": "_TargetValidate-SizeClass",
-          "line": 7726
+          "line": 5724
         },
         {
           "name": "_TargetValidate-PointEdgeDistance",
-          "line": 7728
+          "line": 5726
         },
         {
           "name": "_TargetValidate-InvokePointPlanJson",
-          "line": 7730
+          "line": 5728
         },
         {
           "name": "Invoke-MacroTargetValidate",
-          "line": 7742
+          "line": 5740
         },
         {
           "name": "Invoke-MacroSafeType",
-          "line": 7748
+          "line": 5746
         },
         {
           "name": "Test-CdpPortQuick",
-          "line": 7858
+          "line": 5755
         },
         {
           "name": "Invoke-MacroHistory",
-          "line": 7941
+          "line": 5838
         },
         {
           "name": "Invoke-MacroSmartPlan",
-          "line": 8047
+          "line": 5944
         },
         {
           "name": "_Parse-WorkflowStepTokens",
-          "line": 8144
+          "line": 6041
         },
         {
           "name": "_Read-WorkflowStepSpecs",
-          "line": 8179
+          "line": 6076
         },
         {
           "name": "_Build-WorkflowPlan",
-          "line": 8200
+          "line": 6097
         },
         {
           "name": "Invoke-MacroWorkflowPlan",
-          "line": 8214
+          "line": 6111
         },
         {
           "name": "_Invoke-LegacyExecutionChild",
-          "line": 8227
+          "line": 6124
         },
         {
           "name": "_Execution-EncodeWire($Value)",
-          "line": 8280
+          "line": 6177
         },
         {
           "name": "_Execution-Require($Condition,[string]$Message)",
-          "line": 8288
+          "line": 6185
         },
         {
           "name": "_Execution-Fields($Value,[string[]]$Names)",
-          "line": 8292
+          "line": 6189
         },
         {
           "name": "_Execution-DecodeWire($Wire)",
-          "line": 8298
+          "line": 6195
         },
         {
           "name": "_Execution-WriteChunks($Writer,[long]$Id,[string]$Target,$Value)",
-          "line": 8325
+          "line": 6222
         },
         {
           "name": "_Execution-WriteDiagnostic($State,$Process,$Stderr,[string]$ErrorText)",
-          "line": 8338
+          "line": 6235
         },
         {
           "name": "_Execution-ValidateEffect($Effect,$State)",
-          "line": 8358
+          "line": 6255
         },
         {
           "name": "_Execution-SendEscape",
-          "line": 8419
+          "line": 6316
         },
         {
           "name": "_Execution-Dispatch($Effect,$State)",
-          "line": 8424
+          "line": 6321
         },
         {
           "name": "_Execution-EffectMayChangeState($Effect)",
-          "line": 8465
+          "line": 6362
         },
         {
           "name": "_Invoke-LegacyExecutionEffectLoop",
-          "line": 8478
+          "line": 6375
         },
         {
           "name": "_Invoke-LegacyExecutionFamily",
-          "line": 8535
+          "line": 6432
         },
         {
           "name": "_Invoke-LegacyExecutionHost",
-          "line": 8550
+          "line": 6447
         },
         {
           "name": "Invoke-MacroWorkflowRun",
-          "line": 8605
+          "line": 6502
         },
         {
           "name": "_TaskPlan-QuoteToken",
-          "line": 8607
+          "line": 6504
         },
         {
           "name": "_TaskPlan-StepString",
-          "line": 8615
+          "line": 6512
         },
         {
           "name": "_TaskPlan-UnwrapCommand",
-          "line": 8631
+          "line": 6528
         },
         {
           "name": "_AppStrategy-NormalizeRoute",
-          "line": 8639
+          "line": 6536
         },
         {
           "name": "_AppStrategy-Key",
-          "line": 8658
+          "line": 6555
         },
         {
           "name": "_AppStrategy-Read",
-          "line": 8667
+          "line": 6564
         },
         {
           "name": "_AppStrategy-LastGood",
-          "line": 8680
+          "line": 6577
         },
         {
           "name": "_AppStrategy-Append",
-          "line": 8690
+          "line": 6587
         },
         {
           "name": "Invoke-MacroAppProfile",
-          "line": 8733
+          "line": 6630
         },
         {
           "name": "_Invoke-LegacyReadOnlyQuery",
-          "line": 8834
+          "line": 6731
         },
         {
           "name": "Invoke-MacroTaskPreset",
-          "line": 8887
+          "line": 6784
         },
         {
           "name": "Invoke-MacroTaskPlan",
-          "line": 8937
+          "line": 6834
         },
         {
           "name": "Invoke-MacroTaskRun",
-          "line": 8970
+          "line": 6867
         },
         {
           "name": "Invoke-MacroFormPlan",
-          "line": 8972
+          "line": 6869
         },
         {
           "name": "Invoke-MacroFormRun",
-          "line": 9001
+          "line": 6898
         },
         {
           "name": "Invoke-MacroSmartClick",
-          "line": 9003
+          "line": 6900
         },
         {
           "name": "Invoke-MacroWatch",
-          "line": 9018
+          "line": 6915
         },
         {
           "name": "Invoke-MacroOcrScreen",
-          "line": 9032
+          "line": 6929
         },
         {
           "name": "Invoke-MacroOcrImage",
-          "line": 9061
+          "line": 6958
         },
         {
           "name": "Invoke-MacroOcrFindText",
-          "line": 9085
+          "line": 6982
         },
         {
           "name": "Invoke-MacroOcrClick",
-          "line": 9128
+          "line": 7025
         },
         {
           "name": "Invoke-MacroOcrUiaFuse",
-          "line": 9202
+          "line": 7039
         },
         {
           "name": "Invoke-MacroOcrUiaInvoke",
-          "line": 9245
+          "line": 7082
         },
         {
           "name": "Invoke-MacroScreenshotDiff",
-          "line": 9287
+          "line": 7124
         },
         {
           "name": "Invoke-MacroClickAndVerifyScreen",
-          "line": 9326
+          "line": 7163
         },
         {
           "name": "Invoke-MacroAutoDo",
-          "line": 9423
+          "line": 7260
         },
         {
           "name": "_Trajectory-Append",
-          "line": 9532
+          "line": 7369
         },
         {
           "name": "_Trajectory-Read",
-          "line": 9556
+          "line": 7393
         },
         {
           "name": "_Trajectory-Clear",
-          "line": 9570
+          "line": 7407
         },
         {
           "name": "_History-Append",
-          "line": 9594
+          "line": 7431
         },
         {
           "name": "_History-PickBestStrategy",
-          "line": 9633
+          "line": 7470
         },
         {
           "name": "_History-Stats",
-          "line": 9680
+          "line": 7517
         },
         {
           "name": "_Helper-IsUp",
-          "line": 9717
+          "line": 7554
         },
         {
           "name": "_Helper-Ensure",
-          "line": 9722
+          "line": 7559
         },
         {
           "name": "Invoke-MacroSession",
-          "line": 9743
+          "line": 7580
         },
         {
           "name": "_Cucp-RedactSecrets",
-          "line": 9961
+          "line": 7798
         },
         {
           "name": "Invoke-MacroImePaste",
-          "line": 9993
+          "line": 7830
         },
         {
           "name": "Invoke-MacroSafeTypeIme",
-          "line": 10045
+          "line": 7882
         },
         {
           "name": "Invoke-MacroModalDetect",
-          "line": 10125
+          "line": 7962
         },
         {
           "name": "Invoke-MacroRecoveryPlan",
-          "line": 10158
+          "line": 7995
         },
         {
           "name": "Invoke-MacroRecoveryRun",
-          "line": 10166
+          "line": 8003
         },
         {
           "name": "Invoke-MacroPrecisionValidate",
-          "line": 10173
+          "line": 8010
         },
         {
           "name": "Invoke-MacroBenchmark",
-          "line": 10269
+          "line": 8018
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 10410
+          "line": 8159
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 10542
+          "line": 8191
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 10657
+          "line": 8306
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 10753
+          "line": 8402
         }
       ]
     },
@@ -1284,7 +1284,7 @@
     },
     {
       "path": "scripts/cucp-legacy-interaction-adapter.ps1",
-      "lines": 217,
+      "lines": 208,
       "functions": [
         {
           "name": "_Interaction-Integer($Value)",
@@ -1321,38 +1321,6 @@
         {
           "name": "_Invoke-LegacyInteractionFamily",
           "line": 194
-        },
-        {
-          "name": "Invoke-MacroFindLabel",
-          "line": 210
-        },
-        {
-          "name": "Invoke-MacroClickPoint",
-          "line": 211
-        },
-        {
-          "name": "Invoke-MacroClickLabel",
-          "line": 212
-        },
-        {
-          "name": "Invoke-MacroSafeType",
-          "line": 213
-        },
-        {
-          "name": "Invoke-MacroIconFind",
-          "line": 214
-        },
-        {
-          "name": "Invoke-MacroIconClick",
-          "line": 215
-        },
-        {
-          "name": "Invoke-MacroOcrClick",
-          "line": 216
-        },
-        {
-          "name": "Invoke-MacroPrecisionValidate",
-          "line": 217
         }
       ]
     },
@@ -1595,8 +1563,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 930801,
-    "removed": 82677,
+    "current": 849829,
+    "removed": 163649,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
@@ -2010,6 +1978,156 @@
       "original_body_bytes": 5556,
       "original_body_sha256": "29aaa2c76435f9a05d6c0f0d60ffb07e7d5b99603717e55df17d6a8b5ac2d19d",
       "delegate_body_sha256": "1dd04987765f863f64a9695a42eb18a359e3214aa3bed50786380f118417918e"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroPerf",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticPerformance.cs",
+      "adapter": "Main retains the public delegate and loads the closed diagnostics support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 323 candidate and 323 actual-adapter cases and 196 guards passed, 18 tests without skips. Seven public delegates promoted; benchmark/audit-summary originals remain because conversion gaps are documented. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 10249,
+      "original_body_sha256": "ff9b17550327cfeae75e047d388b78846a7142615c9195534c229fa9cd699d41",
+      "delegate_body_sha256": "935f689ca74460e7109b38959cdd254ad4a161913fa14cdc6ba77162052691de"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroDiagnoseLag",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticLag.cs",
+      "adapter": "Main retains the public delegate and loads the closed diagnostics support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 323 candidate and 323 actual-adapter cases and 196 guards passed, 18 tests without skips. Seven public delegates promoted; benchmark/audit-summary originals remain because conversion gaps are documented. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 9513,
+      "original_body_sha256": "bd3b42f4601fc80cd783aaacabd56c6c0fa462d8a384e570ef8b8b615ba0c0d4",
+      "delegate_body_sha256": "080f47c2abcb8bcd05bda9926eba0ce1aa41fcda0f270fe5bdf8fa2861f47834"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroHealthQuick",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticHealth.cs",
+      "adapter": "Main retains the public delegate and loads the closed diagnostics support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 323 candidate and 323 actual-adapter cases and 196 guards passed, 18 tests without skips. Seven public delegates promoted; benchmark/audit-summary originals remain because conversion gaps are documented. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 4713,
+      "original_body_sha256": "ee8b4ce78342737a7860a9af3ca39eb34fcc6a883088a42cdc598faa044a6b90",
+      "delegate_body_sha256": "1f086fd144947f61190476c209b2ceb576de85b689df6401a7d40fb2c9462698"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroHealthDetail",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticHealth.cs",
+      "adapter": "Main retains the public delegate and loads the closed diagnostics support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 323 candidate and 323 actual-adapter cases and 196 guards passed, 18 tests without skips. Seven public delegates promoted; benchmark/audit-summary originals remain because conversion gaps are documented. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 3146,
+      "original_body_sha256": "825f7d1eb36c7f0d6a5aa9938dccde46a2b784c90de6ea79b76918c79df6662d",
+      "delegate_body_sha256": "fbddeefeaf4495bd2d97e45243edeca31ead6342382735525f10786c822921a5"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroLogTail",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticFiles.cs",
+      "adapter": "Main retains the public delegate and loads the closed diagnostics support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 323 candidate and 323 actual-adapter cases and 196 guards passed, 18 tests without skips. Seven public delegates promoted; benchmark/audit-summary originals remain because conversion gaps are documented. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 6862,
+      "original_body_sha256": "efbec3d5647e6cbf4c3886d301794ae5cea5c901d07d92c5e2d25c1bcb9c6762",
+      "delegate_body_sha256": "4d4adc686cd0fa04c8ba3791c8619a4137344a265b5302d42d28de5ea4e0cb10"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroSelfTest",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticHealth.cs",
+      "adapter": "Main retains the public delegate and loads the closed diagnostics support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 323 candidate and 323 actual-adapter cases and 196 guards passed, 18 tests without skips. Seven public delegates promoted; benchmark/audit-summary originals remain because conversion gaps are documented. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 7094,
+      "original_body_sha256": "4d4249654b27111adb5b5c7c76755a3e6915c9fe4d514b5d12fbeac9f7714632",
+      "delegate_body_sha256": "92e8892916a3e596de226461693ed73529986ee85b78d29c258f63832c88a7f5"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroReleaseNotes",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticFiles.cs",
+      "adapter": "Main retains the public delegate and loads the closed diagnostics support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 323 candidate and 323 actual-adapter cases and 196 guards passed, 18 tests without skips. Seven public delegates promoted; benchmark/audit-summary originals remain because conversion gaps are documented. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 4359,
+      "original_body_sha256": "17c09c39f14c78309fb9d2dda49c89e0cee6438459fce16e5bf06545fcfd4536",
+      "delegate_body_sha256": "c87872554b045f217294cfed81f3076d37766ddc36ba60016de47462220f59ed"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroFindLabel",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyInteraction/LegacyInteractionLabels.cs",
+      "adapter": "Main retains the public delegate and loads the closed interaction support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 870 candidate and 870 actual-adapter comparisons, 12 uncertainty cases, sentinel and descriptor checks passed. The new clone-only harness failed before assertions; its setup repair remains required in the bundled full gate. Eight exact delegate bodies copied from qualified AST extents. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 12541,
+      "original_body_sha256": "2944001d410131b959e82ddfc3a33b557d204998278503a8037cae3b8ac9e7bc",
+      "delegate_body_sha256": "98a6ac896330cb5236f89ea36a9d6327b4863453f727030cdff56eabc01c0b75"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroClickPoint",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyInteraction/LegacyInteractionPoint.cs",
+      "adapter": "Main retains the public delegate and loads the closed interaction support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 870 candidate and 870 actual-adapter comparisons, 12 uncertainty cases, sentinel and descriptor checks passed. The new clone-only harness failed before assertions; its setup repair remains required in the bundled full gate. Eight exact delegate bodies copied from qualified AST extents. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 14896,
+      "original_body_sha256": "4fd94e243d3ed8b07767339eda64ee1184f972b842f2c134f56e929d1e63a1ca",
+      "delegate_body_sha256": "d3aa65480d8218a5934746605f9edcdf8ba6d2297a1c1e4827af1385179b014b"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroClickLabel",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyInteraction/LegacyInteractionIcons.cs",
+      "adapter": "Main retains the public delegate and loads the closed interaction support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 870 candidate and 870 actual-adapter comparisons, 12 uncertainty cases, sentinel and descriptor checks passed. The new clone-only harness failed before assertions; its setup repair remains required in the bundled full gate. Eight exact delegate bodies copied from qualified AST extents. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 5993,
+      "original_body_sha256": "f27efba1d1b5cbb5651b450ab05f991e6b11e992a1388b8fc172ffc986396df8",
+      "delegate_body_sha256": "25e553ea07959ddab041eeaaef42f0e6a72c6c86e5c5489f1ae38b1903184986"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroSafeType",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyInteraction/LegacyInteractionInput.cs",
+      "adapter": "Main retains the public delegate and loads the closed interaction support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 870 candidate and 870 actual-adapter comparisons, 12 uncertainty cases, sentinel and descriptor checks passed. The new clone-only harness failed before assertions; its setup repair remains required in the bundled full gate. Eight exact delegate bodies copied from qualified AST extents. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 4642,
+      "original_body_sha256": "1a49589d9be42894cce7aea7f03f24160554ba2cb8d7db19e2debcb13789fed1",
+      "delegate_body_sha256": "6ae2637b7bc468867949d39390b7823801479c1c546eddd57b15c518b4586510"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroIconFind",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyInteraction/LegacyInteractionIcons.cs",
+      "adapter": "Main retains the public delegate and loads the closed interaction support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 870 candidate and 870 actual-adapter comparisons, 12 uncertainty cases, sentinel and descriptor checks passed. The new clone-only harness failed before assertions; its setup repair remains required in the bundled full gate. Eight exact delegate bodies copied from qualified AST extents. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 8258,
+      "original_body_sha256": "ebeb6fcc0fff51a8238823bab11f5a1353746057674fd5474322f4ab588f7122",
+      "delegate_body_sha256": "a98566e6eb623029382b3244a0690f3e332f8da9b433cf61af88ecf149711d86"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroIconClick",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyInteraction/LegacyInteractionIcons.cs",
+      "adapter": "Main retains the public delegate and loads the closed interaction support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 870 candidate and 870 actual-adapter comparisons, 12 uncertainty cases, sentinel and descriptor checks passed. The new clone-only harness failed before assertions; its setup repair remains required in the bundled full gate. Eight exact delegate bodies copied from qualified AST extents. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 2416,
+      "original_body_sha256": "8577b2ac385c3dd41740112ecf79f3ef4a96cbd09c243282747549fd12f5bb7d",
+      "delegate_body_sha256": "935be4238722c4c91e462bd384a6e59ffc503116d32c81cac3cbe5c5d42581f5"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroOcrClick",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyInteraction/LegacyInteractionInput.cs",
+      "adapter": "Main retains the public delegate and loads the closed interaction support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 870 candidate and 870 actual-adapter comparisons, 12 uncertainty cases, sentinel and descriptor checks passed. The new clone-only harness failed before assertions; its setup repair remains required in the bundled full gate. Eight exact delegate bodies copied from qualified AST extents. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 2686,
+      "original_body_sha256": "dd56918756bc9a00ccc23d099aca6629f7412c78fde93eea0dc5de26db940439",
+      "delegate_body_sha256": "37c0a185df9eabfc49aeed1a7a25a405299a43d9632411f182c75c8f0d4f1240"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroPrecisionValidate",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyInteraction/LegacyInteractionInput.cs",
+      "adapter": "Main retains the public delegate and loads the closed interaction support module; the shared execution host remains counted PowerShell.",
+      "evidence": "At 7fb6c2f68688ef3b414e2edc00a40d700ac15ea2/run37054089596, all 870 candidate and 870 actual-adapter comparisons, 12 uncertainty cases, sentinel and descriptor checks passed. The new clone-only harness failed before assertions; its setup repair remains required in the bundled full gate. Eight exact delegate bodies copied from qualified AST extents. Production main-entry and bundled full-regression acceptance are pending; no interactive Windows evidence is claimed.",
+      "original_body_bytes": 3661,
+      "original_body_sha256": "d52665ab6cdf60af2a4aa0a190b610c751c0138fc9f12c963c2b8eacae091d6c",
+      "delegate_body_sha256": "a8c904f1ce96bddc71ae64e49122d3c257b5c81d2a0f0d172965ed0139083bf5"
     }
   ]
 }

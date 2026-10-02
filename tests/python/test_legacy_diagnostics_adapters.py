@@ -23,6 +23,39 @@ NO_REPLY = {"Clock", "Timestamp", "Sleep", "Notice"}
 UNCERTAIN_MESSAGE = "mutation_may_have_occurred=true; automatic_retry=false; Diagnostic owned-state effect outcome is uncertain; automatic retry is disabled."
 
 
+MIGRATED_DIAGNOSTICS = {
+    'perf':'Invoke-MacroPerf', 'diagnose-lag':'Invoke-MacroDiagnoseLag',
+    'health-quick':'Invoke-MacroHealthQuick', 'health-detail':'Invoke-MacroHealthDetail',
+    'log-tail':'Invoke-MacroLogTail', 'self-test':'Invoke-MacroSelfTest',
+    'release-notes':'Invoke-MacroReleaseNotes',
+}
+RETAINED_DIAGNOSTICS = {'benchmark','audit-summary'}
+KNOWN_ADAPTER_FAMILIES = ('execution','precision','cdp','interaction','diagnostics','file-images')
+
+
+def diagnostic_adapter_mode(root=ROOT):
+    manifest=json.loads((root/'.github/migration-adapters.json').read_text(encoding='utf-8'))
+    if not isinstance(manifest,dict) or set(manifest)!={'test_adapters'}:
+        raise ValueError('Invalid diagnostic adapter selection manifest')
+    values=manifest['test_adapters']
+    if not isinstance(values,list) or any(type(v) is not str or v not in KNOWN_ADAPTER_FAMILIES for v in values) or len(values)!=len(set(values)):
+        raise ValueError('Invalid diagnostic adapter selection manifest')
+    return 'production' if 'diagnostics' in values else 'draft'
+
+
+def actual_adapter_arguments(pinned_source, mode):
+    if mode not in {'draft','production'}:raise ValueError('Unknown diagnostic entry mode')
+    return ['-Source',str(BRIDGE if mode=='production' else pinned_source),
+        '-AdapterSource',str(ADAPTER),'-BridgeSource',str(BRIDGE)]+(['-ProductionEntry'] if mode=='production' else [])
+
+
+def diagnostic_uses_session(operation, mode):
+    if mode not in {'draft','production'}:raise ValueError('Unknown diagnostic entry mode')
+    if operation not in MIGRATED_DIAGNOSTICS and operation not in RETAINED_DIAGNOSTICS:
+        raise ValueError('Unknown diagnostic operation')
+    return mode=='draft' or operation in MIGRATED_DIAGNOSTICS
+
+
 def changes_owned_state(effect):
     if effect["kind"] in {"AuditProbe", "ClearAppshotCache", "Appshot", "Notice", "Native", "Cli", "HelperUp", "AssertAuthorized"}:
         return True
@@ -538,6 +571,38 @@ def assert_owned_guard_files(test,row):
 
 
 class DiagnosticAdapterPortableTests(unittest.TestCase):
+    def test_manifest_selects_current_public_entries_and_retained_boundaries(self):
+        with tempfile.TemporaryDirectory(prefix='cucp-diagnostic-mode-') as temporary:
+            root=Path(temporary);(root/'.github').mkdir();manifest=root/'.github/migration-adapters.json'
+            self.assertEqual(KNOWN_ADAPTER_FAMILIES,('execution','precision','cdp','interaction','diagnostics','file-images'))
+            for mask in range(1 << len(KNOWN_ADAPTER_FAMILIES)):
+                selected=[name for index,name in enumerate(KNOWN_ADAPTER_FAMILIES) if mask & (1 << index)]
+                manifest.write_text(json.dumps(dict(test_adapters=selected)),encoding='utf-8')
+                self.assertEqual(diagnostic_adapter_mode(root),'production' if 'diagnostics' in selected else 'draft')
+            invalid=[None,True,17,'test_adapters',[],[{}],{},
+                {'test_adapters':[],'extra':True}]
+            invalid += [dict(test_adapters=value) for value in (None,False,3,'diagnostics',{},
+                [True],[1],[None],[[]],[{}],['unknown'],['Diagnostics'],['diagnostics','diagnostics'],['cdp','cdp'])]
+            for value in invalid:
+                with self.subTest(manifest=value):
+                    manifest.write_text(json.dumps(value),encoding='utf-8')
+                    with self.assertRaises(ValueError):diagnostic_adapter_mode(root)
+        pinned=Path('pinned-original.ps1')
+        for mode in ('draft','production'):
+            arguments=actual_adapter_arguments(pinned,mode)
+            self.assertEqual(arguments[arguments.index('-Source')+1],str(BRIDGE if mode=='production' else pinned))
+            self.assertEqual('-ProductionEntry' in arguments,mode=='production')
+            for operation in MIGRATED_DIAGNOSTICS:self.assertTrue(diagnostic_uses_session(operation,mode))
+            for operation in RETAINED_DIAGNOSTICS:self.assertEqual(diagnostic_uses_session(operation,mode),mode=='draft')
+        self.assertEqual(len(MIGRATED_DIAGNOSTICS),7)
+        for name in ('file','runtime'):
+            source=(ROOT/f'tests/fixtures/legacy-diagnostics-{name}-oracle.ps1').read_text(encoding='utf-8-sig')
+            self.assertIn('[switch]$ProductionEntry',source)
+            self.assertIn('Production entries must come from current main with support hooks',source)
+            self.assertIn('if($ProductionEntry){& $',source)
+            self.assertIn('Fixture-ValidatePublicDelegate $',source)
+            self.assertIn('elseif($AdapterSource){_Invoke-LegacyDiagnosticFamily',source)
+
     def test_guard_inventory_preserves_all_196_original_checks(self):
         from collections import Counter
         inventory=diagnostic_guard_cases()
@@ -601,7 +666,7 @@ class DiagnosticAdapterPortableTests(unittest.TestCase):
             source=(ROOT/f"tests/fixtures/legacy-diagnostics-{name}-oracle.ps1").read_text(encoding="utf-8")
             for leaf in ("_Diagnostic-Clock","_Diagnostic-NodeVersion","_Diagnostic-TailBytes","_Diagnostic-AuditProbe","_Diagnostic-ClearAppshotCache","_Diagnostic-ProcessorCount","_Diagnostic-ProcessMetrics"):
                 self.assertIn("function "+leaf,source)
-            self.assertIn("if($AdapterSource){_Invoke-LegacyDiagnosticFamily",source)
+            self.assertIn("elseif($AdapterSource){_Invoke-LegacyDiagnosticFamily",source)
             self.assertIn("$node.Extent.Text",source)
             self.assertNotIn("$fixtures=@(",source,"PS5 ConvertFrom-Json already preserves the root array; do not nest the case corpus")
         self.assertGreaterEqual(len(cases()),303)
@@ -619,10 +684,23 @@ class DiagnosticAdapterPortableTests(unittest.TestCase):
 @unittest.skipUnless(sys.platform=="win32","Windows PowerShell 5.1 actual diagnostic adapter qualification")
 class DiagnosticActualAdapterTests(unittest.TestCase):
     maxDiff=1500
+    def test_production_public_delegates_forward_once(self):
+        if diagnostic_adapter_mode()!='production':self.skipTest('Public delegate probe applies only after manifest promotion')
+        rest=['--fixture','한국어','literal; $(inert)']
+        requests=[dict(id=f'{operation}/{brief}',mode='public-delegate',operation=operation,rest=rest if brief else [],brief=brief) for operation in MIGRATED_DIAGNOSTICS for brief in (False,True)]
+        observations=run_guard_driver(self,requests)
+        self.assertEqual(len(observations),14)
+        for request,observed in zip(requests,observations):
+            with self.subTest(operation=request['operation'],brief=request['brief']):
+                self.assertEqual(observed['state'],'ok',observed)
+                self.assertIsNone(observed['error'])
+                self.assertEqual(observed['events'],[])
+                self.assertEqual(observed['value'],dict(exit=31,calls=[dict(operation=request['operation'],rest=request['rest'],brief=request['brief'])]))
     def test_exact_retained_adapter_all_cases(self):
         host=os.environ.get("CUCP_DIAGNOSTICS_TEST_HOST")
         self.assertTrue(host,"Qualification must supply CUCP_DIAGNOSTICS_TEST_HOST; actual adapter gate cannot silently skip")
         self.assertTrue(Path(host).is_file(),"Matching diagnostic NativeHost does not exist")
+        mode=diagnostic_adapter_mode()
         fixtures=cases();original=[None]*len(fixtures);actual=[None]*len(fixtures)
         with tempfile.TemporaryDirectory(prefix="CUCP diagnostic adapter 한국어 ") as temporary:
             temp=Path(temporary);source=temp/"original.ps1";inputs=temp/"cases.json"
@@ -631,10 +709,10 @@ class DiagnosticActualAdapterTests(unittest.TestCase):
                 selected=[(i,f) for i,f in enumerate(fixtures) if (f["operation"] in FILE_OPERATIONS)==file_group]
                 inputs.write_text(json.dumps([f for _,f in selected]),encoding="utf-8-sig")
                 runner=ROOT/("tests/fixtures/legacy-diagnostics-file-oracle.ps1" if file_group else "tests/fixtures/legacy-diagnostics-runtime-oracle.ps1")
-                command=[shutil.which("powershell.exe"),"-NoProfile","-NonInteractive","-File",str(runner),"-Source",str(source),"-InputPath",str(inputs)]
-                before=subprocess.run(command,capture_output=True,timeout=300)
+                command=[shutil.which("powershell.exe"),"-NoProfile","-NonInteractive","-File",str(runner),"-InputPath",str(inputs)]
+                before=subprocess.run(command+["-Source",str(source)],capture_output=True,timeout=300)
                 self.assertEqual(before.returncode,0,before.stderr.decode(errors="replace"))
-                after=subprocess.run(command+["-AdapterSource",str(ADAPTER),"-BridgeSource",str(BRIDGE)],
+                after=subprocess.run(command+actual_adapter_arguments(source,mode),
                     env={**os.environ,"CUCP_NATIVE_HOST":str(Path(host).resolve()),"CUCP_EXECUTION_DIAGNOSTICS":"1"},capture_output=True,timeout=900)
                 self.assertEqual(after.returncode,0,after.stderr.decode(errors="replace"))
                 if after.stderr:print("Diagnostic adapter stderr (first 16 KiB):\n"+after.stderr.decode(errors="replace")[:16384],flush=True)
@@ -646,10 +724,13 @@ class DiagnosticActualAdapterTests(unittest.TestCase):
             with self.subTest(index=index,operation=fixture["operation"],rest=fixture["rest"],brief=fixture.get("brief")):
                 old_effects=decode_wire(before["effects"]);new_effects=decode_wire(after["effects"])
                 failures=captured_failures(fixture,old_effects)
+                # The two retained production bodies do not enter the shared
+                # session: preserve their ordinary errors through full equality.
+                uses_session=diagnostic_uses_session(fixture['operation'],mode)
                 # The assertion leaf converts its original catch-any rejection
                 # into a completed Boolean policy result. It still counts as an
                 # owned write for terminal loss, but is not an error reply.
-                uncertain=next((f for f in failures if changes_owned_state(f["effect"]) and f["effect"]["kind"]!="AssertAuthorized"),None)
+                uncertain=next((f for f in failures if changes_owned_state(f["effect"]) and f["effect"]["kind"]!="AssertAuthorized"),None) if uses_session else None
                 if uncertain is not None:
                     owned_failure+=1;stop=uncertain["trace_index"]+1
                     self.assertEqual(new_effects,old_effects[:stop])
@@ -658,7 +739,7 @@ class DiagnosticActualAdapterTests(unittest.TestCase):
                     self.assertEqual(after["error"],UNCERTAIN_MESSAGE)
                     self.assertEqual(after["console"],"")
                     continue
-                if before["state"]=="error" and any(changes_owned_state(e) for e in old_effects):
+                if uses_session and before["state"]=="error" and any(changes_owned_state(e) for e in old_effects):
                     terminal_failure+=1
                     self.assertEqual(new_effects,old_effects);self.assertEqual(after["consumed"],before["consumed"])
                     self.assertEqual(after["state"],"error")
@@ -671,7 +752,7 @@ class DiagnosticActualAdapterTests(unittest.TestCase):
                 self.assertEqual(after,before)
                 exact+=1
         self.assertGreater(exact,0);self.assertGreater(owned_failure,0)
-        print(f"Compared all {len(fixtures)} diagnostic adapter cases: {exact} exact, {owned_failure} current owned-write failures, {terminal_failure} terminal postdispatch failures",flush=True)
+        print(f"Compared all {len(fixtures)} diagnostic {mode} entry cases: {exact} exact, {owned_failure} current owned-write failures, {terminal_failure} terminal postdispatch failures",flush=True)
     def test_decoded_effect_guards_and_native_getter_order(self):
         self.assertTrue(GUARDS.is_file(),"Diagnostic guard driver is required")
         inventory=diagnostic_guard_cases()

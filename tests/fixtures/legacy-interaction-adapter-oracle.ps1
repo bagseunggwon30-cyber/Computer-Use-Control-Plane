@@ -1,6 +1,6 @@
 param(
  [string]$Source,[string]$BaselineSource,[string]$InputPath,
- [string]$SharedSource,[string]$AdapterSource,[string]$OracleSource,
+ [string]$SharedSource,[string]$AdapterSource,[string]$PublicSource,[string]$OracleSource,
  [switch]$ValidateDescriptors,[switch]$ValidateStartupClone,[switch]$AllowPortableHost
 )
 $ErrorActionPreference='Stop'
@@ -8,6 +8,11 @@ $ErrorActionPreference='Stop'
 if(-not $AllowPortableHost -and ($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1)){throw 'Expected Windows PowerShell 5.1'}
 if(-not $OracleSource){$OracleSource=Join-Path $PSScriptRoot 'legacy-interaction-oracle.ps1'}
 $oracle=Get-Content -LiteralPath $OracleSource -Raw -Encoding UTF8
+if(-not $PublicSource){throw 'The manifest-selected public interaction source is required'}
+$publicPath=[IO.Path]::GetFullPath($PublicSource)
+$sharedPath=[IO.Path]::GetFullPath($SharedSource)
+$adapterPath=[IO.Path]::GetFullPath($AdapterSource)
+if($publicPath -cne $sharedPath -and $publicPath -cne $adapterPath){throw 'Unknown public interaction source'}
 
 # Reuse the accepted oracle's captured native leaves and result envelope. No
 # process bridge, source corpus, or legacy algorithm is copied into this runner.
@@ -29,12 +34,13 @@ foreach($definition in @($sa.FindAll({param($n)$n -is [Management.Automation.Lan
 $at=$null;$ae=$null;$aa=[Management.Automation.Language.Parser]::ParseFile($AdapterSource,[ref]$at,[ref]$ae)
 if($ae.Count){throw 'Interaction adapter source did not parse'}
 $definitions=@($aa.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst]},$true))
-foreach($name in @('_Interaction-ValidateEffect','_Interaction-Dispatch','_Invoke-LegacyInteractionFamily',
- 'Invoke-MacroFindLabel','Invoke-MacroClickPoint','Invoke-MacroClickLabel','Invoke-MacroSafeType',
- 'Invoke-MacroIconFind','Invoke-MacroIconClick','Invoke-MacroOcrClick','Invoke-MacroPrecisionValidate')){
+$publicNames=@('Invoke-MacroFindLabel','Invoke-MacroClickPoint','Invoke-MacroClickLabel','Invoke-MacroSafeType',
+ 'Invoke-MacroIconFind','Invoke-MacroIconClick','Invoke-MacroOcrClick','Invoke-MacroPrecisionValidate')
+foreach($name in @('_Interaction-ValidateEffect','_Interaction-Dispatch','_Invoke-LegacyInteractionFamily')){
  if(@($definitions|Where-Object {$_.Name -ceq $name}).Count -ne 1){throw "Required interaction hook is absent: $name"}
 }
-foreach($definition in $definitions){
+if($publicPath -ceq $sharedPath -and @($definitions|Where-Object {$_.Name -cin $publicNames}).Count -ne 0){throw 'Promoted interaction support must not retain public wrappers'}
+foreach($definition in @($definitions|Where-Object {$_.Name -cnotin $publicNames})){
  $body=$definition.Extent.Text
  if($definition.Name -ceq '_Interaction-Dispatch'){
   # Only clock/ID nondeterminism and output observation are intercepted. The
@@ -47,6 +53,18 @@ foreach($definition in $definitions){
   $body=$body.Replace('[void]$State.pipeline_output.Add([string]$d)',"Capture-Effect 'PipelineOutput' -Data ([string]`$d);[void]`$State.pipeline_output.Add([string]`$d)")
  }
  . ([scriptblock]::Create($body))
+}
+# Load only the eight selected public definitions, never either entry point.
+# ParseInput's filename preserves PSCommandPath for each real delegate.
+$pt=$null;$pe=$null;$pa=[Management.Automation.Language.Parser]::ParseFile($publicPath,[ref]$pt,[ref]$pe)
+if($pe.Count){throw 'Public interaction source did not parse'}
+foreach($name in $publicNames){
+ $definition=@($pa.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name},$true))
+ if($definition.Count -ne 1){throw "Required public interaction delegate is absent or duplicated: $name"}
+ $body=$definition[0].Extent.Text
+ $dt=$null;$de=$null;$delegateAst=[Management.Automation.Language.Parser]::ParseInput($body,$publicPath,[ref]$dt,[ref]$de)
+ if($de.Count){throw "Public interaction delegate did not parse: $name"}
+ . ($delegateAst.GetScriptBlock())
 }
 $Script:CacheDir='C:\fixture'
 '@
@@ -61,12 +79,22 @@ if($ValidateDescriptors -or $ValidateStartupClone){
  }
  . ([scriptblock]::Create($install))
  if($ValidateStartupClone){
+  # This disposable process checks argv ownership, not confirmation parsing.
+  # Exercise the real gate's immutable false ceiling before any subprocess.
+  New-Variable -Name 'CUCP_EXECUTION_SENSITIVE_CEILING' -Scope Global -Option Constant -Value $false
+  Set-Item -Path Function:\_Invoke-LegacyCompatibility -Value {
+   param($Operation,$Arguments)
+   $script:cloneCompatibilityCalls++
+   throw 'Startup clone fixture must not invoke a compatibility subprocess'
+  }
   # Exercise the actual wrapper with one inert host seam. Mutation happens
   # only after startup/state construction, where a reused argv array leaked.
   Set-Item -Path Function:\_Invoke-LegacyExecutionHost -Value {
    param($EntryPoint,$Startup,$State)
    $script:cloneHostCalls++
    $script:cloneEntry=$EntryPoint
+   $script:cloneScriptPath=$State.script_path;$script:cloneOperation=$Startup.operation
+   $script:cloneLive=$State.live;$script:cloneSensitive=$State.sensitive
    $script:cloneStateType=$State.rest.GetType().FullName
    $script:cloneAliasesCaller=[object]::ReferenceEquals($State.rest,$script:cloneCaller)
    $script:cloneStateBefore=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $State.rest -Compress
@@ -79,11 +107,14 @@ if($ValidateDescriptors -or $ValidateStartupClone){
   $AllowLiveControl=$false;$Brief=$false;$CacheSeconds=5;$Script:CliPath=$null
   $rows=New-Object Collections.ArrayList
   foreach($row in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json)){
-   $script:cloneCaller=[string[]]$row.rest;$script:cloneHostCalls=0
+   $script:cloneCaller=[string[]]$row.rest;$script:cloneHostCalls=0;$script:cloneCompatibilityCalls=0
    $before=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $script:cloneCaller -Compress
    $expectedState=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject ([string[]]@($script:cloneCaller)) -Compress
    $expectedStartup=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject @($script:cloneCaller) -Compress
-   if($row.family -ceq 'execution'){
+   if($row.public){
+    if($row.family -cne 'interaction' -or $row.public -cnotin $publicNames){throw 'Unknown public delegate fixture'}
+    $exit=& ([string]$row.public) -Rest $script:cloneCaller
+   }elseif($row.family -ceq 'execution'){
     $exit=_Invoke-LegacyExecutionFamily -Operation 'workflow-run' -Rest $script:cloneCaller -ScriptPath 'C:\fixture\cucp.ps1'
    }elseif($row.family -ceq 'interaction'){
     $exit=_Invoke-LegacyInteractionFamily -Operation 'click-label' -Rest $script:cloneCaller -ScriptPath 'C:\fixture\cucp.ps1'
@@ -91,7 +122,8 @@ if($ValidateDescriptors -or $ValidateStartupClone){
    $after=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $script:cloneCaller -Compress
    [void]$rows.Add(@{case=$row.case;family=$row.family;caller_before=$before;caller_after=$after;expected_state=$expectedState;expected_startup=$expectedStartup;
     state_before=$script:cloneStateBefore;state_after=$script:cloneStateAfter;startup_before=$script:cloneStartupBefore;startup_after=$script:cloneStartupAfter;
-    state_type=$script:cloneStateType;aliases_caller=$script:cloneAliasesCaller;host_calls=$script:cloneHostCalls;entry=$script:cloneEntry;exit=$exit})
+    script_path=$script:cloneScriptPath;operation=$script:cloneOperation;state_type=$script:cloneStateType;aliases_caller=$script:cloneAliasesCaller;host_calls=$script:cloneHostCalls;compatibility_calls=$script:cloneCompatibilityCalls;
+    live=$script:cloneLive;sensitive=$script:cloneSensitive;entry=$script:cloneEntry;exit=$exit})
   }
   [Console]::Out.WriteLine((Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject @($rows) -Depth 100 -Compress))
   return

@@ -206,12 +206,3 @@ function _Invoke-LegacyInteractionFamily {
     interaction_cache_keys=(New-Object Collections.ArrayList);interaction_anchor_records=(New-Object Collections.ArrayList)}
   return _Invoke-LegacyExecutionHost -EntryPoint 'legacy-interaction-session' -Startup $startup -State $state
 }
-
-function Invoke-MacroFindLabel {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'find-label' -Rest $Rest -ScriptPath $PSCommandPath}
-function Invoke-MacroClickPoint {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'click-point' -Rest $Rest -ScriptPath $PSCommandPath}
-function Invoke-MacroClickLabel {param([string[]]$Rest,[switch]$Double,[switch]$RightClick) return _Invoke-LegacyInteractionFamily -Operation 'click-label' -Rest $Rest -ScriptPath $PSCommandPath -Double ([bool]$Double) -RightClick ([bool]$RightClick)}
-function Invoke-MacroSafeType {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'safe-type' -Rest $Rest -ScriptPath $PSCommandPath}
-function Invoke-MacroIconFind {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'icon-find' -Rest $Rest -ScriptPath $PSCommandPath}
-function Invoke-MacroIconClick {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'icon-click' -Rest $Rest -ScriptPath $PSCommandPath}
-function Invoke-MacroOcrClick {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'ocr-click' -Rest $Rest -ScriptPath $PSCommandPath}
-function Invoke-MacroPrecisionValidate {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'precision-validate' -Rest $Rest -ScriptPath $PSCommandPath}

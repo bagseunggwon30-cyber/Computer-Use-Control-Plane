@@ -1,10 +1,11 @@
 # Diagnostic and reporting assembly candidate
 
-This isolated candidate moves nine report/orchestration bodies into
-`PcuCp.LegacyDiagnostics/LegacyDiagnosticCoordinator`. The original production macro bodies and routing remain unchanged. The new
-`scripts/cucp-legacy-diagnostic-adapter.ps1` is an unpromoted acquisition adapter
-that reuses the shared host; it is **not** a qualified retirement or a claim that
-PowerShell has been eliminated.
+The C# implementation covers nine report/orchestration bodies in
+`PcuCp.LegacyDiagnostics/LegacyDiagnosticCoordinator`. Seven qualified bodies now
+use public delegates in the main wrapper and the closed diagnostic support
+module. Benchmark and audit-summary retain their original production bodies:
+their unusual JSON conversion behavior is not fully matched. The integrated
+production and full-regression gate is pending. PowerShell remains required.
 
 The accepted-source tree is `c0d15371b60ebf62be45bfa68b90282405f07273`, reachable
 from remote commit `56be343c786027d27fa3dcb71732157caffc8de0`. The older baseline
@@ -30,8 +31,9 @@ old timing-only SLO result would reintroduce that corrected defect.
 
 These are normalized exact AST function bodies, excluding separators. The
 accepted parser source map independently confirms the total. The Python gate
-pins each body's SHA-256 and byte count. No original body is removed; fixture
-PowerShell remains counted source. Cleanup is excluded: its deletion/process
+pins each body's SHA-256 and byte count. The seven-body cutover removes 44,965
+bytes from the main wrapper, including its new module import; fixture and adapter
+PowerShell remain counted source. Cleanup is excluded: its deletion/process
 policy is not a read-only acquisition boundary and needs separate qualification.
 
 ## Typed effects and retained state
@@ -55,7 +57,25 @@ uses `_Invoke-LegacyExecutionHost` for its process and frame lifecycle. Shared
 `LegacyExecutionWire` preserves true arrays and ordinary `{value,Count}` objects.
 The trusted host can use its new session factory to construct this coordinator;
 the dedicated diagnostic startup schema is independently validated by the
-host while original public macro routing remains unpromoted.
+host. The two unqualified conversion-heavy public macros continue to use their
+original bodies rather than this candidate route.
+
+## Production integration evidence
+
+At `7fb6c2f68688ef3b414e2edc00a40d700ac15ea2`, [run 37054089596](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37054089596)
+passed all 323 candidate and 323 actual-adapter cases plus 196 guards, with no
+Windows skips. The adapter partition was 279 exact rows, 34 current owned-write
+uncertainty outcomes and ten terminal postdispatch failures. Fourteen managed
+checks and 37 independent boundary assertions also passed.
+
+The current integration preserves the seven original public signatures, uses
+verified source hashes and AST extents, and keeps benchmark/audit-summary bytes
+unchanged. Manifest-selected tests now load current main's public functions.
+The retained two still use their existing acquisition seams and require exact
+equality; only the seven session-backed routes use the established uncertainty
+partition. Fourteen inert delegate probes and the disposable whole-script
+startup tests are additional pending acceptance gates. No real desktop input,
+model, clipboard or IME validation is implied.
 
 | Diagnostic enum | Suboperation / value | Captured reply |
 | --- | --- | --- |
@@ -268,8 +288,9 @@ Python unlinks its junction non-recursively before temporary-directory cleanup.
 Local validation passes 15 portable tests, 14 original managed checks and the
 37 additional benchmark boundary assertions. The rewritten driver has real
 Windows execution evidence at the failed checkpoint above, including its owned
-filesystem and native-getter cases. The three repaired Windows gates still need
-a passing rerun. These counts are not Windows parity approval.
+filesystem and native-getter cases. Those three repaired Windows gates later
+passed at `7fb6c2f6`, as recorded above. The local counts alone were not Windows
+parity approval.
 
 The adapter accepts only its configured audit/cache roots. It refuses reparse
 ancestors for owned writes and skips directory/reparse entries matching an
@@ -279,8 +300,8 @@ Windows paths with ordinal case-insensitive comparison, including trailing
 separators; comparison never becomes an unrestricted prefix match.
 
 Production routing, host acquisition checks, exact adapter tests, portable
-packaging and the integrator's bundled full regression must pass before
-retirement/publication.
+packaging and the integrator's bundled full regression must pass before accepting
+the integrated retirement.
 Interactive Windows qualification and eventual tests with PowerShell absent
 remain separate acceptance requirements.
 

@@ -18,13 +18,21 @@ including production interception, portable packaging and explicit privacy check
 The following interaction, diagnostics and file-image batch has a combined
 119,960-byte original function scope. That is a source footprint, not net
 retirement: retained adapters and temporary oracle tests count as PowerShell.
-At `d8bde03d`, the file-image/OCR candidate and actual adapter passed all 167
-Windows comparisons and 47 managed checks. Its six delegates now replace the
-production bodies and its duplicate draft is removed, reducing those files by
-10,898 bytes. Production source selection is explicit and the integrated gate
-is pending. Interaction and diagnostics still retain their original bodies
-while exact-output and boundary repairs undergo the same gate. See the
-[file-image evidence](legacy-file-images-qualification.md).
+At `7fb6c2f6`, file-image/OCR production selection passed all 167 comparisons;
+diagnostics passed its 323 candidate, 323 adapter and 196 guard checks. Interaction
+passed all 870 candidate and 870 adapter comparisons and its uncertainty/descriptor
+checks; one added clone-test setup failed before assertions. Its inert setup is
+repaired in the current integration and remains a required gate.
+
+The current integration replaces 21 bodies: six image/OCR helpers, eight
+interaction macros and seven diagnostic macros. Benchmark and audit-summary
+retain their original bodies because unusual JSON conversion semantics remain
+unqualified. Exact source hashes and parser ranges protect the byte splices.
+Production entry tests now check main's actual delegates and support loading.
+The single bundled full regression must pass before accepting this batch. See
+the [file-image evidence](legacy-file-images-qualification.md),
+[interaction evidence](legacy-interaction-family.md) and
+[diagnostic limits](legacy-diagnostics-candidate.md).
 
 ## Initial core foundation (historical)
 

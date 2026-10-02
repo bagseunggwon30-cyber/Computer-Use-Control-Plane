@@ -1,4 +1,4 @@
-﻿param([string]$Source,[string]$InputPath,[string]$AdapterSource,[string]$BridgeSource)
+﻿param([string]$Source,[string]$InputPath,[string]$AdapterSource,[string]$BridgeSource,[switch]$ProductionEntry)
 # The caller supplies the pinned original source. Parse definitions only: never
 # dot-source the wrapper, invoke its dispatcher, or acquire a real diagnostic file.
 $ErrorActionPreference='Stop'
@@ -6,7 +6,18 @@ $ErrorActionPreference='Stop'
 if($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1){throw 'Expected Windows PowerShell 5.1'}
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[ref]$errors)
-if($errors.Count){throw 'Pinned diagnostic source did not parse'}
+if($errors.Count){throw 'Selected diagnostic source did not parse'}
+if($ProductionEntry -and (-not $AdapterSource -or [IO.Path]::GetFullPath($Source) -cne [IO.Path]::GetFullPath($BridgeSource))){throw 'Production entries must come from current main with support hooks'}
+if($ProductionEntry){
+ # Import only the inert AST validator; never execute the guard driver's body.
+ $guardTokens=$null;$guardErrors=$null
+ $guardAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'legacy-diagnostics-adapter-guards.ps1'),[ref]$guardTokens,[ref]$guardErrors)
+ if($guardErrors.Count){throw 'Public delegate validator failed to parse'}
+ $validator=@($guardAst.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Fixture-ValidatePublicDelegate'},$true))
+ if($validator.Count -ne 1){throw 'Expected one inert public delegate validator'}
+ . ([scriptblock]::Create($validator[0].Extent.Text))
+}
+
 $fixtures=Microsoft.PowerShell.Management\Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json
 
 function Encode-Wire($Value) {
@@ -93,6 +104,13 @@ foreach($name in $names){
  $found=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
  if($found.Count -ne 1){throw "Expected one original diagnostic function: $name"}
  $text=$found[0].Extent.Text
+ # Keep current audit-summary on its original body. The migrated two file
+ # reports load current public delegates without replacing their statements.
+ if($ProductionEntry -and $name -cin @('Invoke-MacroLogTail','Invoke-MacroReleaseNotes')){
+  $operation=if($name -ceq 'Invoke-MacroLogTail'){'log-tail'}else{'release-notes'}
+  Fixture-ValidatePublicDelegate $found[0] $operation
+  . ([scriptblock]::Create($text));continue
+ }
  if($name -eq 'Invoke-MacroLogTail'){
   $text=Replace-ExactSeam $text '[System.Diagnostics.Stopwatch]::StartNew()' '(New-FakeStopwatch -Scope ''log-tail'')' -Label 'log stopwatch'
   # Replace only the bounded binary acquisition, retaining the original catch,
@@ -182,7 +200,7 @@ foreach($fixture in $fixtures){
    'release-notes'{'Invoke-MacroReleaseNotes'}
    default{throw "Unsupported file diagnostic fixture: $($fixture.operation)"}
   }
-  $exit=if($AdapterSource){_Invoke-LegacyDiagnosticFamily -Operation ([string]$fixture.operation) -Rest @($fixture.rest)}else{& $function -Rest @($fixture.rest)}
+  $exit=if($ProductionEntry){& $function -Rest @($fixture.rest)}elseif($AdapterSource){_Invoke-LegacyDiagnosticFamily -Operation ([string]$fixture.operation) -Rest @($fixture.rest)}else{& $function -Rest @($fixture.rest)}
   $result=@{state='complete';payload=$script:payload;exit=[int]$exit;console=$writer.ToString();effects=(Encode-Wire @($script:trace));consumed=$script:cursor}
  }catch{
   $result=@{state='error';error=$_.Exception.Message;console=$writer.ToString();effects=(Encode-Wire @($script:trace));consumed=$script:cursor}

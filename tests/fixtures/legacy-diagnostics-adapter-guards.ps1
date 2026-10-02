@@ -79,6 +79,38 @@ function Fixture-Owned($Case){
   default {throw 'Unknown owned fixture action'}
  }
 }
+
+function Fixture-ValidatePublicDelegate($Definition,[string]$Operation){
+ if($Definition.IsFilter -or $Definition.IsWorkflow -or ($null -ne $Definition.Parameters -and $Definition.Parameters.Count -ne 0)){throw 'Unexpected public function form'}
+ $body=$Definition.Body;$parameters=@($body.ParamBlock.Parameters)
+ if($parameters.Count -ne 1 -or $parameters[0].Name.VariablePath.UserPath -cne 'Rest' -or $parameters[0].StaticType -ne [string[]] -or $parameters[0].DefaultValue -or $parameters[0].Attributes.Count -ne 1 -or $parameters[0].Attributes[0] -isnot [Management.Automation.Language.TypeConstraintAst] -or ($null -ne $body.ParamBlock.Attributes -and $body.ParamBlock.Attributes.Count -ne 0)){throw 'Unexpected public delegate parameters'}
+ if($body.BeginBlock -or $body.ProcessBlock -or $body.DynamicParamBlock -or ($null -ne $body.EndBlock.Traps -and $body.EndBlock.Traps.Count -ne 0) -or $body.EndBlock.Statements.Count -ne 1){throw 'Unexpected public delegate statements'}
+ $statement=$body.EndBlock.Statements[0]
+ if($statement -is [Management.Automation.Language.ReturnStatementAst]){$statement=$statement.Pipeline}
+ if($statement -isnot [Management.Automation.Language.PipelineAst] -or $statement.PipelineElements.Count -ne 1){throw 'Expected one fixed delegate pipeline'}
+ $command=$statement.PipelineElements[0]
+ if($command -isnot [Management.Automation.Language.CommandAst] -or $command.GetCommandName() -cne '_Invoke-LegacyDiagnosticFamily' -or $command.CommandElements.Count -ne 5 -or $command.InvocationOperator -ne [Management.Automation.Language.TokenKind]::Unknown -or ($null -ne $command.Redirections -and $command.Redirections.Count -ne 0)){throw 'Expected one direct family call'}
+ $elements=$command.CommandElements
+ if($elements[1] -isnot [Management.Automation.Language.CommandParameterAst] -or $elements[1].ParameterName -cne 'Operation' -or $elements[1].Argument -or $elements[2] -isnot [Management.Automation.Language.StringConstantExpressionAst] -or $elements[2].Value -cne $Operation -or $elements[3] -isnot [Management.Automation.Language.CommandParameterAst] -or $elements[3].ParameterName -cne 'Rest' -or $elements[3].Argument -or $elements[4] -isnot [Management.Automation.Language.VariableExpressionAst] -or $elements[4].VariablePath.UserPath -cne 'Rest' -or $elements[4].Splatted){throw 'Delegate changed its fixed operation or argv forwarding'}
+}
+function Fixture-PublicDelegate($Case){
+ $names=@{'perf'='Invoke-MacroPerf';'diagnose-lag'='Invoke-MacroDiagnoseLag';'health-quick'='Invoke-MacroHealthQuick';'health-detail'='Invoke-MacroHealthDetail';'log-tail'='Invoke-MacroLogTail';'self-test'='Invoke-MacroSelfTest';'release-notes'='Invoke-MacroReleaseNotes'}
+ if($Case.operation -cnotin @($names.Keys)){throw 'Unknown production diagnostic delegate'}
+ $tokens=$null;$errors=$null;$ast=[Management.Automation.Language.Parser]::ParseFile($BridgeSource,[ref]$tokens,[ref]$errors)
+ if($errors.Count){throw 'Current main failed to parse'}
+ $name=$names[$Case.operation]
+ $found=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name},$true))
+ if($found.Count -ne 1){throw 'Expected exactly one current public delegate'}
+ Fixture-ValidatePublicDelegate $found[0] $Case.operation
+ # Only the AST-proven single call executes. No real family/session definition
+ # is loaded in this driver; this same-scope stub is the sole call destination.
+ $script:delegateCalls=New-Object Collections.ArrayList;$Brief=[bool]$Case.brief
+ function _Invoke-LegacyDiagnosticFamily {param([string]$Operation,[string[]]$Rest) [void]$script:delegateCalls.Add(@{operation=$Operation;rest=@($Rest);brief=[bool]$Brief});return 31}
+ . ([scriptblock]::Create($found[0].Extent.Text))
+ $exit=& $name -Rest @($Case.rest)
+ return @{exit=$exit;calls=@($script:delegateCalls)}
+}
+
 $cases=Microsoft.PowerShell.Utility\ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($InputPath,[Text.Encoding]::UTF8))
 # Captured leaves live in this script's scope, the same scope as the selected
 # source definitions. Never mix real owned I/O with these intercepted requests.
@@ -121,6 +153,7 @@ foreach($case in $cases){
    'metrics' {$state=Fixture-State $case;$current=Fixture-Process $case.current 'current';$previous=Fixture-Process $case.previous 'previous';[void]$state.diagnostic_process_lists.Add([object[]]@($previous));[void]$state.diagnostic_process_lists.Add([object[]]@($current));$ordinal=if($null -eq $previous){$null}else{0};$r.value=@{metrics=(_Diagnostic-ProcessMetrics $state 0 $ordinal);source_start=$current.FixtureStart.ToString('o')}}
    'captured-path' {$r.value=Fixture-CapturedPath $case}
    'actual-owned' {$r.value=Fixture-Owned $case}
+   'public-delegate' {$r.value=Fixture-PublicDelegate $case}
    default {throw 'Unknown diagnostic fixture mode'}
   }
  }catch{$r.state='error';$r.error=$_.Exception.Message}
