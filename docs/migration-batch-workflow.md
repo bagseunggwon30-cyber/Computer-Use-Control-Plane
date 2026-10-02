@@ -166,3 +166,14 @@ Python child reports use explicit UTF-8; a bounded preview escapes characters an
 older console cannot encode while the artifact preserves every original byte and
 the child exit status. All three new families are qualified together before the
 single full regression for retirement.
+
+## Focused literal-tokenizer candidate feedback
+
+The existing `[focus foundation]` lane retains its inventory, pure-kernel and
+TaskForm checks and now also runs `PcuCp.LegacyWorkflow.ContractTests` plus the
+complete `test_legacy_workflow_parity.py` Windows suite. Missing either Python
+suite fails before any build. This makes the observed literal-token fixtures and
+inferred non-relaxation probes part of actual candidate feedback, without
+switching production callers or removing tests. The complete parser remains
+unqualified while known gaps remain; `CUCP_REQUIRE_WORKFLOW_PARSER_PARITY=1` and
+the final full production gate are still required before tokenizer retirement.

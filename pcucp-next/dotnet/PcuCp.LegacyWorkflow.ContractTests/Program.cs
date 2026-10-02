@@ -125,5 +125,45 @@ RejectParsed(JsonSerializer.Serialize(new { rest = new[] { "--step", "macro wind
     parsed_steps = new[] { new { ok = true, error = "", detail = "", tokens = new[] { new string('x', 65537) } } } }));
 RejectParsed(JsonSerializer.Serialize(new { rest = new[] { "--step", "macro windows" },
     parsed_steps = new[] { new { ok = true, error = "", detail = "", tokens = Enumerable.Repeat("x", 4097).ToArray() } } }));
+
+bool Matches(LegacyWorkflowKernel.ParsedStep actual, JsonElement expected) =>
+    actual.Ok == expected.GetProperty("ok").GetBoolean() &&
+    actual.Error == expected.GetProperty("error").GetString() &&
+    actual.Tokens.SequenceEqual(expected.GetProperty("tokens").EnumerateArray().Select(token => token.GetString()!));
+using var observations = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "workflow-ps51-observed.json")));
+var observed = observations.RootElement;
+Check(observed.GetProperty("provenance").GetProperty("evidence").GetString() == "observed-windows-powershell-5.1", "Observed evidence label");
+var targets = observed.GetProperty("batch_target_steps").EnumerateArray().Select(value => value.GetString()!).ToHashSet(StringComparer.Ordinal);
+var historicalCount = 0;
+var resolvedCount = 0;
+foreach (var fixture in observed.GetProperty("historical_gaps").EnumerateArray())
+{
+    historicalCount++;
+    var step = fixture.GetProperty("step").GetString()!;
+    var expected = fixture.GetProperty("before");
+    var actual = LegacyWorkflowKernel.ParseStep(step);
+    var matches = Matches(actual, expected);
+    if (matches) resolvedCount++;
+    Check(!actual.Ok || matches, "Do not relax or reinterpret an observed PS5.1 result: " + step);
+    if (targets.Contains(step)) Check(matches, "Observed literal batch regression: " + step);
+}
+Check(historicalCount == 25 && targets.Count == 6, "Immutable historical gap and batch target counts");
+Console.WriteLine($"Historical PS5.1 replay: {resolvedCount}/{historicalCount} known gaps now match; {historicalCount - resolvedCount} remain. This is not a new Windows qualification run.");
+
+using var inferences = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "workflow-literal-inferred.json")));
+Check(inferences.RootElement.GetProperty("evidence").GetString() == "inferred-unqualified", "Inferred evidence remains distinct");
+var inferredCount = 0;
+foreach (var fixture in inferences.RootElement.GetProperty("cases").EnumerateArray())
+{
+    inferredCount++;
+    var actual = LegacyWorkflowKernel.ParseStep(fixture.GetProperty("step").GetString()!);
+    Check(Matches(actual, fixture.GetProperty("candidate")), "Inferred managed contract: " + fixture.GetProperty("id").GetString());
+}
+Reject("macro type-native --text \"a\0b\"", "unsupported_token");
+Reject("macro type-native --text @'\na\0b\n'@", "unsupported_token");
+Reject("macro type-native --text @'\n" + new string('x', 65536) + "\n'@", "unsupported_token");
+var dollarPlan = Plan("--step", "macro type-native --text \"$env:PATH $(inspect)\"");
+Check(dollarPlan.GetProperty("steps")[0].GetProperty("command")[3].GetString() == "$env:PATH $(inspect)", "Dollar text stays literal plan data");
+Console.WriteLine($"Inferred managed literal contracts: {inferredCount}; Windows PowerShell 5.1 qualification remains required.");
 Console.WriteLine($"PASS: {checks} pure workflow candidate checks; no plan was executed. Full PowerShell parser parity is not established.");
 return 0;

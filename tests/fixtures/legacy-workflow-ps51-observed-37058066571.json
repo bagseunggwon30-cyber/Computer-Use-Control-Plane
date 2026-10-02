@@ -1,0 +1,426 @@
+{
+  "schema": "cucp.workflow-ps51-observations/v1",
+  "provenance": {
+    "evidence": "observed-windows-powershell-5.1",
+    "run_id": "37058066571",
+    "run_url": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37058066571",
+    "tested_commit": "031bff14f7bcf7b4c33766e348c8e1bfbb5f90f9",
+    "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
+    "log_file": "next-batch-integration-ci-37058066571-windows-contracts.log",
+    "log_sha256": "52571b5beb010b45ec3faec306c0c52687a788aecbf655b50ad186556ceec3a2",
+    "log_line": 428,
+    "normalization": "Original log omits localized detail/message fields. before is the PS5.1 result; after is the historical candidate result."
+  },
+  "batch_target_steps": [
+    "macro type-native --text \"hello $name\"",
+    "macro type-native --text \"$(anything)\"",
+    "macro type-native --text \"${name}\"",
+    "macro type-native --text \"$\"",
+    "macro type-native --text @'\nhello\n'@",
+    "macro type-native --text @\"\nhello\n\"@"
+  ],
+  "historical_gaps": [
+    {
+      "step": "-1",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-1"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "+1",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "+1"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "process",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "if",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro windows --% --anything $env:PATH",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "--anything $env:PATH"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro type-native --text \"hello $name\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "hello $name"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro type-native --text \"$(anything)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(anything)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro type-native --text \"${name}\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${name}"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro type-native --text \"$\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro type-native --text a$b",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "a$b"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro type-native --text foo`\nbar",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "foo\nbar"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro type-native --text foo`\r\nbar",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "foo\r",
+          "bar"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro windows (",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro windows )",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro windows {",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro windows [string]",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "[string]"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro windows <# unterminated",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro windows && more",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro windows || more",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro windows < file",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro type-native --text @'\nhello\n'@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "hello"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro type-native --text @\"\nhello\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "hello"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro type-native --text a\u00a0b",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "a",
+          "b"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro type-native --text a\u2003b",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "a",
+          "b"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "step": "macro type-native --text a\u0000b",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "a",
+          "\u0000b"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    }
+  ]
+}

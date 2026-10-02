@@ -30,7 +30,7 @@ PROJECTS = {
     "interaction": ("PcuCp.LegacyInteraction.ContractTests", "PcuCp.LegacyExecution.StartupTests", "PcuCp.LegacyExecution.ContractTests"),
     "diagnostics": ("PcuCp.LegacyDiagnostics.ContractTests", "PcuCp.LegacyExecution.StartupTests", "PcuCp.LegacyExecution.ContractTests"),
     "file-images": ("PcuCp.LegacyFileOcr.ContractTests",),
-    "foundation": ("PcuCp.LegacyPure.ContractTests", "PcuCp.LegacyTaskForm.ContractTests"),
+    "foundation": ("PcuCp.LegacyPure.ContractTests", "PcuCp.LegacyTaskForm.ContractTests", "PcuCp.LegacyWorkflow.ContractTests"),
 }
 PATTERNS = {
     "execution": "test_legacy_execution*.py",
@@ -39,7 +39,7 @@ PATTERNS = {
     "interaction": "test_legacy_interaction*.py",
     "diagnostics": "test_legacy_diagnostics*.py",
     "file-images": ("test_legacy_images.py", "test_legacy_file_ocr.py"),
-    "foundation": "test_migration_inventory.py",
+    "foundation": ("test_migration_inventory.py", "test_legacy_workflow_parity.py"),
 }
 ADAPTER_ENV = {
     "execution": "CUCP_EXECUTION_TEST_HOST",

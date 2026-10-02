@@ -11,6 +11,14 @@ internal static partial class LegacyWorkflowKernel
         "trap", "try", "until", "using", "var", "while", "workflow", "parallel", "sequence", "inlinescript", "configuration"
     };
 
+    // Declaration/contextual keywords are not qualified as single-command
+    // subexpressions. Keep this guard local to the new embedded-text subset;
+    // top-level keyword classification remains a separate historical gap.
+    private static readonly HashSet<string> UnqualifiedSubexpressionStarts = new(Comparer)
+    {
+        "public", "private", "static", "interface", "enum", "namespace", "module", "type", "assembly", "command", "hidden", "base", "default"
+    };
+
     internal static object Plan(JsonElement args)
     {
         Fields(args, "rest");
@@ -51,14 +59,25 @@ internal static partial class LegacyWorkflowKernel
             }
             var first = step[index];
             var tokenStart = index;
-            var startsQuoted = IsSingle(first) || IsDouble(first);
+            var startsHereString = first == '@' && index + 1 < step.Length && step[index + 1] is '\'' or '"';
+            var startsQuoted = IsSingle(first) || IsDouble(first) || startsHereString;
             if (commandStart && first is '.' or '+' or '-' or '!')
                 return Reject("unsupported_token", "Expression and dot-sourcing prefixes require further parser qualification.");
-            if (first == '#' || first == '@') return Reject("unsupported_token", "Comments, splatting and here-strings are outside the literal-command subset.");
+            if (first == '#' || first == '@' && !startsHereString)
+                return Reject("unsupported_token", "Comments and splatting are outside the literal-command subset.");
             if (first == '-' && index + 1 < step.Length && (char.IsLetter(step[index + 1]) || step[index + 1] is '_' or '?'))
                 return Reject("unsupported_token", "unsupported token type 'CommandParameter'");
             var value = new StringBuilder();
-            while (index < step.Length && !char.IsWhiteSpace(step[index]))
+            if (startsHereString)
+            {
+                var failure = ReadHereString(step, ref index, value);
+                if (failure is not null) return failure;
+                // A here-string is a complete token. Do not reinterpret an
+                // adjacent suffix, operator or comment as part of its value.
+                if (index < step.Length && !char.IsWhiteSpace(step[index]))
+                    return Reject("unsupported_token", "Adjacent here-string suffixes require further parser qualification.");
+            }
+            while (!startsHereString && index < step.Length && !char.IsWhiteSpace(step[index]))
             {
                 var c = step[index++];
                 if (c is '$' or '(' or ')' or '{' or '}' or '[' or ']' or ';' or '|' or '&' or '<' or '>' or ',')
@@ -86,7 +105,12 @@ internal static partial class LegacyWorkflowKernel
                             closed = true;
                             break;
                         }
-                        if (!single && quoted == '$') return Reject("unsupported_token", "Expandable strings require further parser qualification.");
+                        if (!single && quoted == '$')
+                        {
+                            if (!ReadDollarText(step, ref index, value))
+                                return Reject("unsupported_token", "This embedded dollar syntax requires further parser qualification.");
+                            continue;
+                        }
                         if (!single && quoted == '`' && index < step.Length) quoted = Unescape(step[index++]);
                         value.Append(quoted);
                     }
@@ -120,6 +144,104 @@ internal static partial class LegacyWorkflowKernel
         }
         return new(items.Count > 0, items.Count > 0 ? "" : "empty_step", "", items.ToArray());
     }
+
+    // Only a small syntactically unambiguous subset of embedded dollar text is
+    // admitted. PSParser still parses embedded syntax even though the legacy
+    // adapter only consumes its outer String token. Balancing parentheses or
+    // treating every quoted dollar as data would silently accept parse errors.
+    // Keep complex/nested syntax as an explicit gap, and preserve accepted
+    // source slices verbatim rather than cooking escapes inside a subexpression.
+    private static bool ReadDollarText(string step, ref int index, StringBuilder value)
+    {
+        var start = index - 1; // The caller has consumed '$'.
+        if (index == step.Length || step[index] is ' ' or '\t' or '\r' or '\n' || IsSingle(step[index]) || IsDouble(step[index]))
+        {
+            value.Append('$');
+            return true;
+        }
+        if (step[index] == '(')
+        {
+            index++;
+            while (index < step.Length && step[index] is ' ' or '\t') index++;
+            var nameStart = index;
+            if (index == step.Length || !IsIdentifierStart(step[index])) return false;
+            while (index < step.Length && (IsIdentifierPart(step[index]) || step[index] == '-')) index++;
+            var name = step[nameStart..index];
+            if (ReservedStarts.Contains(name) || UnqualifiedSubexpressionStarts.Contains(name)) return false;
+            while (index < step.Length && step[index] is ' ' or '\t') index++;
+            if (index == step.Length || step[index] != ')') return false;
+            index++;
+        }
+        else
+        {
+            var braced = step[index] == '{';
+            if (braced) index++;
+            if (index == step.Length || !IsIdentifierPart(step[index])) return false;
+            while (index < step.Length && IsIdentifierPart(step[index])) index++;
+            if (index < step.Length && step[index] == ':')
+            {
+                index++;
+                if (index == step.Length || !IsIdentifierPart(step[index])) return false;
+                while (index < step.Length && IsIdentifierPart(step[index])) index++;
+            }
+            if (braced)
+            {
+                if (index == step.Length || step[index] != '}') return false;
+                index++;
+            }
+            else if (index < step.Length && (step[index] is ':' or '?' || char.IsLetterOrDigit(step[index])))
+                return false; // Do not split a longer PS variable at an unqualified name character.
+        }
+        value.Append(step, start, index - start);
+        return true;
+    }
+
+    private static ParsedStep? ReadHereString(string step, ref int index, StringBuilder value)
+    {
+        var single = step[index + 1] == '\'';
+        index += 2;
+        while (index < step.Length && step[index] is ' ' or '\t') index++;
+        if (index == step.Length || step[index] is not ('\r' or '\n'))
+            return Reject("parse_error", "A here-string header must end with a newline.");
+        if (step[index] == '\r' && (index + 1 == step.Length || step[index + 1] != '\n'))
+            return Reject("unsupported_token", "Bare-CR here-string boundaries are not yet qualified.");
+        index += step[index] == '\r' ? 2 : 1;
+        var atLineStart = true;
+        var beforeBoundary = 0;
+        while (index < step.Length)
+        {
+            if (atLineStart && index + 1 < step.Length && (single ? IsSingle(step[index]) : IsDouble(step[index])) && step[index + 1] == '@')
+            {
+                value.Length = beforeBoundary; // Exclude the final physical newline only.
+                index += 2;
+                return null;
+            }
+            atLineStart = false;
+            var c = step[index++];
+            if (c is '\r' or '\n')
+            {
+                if (c == '\r' && (index == step.Length || step[index] != '\n'))
+                    return Reject("unsupported_token", "Bare-CR here-string boundaries are not yet qualified.");
+                beforeBoundary = value.Length;
+                value.Append(c);
+                if (c == '\r') value.Append(step[index++]);
+                atLineStart = true;
+                continue;
+            }
+            if (!single && c == '$')
+            {
+                if (!ReadDollarText(step, ref index, value))
+                    return Reject("unsupported_token", "This embedded dollar syntax requires further parser qualification.");
+                continue;
+            }
+            if (!single && c == '`' && index < step.Length) c = Unescape(step[index++]);
+            value.Append(c);
+        }
+        return Reject("parse_error", "The here-string is missing its column-zero terminator.");
+    }
+
+    private static bool IsIdentifierStart(char c) => char.IsAsciiLetter(c) || c == '_';
+    private static bool IsIdentifierPart(char c) => IsIdentifierStart(c) || char.IsAsciiDigit(c);
 
     private static bool IsSingle(char c) => c is '\'' or '\u2018' or '\u2019' or '\u201A' or '\u201B';
     private static bool IsDouble(char c) => c is '"' or '\u201C' or '\u201D' or '\u201E';

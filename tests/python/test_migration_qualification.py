@@ -101,6 +101,28 @@ class QualificationSelectionTests(unittest.TestCase):
             self.assertEqual(qualification.available_families(root),
                              ["precision", "cdp", "interaction", "diagnostics", "file-images"])
 
+    def test_foundation_gate_keeps_inventory_and_adds_exact_workflow_candidate_suite(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name in ('tests/python', 'pcucp-next/dotnet/PcuCp.NativeHost', *(
+                    'pcucp-next/dotnet/' + p for p in qualification.PROJECTS['foundation'])):
+                (root / name).mkdir(parents=True, exist_ok=True)
+            (root / 'tests/python/test_migration_inventory.py').write_text('# fixture')
+            calls = []
+            def capture(argv, **kwargs): calls.append((argv, dict(kwargs['env'])))
+            with patch.object(qualification, 'ROOT', root), patch.object(qualification.subprocess, 'run', side_effect=capture), contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(ValueError, 'test_legacy_workflow_parity.py'):
+                    qualification.run_family('foundation')
+                self.assertEqual(calls, [])
+                (root / 'tests/python/test_legacy_workflow_parity.py').write_text('# fixture')
+                qualification.run_family('foundation')
+            projects = [args[args.index('--project') + 1] for args, _ in calls if '--project' in args]
+            self.assertEqual(projects, [str(root / 'pcucp-next/dotnet' / name)
+                                       for name in qualification.PROJECTS['foundation']])
+            self.assertIn(str(root / 'pcucp-next/dotnet/PcuCp.LegacyWorkflow.ContractTests'), projects)
+            suites = [args[args.index('-p') + 1] for args, _ in calls if '-p' in args]
+            self.assertEqual(suites, ['test_migration_inventory.py', 'test_legacy_workflow_parity.py'])
+
     def test_file_images_requires_and_runs_both_exact_suites_with_matching_dll(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

@@ -13,7 +13,7 @@ integrated checkpoint passed all 11 active jobs in [full run 37022764709](https:
 including production interception, portable packaging and explicit privacy checks. See the
 [current report](migration-checkpoint-report.md) and [inventory](legacy-function-inventory.json).
 
-## Current integration gate
+## Qualified subsequent integration
 
 The following interaction, diagnostics and file-image batch has a combined
 119,960-byte original function scope. That is a source footprint, not net
@@ -29,7 +29,10 @@ interaction macros and seven diagnostic macros. Benchmark and audit-summary
 retain their original bodies because unusual JSON conversion semantics remain
 unqualified. Exact source hashes and parser ranges protect the byte splices.
 Production entry tests now check main's actual delegates and support loading.
-The single bundled full regression must pass before accepting this batch. See
+The bundled full regression passed at `c414f024` in
+[run 37072046282](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37072046282),
+with all 14 active jobs green. Zero-PowerShell and interactive acceptance remain
+open; the latest report records the fully counted temporary-fixture growth. See
 the [file-image evidence](legacy-file-images-qualification.md),
 [interaction evidence](legacy-interaction-family.md) and
 [diagnostic limits](legacy-diagnostics-candidate.md).

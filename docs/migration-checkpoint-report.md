@@ -6,6 +6,36 @@ The provider-neutral core exposes 52 MCP/JSONL tools through Python and C# witho
 PowerShell, Pi, or an authenticated model provider. The broader legacy surface
 still uses compatibility hosts and unported PowerShell acquisitions/actions.
 
+## Latest qualified checkpoint
+
+Commit `c414f0240a6a3fde78719f4ae44baddaf990e92b`, tree
+`d4c9660d40c7e909f18afb166a8e846798f63b1d`, passed all 14 active jobs in
+[full run 37072046282](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37072046282)
+on 2026-10-02 UTC. Three focused-only jobs were intentionally skipped because
+that full gate ran. All 341 published blob hashes and modes match the reviewed
+local tree. The gate includes Windows native/contracts, all six migration
+families, profile, real-browser fixtures and relocated portable packaging.
+
+The execution job passed 43 tests with zero skips, including 121 completion cases
+and 259 strict integer cases under each of PS5.1 and PS7. Interaction passed 28
+tests with zero skips, including all 870 actual-adapter comparisons and the
+18-case ownership matrix under both shells. The original Windows boundary tests
+also passed. These are automated noninteractive results, not live GUI, IME,
+clipboard, focus-race, mixed-DPI or elevation acceptance.
+
+At this qualified checkpoint, 26 tracked PowerShell files total **867,162 bytes**:
+**612,709 runtime bytes** and **254,453 other source/test bytes**. All-source
+reduction from the 1,013,478-byte baseline is **146,316 bytes (14.44%)**. Compared
+with the older accepted `56be343c` milestone, runtime is 55,061 bytes lower, while
+temporary fixtures make total PS 44,084 bytes higher. The older 190,400-byte
+reduction is a dated milestone, not the current total. No files are hidden from
+language accounting, and zero-PowerShell completion remains open.
+
+The next literal-tokenizer changes are candidate-only. Six previously observed
+mismatches are repaired in local replay; 19 known historical gaps remain, and
+202 separately labelled inferred cases still require Windows qualification.
+The production host continues to exclude that candidate and retains PSParser.
+
 ## Actual source replacement
 
 The baseline is commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tree
@@ -31,7 +61,7 @@ to reproduce the current [inventory](legacy-function-inventory.json). Canonical
 index blobs avoid checkout line-ending differences. Review and stage PS changes
 before using `--update`.
 
-## Current integration awaiting the full gate
+## Historical integration before the full gate
 
 The subsequent batch replaces 21 more original bodies: eight interaction macros,
 seven diagnostic macros and six image/OCR helpers. Benchmark and audit-summary
@@ -61,7 +91,7 @@ original 21 Pester assertions remain unchanged. The integrated checkpoint needs
 the complete Windows, browser, portable and regression gate; none of this is
 interactive desktop, clipboard or IME acceptance.
 
-## Integrated boundary repair awaiting qualification
+## Historical integrated boundary repair
 
 The initial integration tree (`031bff14` remotely, `2cc712d` locally) failed the
 full run [37058066571](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37058066571):
@@ -221,7 +251,7 @@ interaction has 106 locally (109 on Windows). Windows actual-adapter checks are
 still pending; local results do not establish those gates or interactive GUI
 acceptance.
 
-## Guard-fixture follow-up
+## Historical guard-fixture follow-up
 
 Run [37066314234](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37066314234)
 passed the previously failing original Windows boundary stage, but its new guard

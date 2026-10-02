@@ -20,6 +20,17 @@ BASELINE_TREE = "bf895d3120dd5e145f360cb1c41e1d79a061d048"
 PROJECT = ROOT / "pcucp-next/dotnet/PcuCp.LegacyWorkflow.ContractTests"
 KERNEL = ROOT / "pcucp-next/dotnet/PcuCp.NativeHost/LegacyWorkflowKernel.cs"
 LITERAL_PARSER = KERNEL.with_name("LegacyWorkflowLiteralParser.cs")
+OBSERVED_FIXTURES = ROOT / "tests/fixtures/legacy-workflow-ps51-observed-37058066571.json"
+INFERRED_FIXTURES = ROOT / "tests/fixtures/legacy-workflow-literal-inferred.json"
+
+
+def observed_literal_fixtures():
+    return json.loads(OBSERVED_FIXTURES.read_text(encoding="utf-8"))
+
+
+def inferred_literal_fixtures():
+    # These are local candidate contracts, never claimed as historical output.
+    return json.loads(INFERRED_FIXTURES.read_text(encoding="utf-8"))
 
 
 def original_source():
@@ -128,6 +139,45 @@ class WorkflowFixtureTests(unittest.TestCase):
         self.assertNotIn("ParseStep(", kernel)
         self.assertNotIn("Plan(string[] rest)", kernel)
         self.assertIn("ParseStep(string step)", LITERAL_PARSER.read_text(encoding="utf-8"))
+        project = KERNEL.with_name("PcuCp.NativeHost.csproj").read_text(encoding="utf-8")
+        self.assertIn('<Compile Remove="LegacyWorkflowLiteralParser.cs" />', project)
+
+    def test_historical_literal_observations_keep_exact_provenance(self):
+        observed = observed_literal_fixtures()
+        provenance = observed["provenance"]
+        self.assertEqual(provenance["evidence"], "observed-windows-powershell-5.1")
+        self.assertEqual(provenance["baseline_tree"], BASELINE_TREE)
+        self.assertEqual(provenance["run_id"], "37058066571")
+        self.assertEqual(provenance["tested_commit"], "031bff14f7bcf7b4c33766e348c8e1bfbb5f90f9")
+        self.assertRegex(provenance["log_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(provenance["log_line"], 428)
+        gaps = observed["historical_gaps"]
+        self.assertEqual(len(gaps), 25)
+        targets = observed["batch_target_steps"]
+        self.assertEqual(len(targets), 6)
+        self.assertEqual(len(set(targets)), 6)
+        self.assertTrue(set(targets).issubset(gap["step"] for gap in gaps))
+        for gap in gaps:
+            self.assertNotEqual(gap["before"], gap["after"])
+            if gap["step"] in targets:
+                self.assertTrue(gap["before"]["ok"])
+                self.assertEqual(gap["after"], {"ok": False, "error": "unsupported_token", "tokens": []})
+
+    def test_inferred_literal_edges_are_separate_and_bounded(self):
+        inferred = inferred_literal_fixtures()
+        self.assertEqual(inferred["evidence"], "inferred-unqualified")
+        cases = inferred["cases"]
+        self.assertGreater(len(cases), 100)
+        self.assertEqual(len({case["id"] for case in cases}), len(cases))
+        self.assertFalse(set(observed_literal_fixtures()["batch_target_steps"]) & {case["step"] for case in cases})
+        for case in cases:
+            self.assertLessEqual(len(case["step"]), 65536)
+            expected = case["candidate"]
+            self.assertEqual(set(expected), {"ok", "error", "tokens"})
+            self.assertEqual(expected["ok"], bool(expected["tokens"]))
+            self.assertEqual(not expected["error"], expected["ok"])
+        for fragment in ("crlf", "escaped_lf", "escaped_crlf", "scope_no_name", "nested_subexpression", "indented_footer", "suffix_pipeline"):
+            self.assertTrue(any(fragment in case["id"] for case in cases), fragment)
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows PowerShell 5.1 differential qualification")
@@ -275,6 +325,34 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
             print("WORKFLOW PARSER NOT QUALIFIED: " + json.dumps(gaps, ensure_ascii=True))
         if os.environ.get("CUCP_REQUIRE_WORKFLOW_PARSER_PARITY") == "1":
             self.assertEqual(gaps, [], "Do not retire the original PSParser while compatibility gaps remain")
+
+    def test_historical_literal_observations_match_original_ps51(self):
+        observed = observed_literal_fixtures()
+        gaps = observed["historical_gaps"]
+        targets = set(observed["batch_target_steps"])
+        cases = [{"kind": "parse", "step": gap["step"]} for gap in gaps]
+        for gap, (fixture, expected, actual) in zip(gaps, self.differential(cases)):
+            with self.subTest(fixture=fixture):
+                self.assertEqual(normalized(expected), gap["before"], "Historical PS5.1 observation changed")
+                if fixture["step"] in targets:
+                    self.assertEqual(normalized(actual), normalized(expected))
+
+    def test_inferred_literal_edges_never_relax_ps51_rejections(self):
+        inferred = inferred_literal_fixtures()["cases"]
+        cases = [{"kind": "parse", "step": case["step"]} for case in inferred]
+        gaps = []
+        for case, (fixture, expected, actual) in zip(inferred, self.differential(cases)):
+            with self.subTest(fixture=case["id"]):
+                self.assertEqual(normalized(actual), case["candidate"], "Managed candidate contract changed")
+                if actual.get("ok"):
+                    self.assertTrue(expected.get("ok"), "Candidate accepted a sequence rejected by PSParser")
+                    self.assertEqual(actual["tokens"], expected["tokens"], "Candidate reinterpreted accepted tokens")
+                if normalized(expected) != normalized(actual):
+                    gaps.append({"id": case["id"], "step": fixture["step"], "before": normalized(expected), "after": normalized(actual)})
+        if gaps:
+            print("WORKFLOW INFERRED LITERAL EDGES NOT QUALIFIED: " + json.dumps(gaps, ensure_ascii=True))
+        if os.environ.get("CUCP_REQUIRE_WORKFLOW_PARSER_PARITY") == "1":
+            self.assertEqual(gaps, [], "Inferred edge gaps also block original PSParser retirement")
 
 
 if __name__ == "__main__":

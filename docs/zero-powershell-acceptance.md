@@ -33,6 +33,20 @@ These are canonical Git blob bytes, including comments and tests. They are not
 GitHub Linguist percentages or a functional completion percentage. No source is
 excluded, renamed, embedded elsewhere or padded to change the metric.
 
+## Latest automated checkpoint
+
+The subsequent interaction/diagnostic/file-image integration and boundary repairs
+passed all 14 active jobs at `c414f024` in
+[full run 37072046282](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37072046282).
+Its 26 tracked PS files total 867,162 bytes, including 612,709 runtime bytes.
+Current net reduction is 146,316 bytes (14.44%) from the original baseline;
+extra temporary oracles and boundary fixtures explain why total source exceeds
+the earlier 823,078-byte checkpoint despite lower runtime source. These test
+files remain counted and must acquire equivalent no-PowerShell coverage before
+removal. The required interactive Windows matrix and all zero-dependency final
+gates below remain open. The unqualified literal-tokenizer candidate is still
+excluded from production.
+
 ## Ordered implementation families
 
 1. **Remaining deterministic planning and observations.** App-profile, task/form,
