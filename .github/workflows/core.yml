@@ -118,20 +118,6 @@ jobs:
           $env:CUCP_SMART_PLAN_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
           python -m unittest discover -s tests/python -p test_legacy_smart_plan_parity.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: App-profile captured-reply and culture qualification (candidate only)
-        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
-        shell: pwsh
-        run: |
-          dotnet run --project pcucp-next/dotnet/PcuCp.LegacyAppProfile.ContractTests -c Release -- --self-test
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m unittest discover -s tests/python -p test_legacy_app_profile_parity.py -v
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Explicit culture alias qualification (candidate only)
-        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
-        shell: pwsh
-        run: |
-          python -m unittest discover -s tests/python -p test_legacy_strategy_culture_alias_parity.py -v
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compiled legacy interop API and ABI qualification
         if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
         shell: pwsh
@@ -158,6 +144,31 @@ jobs:
           Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
           Invoke-Pester -Path tests/cucp.LegacyRegression.Tests.ps1 -CI
       # No interactive desktop input tests on hosted runners. See manual Windows checks.
+  windows-profile-candidate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: App-profile captured-reply and culture qualification (candidate only)
+        shell: pwsh
+        run: |
+          dotnet run --project pcucp-next/dotnet/PcuCp.LegacyAppProfile.ContractTests -c Release -- --self-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tests/python -p test_legacy_app_profile_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Explicit culture alias qualification (candidate only)
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests/python -p test_legacy_strategy_culture_alias_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   windows-portable:
     runs-on: windows-latest
     steps:
