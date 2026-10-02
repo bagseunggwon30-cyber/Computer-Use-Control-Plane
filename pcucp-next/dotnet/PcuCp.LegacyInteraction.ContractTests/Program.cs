@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-if (args.SequenceEqual(new[] { "--self-test" })) { InteractionChecks.Run(); return; }
+if (args.SequenceEqual(new[] { "--self-test" })) { InteractionChecks.Run(); InteractionBoundaryRegressionChecks.Run(); return; }
 if (args.SequenceEqual(new[] { "--session-fixture" }))
 {
     using var startup = JsonDocument.Parse(Console.In.ReadLine() ?? throw new InvalidOperationException("Missing fixture startup.")); var root = startup.RootElement;

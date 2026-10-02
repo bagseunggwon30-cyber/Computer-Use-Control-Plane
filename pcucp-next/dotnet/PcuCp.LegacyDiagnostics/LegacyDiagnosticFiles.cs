@@ -46,14 +46,16 @@ internal sealed partial class LegacyDiagnosticCoordinator
                 string line = S(lineElement);
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 JsonElement ev;
-                try
-                {
-                    using var document = JsonDocument.Parse(line);
-                    ev = document.RootElement.Clone();
-                }
+                DateTime? timestamp;
+                try { ev = LegacyDiagnosticJson.Parse(line, out timestamp); }
                 catch (JsonException) { continue; }
                 var ts = DiagnosticEventProperty(ev, "ts");
-                if (cutoff is not null && T(ts) && DiagnosticTryDate(ts, out var eventTime) && eventTime < cutoff.Value)
+                // Legacy /Date(...)/ values are real DateTime objects. Compare
+                // their clock ticks as PowerShell's [datetime] comparison does;
+                // their string form above is only for output/interpolation.
+                if (cutoff is not null && T(ts) && (timestamp is DateTime date
+                    ? date.Ticks < cutoff.Value.DateTime.Ticks
+                    : DiagnosticTryDate(ts, out var eventTime) && eventTime < cutoff.Value))
                     continue;
                 totalEvents++;
                 string macro = S(DiagnosticEventProperty(ev, "macro"));

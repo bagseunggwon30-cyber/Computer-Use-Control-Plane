@@ -83,3 +83,16 @@ leaf trace empty and consume zero replies. Positive controls prove the harness
 can dispatch and preserve control-looking text values as inert native arguments.
 Well-shaped but unowned/mismatched observation IDs, screenshot paths, cache keys,
 and scored anchor records are rejected before leaf dispatch too.
+
+## Caller argv isolation
+
+The same inert runner AST-loads `_Invoke-LegacyInteractionFamily` and
+`_Invoke-LegacyExecutionFamily` for a bounded wrapper check. One inert host seam
+mutates every element of `State.rest` after startup construction, then returns a
+fixed exit. Twelve cases cover both wrappers with null argv, empty arrays,
+null/empty elements, singleton arrays and ordinary/control-looking tokens.
+The assertions require a distinct `System.String[]`, actual state mutation,
+unchanged caller argv and unchanged serialized startup, preserving the existing
+PowerShell conversion of null and empty values. This check executes no process
+or acquisition and does not claim that malformed startup argv is accepted by
+NativeHost. It leaves the 870 source cases and 12 uncertainty cases intact.

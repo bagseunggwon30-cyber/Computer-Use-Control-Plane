@@ -178,3 +178,26 @@ confidence/score additions preserve Int32-to-Double promotion, comparison and
 integral Double JSON spelling. The shared FindElement ranking also avoids
 Int32 wrapping. IconFind still ignores numeric confidence. These new probes,
 like the six earlier Windows repairs, require the next exact PS5 oracle gate.
+
+## Combined adapter checkpoint feedback
+
+Remote commit `d8bde03dfa1f1c2b0ab576041521786d1ae62573`, run `37048150884`,
+interaction job `110974667870`, passed 109 interaction, 110 startup and 994
+execution contracts. The actual adapter passed all 12 explicit uncertainty
+cases. The complete 870-case candidate and actual-adapter comparison exposed
+eight assertions across three causes: a forced `.0` suffix on promoted scores,
+an oracle snapshot that lost the empty pipeline sentinel, and four positive
+descriptor controls whose fixture omitted the production JSON framing round
+trip. This is diagnostic evidence, not a passed family gate.
+
+The score now uses PS5's observed integral JSON spelling. The oracle checks
+empty pipeline values before argument binding can convert them to ordinary
+null; native PS5 Console output remains independently compared. A focused
+Windows probe checks null, empty pipeline, empty array and empty object against
+the native serializer in both object and dictionary containers. This preserves
+the documented [empty pipeline versus null distinction](https://learn.microsoft.com/en-us/powershell/scripting/learn/deep-dives/everything-about-null#enumerable-null),
+without changing the retained source bodies. The shared-validator fixture now
+serializes and parses descriptors just as the host framing does, so both valid
+controls and malformed descriptors reach the intended decoded validation path.
+All 870 ordinary and 12 uncertainty cases and exact comparison assertions remain.
+The repaired Windows checks still require a rerun.

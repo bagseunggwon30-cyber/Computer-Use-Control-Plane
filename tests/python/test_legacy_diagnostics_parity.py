@@ -126,6 +126,12 @@ def cases():
     for f in original:f["brief"]=True;result.append(f)
     for operation in ("perf","health-quick","health-detail","diagnose-lag","audit-summary","log-tail","self-test","benchmark","release-notes"):
         f=copy.deepcopy(next(f for f in result if f["operation"]==operation));f["brief"]=True;f["rest"] += ["--json-only"];result.append(f)
+    # Append source-derived boundary characterizations without changing any of
+    # the original 321 case identities or assertions.
+    add("audit-summary",[],[True,[dict(full_name="date-fixture",last_write_time="2026-10-02T00:00:00Z")],
+        [r'{"ts":"\/Date(0)\/","macro":"date"}']])
+    metadata=dict(__type="inert-fixture",__Type="retained-member",results=[dict(name="windows",p50_ms=100,p95_ms=200)])
+    add("benchmark",["--iters","1","--baseline",r"C:\fixture\baseline.json"],[reply()]*4+[True,json.dumps(metadata)])
     return result
 
 @lru_cache(maxsize=1)
@@ -147,6 +153,17 @@ def decode_wire(value):
     return {v["name"]:decode_wire(v["value"]) for v in value["properties"]}
 
 class DiagnosticPortableTests(unittest.TestCase):
+    def test_windows_observed_json_error_and_duplicate_semantics(self):
+        # Exact PS5 results observed at d8bde03d in run 37048150884. Keep the
+        # unchanged Windows differential cases as the independent oracle too.
+        fixtures=cases()
+        malformed,duplicates=run_candidate([fixtures[27],fixtures[63]])
+        self.assertEqual(malformed['state'],'complete')
+        self.assertEqual(malformed['payload']['baseline_compare']['detail'],
+            "Invalid object passed in, ':' or '}' expected. (7): {broken")
+        self.assertEqual(duplicates['state'],'complete')
+        self.assertEqual(duplicates['payload']['event_count'],1)
+        self.assertEqual(duplicates['payload']['by_macro'],{'two':1})
     def test_pinned_accepted_body_footprint(self):
         source=subprocess.check_output(["git","show",f"{ACCEPTED_TREE}:scripts/cucp.ps1"],cwd=ROOT).decode("utf-8")
         for name,(size,digest) in BODY_HASHES.items():
@@ -249,7 +266,7 @@ class DiagnosticWindowsParityTests(unittest.TestCase):
             # Use the same PS Console serializer to retain its raw formatting.
             from test_legacy_execution_parity import PS_RENDER
             PS_RENDER=PS_RENDER.replace('if($r.emit_json){', '''if(@($r.hashtable_paths).Count -eq 2 -and $r.hashtable_paths[0] -eq "by_macro" -and $r.hashtable_paths[1] -eq "by_exit_code") {
- foreach($field in @("by_macro","by_exit_code")) { $map=@{};foreach($p in $r.payload.$field.PSObject.Properties){$map[$p.Name]=$p.Value};$r.payload.$field=$map }
+ foreach($field in @("by_macro","by_exit_code")) { $map=@{};foreach($p in $r.payload.$field.PSObject.Properties){$map[$p.Name]=0;$map[$p.Name]=$p.Value};$r.payload.$field=$map }
 }
 if(@($r.hashtable_paths).Count -eq 1 -and $r.hashtable_paths[0] -eq "processes.*.priority_classes") {
  foreach($process in @($r.payload.processes)) { $map=@{};foreach($p in $process.priority_classes.PSObject.Properties){$map[$p.Name]=$p.Value};$process.priority_classes=$map }

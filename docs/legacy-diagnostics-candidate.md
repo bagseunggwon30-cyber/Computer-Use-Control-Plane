@@ -170,13 +170,14 @@ annotation from its immutable operation.
 
 ## Qualification evidence and remaining gates
 
-Local managed compilation uses warnings as errors. The portable suite runs 321
+Local managed compilation uses warnings as errors. The portable suite runs 323
 finite cases, including 100 reached captured exceptions, all nine operations,
 brief/JSON-only modes, typed owned-path descriptors, option errors, exact source
 hashes, sample math, partial results and all-samples SLO protection. Fourteen
 additional managed contracts cover representative report and codec behavior.
-The targeted local suite has twelve passing tests plus three explicitly skipped
-Windows-only tests. No live acquisition is used.
+The repaired local suite has fifteen passing tests plus three explicitly skipped
+Windows-only tests. The additional local regression checks retain 37 assertions
+for the two accepted benchmark boundary IDs. No live acquisition is used.
 
 The Windows test extracts the nine definitions and required pure helpers from
 accepted Git source, replacing exact bounded acquisition seams before invocation.
@@ -186,13 +187,33 @@ consumption, exact errors, exits and raw Console bytes. Every injected failure
 must be reached; exhausting a fixture fails the portable gate. The original
 source is parsed, never dot-sourced as a whole.
 
-Windows PowerShell 5.1 differential execution is **pending**, not passed. The
-oracles have static seam checks but cannot run on this cloud Linux environment.
-Malformed baseline JSON currently exposes System.Text.Json parser-detail wording;
-matching the PS5.1 ConvertFrom-Json detail is a known pending compatibility repair.
-The corpus also characterizes exact/case-folded duplicate audit keys, whose legacy
-parser acceptance and last-key behavior must be reconciled before promotion.
-These cases remain full equality assertions in the Windows gate, not exclusions.
+Windows PowerShell 5.1 execution at `d8bde03dfa1f1c2b0ab576041521786d1ae62573`
+completed in [run 37048150884, diagnostics job 110974667877](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37048150884/job/110974667877).
+All 321 actual-adapter cases ran: 273 exact cases, 34 expected current owned-write
+uncertainty cases and 10 expected terminal uncertainty cases passed. Four report
+mismatches remained, and 195 of the 196 guard checks passed. This failed checkpoint
+is evidence, not qualification approval.
+
+The concrete repairs retain every comparison: an explicit array clone fixes the
+argv alias caught by guard 42; a diagnostics-only JSON reader preserves PS5's
+exact-duplicate overwrite, case-collision rejection and positional syntax errors;
+and audit map restoration replays initialization before assignment. That final
+step matters because Framework Hashtable expansion occurs before existing-key
+lookup, affecting raw enumeration order. See [Microsoft's reference source](https://github.com/microsoft/referencesource/blob/main/mscorlib/system/collections/hashtable.cs).
+Candidate rendering uses the same narrow audit restoration; raw Console and
+full tagged payload ordering remain exact assertions. These repairs require a
+new Windows run; no original body is retired by the local pass.
+
+The reader remains a bounded diagnostic conversion, not a general PSObject/CLR
+serializer. Escaped JSON dates now retain a UTC DateTime for audit cutoff math
+and use invariant interpolation for the reported timestamp; bare date-like
+strings stay strings. Non-null `__type` metadata is removed before case-collision
+validation using the desktop resolver's fixed dictionary semantics. No supplied
+type name can load or construct a CLR type. The two additional characterizations
+await Windows comparison. Remaining conversion limits are DateTime-to-number
+error details in benchmark fields, nonfinite primitives, and PSObject empty or
+special property-name behavior. These require an exact retained conversion leaf
+or later bounded companion qualification before claiming full conversion parity.
 The new real adapter is implemented but **not yet Windows-qualified**. Its
 actual-adapter test requires `CUCP_DIAGNOSTICS_TEST_HOST` and compares the entire
 finite corpus against the pinned source. It preserves full equality for ordinary
@@ -232,8 +253,11 @@ compared with that blob. The Python gate pins the exact identity-list digest,
 checks category counts and requires every check to execute; the former
 `checks >= 40` floor is gone. Multiple native calls remain grouped under the same
 logical check, including all three path-equality comparisons and every real
-filesystem observation. Raw Console/error/exit/effect comparisons for all 321
-diagnostic adapter cases remain separate and unchanged.
+filesystem observation. Raw Console/error/exit/effect comparisons for the
+original 321 diagnostic adapter cases remain separate and unchanged. Two
+additional captured inputs characterize an escaped JSON DateTime audit timestamp
+and benchmark dictionary metadata; they append to the corpus without renumbering
+existing cases.
 
 The driver accepts only inert JSON and six closed modes. Captured filesystem
 leaves are installed at the same script scope as the actual loaded definitions.
@@ -241,9 +265,11 @@ A source-helper sentinel probe verifies that lookup resolves those leaves before
 write-capable captured cases can run; captured and real owned requests cannot
 mix. Real I/O accepts only a marked Python-created root and fixed child paths.
 Python unlinks its junction non-recursively before temporary-directory cleanup.
-Local validation passes 14 portable tests and 14 managed checks; the three
-Windows-only gates, including the rewritten driver, still require actual
-Windows PowerShell 5.1 execution. These counts are not Windows parity approval.
+Local validation passes 15 portable tests, 14 original managed checks and the
+37 additional benchmark boundary assertions. The rewritten driver has real
+Windows execution evidence at the failed checkpoint above, including its owned
+filesystem and native-getter cases. The three repaired Windows gates still need
+a passing rerun. These counts are not Windows parity approval.
 
 The adapter accepts only its configured audit/cache roots. It refuses reparse
 ancestors for owned writes and skips directory/reparse entries matching an

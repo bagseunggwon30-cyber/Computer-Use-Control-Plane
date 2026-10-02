@@ -248,44 +248,24 @@ $Script:_OCRLoaded = $false
 $Script:_OCREngine = $null
 $Script:_OCRError = $null
 
+function _Require-LegacyImages {
+  if ('PcuCp.LegacyImages.FileOcr' -as [type]) { return }
+  $dll = $env:CUCP_LEGACY_IMAGES_DLL
+  if (-not $dll) { $dll = Join-Path $PSScriptRoot '..\pcucp-next\bin\legacy\PcuCp.LegacyImages.dll' }
+  if (-not (Test-Path -LiteralPath $dll -PathType Leaf)) { throw 'Legacy images DLL missing. Run python pcucp-next/packaging/publish_legacy_images.py or set CUCP_LEGACY_IMAGES_DLL.' }
+  Add-Type -LiteralPath $dll -ErrorAction Stop
+}
+
 function _Ensure-OCR {
-  # 한 번만 WinRT 어셈블리 로드 + OcrEngine 인스턴스화
   if ($Script:_OCRLoaded) { return ($null -ne $Script:_OCREngine) }
   $Script:_OCRLoaded = $true
   try {
-    Add-Type -AssemblyName System.Runtime.WindowsRuntime -ErrorAction Stop
-    # 정적 reference로 WinRT projection 트리거 (PS 5.x 패턴)
-    [void][Windows.Media.Ocr.OcrEngine, Windows.Media.Ocr, ContentType=WindowsRuntime]
-    [void][Windows.Storage.StorageFile, Windows.Storage, ContentType=WindowsRuntime]
-    [void][Windows.Graphics.Imaging.SoftwareBitmap, Windows.Graphics.Imaging, ContentType=WindowsRuntime]
-    [void][Windows.Graphics.Imaging.BitmapDecoder, Windows.Graphics.Imaging, ContentType=WindowsRuntime]
-    [void][Windows.Storage.Streams.RandomAccessStream, Windows.Storage.Streams, ContentType=WindowsRuntime]
-    [void][Windows.Globalization.Language, Windows.Globalization, ContentType=WindowsRuntime]
-
-    # 엔진 선택: -OcrLanguage 명시 우선, 없으면 사용자 프로필 언어 자동
-    $engine = $null
-    if ($OcrLanguage) {
-      try {
-        $lang = New-Object Windows.Globalization.Language $OcrLanguage
-        $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($lang)
-      } catch { $engine = $null }
-    }
-    if (-not $engine) {
-      $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
-    }
-    if (-not $engine) {
-      # 마지막 fallback — 첫 사용 가능 언어
-      $avail = [Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages
-      if ($avail -and $avail.Count -gt 0) {
-        $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($avail[0])
-      }
-    }
-    if (-not $engine) {
-      $Script:_OCRError = "no_ocr_language_available"
-      return $false
-    }
-    $Script:_OCREngine = $engine
-    return $true
+    _Require-LegacyImages
+    $session = New-Object PcuCp.LegacyImages.FileOcrSession
+    $available = $session.Ensure($OcrLanguage)
+    $Script:_OCREngine = $session.Engine
+    $Script:_OCRError = $session.Error
+    return $available
   } catch {
     $Script:_OCRError = $_.Exception.Message
     return $false
@@ -295,73 +275,26 @@ function _Ensure-OCR {
 # IAsyncOperation<T> -> .Result wait helper. PS 5.x에서 await 흉내.
 function _Wait-AsyncOp {
   param($AsyncOp, [Type]$ResultType)
-  $asTask = [WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
-    $_.Name -eq "AsTask" -and $_.GetParameters().Count -eq 1 -and $_.IsGenericMethod
-  } | Select-Object -First 1
-  $generic = $asTask.MakeGenericMethod($ResultType)
-  $task = $generic.Invoke($null, @($AsyncOp))
-  $task.Wait()
-  return $task.Result
+  _Require-LegacyImages
+  $result = [PcuCp.LegacyImages.FileOcr]::TryWaitAsyncOperation($AsyncOp, $ResultType)
+  if ($null -ne $result.Error) { throw $result.Error }
+  return $result.Value
 }
 
 # PNG 파일 -> SoftwareBitmap (OcrEngine.RecognizeAsync 입력 형식)
 function _Load-SoftwareBitmapFromFile {
   param([string]$Path)
-  $file = _Wait-AsyncOp ([Windows.Storage.StorageFile]::GetFileFromPathAsync($Path)) ([Windows.Storage.StorageFile])
-  $stream = _Wait-AsyncOp ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
-  $decoder = _Wait-AsyncOp ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
-  $sb = _Wait-AsyncOp ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
-  return $sb
+  _Require-LegacyImages
+  $result = [PcuCp.LegacyImages.FileOcr]::TryLoadSoftwareBitmapFromFile($Path)
+  if ($null -ne $result.Error) { throw $result.Error }
+  return $result.Value
 }
 
 # OcrResult를 결정론적 JSON-friendly 구조로 변환 (offset_x/offset_y 적용 가능)
 function _Convert-OcrResult {
   param($OcrResult, [int]$OffsetX = 0, [int]$OffsetY = 0)
-  $lines = @()
-  $allWords = @()
-  foreach ($line in $OcrResult.Lines) {
-    $words = @()
-    $minX = [int]::MaxValue; $minY = [int]::MaxValue
-    $maxR = 0; $maxB = 0
-    foreach ($w in $line.Words) {
-      $r = $w.BoundingRect
-      $wx = [int]$r.X + $OffsetX
-      $wy = [int]$r.Y + $OffsetY
-      $ww = [int]$r.Width
-      $wh = [int]$r.Height
-      $word = [ordered]@{
-        text = $w.Text
-        x = $wx; y = $wy; w = $ww; h = $wh
-        # 클릭 좌표 (BoundingRect 중심)
-        cx = $wx + [int]($ww / 2)
-        cy = $wy + [int]($wh / 2)
-      }
-      $words += $word
-      $allWords += $word
-      if ($wx -lt $minX) { $minX = $wx }
-      if ($wy -lt $minY) { $minY = $wy }
-      if ($wx + $ww -gt $maxR) { $maxR = $wx + $ww }
-      if ($wy + $wh -gt $maxB) { $maxB = $wy + $wh }
-    }
-    if ($words.Count -gt 0) {
-      $lineCx = $minX + [int](($maxR - $minX) / 2)
-      $lineCy = $minY + [int](($maxB - $minY) / 2)
-      $lines += [ordered]@{
-        text = $line.Text
-        x = $minX; y = $minY
-        w = $maxR - $minX; h = $maxB - $minY
-        cx = $lineCx; cy = $lineCy
-        word_count = $words.Count
-        words = $words
-      }
-    }
-  }
-  return [ordered]@{
-    text = $OcrResult.Text
-    line_count = $lines.Count
-    word_count = $allWords.Count
-    lines = $lines
-  }
+  _Require-LegacyImages
+  return [PcuCp.LegacyImages.FileOcr]::ConvertResult($OcrResult, $OffsetX, $OffsetY)
 }
 
 # ocr-find-text matching score. 0..100.
@@ -2040,27 +1973,15 @@ function _Action-UiaToggle {
 # 화면 클릭 좌표가 필요하면 ocr-screen 또는 ocr-find-text를 쓰세요.
 # ============================================================================
 function _Action-OcrImage {
-  if (-not $OcrPath) {
-    _Emit @{status="error"; reason="missing_ocr_path"; recommended_action="provide -OcrPath <png file>"} 1
-  }
-  if (-not (Test-Path -LiteralPath $OcrPath)) {
-    _Emit @{status="error"; reason="ocr_path_not_found"; ocr_path=$OcrPath} 1
-  }
+  _Require-LegacyImages
+  $result = [PcuCp.LegacyImages.FileOcr]::ValidatePath($OcrPath)
+  if ($null -ne $result) { _Emit $result.Data $result.ExitCode }
   if (-not (_Ensure-OCR)) {
-    _Emit @{status="error"; reason="ocr_unavailable"; ocr_error=$Script:_OCRError; recommended_action="install_windows_ocr_language_pack"} 1
+    $result = [PcuCp.LegacyImages.FileOcr]::Unavailable($Script:_OCRError)
+    _Emit $result.Data $result.ExitCode
   }
-  try {
-    $sb = _Load-SoftwareBitmapFromFile -Path $OcrPath
-    $ocrResult = _Wait-AsyncOp ($Script:_OCREngine.RecognizeAsync($sb)) ([Windows.Media.Ocr.OcrResult])
-    $payload = _Convert-OcrResult -OcrResult $ocrResult
-    $payload["status"] = "ok"
-    $payload["engine_language"] = $Script:_OCREngine.RecognizerLanguage.LanguageTag
-    $payload["source"] = "image"
-    $payload["ocr_path"] = $OcrPath
-    _Emit $payload
-  } catch {
-    _Emit @{status="error"; reason="ocr_failed"; detail=$_.Exception.Message; ocr_path=$OcrPath} 1
-  }
+  $result = [PcuCp.LegacyImages.FileOcr]::RecognizeFile($OcrPath, $Script:_OCREngine)
+  _Emit $result.Data $result.ExitCode
 }
 
 # ============================================================================
@@ -2590,139 +2511,9 @@ function _Action-OcrUiaInvoke {
 # 정확도/속도: LockBits + 마샬링으로 픽셀 직접 접근, 1920x1080 ~150ms 수준
 # ============================================================================
 function _Action-ScreenshotDiff {
-  if (-not $DiffBefore -or -not $DiffAfter) {
-    _Emit @{status="error"; reason="missing_diff_paths"; recommended_action="provide -DiffBefore and -DiffAfter"} 1
-  }
-  if (-not (Test-Path -LiteralPath $DiffBefore)) {
-    _Emit @{status="error"; reason="before_not_found"; path=$DiffBefore} 1
-  }
-  if (-not (Test-Path -LiteralPath $DiffAfter)) {
-    _Emit @{status="error"; reason="after_not_found"; path=$DiffAfter} 1
-  }
-  Add-Type -AssemblyName System.Drawing -ErrorAction Stop
-
-  $bmp1 = $null; $bmp2 = $null
-  $data1 = $null; $data2 = $null
-  try {
-    $bmp1 = [System.Drawing.Bitmap]::FromFile($DiffBefore)
-    $bmp2 = [System.Drawing.Bitmap]::FromFile($DiffAfter)
-
-    # 비교 영역 결정 — 두 이미지 교집합
-    # PS 5.x inline-if 함정 회피: 변수 미리 할당
-    $cmpW = [Math]::Min($bmp1.Width, $bmp2.Width)
-    $cmpH = [Math]::Min($bmp1.Height, $bmp2.Height)
-    if ($ScreenshotW -gt 0) { $cmpW = [Math]::Min($cmpW, $ScreenshotW) }
-    if ($ScreenshotH -gt 0) { $cmpH = [Math]::Min($cmpH, $ScreenshotH) }
-    $offX = 0
-    if ($ScreenshotX -gt 0) { $offX = $ScreenshotX }
-    $offY = 0
-    if ($ScreenshotY -gt 0) { $offY = $ScreenshotY }
-    if ($offX + $cmpW -gt $bmp1.Width)  { $cmpW = $bmp1.Width  - $offX }
-    if ($offY + $cmpH -gt $bmp1.Height) { $cmpH = $bmp1.Height - $offY }
-    if ($offX + $cmpW -gt $bmp2.Width)  { $cmpW = $bmp2.Width  - $offX }
-    if ($offY + $cmpH -gt $bmp2.Height) { $cmpH = $bmp2.Height - $offY }
-
-    if ($cmpW -le 0 -or $cmpH -le 0) {
-      _Emit @{status="error"; reason="empty_compare_region"; cmp_w=$cmpW; cmp_h=$cmpH} 1
-    }
-
-    $rect = New-Object System.Drawing.Rectangle $offX, $offY, $cmpW, $cmpH
-    $fmt = [System.Drawing.Imaging.PixelFormat]::Format32bppArgb
-    $data1 = $bmp1.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::ReadOnly, $fmt)
-    $data2 = $bmp2.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::ReadOnly, $fmt)
-
-    $stride = $data1.Stride
-    $byteCount = [Math]::Abs($stride) * $cmpH
-    $buf1 = New-Object byte[] $byteCount
-    $buf2 = New-Object byte[] $byteCount
-    [System.Runtime.InteropServices.Marshal]::Copy($data1.Scan0, $buf1, 0, $byteCount)
-    [System.Runtime.InteropServices.Marshal]::Copy($data2.Scan0, $buf2, 0, $byteCount)
-
-    # v1.0.0: ignore-regions 파싱 (마스킹 영역)
-    # 형식: "x1,y1,w1,h1;x2,y2,w2,h2"
-    # 비교 영역 좌표계는 LockBits 의 (offX,offY) 부터 시작하므로 입력 좌표를 보정
-    $ignoreRects = @()
-    if ($DiffIgnoreRegions) {
-      foreach ($spec in ($DiffIgnoreRegions -split ';')) {
-        $spec = $spec.Trim()
-        if (-not $spec) { continue }
-        $p = $spec -split ','
-        if ($p.Count -ne 4) { continue }
-        $rx = [int]$p[0].Trim() - $offX
-        $ry = [int]$p[1].Trim() - $offY
-        $rw = [int]$p[2].Trim()
-        $rh = [int]$p[3].Trim()
-        # 비교 영역 안으로 클램프
-        if ($rx -lt 0) { $rw += $rx; $rx = 0 }
-        if ($ry -lt 0) { $rh += $ry; $ry = 0 }
-        if ($rw -le 0 -or $rh -le 0) { continue }
-        if ($rx + $rw -gt $cmpW) { $rw = $cmpW - $rx }
-        if ($ry + $rh -gt $cmpH) { $rh = $cmpH - $ry }
-        if ($rw -le 0 -or $rh -le 0) { continue }
-        $ignoreRects += [ordered]@{ x=$rx; y=$ry; w=$rw; h=$rh }
-      }
-    }
-
-    # ignore-region 빠른 검사 함수: 픽셀 (xx, yy) 가 마스크 안인지
-    # 작은 ignoreRects.Count(보통 0~3) 라 선형 탐색이 충분
-    $hasIgnore = ($ignoreRects.Count -gt 0)
-
-    $changed = 0
-    $ignoredCount = 0
-    $total = $cmpW * $cmpH
-    # 32bpp ARGB: B G R A 순. 4바이트씩 stride 따라 진행
-    for ($yy = 0; $yy -lt $cmpH; $yy++) {
-      $rowOff = $yy * $stride
-      for ($xx = 0; $xx -lt $cmpW; $xx++) {
-        # ignore-region 안 픽셀은 비교 스킵
-        if ($hasIgnore) {
-          $skipped = $false
-          foreach ($irc in $ignoreRects) {
-            if ($xx -ge $irc.x -and $xx -lt ($irc.x + $irc.w) -and
-                $yy -ge $irc.y -and $yy -lt ($irc.y + $irc.h)) {
-              $skipped = $true
-              break
-            }
-          }
-          if ($skipped) { $ignoredCount++; continue }
-        }
-        $i = $rowOff + ($xx * 4)
-        $db = [int][Math]::Abs([int]$buf1[$i]     - [int]$buf2[$i])
-        $dg = [int][Math]::Abs([int]$buf1[$i + 1] - [int]$buf2[$i + 1])
-        $dr = [int][Math]::Abs([int]$buf1[$i + 2] - [int]$buf2[$i + 2])
-        if (($db + $dg + $dr) -gt $DiffThreshold) { $changed++ }
-      }
-    }
-
-    # ignore 영역 제외한 effective_total 기준으로 ratio 계산
-    $effectiveTotal = $total - $ignoredCount
-    $ratio = if ($effectiveTotal -gt 0) { [double]$changed / [double]$effectiveTotal } else { 0.0 }
-    $isChanged = ($ratio -gt 0.001)
-
-    _Emit ([ordered]@{
-      status = "ok"
-      width = $cmpW
-      height = $cmpH
-      total_pixels = $total
-      effective_pixels = $effectiveTotal
-      ignored_pixels = $ignoredCount
-      ignored_regions = @($ignoreRects)
-      changed_pixels = $changed
-      changed_ratio = [math]::Round($ratio, 6)
-      changed = $isChanged
-      threshold = $DiffThreshold
-      offset = [ordered]@{ x=$offX; y=$offY }
-      before = $DiffBefore
-      after = $DiffAfter
-    })
-  } catch {
-    _Emit @{status="error"; reason="diff_failed"; detail=$_.Exception.Message} 1
-  } finally {
-    if ($data1 -and $bmp1) { try { $bmp1.UnlockBits($data1) } catch { } }
-    if ($data2 -and $bmp2) { try { $bmp2.UnlockBits($data2) } catch { } }
-    if ($bmp1) { $bmp1.Dispose() }
-    if ($bmp2) { $bmp2.Dispose() }
-  }
+  _Require-LegacyImages
+  $result = [PcuCp.LegacyImages.ScreenshotDiff]::Compare($DiffBefore, $DiffAfter, $ScreenshotX, $ScreenshotY, $ScreenshotW, $ScreenshotH, $DiffThreshold, $DiffIgnoreRegions)
+  _Emit $result.Data $result.ExitCode
 }
 
 # ============================================================================

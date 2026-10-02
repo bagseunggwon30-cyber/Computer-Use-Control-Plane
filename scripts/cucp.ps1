@@ -8542,7 +8542,8 @@ function _Invoke-LegacyExecutionFamily {
       -not ($inherited.Options -band [Management.Automation.ScopedItemOptions]::Constant))){$sensitiveCeiling=$false}
   $startup=[ordered]@{schema='cucp.execution-start/v1';operation=$Operation;rest=@($Rest);brief=[bool]$Brief;
     cache_seconds=[int]$CacheSeconds;vision_available=[bool]$Script:CliPath;culture=[Globalization.CultureInfo]::CurrentCulture.Name}
-  $state=@{family='execution';operation=$Operation;rest=@($Rest);state_effect_seen=$false;live=$liveCeiling;sensitive=$sensitiveCeiling;script_path=$ScriptPath;cache_dir=$Script:CacheDir;paths=@{};clocks=@{};writer=$null;live_effect_seen=$false}
+  $restCopy=[string[]]@($Rest);$restCopy=[string[]]$restCopy.Clone()
+  $state=@{family='execution';operation=$Operation;rest=$restCopy;state_effect_seen=$false;live=$liveCeiling;sensitive=$sensitiveCeiling;script_path=$ScriptPath;cache_dir=$Script:CacheDir;paths=@{};clocks=@{};writer=$null;live_effect_seen=$false}
   return _Invoke-LegacyExecutionHost -EntryPoint 'legacy-execution-session' -Startup $startup -State $state
 }
 

@@ -54,7 +54,7 @@
     },
     {
       "path": "scripts/cucp-native-helper.ps1",
-      "lines": 3001,
+      "lines": 2792,
       "functions": [
         {
           "name": "_Ensure-Win32Native",
@@ -65,178 +65,182 @@
           "line": 226
         },
         {
-          "name": "_Ensure-OCR",
+          "name": "_Require-LegacyImages",
           "line": 251
         },
         {
+          "name": "_Ensure-OCR",
+          "line": 259
+        },
+        {
           "name": "_Wait-AsyncOp",
-          "line": 296
+          "line": 276
         },
         {
           "name": "_Load-SoftwareBitmapFromFile",
-          "line": 308
+          "line": 285
         },
         {
           "name": "_Convert-OcrResult",
-          "line": 318
+          "line": 294
         },
         {
           "name": "_Capture-ScreenRegionToTempPng",
-          "line": 369
+          "line": 302
         },
         {
           "name": "_Match-OcrCandidates",
-          "line": 422
+          "line": 355
         },
         {
           "name": "_Get-UiaSupportedPatternName",
-          "line": 476
+          "line": 409
         },
         {
           "name": "_New-UiaMatchPayload",
-          "line": 494
+          "line": 427
         },
         {
           "name": "_Get-RoleWeight",
-          "line": 522
+          "line": 455
         },
         {
           "name": "_Clamp-UiaPointToRect",
-          "line": 532
+          "line": 465
         },
         {
           "name": "_Get-UiaPreferredClickPoint",
-          "line": 561
+          "line": 494
         },
         {
           "name": "_Resolve-UiaPointRefinement",
-          "line": 582
+          "line": 515
         },
         {
           "name": "_Find-SmallestUiaElementAtPoint",
-          "line": 651
+          "line": 584
         },
         {
           "name": "_Resolve-OcrUiaFusionCandidate",
-          "line": 675
+          "line": 608
         },
         {
           "name": "_Emit",
-          "line": 771
+          "line": 704
         },
         {
           "name": "_Action-Health",
-          "line": 793
+          "line": 726
         },
         {
           "name": "_Action-Windows",
-          "line": 824
+          "line": 757
         },
         {
           "name": "_Action-Focused",
-          "line": 858
+          "line": 791
         },
         {
           "name": "_Action-Focus",
-          "line": 879
+          "line": 812
         },
         {
           "name": "_Action-Screenshot",
-          "line": 914
+          "line": 847
         },
         {
           "name": "_Test-CoordsInTarget",
-          "line": 984
+          "line": 917
         },
         {
           "name": "_Action-HitTest",
-          "line": 1037
+          "line": 970
         },
         {
           "name": "_Action-HitScan",
-          "line": 1117
+          "line": 1050
         },
         {
           "name": "_Action-Click",
-          "line": 1341
+          "line": 1274
         },
         {
           "name": "_Assert-ForegroundTarget",
-          "line": 1441
+          "line": 1374
         },
         {
           "name": "_Action-Type",
-          "line": 1473
+          "line": 1406
         },
         {
           "name": "_Action-Shortcut",
-          "line": 1504
+          "line": 1437
         },
         {
           "name": "_Action-UiaTree",
-          "line": 1553
+          "line": 1486
         },
         {
           "name": "_Action-UiaFind",
-          "line": 1635
+          "line": 1568
         },
         {
           "name": "_Action-UiaClick",
-          "line": 1754
+          "line": 1687
         },
         {
           "name": "_Resolve-UiaElement",
-          "line": 1787
+          "line": 1720
         },
         {
           "name": "_Action-UiaInvoke",
-          "line": 1887
+          "line": 1820
         },
         {
           "name": "_Action-UiaSetValue",
-          "line": 1978
+          "line": 1911
         },
         {
           "name": "_Action-UiaToggle",
-          "line": 2010
+          "line": 1943
         },
         {
           "name": "_Action-OcrImage",
-          "line": 2042
+          "line": 1975
         },
         {
           "name": "_Action-OcrScreen",
-          "line": 2073
+          "line": 1994
         },
         {
           "name": "_Action-OcrFindText",
-          "line": 2138
+          "line": 2059
         },
         {
           "name": "_Action-OcrUiaFuse",
-          "line": 2263
+          "line": 2184
         },
         {
           "name": "_Action-OcrUiaInvoke",
-          "line": 2404
+          "line": 2325
         },
         {
           "name": "_Action-ScreenshotDiff",
-          "line": 2592
+          "line": 2513
         },
         {
           "name": "_Action-ImePaste",
-          "line": 2760
+          "line": 2551
         },
         {
           "name": "_Action-ModalDetect",
-          "line": 2865
+          "line": 2656
         }
       ]
     },
     {
       "path": "scripts/cucp.ps1",
-      "lines": 10920,
+      "lines": 10921,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -980,199 +984,199 @@
         },
         {
           "name": "_Invoke-LegacyExecutionHost",
-          "line": 8549
+          "line": 8550
         },
         {
           "name": "Invoke-MacroWorkflowRun",
-          "line": 8604
+          "line": 8605
         },
         {
           "name": "_TaskPlan-QuoteToken",
-          "line": 8606
+          "line": 8607
         },
         {
           "name": "_TaskPlan-StepString",
-          "line": 8614
+          "line": 8615
         },
         {
           "name": "_TaskPlan-UnwrapCommand",
-          "line": 8630
+          "line": 8631
         },
         {
           "name": "_AppStrategy-NormalizeRoute",
-          "line": 8638
+          "line": 8639
         },
         {
           "name": "_AppStrategy-Key",
-          "line": 8657
+          "line": 8658
         },
         {
           "name": "_AppStrategy-Read",
-          "line": 8666
+          "line": 8667
         },
         {
           "name": "_AppStrategy-LastGood",
-          "line": 8679
+          "line": 8680
         },
         {
           "name": "_AppStrategy-Append",
-          "line": 8689
+          "line": 8690
         },
         {
           "name": "Invoke-MacroAppProfile",
-          "line": 8732
+          "line": 8733
         },
         {
           "name": "_Invoke-LegacyReadOnlyQuery",
-          "line": 8833
+          "line": 8834
         },
         {
           "name": "Invoke-MacroTaskPreset",
-          "line": 8886
+          "line": 8887
         },
         {
           "name": "Invoke-MacroTaskPlan",
-          "line": 8936
+          "line": 8937
         },
         {
           "name": "Invoke-MacroTaskRun",
-          "line": 8969
+          "line": 8970
         },
         {
           "name": "Invoke-MacroFormPlan",
-          "line": 8971
+          "line": 8972
         },
         {
           "name": "Invoke-MacroFormRun",
-          "line": 9000
+          "line": 9001
         },
         {
           "name": "Invoke-MacroSmartClick",
-          "line": 9002
+          "line": 9003
         },
         {
           "name": "Invoke-MacroWatch",
-          "line": 9017
+          "line": 9018
         },
         {
           "name": "Invoke-MacroOcrScreen",
-          "line": 9031
+          "line": 9032
         },
         {
           "name": "Invoke-MacroOcrImage",
-          "line": 9060
+          "line": 9061
         },
         {
           "name": "Invoke-MacroOcrFindText",
-          "line": 9084
+          "line": 9085
         },
         {
           "name": "Invoke-MacroOcrClick",
-          "line": 9127
+          "line": 9128
         },
         {
           "name": "Invoke-MacroOcrUiaFuse",
-          "line": 9201
+          "line": 9202
         },
         {
           "name": "Invoke-MacroOcrUiaInvoke",
-          "line": 9244
+          "line": 9245
         },
         {
           "name": "Invoke-MacroScreenshotDiff",
-          "line": 9286
+          "line": 9287
         },
         {
           "name": "Invoke-MacroClickAndVerifyScreen",
-          "line": 9325
+          "line": 9326
         },
         {
           "name": "Invoke-MacroAutoDo",
-          "line": 9422
+          "line": 9423
         },
         {
           "name": "_Trajectory-Append",
-          "line": 9531
+          "line": 9532
         },
         {
           "name": "_Trajectory-Read",
-          "line": 9555
+          "line": 9556
         },
         {
           "name": "_Trajectory-Clear",
-          "line": 9569
+          "line": 9570
         },
         {
           "name": "_History-Append",
-          "line": 9593
+          "line": 9594
         },
         {
           "name": "_History-PickBestStrategy",
-          "line": 9632
+          "line": 9633
         },
         {
           "name": "_History-Stats",
-          "line": 9679
+          "line": 9680
         },
         {
           "name": "_Helper-IsUp",
-          "line": 9716
+          "line": 9717
         },
         {
           "name": "_Helper-Ensure",
-          "line": 9721
+          "line": 9722
         },
         {
           "name": "Invoke-MacroSession",
-          "line": 9742
+          "line": 9743
         },
         {
           "name": "_Cucp-RedactSecrets",
-          "line": 9960
+          "line": 9961
         },
         {
           "name": "Invoke-MacroImePaste",
-          "line": 9992
+          "line": 9993
         },
         {
           "name": "Invoke-MacroSafeTypeIme",
-          "line": 10044
+          "line": 10045
         },
         {
           "name": "Invoke-MacroModalDetect",
-          "line": 10124
+          "line": 10125
         },
         {
           "name": "Invoke-MacroRecoveryPlan",
-          "line": 10157
+          "line": 10158
         },
         {
           "name": "Invoke-MacroRecoveryRun",
-          "line": 10165
+          "line": 10166
         },
         {
           "name": "Invoke-MacroPrecisionValidate",
-          "line": 10172
+          "line": 10173
         },
         {
           "name": "Invoke-MacroBenchmark",
-          "line": 10268
+          "line": 10269
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 10409
+          "line": 10410
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 10541
+          "line": 10542
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 10656
+          "line": 10657
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 10752
+          "line": 10753
         }
       ]
     },
@@ -1280,7 +1284,7 @@
     },
     {
       "path": "scripts/cucp-legacy-interaction-adapter.ps1",
-      "lines": 216,
+      "lines": 217,
       "functions": [
         {
           "name": "_Interaction-Integer($Value)",
@@ -1320,41 +1324,41 @@
         },
         {
           "name": "Invoke-MacroFindLabel",
-          "line": 209
-        },
-        {
-          "name": "Invoke-MacroClickPoint",
           "line": 210
         },
         {
-          "name": "Invoke-MacroClickLabel",
+          "name": "Invoke-MacroClickPoint",
           "line": 211
         },
         {
-          "name": "Invoke-MacroSafeType",
+          "name": "Invoke-MacroClickLabel",
           "line": 212
         },
         {
-          "name": "Invoke-MacroIconFind",
+          "name": "Invoke-MacroSafeType",
           "line": 213
         },
         {
-          "name": "Invoke-MacroIconClick",
+          "name": "Invoke-MacroIconFind",
           "line": 214
         },
         {
-          "name": "Invoke-MacroOcrClick",
+          "name": "Invoke-MacroIconClick",
           "line": 215
         },
         {
-          "name": "Invoke-MacroPrecisionValidate",
+          "name": "Invoke-MacroOcrClick",
           "line": 216
+        },
+        {
+          "name": "Invoke-MacroPrecisionValidate",
+          "line": 217
         }
       ]
     },
     {
       "path": "scripts/cucp-legacy-diagnostic-adapter.ps1",
-      "lines": 394,
+      "lines": 397,
       "functions": [
         {
           "name": "_Diagnostic-Require($Condition,[string]$Message)",
@@ -1382,75 +1386,75 @@
         },
         {
           "name": "_Diagnostic-Limit($State,[string]$Key,[int]$Limit)",
-          "line": 37
+          "line": 38
         },
         {
           "name": "_Diagnostic-ValidateEffect($Effect,$State)",
-          "line": 42
+          "line": 43
         },
         {
           "name": "_Diagnostic-Clock($State,[string]$Name,[string]$Scope)",
-          "line": 190
+          "line": 191
         },
         {
           "name": "_Diagnostic-NodeVersion",
-          "line": 197
+          "line": 198
         },
         {
           "name": "_Diagnostic-TailBytes([string]$Path,[int]$Maximum)",
-          "line": 201
+          "line": 202
         },
         {
           "name": "_Diagnostic-AssertOwnedRoot([string]$Path)",
-          "line": 211
+          "line": 212
         },
         {
           "name": "_Diagnostic-PathEquals([string]$Left,[string]$Right)",
-          "line": 225
+          "line": 226
         },
         {
           "name": "_Diagnostic-AuditProbe([string]$Directory,[string]$Prefix)",
-          "line": 228
+          "line": 229
         },
         {
           "name": "_Diagnostic-ClearAppshotCache([string]$Directory)",
-          "line": 236
+          "line": 237
         },
         {
           "name": "_Diagnostic-CapturedMacro([string]$Name,[string[]]$Argv)",
-          "line": 247
+          "line": 248
         },
         {
           "name": "_Diagnostic-Dispatch($Effect,$State)",
-          "line": 261
+          "line": 262
         },
         {
           "name": "_Diagnostic-PreparePayload($Payload,$State)",
-          "line": 325
+          "line": 326
         },
         {
           "name": "_Diagnostic-GetContext",
-          "line": 343
+          "line": 346
         },
         {
           "name": "_Diagnostic-ProcessorCount",
-          "line": 350
+          "line": 353
         },
         {
           "name": "_Invoke-LegacyDiagnosticFamily",
-          "line": 351
+          "line": 354
         },
         {
           "name": "_Diagnostic-Processes($State)",
-          "line": 360
+          "line": 363
         },
         {
           "name": "_Diagnostic-ProcessMetrics($State,[int]$CurrentOrdinal,$PreviousOrdinal)",
-          "line": 374
+          "line": 377
         },
         {
           "name": "_Diagnostic-DisposeProcesses($State)",
-          "line": 391
+          "line": 394
         }
       ]
     }
@@ -1591,8 +1595,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 934772,
-    "removed": 78706,
+    "current": 930801,
+    "removed": 82677,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
@@ -1946,6 +1950,66 @@
       "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
       "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
       "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Ensure-OCR",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyImages/FileOcr.cs",
+      "adapter": "Qualified delegate retains the original parameters, script OCR cache state, WinRT object returns and existing _Emit boundary.",
+      "evidence": "All 167 Windows comparisons and 47 managed checks passed at d8bde03dfa1f1c2b0ab576041521786d1ae62573 / run37048150884, job110974667863. Exact UTF-16 AST spans and SHA-256 function hashes used for six-body promotion. Production-source and bundled full-regression gates remain required.",
+      "original_body_bytes": 1907,
+      "original_body_sha256": "8fbb8a2321ff46d7298bbc51483fd6f7058b50543fe646e240f3be5a26f510a1",
+      "delegate_body_sha256": "153e7f1724a2b109ea69f090b486f69a519eb8bbba10dd3515b67687dfd8d5db"
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Wait-AsyncOp",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyImages/FileOcr.cs",
+      "adapter": "Qualified delegate retains the original parameters, script OCR cache state, WinRT object returns and existing _Emit boundary.",
+      "evidence": "All 167 Windows comparisons and 47 managed checks passed at d8bde03dfa1f1c2b0ab576041521786d1ae62573 / run37048150884, job110974667863. Exact UTF-16 AST spans and SHA-256 function hashes used for six-body promotion. Production-source and bundled full-regression gates remain required.",
+      "original_body_bytes": 387,
+      "original_body_sha256": "fda513991fc1fa5679c42646d740502f994f1f4d942c472ba92e5566b842e12f",
+      "delegate_body_sha256": "6ca99bf69e734959bbee3013755cbf6e820fd31bc50e3c0b0f5336f58ab467b2"
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Load-SoftwareBitmapFromFile",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyImages/FileOcr.cs",
+      "adapter": "Qualified delegate retains the original parameters, script OCR cache state, WinRT object returns and existing _Emit boundary.",
+      "evidence": "All 167 Windows comparisons and 47 managed checks passed at d8bde03dfa1f1c2b0ab576041521786d1ae62573 / run37048150884, job110974667863. Exact UTF-16 AST spans and SHA-256 function hashes used for six-body promotion. Production-source and bundled full-regression gates remain required.",
+      "original_body_bytes": 563,
+      "original_body_sha256": "2593da1682a67b7d027dd6940bf6a210dfe614785e3b46285f33246f8e21c8ee",
+      "delegate_body_sha256": "0f03e03b140f21231b036ddf1ebd292f15e5a3fccc831ee854f945311e8b2b9c"
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Convert-OcrResult",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyImages/FileOcr.cs",
+      "adapter": "Qualified delegate retains the original parameters, script OCR cache state, WinRT object returns and existing _Emit boundary.",
+      "evidence": "All 167 Windows comparisons and 47 managed checks passed at d8bde03dfa1f1c2b0ab576041521786d1ae62573 / run37048150884, job110974667863. Exact UTF-16 AST spans and SHA-256 function hashes used for six-body promotion. Production-source and bundled full-regression gates remain required.",
+      "original_body_bytes": 1396,
+      "original_body_sha256": "ae51b0991e31e175db7c3382d116ccaaad8dcb598a48dd43d6795fa2d5100b86",
+      "delegate_body_sha256": "b93836e1aef5f6cb2e13465dcd1c3bdf487d8d5af60046c92554e53a7bc40b82"
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Action-OcrImage",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyImages/FileOcr.cs",
+      "adapter": "Qualified delegate retains the original parameters, script OCR cache state, WinRT object returns and existing _Emit boundary.",
+      "evidence": "All 167 Windows comparisons and 47 managed checks passed at d8bde03dfa1f1c2b0ab576041521786d1ae62573 / run37048150884, job110974667863. Exact UTF-16 AST spans and SHA-256 function hashes used for six-body promotion. Production-source and bundled full-regression gates remain required.",
+      "original_body_bytes": 1005,
+      "original_body_sha256": "c72799fe2985758d939e99e9af298d719590f97a1498c8786dbd58aa34560c9a",
+      "delegate_body_sha256": "3ae3cbdbdee476cab2db54f6c5eb48e52ac0c943940a84255bbc4dc70f47b3d5"
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Action-ScreenshotDiff",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyImages/ScreenshotDiff.cs",
+      "adapter": "Qualified delegate retains the original parameters, script OCR cache state, WinRT object returns and existing _Emit boundary.",
+      "evidence": "All 167 Windows comparisons and 47 managed checks passed at d8bde03dfa1f1c2b0ab576041521786d1ae62573 / run37048150884, job110974667863. Exact UTF-16 AST spans and SHA-256 function hashes used for six-body promotion. Production-source and bundled full-regression gates remain required.",
+      "original_body_bytes": 5556,
+      "original_body_sha256": "29aaa2c76435f9a05d6c0f0d60ffb07e7d5b99603717e55df17d6a8b5ac2d19d",
+      "delegate_body_sha256": "1dd04987765f863f64a9695a42eb18a359e3214aa3bed50786380f118417918e"
     }
   ]
 }

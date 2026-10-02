@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE_TREE = 'bf895d3120dd5e145f360cb1c41e1d79a061d048'
@@ -15,8 +16,17 @@ DRAFT = ROOT / 'tests/fixtures/legacy-file-images-adapter.ps1'
 
 
 def adapter_source():
-    manifest = json.loads((ROOT / '.github/migration-adapters.json').read_text())
-    return ROOT / 'scripts/cucp-native-helper.ps1' if 'file-images' in manifest['test_adapters'] else DRAFT
+    override = os.environ.get('CUCP_LEGACY_IMAGES_ADAPTER_SOURCE')
+    if override:
+        source = Path(override)
+        if not source.is_absolute():
+            source = ROOT / source
+    else:
+        manifest = json.loads((ROOT / '.github/migration-adapters.json').read_text())
+        source = ROOT / 'scripts/cucp-native-helper.ps1' if 'file-images' in manifest['test_adapters'] else DRAFT
+    if not source.is_file():
+        raise FileNotFoundError(f'Configured file-images adapter source is missing: {source}')
+    return source
 
 
 def image_cases():
@@ -49,6 +59,16 @@ def image_cases():
 
 
 class ImagesSourceTests(unittest.TestCase):
+    def test_adapter_source_override_is_explicit_and_missing_source_fails(self):
+        with tempfile.TemporaryDirectory(prefix='CUCP adapter selection ') as temp:
+            source = Path(temp) / 'owned.ps1'
+            source.write_text('# owned source')
+            with mock.patch.dict(os.environ, {'CUCP_LEGACY_IMAGES_ADAPTER_SOURCE': str(source)}):
+                self.assertEqual(adapter_source(), source)
+                source.unlink()
+                with self.assertRaises(FileNotFoundError):
+                    adapter_source()
+
     def test_codec_and_disposal_boundary_remains_framework_drawing(self):
         source = (PROJECT / 'ScreenshotDiff.cs').read_text()
         for required in ('Image.FromFile', 'LockBits', 'Format32bppArgb', 'Marshal.Copy', 'UnlockBits', 'bmp1.Dispose()', 'bmp2.Dispose()'):
@@ -84,7 +104,7 @@ class ImagesWindowsParityTests(unittest.TestCase):
             source.write_bytes(subprocess.check_output(['git', 'show', f'{BASELINE_TREE}:scripts/cucp-native-helper.ps1'], cwd=ROOT))
             runner = folder / 'runner.ps1'
             runner.write_text(r'''
-param([string]$Mode,[string]$Root,[string]$Source,[string]$Dll,[string]$CasePath,[string]$Adapter,[switch]$Boundary)
+param([string]$Mode,[string]$Root,[string]$Source,[string]$Dll,[string]$CasePath,[string]$Adapter,[string]$NativeSource,[switch]$Boundary)
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 Add-Type -AssemblyName System.Drawing
@@ -139,7 +159,12 @@ if ($Mode -eq 'adapter') {
   }
 }
 if ($Boundary) {
-  $emitter=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq '_Emit'},$true))
+  $emitterAst=$ast
+  if ($Mode -eq 'adapter') {
+    $emitterAst=[Management.Automation.Language.Parser]::ParseFile($NativeSource,[ref]$tokens,[ref]$errors)
+    if ($errors.Count) { throw 'Current native emitter source did not parse' }
+  }
+  $emitter=@($emitterAst.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq '_Emit'},$true))
   if($emitter.Count -ne 1){throw 'Expected exactly one original emitter'}
   . ([scriptblock]::Create($emitter[0].Extent.Text))
   $Script:_StartedAt=[datetime]'2020-01-01T00:00:00Z'
@@ -150,7 +175,7 @@ if ($Boundary) {
 }
 _Action-ScreenshotDiff
 ''', encoding='utf-8-sig')
-            command = ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(runner), '-Root', str(folder), '-Source', str(source), '-Dll', os.environ['CUCP_LEGACY_IMAGES_TEST_DLL'], '-Adapter', str(adapter_source())]
+            command = ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(runner), '-Root', str(folder), '-Source', str(source), '-Dll', os.environ['CUCP_LEGACY_IMAGES_TEST_DLL'], '-Adapter', str(adapter_source()), '-NativeSource', str(ROOT / 'scripts/cucp-native-helper.ps1')]
             if boundary:
                 command.append('-Boundary')
             generation = subprocess.run([*command, '-Mode', 'generate'], capture_output=True, timeout=30)

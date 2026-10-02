@@ -29,7 +29,8 @@ function _Diagnostic-NewState {
   foreach($key in @('audit_directory','cache_directory','wrapper_log','cli_path','changelog_path','temp_root','benchmark_schema','release_schema')) {
     $owned|Add-Member NoteProperty $key $Context.$key
   }
-  return @{family='diagnostics';operation=$Operation;rest=[string[]]@($Rest);context=$owned;
+  $restCopy=[string[]]@($Rest);$restCopy=[string[]]$restCopy.Clone()
+  return @{family='diagnostics';operation=$Operation;rest=$restCopy;context=$owned;
     live=$false;sensitive=$false;paths=@{};clocks=@{};writer=$null;live_effect_seen=$false;
     diagnostic_counts=@{};diagnostic_audit_files=@{};diagnostic_cache_path=$null;diagnostic_changelog=$null;
     diagnostic_process_lists=(New-Object Collections.ArrayList);diagnostic_process_rows=(New-Object Collections.ArrayList);diagnostic_metric_order=@();diagnostic_metric_cursor=0}
@@ -329,7 +330,9 @@ function _Diagnostic-PreparePayload($Payload,$State) {
     _Diagnostic-Require ($null -ne $Payload -and $Payload.schema -ceq 'cucp.audit-summary/v1') 'Invalid audit-summary completion.'
     foreach($name in @('by_macro','by_exit_code')){
       $object=$Payload.$name;_Diagnostic-Require ($null -ne $object -and $object -isnot [array] -and $object -isnot [string] -and $object -isnot [ValueType]) 'Invalid audit counter map.'
-      $map=@{};foreach($property in $object.PSObject.Properties){$map[$property.Name]=$property.Value};$Payload.$name=$map
+      # Audit initializes each new counter, then assigns its incremented value.
+      # Hashtable may expand even on that second assignment; preserve its raw order.
+      $map=@{};foreach($property in $object.PSObject.Properties){$map[$property.Name]=0;$map[$property.Name]=$property.Value};$Payload.$name=$map
     }
   } elseif($State.operation -ceq 'diagnose-lag'){
     _Diagnostic-Require ($null -ne $Payload -and $Payload.schema -ceq 'cucp.diagnose-lag/v1' -and $Payload.processes -is [array]) 'Invalid diagnose-lag completion.'

@@ -13,6 +13,19 @@ integrated checkpoint passed all 11 active jobs in [full run 37022764709](https:
 including production interception, portable packaging and explicit privacy checks. See the
 [current report](migration-checkpoint-report.md) and [inventory](legacy-function-inventory.json).
 
+## Current integration gate
+
+The following interaction, diagnostics and file-image batch has a combined
+119,960-byte original function scope. That is a source footprint, not net
+retirement: retained adapters and temporary oracle tests count as PowerShell.
+At `d8bde03d`, the file-image/OCR candidate and actual adapter passed all 167
+Windows comparisons and 47 managed checks. Its six delegates now replace the
+production bodies and its duplicate draft is removed, reducing those files by
+10,898 bytes. Production source selection is explicit and the integrated gate
+is pending. Interaction and diagnostics still retain their original bodies
+while exact-output and boundary repairs undergo the same gate. See the
+[file-image evidence](legacy-file-images-qualification.md).
+
 ## Initial core foundation (historical)
 
 | Capability | Python responsibility | C# responsibility | Compatibility / parity status |
@@ -47,11 +60,20 @@ including production interception, portable packaging and explicit privacy check
 3. Legacy vision execution no longer evaluates a command string through `cmd.exe`. Native executable arguments are individually Windows-quoted. **`.cmd`/`.bat` provider wrappers are rejected**, including typical npm wrapper-only installations; supply a trusted native executable or keep vision in the host. This is an explicit compatibility restriction, not full provider-launch parity
 4. Workflow `session` is no longer classified wholesale as read-only. Only `info`, `helper-status` and `autostart-status` are accepted in a read-only workflow. Direct install/uninstall-autostart requires explicit live mode. Persistence is not added to the new core
 
-## What “done” means here
+## Completion criteria
 
-Done: local reviewable source patch, generic protocol path, priority process lifecycle migration, Python publishing, retained-source safety repairs and isolated regression tests. Not done: all roughly 20,000 lines of retained PS runtime sources rewritten, every legacy feature ported, Windows interactive validation, deployment, signing, new release artifacts, commits, pushes or PRs.
+The target is zero PowerShell source and execution, including runtime leaves,
+installer/elevation entries, tests and CI. A Python or C# bridge that still runs
+PowerShell is an intermediate stage. Completion requires replacement behavior,
+permission boundaries, errors and uncertainty handling to be qualified; it is
+not established by a language percentage or a successful source build.
 
-Next migration order: UIA action references → Python workflow/recorder state → OCR/diff/fusion → IME/input peripherals → optional CDP/provider adapters → legacy retirement only after parity evidence. Keep each legacy implementation until its replacement passes equivalent fixtures and Windows tests; do not delete features to make language counts look better.
+Feature-branch checkpoints are published and checked against exact Git blobs.
+Interactive Windows acceptance remains outstanding for screen/focus races,
+Korean IME, clipboard restoration, held-input cleanup, mixed DPI and UAC. Keep
+each retained implementation until its replacement has the required evidence;
+old source may remain in normal Git history without being copied into a runtime
+archive. Final integration and history cleanup follow completed verification.
 
 ## Stage-two additions (cumulative local patch)
 

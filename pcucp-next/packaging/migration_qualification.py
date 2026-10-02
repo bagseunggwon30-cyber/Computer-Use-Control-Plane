@@ -127,7 +127,8 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
     # UTF-8 without changing file decoding or PowerShell culture semantics.
     env["PYTHONIOENCODING"] = "utf-8"
     for name in (*ADAPTER_ENV.values(), "CUCP_EXECUTION_STARTUP_TEST_HOST", "CUCP_EXECUTION_ADAPTER_SOURCE",
-                 "CUCP_PRECISION_ADAPTER_DRAFT", "CUCP_LEGACY_CDP_ADAPTER_MODE", "CUCP_INTERACTION_TEST_HOST"):
+                 "CUCP_PRECISION_ADAPTER_DRAFT", "CUCP_LEGACY_CDP_ADAPTER_MODE", "CUCP_INTERACTION_TEST_HOST",
+                 "CUCP_LEGACY_IMAGES_ADAPTER_SOURCE"):
         env.pop(name, None)
     command_index = 0
     def run(argv: list[str]) -> None:
@@ -176,6 +177,11 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
             elif promoted:
                 if family == "cdp":
                     env["CUCP_LEGACY_CDP_ADAPTER_MODE"] = "production"
+                elif family == "file-images":
+                    source = ROOT / "scripts/cucp-native-helper.ps1"
+                    if not source.is_file():
+                        raise ValueError("Missing promoted file-images adapter source.")
+                    env["CUCP_LEGACY_IMAGES_ADAPTER_SOURCE"] = str(source)
                 print(f"Running candidate and promoted {family} adapter gates", flush=True)
             else:
                 draft = ROOT / DRAFT_ADAPTERS.get(family, f"tests/fixtures/legacy-{family}-adapter.ps1")
@@ -187,6 +193,8 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
                     env["CUCP_PRECISION_ADAPTER_DRAFT"] = str(draft)
                 elif family == "cdp":
                     env["CUCP_LEGACY_CDP_ADAPTER_MODE"] = "draft"
+                elif family == "file-images":
+                    env["CUCP_LEGACY_IMAGES_ADAPTER_SOURCE"] = str(draft)
                 print(f"Running candidate and exact {family} draft adapter gates; production bodies retained", flush=True)
     try:
         for pattern in patterns:

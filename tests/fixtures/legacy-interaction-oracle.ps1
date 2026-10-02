@@ -8,9 +8,20 @@ if($errors.Count){throw 'Accepted source did not parse'}
 function Encode-Wire($Value) {
  if($null -eq $Value){return @{kind='scalar';value=$null}}
  if($Value -is [string] -or $Value -is [ValueType]){return @{kind='scalar';value=$Value}}
- if($Value -is [Collections.IDictionary]){return @{kind='object';properties=@(foreach($key in $Value.Keys){@{name=[string]$key;value=(Encode-Wire $Value[$key])}})}}
- if($Value -is [Collections.IEnumerable]){return @{kind='array';items=@(foreach($item in $Value){Encode-Wire $item})}}
- return @{kind='object';properties=@(foreach($p in $Value.PSObject.Properties){@{name=$p.Name;value=(Encode-Wire $p.Value)}})}
+ # Detect empty pipeline output before passing it through a function argument,
+ # which converts AutomationNull to ordinary null. PS5 serializes a retained
+ # AutomationNull property as {}, while a real null remains null.
+ if($Value -is [Collections.IDictionary]){return @{kind='object';properties=@(foreach($key in $Value.Keys){
+  $encoded=if($null -eq $Value[$key] -and @($Value[$key]).Count -eq 0){@{kind='object';properties=@()}}else{Encode-Wire $Value[$key]}
+  @{name=[string]$key;value=$encoded}
+ })}}
+ if($Value -is [Collections.IEnumerable]){return @{kind='array';items=@(foreach($item in $Value){
+  if($null -eq $item -and @($item).Count -eq 0){@{kind='object';properties=@()}}else{Encode-Wire $item}
+ })}}
+ return @{kind='object';properties=@(foreach($p in $Value.PSObject.Properties){
+  $encoded=if($null -eq $p.Value -and @($p.Value).Count -eq 0){@{kind='object';properties=@()}}else{Encode-Wire $p.Value}
+  @{name=$p.Name;value=$encoded}
+ })}
 }
 function Capture-Effect {
  param([string]$Kind,[string]$Name='', [string[]]$Argv=@(),$Data=$null,[bool]$Live=$false)

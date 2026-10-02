@@ -499,6 +499,37 @@ class InteractionPortableTests(unittest.TestCase):
 @unittest.skipUnless(sys.platform=='win32','Windows PowerShell 5.1 differential qualification')
 class InteractionWindowsParityTests(unittest.TestCase):
     maxDiff=1200
+    def test_oracle_wire_preserves_empty_pipeline_null_array_and_object(self):
+        ps=os.environ.get('CUCP_INTERACTION_POWERSHELL') or shutil.which('powershell.exe')
+        if not ps:raise unittest.SkipTest('Windows PowerShell 5.1 not available')
+        script=r'''
+param([string]$OraclePath)
+$ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+if($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1){throw 'Expected Windows PowerShell 5.1'}
+$tokens=$null;$errors=$null
+$ast=[Management.Automation.Language.Parser]::ParseFile($OraclePath,[ref]$tokens,[ref]$errors)
+if($errors.Count){throw 'Oracle did not parse'}
+$definition=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Encode-Wire'},$true))
+if($definition.Count -ne 1){throw 'Expected one wire encoder'}
+. ([scriptblock]::Create($definition[0].Extent.Text))
+$object=[pscustomobject]@{actual_null=$null;empty_pipeline=(@()|Select-Object -First 8);empty_array=@();empty_object=[pscustomobject]@{}}
+$dictionary=[ordered]@{actual_null=$null;empty_pipeline=(@()|Select-Object -First 8);empty_array=@();empty_object=[pscustomobject]@{}}
+$rows=@(foreach($value in @($object,$dictionary)){
+ @{wire=(Encode-Wire $value);rendered=(Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $value -Depth 8 -Compress)}
+})
+[Console]::Out.WriteLine((Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $rows -Depth 100 -Compress))
+'''
+        with tempfile.TemporaryDirectory(prefix='CUCP wire interaction ') as temp:
+            path=Path(temp)/'probe.ps1';path.write_text(script,encoding='utf-8-sig')
+            result=subprocess.run([ps,'-NoProfile','-NonInteractive','-File',str(path),str(ORACLE)],capture_output=True,timeout=30)
+            self.assertEqual(result.returncode,0,result.stderr.decode(errors='replace'))
+            rows=json.loads(result.stdout.decode('utf-8-sig'))
+        self.assertEqual(len(rows),2)
+        expected={'actual_null':None,'empty_pipeline':{},'empty_array':[],'empty_object':{}}
+        for row in rows:
+            self.assertIsNone(first_difference(decode_wire(row['wire']),expected))
+            self.assertIsNone(first_difference(json.loads(row['rendered']),expected))
+
     def test_accepted_payload_console_effect_order_errors_and_exits(self):
         fixtures=cases();expected=run_oracle(fixtures);actual=run_candidate(fixtures)
         self.assertEqual(len(expected),len(fixtures));self.assertEqual(len(actual),len(fixtures))

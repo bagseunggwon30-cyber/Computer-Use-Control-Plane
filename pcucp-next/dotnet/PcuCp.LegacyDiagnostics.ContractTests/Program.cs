@@ -7,7 +7,7 @@ if (args.SequenceEqual(new[] { "--fixtures" }))
     Console.WriteLine(JsonSerializer.Serialize(document.RootElement.EnumerateArray().Select(DiagnosticFixture.Evaluate).ToArray()));
     return;
 }
-if (args.SequenceEqual(new[] { "--self-test" })) { DiagnosticChecks.Run(); return; }
+if (args.SequenceEqual(new[] { "--self-test" })) { DiagnosticChecks.Run(); DiagnosticBoundaryRegressionChecks.Run(); return; }
 Console.WriteLine("Use --fixtures or --self-test. This runner never dispatches a real acquisition or write.");
 
 internal sealed class DiagnosticFixture(JsonElement fixture) : ILegacyDiagnosticEffects

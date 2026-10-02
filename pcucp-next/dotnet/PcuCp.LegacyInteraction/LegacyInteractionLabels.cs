@@ -19,19 +19,13 @@ internal sealed partial class LegacyExecutionCoordinator
         // PS5. Its original `-is [double] -or -is [int]` excludes Decimal.
         return c.ValueKind == JsonValueKind.Number && c.TryGetInt32(out int number) ? LegacyPrecisionKernel.I((double)number * 5) : 0;
     }
-    // PS promotes overflowing Int32 addition to Double. Preserve both the
-    // comparison value and its JSON spelling; an integral Double renders .0.
+    // PS promotes overflowing Int32 addition to Double. Preserve the
+    // comparison value. PS5 emits integral promoted scores without a .0 suffix.
     private static object AddScore(object left, object right)
     {
         double sum = LegacyPrecisionKernel.N(left) + LegacyPrecisionKernel.N(right);
         if (left is int && right is int && sum >= int.MinValue && sum <= int.MaxValue) return (int)sum;
         return sum;
-    }
-    private static object ScoreWire(object value)
-    {
-        if (value is not double number) return value;
-        using var document = JsonDocument.Parse(number.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
-        return document.RootElement.Clone();
     }
     private static double ScoreNumber(object? value) => LegacyPrecisionKernel.N(value);
     private static string ScoreText(object? value) => ScoreNumber(value).ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -100,7 +94,7 @@ internal sealed partial class LegacyExecutionCoordinator
                 string hay = Normal(S(P(el, "text"))); var score = LabelScore(hay, needle, 3, 20); if (score.Score == 0) continue;
                 object conf = AddScore(boost, ConfidenceBoost(P(el, "confidence")));
                 candidates.Add(D("text", P(el, "text"), "normalized", hay, "role", P(el, "role"), "window", P(el, "window"), "rect", P(el, "rect"),
-                    "affordance_id", P(el, "affordance_id"), "score", ScoreWire(AddScore(score.Score, conf)), "tier", tier, "match_reason", score.Reason, "confidence_boost", ScoreWire(conf),
+                    "affordance_id", P(el, "affordance_id"), "score", AddScore(score.Score, conf), "tier", tier, "match_reason", score.Reason, "confidence_boost", conf,
                     "sources", Pipe(T(P(el, "sources")) ? A(P(el, "sources")).Cast<object>() : new object[] { tier })));
             }
         }

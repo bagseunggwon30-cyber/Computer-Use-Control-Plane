@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 
-from test_legacy_images import ROOT, BASELINE_TREE, PROJECT, DRAFT, adapter_source
+from test_legacy_images import ROOT, BASELINE_TREE, PROJECT, adapter_source
 
 FUNCTIONS = ['_Ensure-OCR', '_Wait-AsyncOp', '_Load-SoftwareBitmapFromFile', '_Convert-OcrResult', '_Action-OcrImage']
 
@@ -28,7 +28,7 @@ def conversion_cases():
 
 
 RUNNER = r'''
-param([string]$Mode,[string]$Operation,[string]$Source,[string]$Adapter,[string]$Dll,[string]$Root,[string]$CasePath)
+param([string]$Mode,[string]$Operation,[string]$Source,[string]$Adapter,[string]$NativeSource,[string]$Dll,[string]$Root,[string]$CasePath)
 $ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 function Load-Functions($Path,$Names) {
   $tokens=$null;$errors=$null
@@ -68,7 +68,7 @@ if($Operation -eq 'generate'){
 }
 $names=@('_Ensure-OCR','_Wait-AsyncOp','_Load-SoftwareBitmapFromFile','_Convert-OcrResult','_Action-OcrImage')
 if($Mode -eq 'baseline'){Load-Functions $Source $names}else{$env:CUCP_LEGACY_IMAGES_DLL=$Dll;Load-Functions $Adapter (@('_Require-LegacyImages')+$names)}
-Load-Functions $Source @('_Emit')
+if($Mode -eq 'baseline'){Load-Functions $Source @('_Emit')}else{Load-Functions $NativeSource @('_Emit')}
 $Script:_StartedAt=[datetime]'2020-01-01T00:00:00Z'
 function Get-Date { return [datetime]'2020-01-01T00:00:00.125Z' }
 $Action='ocr-image';$Script:_OCRLoaded=$false;$Script:_OCREngine=$null;$Script:_OCRError=$null
@@ -151,7 +151,7 @@ class FileOcrWindowsParityTests(unittest.TestCase):
         self.runner = self.root / 'runner.ps1'
         self.runner.write_text(RUNNER, encoding='utf-8-sig')
         self.command = ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(self.runner),
-                        '-Root', str(self.root), '-Source', str(source), '-Adapter', str(adapter_source()), '-Dll', os.environ['CUCP_LEGACY_IMAGES_TEST_DLL']]
+                        '-Root', str(self.root), '-Source', str(source), '-Adapter', str(adapter_source()), '-NativeSource', str(ROOT / 'scripts/cucp-native-helper.ps1'), '-Dll', os.environ['CUCP_LEGACY_IMAGES_TEST_DLL']]
 
     def compare(self, operation, case):
         path = self.root / 'case.json'

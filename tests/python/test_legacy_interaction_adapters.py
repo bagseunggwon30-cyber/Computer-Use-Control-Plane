@@ -50,8 +50,8 @@ def configured_native_host():
     return host.resolve()
 
 
-def run_adapter(fixtures, *, descriptors=False, portable=False):
-    host = None if descriptors else configured_native_host()
+def run_adapter(fixtures, *, descriptors=False, startup_clone=False, portable=False):
+    host = None if descriptors or startup_clone else configured_native_host()
     # Explicit opt-in must never become a skip because another prerequisite is
     # missing. Portable descriptor checks are supplemental, not PS5.1 parity.
     ps = powershell(required=host is not None or bool(os.environ.get('CUCP_INTERACTION_TEST_HOST')),
@@ -72,6 +72,8 @@ def run_adapter(fixtures, *, descriptors=False, portable=False):
                    '-OracleSource', str(ORACLE), '-InputPath', str(inputs)]
         if descriptors:
             command.append('-ValidateDescriptors')
+        if startup_clone:
+            command.append('-ValidateStartupClone')
         if portable:
             command.append('-AllowPortableHost')
         env = dict(os.environ)
@@ -288,6 +290,31 @@ class InteractionAdapterHarnessTests(unittest.TestCase):
 
 
 class InteractionDecodedDescriptorTests(unittest.TestCase):
+    def test_wrapper_host_state_rest_cannot_mutate_caller_or_startup(self):
+        fixtures=[dict(case=name,rest=rest,family=family) for family in ('interaction','execution') for name,rest in (
+            ('null-argv',None),('empty-argv',[]),('null-element',[None]),
+            ('empty-element',['']),('singleton',['--label']),
+            ('literal-tokens',['--label','한글','--text','-AllowLiveControl','']))]
+        results=run_adapter(fixtures,startup_clone=True)
+        self.assertEqual(len(results),len(fixtures))
+        for fixture,result in zip(fixtures,results):
+            with self.subTest(case=fixture['case'],family=fixture['family']):
+                self.assertEqual(result['case'],fixture['case'])
+                self.assertEqual(result['family'],fixture['family'])
+                self.assertEqual(result['host_calls'],1)
+                self.assertEqual(result['entry'],f"legacy-{fixture['family']}-session")
+                self.assertEqual(result['exit'],7)
+                self.assertEqual(result['state_type'],'System.String[]')
+                self.assertIs(result['aliases_caller'],False)
+                self.assertEqual(result['caller_after'],result['caller_before'])
+                self.assertEqual(json.loads(result['caller_before']),fixture['rest'])
+                self.assertEqual(result['startup_before'],result['expected_startup'])
+                self.assertEqual(result['startup_after'],result['startup_before'])
+                self.assertEqual(result['state_before'],result['expected_state'])
+                state_before=json.loads(result['state_before'])
+                self.assertIsInstance(state_before,list)
+                self.assertEqual(json.loads(result['state_after']),[f'host-mutated-{i}' for i in range(len(state_before))])
+
     def test_forged_descriptors_fail_before_any_captured_leaf(self):
         fixtures = descriptor_cases()
         results = run_adapter(fixtures, descriptors=True,

@@ -1,7 +1,7 @@
 param(
  [string]$Source,[string]$BaselineSource,[string]$InputPath,
  [string]$SharedSource,[string]$AdapterSource,[string]$OracleSource,
- [switch]$ValidateDescriptors,[switch]$AllowPortableHost
+ [switch]$ValidateDescriptors,[switch]$ValidateStartupClone,[switch]$AllowPortableHost
 )
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
@@ -19,6 +19,7 @@ $required=@('_Execution-Require','_Execution-Fields','_Execution-EncodeWire','_E
  '_Execution-ValidateEffect','_Execution-Dispatch')
 if(-not $ValidateDescriptors){$required+=@('_Read-StandaloneConfirmation','_Invoke-LegacyCompatibility',
  '_Execution-WriteChunks','_Execution-WriteDiagnostic','_Invoke-LegacyExecutionEffectLoop','_Invoke-LegacyExecutionHost')}
+if($ValidateStartupClone){$required+='_Invoke-LegacyExecutionFamily'}
 foreach($name in $required){
  $definition=@($sa.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
  if($definition.Count -ne 1){throw "Required shared interaction transport function is absent: $name"}
@@ -50,7 +51,7 @@ foreach($definition in $definitions){
 $Script:CacheDir='C:\fixture'
 '@
 
-if($ValidateDescriptors){
+if($ValidateDescriptors -or $ValidateStartupClone){
  # Install exactly the same captured leaves as the original oracle without
  # loading its accepted macro bodies or entering its fixture loop.
  $ot=$null;$oe=$null;$oa=[Management.Automation.Language.Parser]::ParseInput($oracle,[ref]$ot,[ref]$oe)
@@ -59,6 +60,42 @@ if($ValidateDescriptors){
   if($definition.Name -cne 'ConvertTo-Json'){. ([scriptblock]::Create($definition.Extent.Text))}
  }
  . ([scriptblock]::Create($install))
+ if($ValidateStartupClone){
+  # Exercise the actual wrapper with one inert host seam. Mutation happens
+  # only after startup/state construction, where a reused argv array leaked.
+  Set-Item -Path Function:\_Invoke-LegacyExecutionHost -Value {
+   param($EntryPoint,$Startup,$State)
+   $script:cloneHostCalls++
+   $script:cloneEntry=$EntryPoint
+   $script:cloneStateType=$State.rest.GetType().FullName
+   $script:cloneAliasesCaller=[object]::ReferenceEquals($State.rest,$script:cloneCaller)
+   $script:cloneStateBefore=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $State.rest -Compress
+   $script:cloneStartupBefore=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $Startup.rest -Compress
+   for($i=0;$i -lt $State.rest.Count;$i++){$State.rest[$i]="host-mutated-$i"}
+   $script:cloneStateAfter=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $State.rest -Compress
+   $script:cloneStartupAfter=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $Startup.rest -Compress
+   return 7
+  }
+  $AllowLiveControl=$false;$Brief=$false;$CacheSeconds=5;$Script:CliPath=$null
+  $rows=New-Object Collections.ArrayList
+  foreach($row in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json)){
+   $script:cloneCaller=[string[]]$row.rest;$script:cloneHostCalls=0
+   $before=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $script:cloneCaller -Compress
+   $expectedState=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject ([string[]]@($script:cloneCaller)) -Compress
+   $expectedStartup=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject @($script:cloneCaller) -Compress
+   if($row.family -ceq 'execution'){
+    $exit=_Invoke-LegacyExecutionFamily -Operation 'workflow-run' -Rest $script:cloneCaller -ScriptPath 'C:\fixture\cucp.ps1'
+   }elseif($row.family -ceq 'interaction'){
+    $exit=_Invoke-LegacyInteractionFamily -Operation 'click-label' -Rest $script:cloneCaller -ScriptPath 'C:\fixture\cucp.ps1'
+   }else{throw 'Unknown startup clone fixture family'}
+   $after=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $script:cloneCaller -Compress
+   [void]$rows.Add(@{case=$row.case;family=$row.family;caller_before=$before;caller_after=$after;expected_state=$expectedState;expected_startup=$expectedStartup;
+    state_before=$script:cloneStateBefore;state_after=$script:cloneStateAfter;startup_before=$script:cloneStartupBefore;startup_after=$script:cloneStartupAfter;
+    state_type=$script:cloneStateType;aliases_caller=$script:cloneAliasesCaller;host_calls=$script:cloneHostCalls;entry=$script:cloneEntry;exit=$exit})
+  }
+  [Console]::Out.WriteLine((Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject @($rows) -Depth 100 -Compress))
+  return
+ }
  $rows=New-Object Collections.ArrayList
  foreach($row in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json)){
   $script:fixture=[pscustomobject]@{replies=@($null)};$script:cursor=0
@@ -79,6 +116,10 @@ if($ValidateDescriptors){
   try {
    if($row.shared){
     $effect.data=_Execution-EncodeWire $effect.data
+    # Production framing serializes hashtables and parses PSCustomObjects before
+    # validation. Preserve that boundary instead of handing raw hashtables to
+    # the strict decoded-wire object validator.
+    $effect=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $effect -Depth 100 -Compress | ConvertFrom-Json
     # The shared validator alone decodes the tagged data, then calls the hook.
     _Execution-ValidateEffect $effect $state
     _Execution-Dispatch $effect $state | Out-Null
@@ -99,7 +140,7 @@ if([IO.Path]::GetExtension($env:CUCP_INTERACTION_TEST_HOST) -notin @('.exe','.dl
 $env:CUCP_NATIVE_HOST=$env:CUCP_INTERACTION_TEST_HOST
 
 # Every replacement is a narrow harness seam and must match exactly once. The
-# unmodified oracle file and its 854 ordinary + 12 boundary inputs stay shared.
+# shared oracle file and its 870 ordinary + 12 boundary inputs stay shared.
 $marker='$Script:CucpV14Schema='
 if(([regex]::Matches($oracle,[regex]::Escape($marker))).Count -ne 1){throw 'Missing unique oracle installation seam'}
 $oracle=$oracle.Replace($marker,$install+"`n"+$marker)

@@ -17,8 +17,8 @@ before six-place ToEven rounding. Mask overlaps count once. The legacy first
 image stride is reused for both arrays, including PowerShell negative array-index
 semantics. This behavior is not claimed safe or repaired without separate evidence.
 
-The original 5,556-byte/135-line PowerShell algorithm remains authoritative until
-Windows differential qualification passes. Generated PNG, BMP, JPEG, GIF, TIFF,
+The original 5,556-byte/135-line PowerShell algorithm is the pinned qualification
+oracle. Its qualified delegate is now integrated in production. Generated PNG, BMP, JPEG, GIF, TIFF,
 crops, dimensions, masks, thresholds, alpha, corrupt/missing/directory inputs and
 full error envelopes are compared against the pinned original function. Tests
 use temporary fixtures only. No real screenshots or user images are inspected.
@@ -48,7 +48,9 @@ original integer-format exception for nonfinite fallback results. All existing
 55 comparisons, including full error text, remain unchanged for requalification.
 
 The accepted checkpoint `56be343c` passed all 55 original kernel comparisons
-in full regression run `37022764709`. The next file-images batch adds the actual
-retained-adapter boundary and file-only OCR qualification; see
-[the finite gate and compatibility scope](legacy-file-images-qualification.md).
-Production bodies remain intact while those new gates are pending.
+in full regression run `37022764709`. The file-images batch then passed all 167 exact image/OCR comparisons and 47
+managed checks at `d8bde03d` in run `37048150884`, including the actual
+retained-adapter boundary and installed English OCR on owned generated files.
+The six qualified delegates are integrated and the duplicate draft removed; see
+[the finite gate, hash proof and source accounting](legacy-file-images-qualification.md).
+The integrated full regression remains pending.

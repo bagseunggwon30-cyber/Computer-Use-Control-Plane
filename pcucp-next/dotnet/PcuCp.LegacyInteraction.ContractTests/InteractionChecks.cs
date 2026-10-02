@@ -121,7 +121,7 @@ internal static class InteractionChecks
             {
                 var payload = boundary.GetProperty("payload");
                 Assert(payload.GetProperty("score").GetDouble() == (double)confidence * 5 + 104, "confidence score promotes without wrapping");
-                Assert(payload.GetProperty("score").GetRawText() == (confidence > 0 ? "2147483749.0" : "-2147483541"), "confidence promotion retains integral Double JSON spelling");
+                Assert(payload.GetProperty("score").GetRawText() == (confidence > 0 ? "2147483749" : "-2147483541"), "confidence promotion retains PS5 integral JSON spelling");
             }
             var iconBoundary = Evaluate("icon-find", ["--label", "Save"], [new object[] { Element(confidence: confidence) }]);
             Assert(iconBoundary.GetProperty("payload").GetProperty("top").GetProperty("score").GetInt32() == 100, "IconFind ignores numeric confidence at Int32 boundaries");

@@ -14,6 +14,18 @@ $cdpPath = Join-Path $repoRoot "scripts/cucp-legacy-cdp-adapter.ps1"
 $cdpAst = [System.Management.Automation.Language.Parser]::ParseFile($cdpPath, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
 $Script:LegacyCdpSourceRoot = $repoRoot
+# The CI gate supplies the matching compiled host for compatibility and family sessions.
+if (-not $env:CUCP_NATIVE_HOST -or -not (Test-Path -LiteralPath $env:CUCP_NATIVE_HOST -PathType Leaf) -or
+    [IO.Path]::GetExtension($env:CUCP_NATIVE_HOST) -notin @('.exe', '.dll')) {
+  throw 'Set CUCP_NATIVE_HOST to the matching built NativeHost executable or DLL before running these regressions.'
+}
+$Script:Brief = $false
+$Script:AllowLiveControl = $false
+$Script:CacheSeconds = 0
+$Script:CliPath = $null
+$Script:AuditDir = Join-Path $TestDrive 'audit'
+$Script:CacheDir = Join-Path $TestDrive 'cache'
+$Script:WrapperLog = Join-Path $TestDrive 'wrapper.log'
 
 function Get-LegacyFunctionText {
   param($Ast, [string]$Name)
@@ -30,6 +42,37 @@ foreach ($name in @("_Invoke-LegacyCompatibility", "_Read-OptValue", "_Read-Swit
 }
 foreach ($name in @("_Invoke-LegacyCdpBridge", "_Invoke-LegacyCdpMacro", "Invoke-MacroCdpEval")) {
   . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $cdpAst -Name $name)))
+}
+# Load real transport and family support for both retained bodies and promoted
+# delegates. Public macros above always come from the main production wrapper;
+# importing the support file's draft Invoke-Macro* definitions would bypass it.
+foreach ($name in @('_Read-StandaloneConfirmation', '_Execution-Require', '_Execution-Fields',
+    '_Execution-EncodeWire', '_Execution-DecodeWire', '_Execution-WriteChunks', '_Execution-WriteDiagnostic',
+    '_Execution-ValidateEffect', '_Execution-Dispatch', '_Execution-EffectMayChangeState',
+    '_Invoke-LegacyExecutionEffectLoop', '_Invoke-LegacyExecutionHost')) {
+  . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $wrapperAst -Name $name)))
+}
+$familySupport = @(
+  @{ Path = 'scripts/cucp-legacy-interaction-adapter.ps1'; Names = @(
+    '_Interaction-Integer', '_Interaction-Number', '_Interaction-Text', '_Interaction-Point',
+    '_Interaction-Arguments', '_Interaction-Record', '_Interaction-ValidateEffect', '_Interaction-Dispatch',
+    '_Invoke-LegacyInteractionFamily') },
+  @{ Path = 'scripts/cucp-legacy-diagnostic-adapter.ps1'; Names = @(
+    '_Diagnostic-Require', '_Diagnostic-Fields', '_Diagnostic-ArgvEquals', '_Diagnostic-Value',
+    '_Diagnostic-IntOption', '_Diagnostic-NewState', '_Diagnostic-Limit', '_Diagnostic-ValidateEffect',
+    '_Diagnostic-Clock', '_Diagnostic-NodeVersion', '_Diagnostic-TailBytes', '_Diagnostic-AssertOwnedRoot',
+    '_Diagnostic-PathEquals', '_Diagnostic-AuditProbe', '_Diagnostic-ClearAppshotCache',
+    '_Diagnostic-CapturedMacro', '_Diagnostic-Dispatch', '_Diagnostic-PreparePayload', '_Diagnostic-GetContext',
+    '_Diagnostic-ProcessorCount', '_Invoke-LegacyDiagnosticFamily', '_Diagnostic-Processes',
+    '_Diagnostic-ProcessMetrics', '_Diagnostic-DisposeProcesses') }
+)
+foreach ($support in $familySupport) {
+  $supportPath = Join-Path $repoRoot $support.Path
+  $supportAst = [System.Management.Automation.Language.Parser]::ParseFile($supportPath, [ref]$tokens, [ref]$parseErrors)
+  if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+  foreach ($name in $support.Names) {
+    . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $supportAst -Name $name)))
+  }
 }
 function Invoke-NativeHelper { param([string[]]$ArgList) throw "Live helper must be mocked" }
 function _Classify-SafetyFromText { param($Text, $MacroName) return @{ requires_explicit_confirmation=$false } }

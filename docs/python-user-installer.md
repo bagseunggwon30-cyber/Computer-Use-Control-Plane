@@ -15,7 +15,12 @@ to the new core's different interface.
 
 - `--backend legacy`: retained `scripts/cucp.ps1`; Windows PowerShell 5.1+ remains a
   runtime prerequisite. Generated ASCII `cucp.cmd` invokes a sibling UTF-8-BOM
-  `cucp-launch.ps1` containing the safely quoted source path
+  `cucp-launch.ps1` containing the safely quoted source path. Build the matching
+  native host and compatibility assemblies before using migrated legacy routes:
+  `publish_native.py`, `publish_legacy_interop.py` and `publish_legacy_images.py`
+  under `pcucp-next/packaging`. The last supplies the file-image and shared OCR
+  helpers; it uses .NET Framework 4.8 on Windows. The installer does not build or
+  download missing dependencies, and its health warning is not a parity check
 - `--backend core`: source Python 3.10+ and the matching published native worker.
   Generated UTF-8 `cucp.cmd` invokes Python and `pcucp-next/python/run_source.py`
   directly, with the correct process-local `CUCP_ROOT`. PowerShell is not required

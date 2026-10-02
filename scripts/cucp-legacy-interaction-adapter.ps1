@@ -199,7 +199,8 @@ function _Invoke-LegacyInteractionFamily {
   $startup=[ordered]@{schema='cucp.interaction-start/v1';operation=$Operation;rest=@($Rest);brief=[bool]$Brief;
     cache_seconds=[int]$CacheSeconds;vision_available=[bool]$Script:CliPath;culture=[Globalization.CultureInfo]::CurrentCulture.Name;
     double=[bool]$Double;right_click=[bool]$RightClick}
-  $state=@{family='interaction';operation=$Operation;rest=@($Rest);live=$liveCeiling;sensitive=$sensitiveCeiling;
+  $restCopy=[string[]]@($Rest);$restCopy=[string[]]$restCopy.Clone()
+  $state=@{family='interaction';operation=$Operation;rest=$restCopy;live=$liveCeiling;sensitive=$sensitiveCeiling;
     script_path=$ScriptPath;cache_dir=$Script:CacheDir;paths=@{};clocks=@{};pipeline_output=(New-Object Collections.ArrayList);writer=$null;live_effect_seen=$false;
     interaction_observations=(New-Object Collections.ArrayList);interaction_screenshots=(New-Object Collections.ArrayList);
     interaction_cache_keys=(New-Object Collections.ArrayList);interaction_anchor_records=(New-Object Collections.ArrayList)}

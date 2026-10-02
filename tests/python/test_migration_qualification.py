@@ -128,6 +128,28 @@ class QualificationSelectionTests(unittest.TestCase):
             for _, env in suites:
                 self.assertEqual(env['CUCP_LEGACY_IMAGES_TEST_DLL'],
                                  str(root / 'pcucp-next/bin/legacy/PcuCp.LegacyImages.dll'))
+                self.assertEqual(env['CUCP_LEGACY_IMAGES_ADAPTER_SOURCE'],
+                                 str(root / 'tests/fixtures/legacy-file-images-adapter.ps1'))
+            # Promotion must exercise the installed body. A stale caller
+            # override cannot keep a deleted draft passing in its place.
+            (root / 'scripts').mkdir()
+            production = root / 'scripts/cucp-native-helper.ps1'
+            production.write_text('# production adapter')
+            (root / '.github/migration-adapters.json').write_text('{"test_adapters":["file-images"]}')
+            (root / 'tests/fixtures/legacy-file-images-adapter.ps1').unlink()
+            calls.clear()
+            with patch.object(qualification, 'ROOT', root), patch.object(qualification.subprocess, 'run',
+                    side_effect=lambda argv, **kw: calls.append((argv, dict(kw['env'])))), \
+                    patch.dict(os.environ, {'CUCP_LEGACY_IMAGES_ADAPTER_SOURCE':'stale-draft.ps1'}), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                qualification.run_family('file-images')
+                suites = [(args, env) for args, env in calls if '-m' in args and 'unittest' in args]
+                self.assertEqual(len(suites), 2)
+                for _, env in suites:
+                    self.assertEqual(env['CUCP_LEGACY_IMAGES_ADAPTER_SOURCE'], str(production))
+                production.unlink()
+                with self.assertRaisesRegex(ValueError, 'Missing promoted file-images adapter source'):
+                    qualification.run_family('file-images')
 
     def test_candidate_kernel_gate_cannot_claim_adapter_retirement(self):
         with tempfile.TemporaryDirectory() as temp:

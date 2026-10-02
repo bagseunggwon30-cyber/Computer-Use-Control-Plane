@@ -120,10 +120,10 @@ internal sealed partial class LegacyDiagnosticCoordinator
             try
             {
                 string raw = S(Effect(LegacyDiagnosticEffectKind.ReadText, data: baselinePath));
-                using var doc = JsonDocument.Parse(raw); var rows = new List<object>(); int improved = 0, regressed = 0;
+                var baseline = LegacyDiagnosticJson.Parse(raw); var rows = new List<object>(); int improved = 0, regressed = 0;
                 foreach (var current in results)
                 {
-                    var before = A(P(doc.RootElement, "results")).FirstOrDefault(b => Eq(P(b, "name"), (string)current["name"]!));
+                    var before = A(P(baseline, "results")).FirstOrDefault(b => Eq(P(b, "name"), (string)current["name"]!));
                     if (before.ValueKind == JsonValueKind.Undefined || current["p50_ms"] is null || P(before, "p50_ms").ValueKind == JsonValueKind.Null) continue;
                     int b50 = I(P(before, "p50_ms")), delta = (int)current["p50_ms"]! - b50;
                     _ = (int)current["p95_ms"]! - I(P(before, "p95_ms"));
