@@ -46,3 +46,9 @@ comparisons. NaN and Infinity were rejected on both sides, but the candidate
 reported overflow instead of the baseline's format error. It now preserves the
 original integer-format exception for nonfinite fallback results. All existing
 55 comparisons, including full error text, remain unchanged for requalification.
+
+The accepted checkpoint `56be343c` passed all 55 original kernel comparisons
+in full regression run `37022764709`. The next file-images batch adds the actual
+retained-adapter boundary and file-only OCR qualification; see
+[the finite gate and compatibility scope](legacy-file-images-qualification.md).
+Production bodies remain intact while those new gates are pending.

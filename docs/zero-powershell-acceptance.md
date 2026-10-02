@@ -13,9 +13,10 @@ remaining source to 921,614 bytes. Its exact-commit actual-adapter gate passed i
 The three-family kernels and exact adapters passed all focused jobs at `e9e015c6`
 in run `37007340738`. Their production integration replaces 53 original function
 extents and removes duplicate fixtures, leaving **823,078 bytes**: a further
-98,536-byte reduction, and 190,400 bytes below the original baseline. This is an
-integrated source measurement; the current commit still requires the bundled full
-regression and its privacy/production routing checks. Current source groups are:
+98,536-byte reduction, and 190,400 bytes below the original baseline. This is a
+verified source measurement at `56be343c`, with all 11 active jobs green in
+[full run 37022764709](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37022764709), including privacy,
+production routing and portable packaging. Source groups at that checkpoint are:
 
 | Remaining source group | Bytes |
 | --- | ---: |

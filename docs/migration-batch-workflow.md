@@ -92,7 +92,7 @@ recompute actual PS bytes, and report only the accepted reduction. Interactive
 Windows checks remain separately identified; captured effects and headless
 browser fixtures do not prove desktop input, IME, focus or mixed-DPI behavior.
 
-## Last accepted checkpoint
+## Prior accepted checkpoint
 
 Commit `27400c98ea9f460e243240be0f27d39e69ca348c`, tree
 `73efdd9ae8f6702afafa91a81afaf12e7db955fc`, passed all five jobs in
@@ -104,7 +104,7 @@ controller guards, plus the separate culture/quote/casing suite. It retires
 1,013,478-byte baseline. The remaining 921,614 bytes are not a feature-completion
 percentage. Main remains at `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`.
 
-## Current integration and source accounting
+## Accepted integration and source accounting
 
 All focused jobs passed at `e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe` in
 [run 37007340738](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37007340738).
@@ -115,15 +115,44 @@ The shared CDP host remains an ordinary counted PowerShell file.
 
 The integration replaces 53 original function extents, retaining 42 compatible
 delegates and removing 11 private helpers. Including adapter and test overhead,
-current tracked PowerShell is 823,078 bytes: 98,536 fewer than the prior accepted
+accepted tracked PowerShell is 823,078 bytes: 98,536 fewer than the prior accepted
 checkpoint and 190,400 fewer than the original baseline. The
 [canonical source inventory](legacy-function-inventory.json) reproduces these
-measurements. These are pending integrated source measurements until the exact
-current commit passes its bundled full regression.
+measurements. Exact checkpoint `56be343c786027d27fa3dcb71732157caffc8de0`
+passed all 11 active jobs in [full run 37022764709](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37022764709).
+All 283 blob hashes/modes match tree `c0d15371b60ebf62be45bfa68b90282405f07273`;
+main is unchanged. The three focused-only jobs were intentionally skipped.
 
 The full gate also checks promoted central CDP routing, relocated test loaders,
 portable packaging and a narrow intentional privacy correction. Legacy CDP
 search exposed field values and source-only text; the corrected assets exclude
 those signals before matching and output. Synthetic characterization is separate
-from ordinary parity, and four legacy plus one modern owned-browser privacy cases must pass. The
+from ordinary parity, and all four legacy plus one modern owned-browser privacy cases passed. The
 existing side-effect guard and ordinary compatibility assertions remain intact.
+
+## Next parallel scopes
+
+| Family | Exact retained function bytes | Boundary |
+| --- | ---: | --- |
+| Interaction/target planners | 55,093 | Eight FindLabel/ClickPoint/ClickLabel/SafeType/icon/OCR-click/precision bodies |
+| Diagnostic/report assembly | 54,053 | Nine performance, lag, health, logs, benchmark, self-test, audit and release-note bodies |
+| File-image/OCR processing | 10,814 | Six diff/file-OCR/runtime/conversion helpers; no screen acquisition or input |
+
+The 119,960-byte total uses verified Windows AST function extents at `56be343c`,
+excluding inter-function comments. Bridge/test overhead and retained shared
+helper dependencies affect eventual net retirement. Cleanup/termination,
+registration, actual screen/IME/clipboard actions and authenticated providers
+are outside these candidates' executed fixtures. Existing shared helpers remain
+callable for unported families. Candidates reuse the same effect/codec/session
+infrastructure with closed new descriptors; startup registration and effect
+validation stay closed until integration. Qualify the independent families in
+parallel, then run one bundled full gate for their coherent production cutover.
+
+The initial `[focus next-batch]` checkpoint runs those three Windows families in
+parallel plus fast contracts. Interaction and diagnostics are explicitly
+candidate-only: the manifest rejects marking either as promoted until its exact
+host adapter is added and that temporary stage is removed. The file-images gate
+already requires its real adapter draft and both image-diff and file-OCR suites.
+A candidate-only result is printed in logs and the CI summary and never qualifies
+source retirement. Actual adapter work proceeds alongside these initial oracle
+runs; the production cutover still requires its own bundled full regression.

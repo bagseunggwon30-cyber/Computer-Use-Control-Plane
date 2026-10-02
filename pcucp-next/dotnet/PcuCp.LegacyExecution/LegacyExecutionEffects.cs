@@ -5,7 +5,11 @@ using System.Text.Json;
 internal enum LegacyExecutionEffectKind
 {
     WorkflowPlan, Child, Native, LocalMacro, CdpPort, HistoryRead, HistoryAppend,
-    TrajectoryAppend, Sleep, Clock, Timestamp, CachePath, FileExists, RemoveFile, SendEscape, Console
+    TrajectoryAppend, Sleep, Clock, Timestamp, CachePath, FileExists, RemoveFile, SendEscape, Console,
+    // Closed candidate families; startup/dispatch registration is qualified separately.
+    Appshot, Win32Windows, UIAffordances, Cucp, Vision, HitTestPoint,
+    PointCacheRead, PointCacheWrite, CoordProfile, AnchorScore, AnchorAppend,
+    Notice, PipelineOutput, ObservationId, Diagnostic
 }
 internal sealed record LegacyExecutionAuthority(bool AllowLiveControl, bool ConfirmSensitive);
 internal sealed record LegacyExecutionEffect(

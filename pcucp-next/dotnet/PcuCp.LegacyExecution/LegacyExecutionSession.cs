@@ -75,10 +75,15 @@ internal sealed class LegacyExecutionSession(TextReader input, TextWriter output
         return LegacyExecutionWire.Decode(value);
     }
     internal int Run(string operation, string[] rest, LegacyExecutionAuthority authority, bool brief = false, int cacheSeconds = 5, bool visionAvailable = false)
+        => Run(effects => new LegacyExecutionCoordinator(effects, authority, rest, brief, cacheSeconds, visionAvailable).Run(operation));
+
+    // Only a trusted host dispatch supplies this factory. Operation names and
+    // authority still come from the separate validated startup, never replies.
+    internal int Run(Func<ILegacyExecutionEffects, LegacyExecutionResult> operation)
     {
         try
         {
-            var result = new LegacyExecutionCoordinator(this, authority, rest, brief, cacheSeconds, visionAvailable).Run(operation);
+            var result = operation(this);
             Send("complete", ++sequence, new { payload = LegacyExecutionWire.Encode(result.Payload), exit = result.Exit, json_depth = result.JsonDepth, brief = result.Brief, emit_json = result.EmitJson });
             return result.Exit;
         }

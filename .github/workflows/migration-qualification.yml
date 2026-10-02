@@ -9,7 +9,7 @@ on:
         description: Qualification scope (full includes the complete regression suite)
         type: choice
         default: all
-        options: [all, foundation, execution, precision, cdp, full]
+        options: [all, next-batch, foundation, execution, precision, cdp, interaction, diagnostics, file-images, full]
 permissions:
   contents: read
 jobs:

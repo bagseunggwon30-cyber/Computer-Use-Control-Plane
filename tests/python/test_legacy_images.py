@@ -11,6 +11,12 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE_TREE = 'bf895d3120dd5e145f360cb1c41e1d79a061d048'
 PROJECT = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyImages'
+DRAFT = ROOT / 'tests/fixtures/legacy-file-images-adapter.ps1'
+
+
+def adapter_source():
+    manifest = json.loads((ROOT / '.github/migration-adapters.json').read_text())
+    return ROOT / 'scripts/cucp-native-helper.ps1' if 'file-images' in manifest['test_adapters'] else DRAFT
 
 
 def image_cases():
@@ -66,13 +72,19 @@ class ImagesWindowsParityTests(unittest.TestCase):
     maxDiff = None
 
     def test_generated_images_and_errors_match_whole_pinned_result(self):
+        self._run_matrix(False)
+
+    def test_actual_adapter_and_original_emit_match_pinned_boundary(self):
+        self._run_matrix(True)
+
+    def _run_matrix(self, boundary):
         with tempfile.TemporaryDirectory(prefix='CUCP images 한글 ') as temp:
             folder = Path(temp)
             source = folder / 'original.ps1'
             source.write_bytes(subprocess.check_output(['git', 'show', f'{BASELINE_TREE}:scripts/cucp-native-helper.ps1'], cwd=ROOT))
             runner = folder / 'runner.ps1'
             runner.write_text(r'''
-param([string]$Mode,[string]$Root,[string]$Source,[string]$Dll,[string]$CasePath)
+param([string]$Mode,[string]$Root,[string]$Source,[string]$Dll,[string]$CasePath,[string]$Adapter,[switch]$Boundary)
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 Add-Type -AssemblyName System.Drawing
@@ -116,10 +128,31 @@ $ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[re
 $fn=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq '_Action-ScreenshotDiff'},$true))
 if ($fn.Count -ne 1) { throw 'Expected exactly one pinned image function' }
 . ([scriptblock]::Create($fn[0].Extent.Text))
-function _Emit { param($Payload,[int]$ExitCode=0) [Console]::Out.WriteLine((ConvertTo-Json -InputObject $Payload -Depth 16 -Compress));exit $ExitCode }
+if ($Mode -eq 'adapter') {
+  $env:CUCP_LEGACY_IMAGES_DLL=$Dll
+  $draft=[Management.Automation.Language.Parser]::ParseFile($Adapter,[ref]$tokens,[ref]$errors)
+  if ($errors.Count) { throw 'Image adapter parse failed' }
+  foreach($name in @('_Require-LegacyImages','_Action-ScreenshotDiff')) {
+    $entry=@($draft.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
+    if($entry.Count -ne 1){throw "Expected exactly one adapter $name"}
+    . ([scriptblock]::Create($entry[0].Extent.Text))
+  }
+}
+if ($Boundary) {
+  $emitter=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq '_Emit'},$true))
+  if($emitter.Count -ne 1){throw 'Expected exactly one original emitter'}
+  . ([scriptblock]::Create($emitter[0].Extent.Text))
+  $Script:_StartedAt=[datetime]'2020-01-01T00:00:00Z'
+  function Get-Date { return [datetime]'2020-01-01T00:00:00.125Z' }
+  $Action='screenshot-diff'
+} else {
+  function _Emit { param($Payload,[int]$ExitCode=0) [Console]::Out.WriteLine((ConvertTo-Json -InputObject $Payload -Depth 16 -Compress));exit $ExitCode }
+}
 _Action-ScreenshotDiff
 ''', encoding='utf-8-sig')
-            command = ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(runner), '-Root', str(folder), '-Source', str(source), '-Dll', os.environ['CUCP_LEGACY_IMAGES_TEST_DLL']]
+            command = ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(runner), '-Root', str(folder), '-Source', str(source), '-Dll', os.environ['CUCP_LEGACY_IMAGES_TEST_DLL'], '-Adapter', str(adapter_source())]
+            if boundary:
+                command.append('-Boundary')
             generation = subprocess.run([*command, '-Mode', 'generate'], capture_output=True, timeout=30)
             self.assertEqual(generation.returncode, 0, generation.stderr.decode('utf-8', errors='replace'))
             for case in image_cases():
@@ -127,6 +160,13 @@ _Action-ScreenshotDiff
                     path = folder / 'case.json'
                     path.write_text(json.dumps(case, ensure_ascii=True), encoding='utf-8-sig')
                     before = subprocess.run([*command, '-Mode', 'baseline', '-CasePath', str(path)], capture_output=True, timeout=15)
-                    after = subprocess.run([*command, '-Mode', 'candidate', '-CasePath', str(path)], capture_output=True, timeout=15)
+                    after = subprocess.run([*command, '-Mode', 'adapter' if boundary else 'candidate', '-CasePath', str(path)], capture_output=True, timeout=15)
                     self.assertEqual(after.returncode, before.returncode, (before.stderr, after.stderr))
-                    self.assertEqual(json.loads(after.stdout.decode('utf-8-sig')), json.loads(before.stdout.decode('utf-8-sig')))
+                    actual = json.loads(after.stdout.decode('utf-8-sig'))
+                    expected = json.loads(before.stdout.decode('utf-8-sig'))
+                    self.assertEqual(actual, expected)
+                    if boundary:
+                        self.assertEqual(actual['elapsed_ms'], 125)
+                        self.assertEqual(actual['action'], 'screenshot-diff')
+                        if actual['status'] == 'ok':
+                            self.assertEqual(after.stdout, before.stdout, 'Ordered public Console output changed')

@@ -1,0 +1,142 @@
+# Interaction and target planning candidate
+
+This isolated C# candidate covers `find-label`, `click-label` (including its
+right/double switch modes), `click-point`, `safe-type`, `icon-find`, `icon-click`,
+`ocr-click`, and `precision-validate`. The original PowerShell functions remain
+in production. No source retirement or zero-PowerShell completion is claimed.
+
+The accepted behavior oracle is `scripts/cucp.ps1` at tree
+`c0d15371b60ebf62be45bfa68b90282405f07273`, reachable from published commit
+`56be343c786027d27fa3dcb71732157caffc8de0` (and local checkout commit
+`d78ea2bd0ea3ced7121beafd6888209dae872add`). The original
+`bf895d3120dd5e145f360cb1c41e1d79a061d048` tree supplies only the already-qualified
+pure point cache-key body in the oracle. In particular, SafeType preserves the
+accepted no-probe/no-replay fix; the older unsafe SafeType body is not the oracle.
+
+## Scope and byte accounting
+
+Verified parser AST extents, rather than regex regions, are the retirement scope:
+
+| Original function | UTF-8 bytes |
+| --- | ---: |
+| Invoke-MacroFindLabel | 12,541 |
+| Invoke-MacroClickPoint | 14,896 |
+| Invoke-MacroClickLabel | 5,993 |
+| Invoke-MacroSafeType | 4,642 |
+| Invoke-MacroIconFind | 8,258 |
+| Invoke-MacroIconClick | 2,416 |
+| Invoke-MacroOcrClick | 2,686 |
+| Invoke-MacroPrecisionValidate | 3,661 |
+| Total | 55,093 |
+
+The initial function-to-next-function inventory was 56,831 bytes; it includes
+1,738 bytes of separators/comments outside these AST extents. Neither number is
+net retirement. Adapter/test overhead and retained shared leaves must be counted
+before any future source-reduction claim.
+
+`Find-Element`, `Get-ElementCenter`, `_New-ObservationEnvelope`, label score
+pooling and PS5 numeric-score sorting are pure in-process helpers in the
+candidate. Existing original helper definitions remain because other production
+callers still use them. The candidate uses `LegacyPrecisionKernel.CacheKey` and
+`Hash`; it does not introduce another precision-cache format.
+
+## Integration interface
+
+`PcuCp.LegacyInteraction` contains partial `LegacyExecutionCoordinator` sources.
+It uses the same immutable `LegacyExecutionAuthority`, result, effects, tagged
+wire codec and streaming session. `RunInteraction(operation, doubleClick,
+rightClick)` is the candidate entry. The existing session's callback overload
+can run that entry without a second protocol or process bridge. The sources props
+file imports only this family; an embedding host must also include the qualified
+execution/precision dependencies.
+
+The integrator owns production dispatch/startup registration, exact retained
+PowerShell adapters and future removal. A final adapter must preserve:
+
+- The original global live/sensitive macro checks and immutable process ceilings
+- `LegacyExecutionResult` payload, exit, depth and emit-json fields
+- `PipelineOutput` as PowerShell pipeline output, not Console output
+- `Console` with `name=write` as a raw write with no appended newline
+- Nested IconFind acquisition in the same in-memory call; no growing reply replay
+- Actual names and arities below; unknown descriptors fail before dispatch
+
+All new effect names are empty unless explicitly listed:
+
+| Kind | Data or arguments | Live |
+| --- | --- | --- |
+| Appshot | `{match,semantic:true,no_cache}` | false |
+| Win32Windows | `{match}` | false |
+| UIAffordances | `{focused_window,max_elements:800}` | false |
+| Vision | `{screenshot_path,description}` | false |
+| Cucp | argv starts `act click` or `act right-click`, then x/y/after and optional target-window | true |
+| HitTestPoint | `{x,y,target_hwnd,target_match}` | false |
+| PointCacheRead | `{key,max_age_seconds}` | false |
+| PointCacheWrite | `{key,payload}` | false |
+| CoordProfile | `{has_point:true,x,y,target_hwnd,target_match}` | false |
+| AnchorScore | `{record}` | false |
+| AnchorAppend | `{record}` | false |
+| Notice | name `ERROR` or `WARN`; data is message string | false |
+| PipelineOutput | data is output string | false |
+| ObservationId | name `icon-click`; null data; returns full synthetic ID | false |
+
+The existing `Native` kind is explicitly classified inside this candidate:
+`focus`, `click`, `type`, `shortcut` are live; `windows`, `ocr-find-text`, and
+`hit-scan` are acquisition. No unlisted native action is accepted. Point cache
+and anchor writes are local persistence effects, not input authority; their
+existing storage implementations and configured roots remain authoritative.
+The candidate also uses existing Clock, Timestamp, Sleep, TrajectoryAppend and
+Console effects. String parameters to legacy leaf seams use empty string for
+missing values, while untyped report properties retain null.
+
+Native and Cucp results retain `{ExitCode,ElapsedMs,Raw,Json}`. The internal
+uncertainty envelope may use lowercase `exit`; this is not a second public wire
+shape. The callback fixture does not execute commands, invoke models, move the
+mouse, change clipboard/IME, write history or sleep.
+
+## Preserved behavior and bounded correction
+
+FindLabel retains fast-window short circuit, pool confidence, whitespace
+normalization, ambiguity window, exact Console/public shapes, cache provenance,
+and the historical exit-one not-found result. IconFind keeps size/near filters,
+round-to-even coordinate and distance conversions, truncation before ambiguity,
+and PS scalar-versus-array shape when a multi-candidate list is truncated to one.
+PS5 median-pivot sorting deliberately swaps equal keys; stable LINQ sorting would
+change target selection. FindElement sorts the full tier/score list together.
+
+ClickPoint retains guard, micro-refinement cache/scan/write, optional anchor
+profile/score, action, successful anchor append and trajectory ordering. Its
+cached points and history use the existing precision kernel/storage contract.
+ClickLabel preserves direct/icon/vision paths, optional second action, notice
+ordering and its unusual Brief pipeline output. IconClick preserves the existing
+fresh observation and synthetic ID fallback. OCR threshold failure emits no JSON
+when not brief. PrecisionValidate preserves per-sample exception continuation,
+30ms captured sleeps, evidence and drift thresholds.
+
+SafeType resolves a unique title/HWND before focus, retries only focus preparation,
+pins the verified foreground identity, never injects an old probe string, and
+never replays click/text/submit after ordinary failure. Input dispatch does not
+claim the app accepted or saved text. Its historical last focus failure reason
+is retained even if a later attempt succeeds.
+
+Explicit `mutation_may_have_occurred:true` from a live effect is terminal before
+any fallback, second click, success history, or trajectory append. A failed
+read/persistence effect after input cannot enter a caught legacy fallback.
+The shared session reports uncertainty after a lost/malformed live reply and
+sets automatic_retry false. These qualified execution-boundary corrections are
+separately tested, not represented as exact parity with a PS body that ignored
+uncertainty metadata. Ordinary captured errors remain on the exact parity path.
+
+## Evidence and remaining gates
+
+The managed candidate compiles for net8 with zero warnings/errors. The local
+self-test runs 86 independent checks, including immutable live denial, all four
+native mutation classifications, uncertainty/no-replay, verified target identity,
+equal-score selection, malformed shared-session frames and a reply larger than
+1MiB split into bounded frames. The Python fixture corpus and exact oracle details
+are documented in `legacy-interaction-corpus.md`.
+
+Linux candidate/fixture checks do not qualify PS5.1 Console formatting or Windows
+NLS ordering. The Windows pinned-oracle differential, exact actual-adapter gate,
+production integration and bundled full regression remain required before
+retirement. Actual acquisition/input/IME/clipboard/model leaves remain separate
+Windows acceptance work. No mock result is evidence of interactive desktop input.

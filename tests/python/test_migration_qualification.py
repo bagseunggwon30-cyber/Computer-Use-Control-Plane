@@ -46,6 +46,8 @@ class QualificationSelectionTests(unittest.TestCase):
         self.assertEqual(qualification.select_scope("", "Implement batch"), (families, False))
         self.assertEqual(qualification.select_scope("", "[focus cdp] [full regression] Verify batch"), (families, True))
         self.assertEqual(qualification.select_scope("full", "[focus cdp]"), (families, True))
+        self.assertEqual(qualification.select_scope("", "[focus next-batch] Qualify candidates"),
+                         (list(qualification.NEXT_BATCH), False))
 
     def test_only_a_single_known_first_line_scope_is_accepted(self):
         for family in (*qualification.FAMILIES, "foundation"):
@@ -61,12 +63,13 @@ class QualificationSelectionTests(unittest.TestCase):
             (root / ".github").mkdir()
             path = root / ".github/migration-adapters.json"
             for data in [[], {"test_adapters": ["unknown"]}, {"test_adapters": [True]},
-                         {"test_adapters": ["cdp", "cdp"]}, {"test_adapters": [], "extra": True}]:
+                         {"test_adapters": ["cdp", "cdp"]}, {"test_adapters": [], "extra": True},
+                         {"test_adapters": ["interaction"]}, {"test_adapters": ["diagnostics"]}]:
                 path.write_text(json.dumps(data))
                 with self.assertRaises(ValueError):
                     qualification.enabled_adapters(root)
             path.write_text('{"test_adapters":["execution","precision","cdp"]}')
-            self.assertEqual(qualification.enabled_adapters(root), set(qualification.FAMILIES))
+            self.assertEqual(qualification.enabled_adapters(root), {"execution", "precision", "cdp"})
 
     def test_full_suite_discovers_any_staged_family_implementation(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -78,6 +81,61 @@ class QualificationSelectionTests(unittest.TestCase):
             path.parent.mkdir(parents=True)
             path.write_text("# fixture")
             self.assertEqual(qualification.available_families(root), ["precision", "cdp"])
+            for name in ("PcuCp.LegacyInteraction", "PcuCp.LegacyDiagnostics", "PcuCp.LegacyImages"):
+                (root / "pcucp-next/dotnet" / name).mkdir()
+            (root / "pcucp-next/dotnet/PcuCp.LegacyImages/FileOcr.cs").write_text("// fixture")
+            self.assertEqual(qualification.available_families(root),
+                             ["precision", "cdp", "interaction", "diagnostics", "file-images"])
+
+    def test_file_images_requires_and_runs_both_exact_suites_with_matching_dll(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name in ("tests/python", "tests/fixtures", ".github", "pcucp-next/packaging",
+                         "pcucp-next/dotnet/PcuCp.NativeHost", *(
+                         "pcucp-next/dotnet/" + p for p in qualification.PROJECTS["file-images"])):
+                (root / name).mkdir(parents=True, exist_ok=True)
+            (root / ".github/migration-adapters.json").write_text('{"test_adapters":[]}')
+            (root / "tests/fixtures/legacy-file-images-adapter.ps1").write_text("# fixture")
+            publisher = root / "pcucp-next/packaging/publish_legacy_images.py"
+            publisher.write_text("# fixture")
+            (root / "tests/python/test_legacy_images.py").write_text("# fixture")
+            calls = []
+            with patch.object(qualification, "ROOT", root), patch.object(qualification.subprocess, "run",
+                    side_effect=lambda argv, **kw: calls.append((argv, dict(kw['env'])))), contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(ValueError, 'test_legacy_file_ocr.py'):
+                    qualification.run_family('file-images')
+                self.assertEqual(calls, [])
+                (root / 'tests/python/test_legacy_file_ocr.py').write_text('# fixture')
+                qualification.run_family('file-images')
+            self.assertIn([sys.executable, str(publisher)], [args for args, _ in calls])
+            suites = [(args, env) for args, env in calls if '-m' in args and 'unittest' in args]
+            self.assertEqual([args[args.index('-p')+1] for args, _ in suites],
+                             ['test_legacy_images.py', 'test_legacy_file_ocr.py'])
+            for _, env in suites:
+                self.assertEqual(env['CUCP_LEGACY_IMAGES_TEST_DLL'],
+                                 str(root / 'pcucp-next/bin/legacy/PcuCp.LegacyImages.dll'))
+
+    def test_candidate_kernel_gate_cannot_claim_adapter_retirement(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name in ('tests/python', '.github', 'pcucp-next/dotnet/PcuCp.NativeHost', *(
+                    'pcucp-next/dotnet/' + p for p in qualification.PROJECTS['interaction'])):
+                (root / name).mkdir(parents=True, exist_ok=True)
+            (root / '.github/migration-adapters.json').write_text('{"test_adapters":[]}')
+            (root / 'tests/python/test_legacy_interaction_fixture.py').write_text('# fixture')
+            output = io.StringIO()
+            with patch.object(qualification, 'ROOT', root), patch.object(qualification.subprocess, 'run'), \
+                    patch.dict(os.environ, {'GITHUB_STEP_SUMMARY':str(root / 'summary.md')}), \
+                    contextlib.redirect_stdout(output):
+                qualification.run_family('interaction')
+            self.assertIn('CANDIDATE ONLY', output.getvalue())
+            self.assertIn('retirement are NOT qualified', output.getvalue())
+            self.assertIn('CANDIDATE ONLY', (root / 'summary.md').read_text())
+            # Removing the candidate-only declaration is insufficient: the
+            # next stage must actually provide the production-boundary suite.
+            with patch.object(qualification, 'ROOT', root), patch.object(qualification, 'CANDIDATE_ONLY', frozenset()):
+                with self.assertRaisesRegex(ValueError, 'Missing exact adapter tests'):
+                    qualification.run_family('interaction')
 
 
     def test_execution_draft_and_promoted_modes_run_real_adapter_gates(self):

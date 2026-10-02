@@ -10,23 +10,39 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-FAMILIES = ("execution", "precision", "cdp")
+FAMILIES = ("execution", "precision", "cdp", "interaction", "diagnostics", "file-images")
+NEXT_BATCH = ("interaction", "diagnostics", "file-images")
+# Explicit temporary qualification stage. These kernels have no registered
+# production adapter yet, and cannot be marked promoted in the manifest.
+CANDIDATE_ONLY = frozenset({"interaction", "diagnostics"})
+REQUIRED_ADAPTER_TESTS = {
+    "interaction": "test_legacy_interaction_adapters.py",
+    "diagnostics": "test_legacy_diagnostics_adapters.py",
+}
 PROJECTS = {
     "execution": ("PcuCp.LegacyExecution.ContractTests", "PcuCp.LegacyExecution.StartupTests"),
     "precision": ("PcuCp.LegacyPrecision.ContractTests",),
     "cdp": (),
+    "interaction": ("PcuCp.LegacyInteraction.ContractTests",),
+    "diagnostics": ("PcuCp.LegacyDiagnostics.ContractTests",),
+    "file-images": ("PcuCp.LegacyFileOcr.ContractTests",),
     "foundation": ("PcuCp.LegacyPure.ContractTests", "PcuCp.LegacyTaskForm.ContractTests"),
 }
 PATTERNS = {
     "execution": "test_legacy_execution*.py",
     "precision": "test_legacy_precision*.py",
     "cdp": "test_legacy_cdp*.py",
+    "interaction": "test_legacy_interaction*.py",
+    "diagnostics": "test_legacy_diagnostics*.py",
+    "file-images": ("test_legacy_images.py", "test_legacy_file_ocr.py"),
     "foundation": "test_migration_inventory.py",
 }
 ADAPTER_ENV = {
     "execution": "CUCP_EXECUTION_TEST_HOST",
     "precision": "CUCP_PRECISION_TEST_HOST",
     "cdp": "CUCP_LEGACY_CDP_TEST_PYTHON",
+    "interaction": "CUCP_INTERACTION_TEST_DLL",
+    "file-images": "CUCP_LEGACY_IMAGES_TEST_DLL",
 }
 
 
@@ -41,8 +57,10 @@ def select_scope(explicit: str, message: str) -> tuple[list[str], bool]:
             if len(tags) > 1:
                 raise ValueError("Use one focused scope or the full regression marker.")
             scope = tags[0] if tags else "all"
-    if scope not in (*FAMILIES, "foundation", "all", "full"):
+    if scope not in (*FAMILIES, "foundation", "next-batch", "all", "full"):
         raise ValueError(f"Unknown migration qualification scope: {scope}")
+    if scope == "next-batch":
+        return list(NEXT_BATCH), False
     return list(FAMILIES) if scope in ("all", "full") else [scope], scope == "full"
 
 
@@ -53,6 +71,8 @@ def enabled_adapters(root: Path = ROOT) -> set[str]:
     values = data["test_adapters"]
     if not isinstance(values, list) or any(type(v) is not str or v not in FAMILIES for v in values) or len(values) != len(set(values)):
         raise ValueError("Adapter families must be unique known names.")
+    if CANDIDATE_ONLY.intersection(values):
+        raise ValueError("Candidate-only kernels cannot be marked as promoted adapters.")
     return set(values)
 
 
@@ -76,10 +96,15 @@ def run_logged(argv: list[str], *, cwd: Path, env: dict[str, str], log_path: Pat
 def run_family(family: str, browser: bool = False, log_dir: Path | None = None) -> None:
     if family not in PROJECTS or browser and family != "cdp":
         raise ValueError("Unsupported qualification family/platform combination.")
-    pattern = "test_legacy_cdp_browser*.py" if browser else PATTERNS[family]
-    tests = sorted((ROOT / "tests/python").glob(pattern))
-    if not tests:
-        raise ValueError(f"No staged tests for requested family {family}; refusing an empty pass.")
+    selected = "test_legacy_cdp_browser*.py" if browser else PATTERNS[family]
+    patterns = (selected,) if isinstance(selected, str) else selected
+    for pattern in patterns:
+        if not list((ROOT / "tests/python").glob(pattern)):
+            raise ValueError(f"Missing staged tests {pattern} for {family}; refusing an incomplete pass.")
+    if family in REQUIRED_ADAPTER_TESTS and family not in CANDIDATE_ONLY:
+        required = ROOT / "tests/python" / REQUIRED_ADAPTER_TESTS[family]
+        if not required.is_file():
+            raise ValueError(f"Missing exact adapter tests: {required.name}; kernel parity alone cannot qualify promotion.")
     env = dict(os.environ)
     env["PYTHONPATH"] = str(ROOT / "pcucp-next/python")
     for name in (*ADAPTER_ENV.values(), "CUCP_EXECUTION_STARTUP_TEST_HOST", "CUCP_EXECUTION_ADAPTER_SOURCE",
@@ -110,9 +135,25 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
         host = native / "bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll"
         if family == "execution" and (native / "LegacyExecutionStartup.cs").exists():
             env["CUCP_EXECUTION_STARTUP_TEST_HOST"] = str(host)
-        if family in FAMILIES:
+        if family == "file-images":
+            publisher = ROOT / "pcucp-next/packaging/publish_legacy_images.py"
+            if not publisher.is_file():
+                raise ValueError("Missing compiled file-images publisher.")
+            run([sys.executable, str(publisher)])
+            env[ADAPTER_ENV[family]] = str(ROOT / "pcucp-next/bin/legacy/PcuCp.LegacyImages.dll")
+        elif family == "interaction":
+            env[ADAPTER_ENV[family]] = str(ROOT / "pcucp-next/dotnet/PcuCp.LegacyInteraction.ContractTests/bin/Release/net8.0/PcuCp.LegacyInteraction.ContractTests.dll")
+        elif family in ADAPTER_ENV:
             env[ADAPTER_ENV[family]] = sys.executable if family == "cdp" else str(host)
-            if family in enabled_adapters(ROOT):
+        if family in FAMILIES:
+            promoted = family in enabled_adapters(ROOT)
+            if family in CANDIDATE_ONLY:
+                notice = f"CANDIDATE ONLY: {family} kernel/oracle checks; actual adapter and retirement are NOT qualified."
+                print(notice, flush=True)
+                if summary := env.get("GITHUB_STEP_SUMMARY"):
+                    with open(summary, "a", encoding="utf-8") as stream:
+                        stream.write(notice + "\n")
+            elif promoted:
                 if family == "cdp":
                     env["CUCP_LEGACY_CDP_ADAPTER_MODE"] = "production"
                 print(f"Running candidate and promoted {family} adapter gates", flush=True)
@@ -124,11 +165,12 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
                     env["CUCP_EXECUTION_ADAPTER_SOURCE"] = str(draft)
                 elif family == "precision":
                     env["CUCP_PRECISION_ADAPTER_DRAFT"] = str(draft)
-                else:
+                elif family == "cdp":
                     env["CUCP_LEGACY_CDP_ADAPTER_MODE"] = "draft"
                 print(f"Running candidate and exact {family} draft adapter gates; production bodies retained", flush=True)
     try:
-        run([sys.executable, "-m", "unittest", "discover", "-s", "tests/python", "-p", pattern, "-v"])
+        for pattern in patterns:
+            run([sys.executable, "-m", "unittest", "discover", "-s", "tests/python", "-p", pattern, "-v"])
     finally:
         if not browser and log_dir is not None:
             run(["powershell.exe", "-NoProfile", "-NonInteractive", "-File",
@@ -141,6 +183,9 @@ def available_families(root: Path = ROOT) -> list[str]:
         "execution": root / "pcucp-next/dotnet/PcuCp.LegacyExecution",
         "precision": root / "pcucp-next/dotnet/PcuCp.LegacyPrecision",
         "cdp": root / "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+        "interaction": root / "pcucp-next/dotnet/PcuCp.LegacyInteraction",
+        "diagnostics": root / "pcucp-next/dotnet/PcuCp.LegacyDiagnostics",
+        "file-images": root / "pcucp-next/dotnet/PcuCp.LegacyImages/FileOcr.cs",
     }
     return [family for family in FAMILIES if markers[family].exists()]
 

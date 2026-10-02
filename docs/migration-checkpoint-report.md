@@ -11,13 +11,13 @@ still uses compatibility hosts and unported PowerShell acquisitions/actions.
 The baseline is commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tree
 `bf895d3120dd5e145f360cb1c41e1d79a061d048`.
 
-| Canonical Git source | Baseline | Prior verified `27400c98` | Current integration |
+| Canonical Git source | Baseline | Prior verified `27400c98` | Accepted `56be343c` |
 | --- | ---: | ---: | ---: |
 | All tracked `.ps1` source/tests | 1,013,478 bytes | 921,614 bytes | 823,078 bytes |
 | Runtime scripts, including the new shared host | 858,937 bytes | 770,805 bytes | 667,770 bytes |
 | Actual all-source reduction | — | 91,864 bytes | **190,400 bytes (18.79%)** |
 
-The current integration removes another **98,536 bytes** relative to the prior
+The accepted batch removes another **98,536 bytes** relative to the prior
 verified checkpoint, including all adapter and test overhead. It replaces 53
 original function extents: 42 retain compatible delegates and 11 private helpers
 disappear. The duplicate adapter fixtures are removed; shared CDP host code is
@@ -47,9 +47,15 @@ Windows parser-derived function ranges and SHA-256 hashes were checked against
 all six source/draft files before promotion. The integrated hosts copy the exact
 qualified helper/delegate bodies and preserve bytes outside explicit replacement
 and initialization regions. Production source selection is now enabled for all
-three families. This integration requires the **current commit's bundled full
-regression**, including promoted central routing, prior legacy suites and relocated
-Windows packaging. The earlier focused result does not substitute for that gate.
+three families. The integrated checkpoint `56be343c786027d27fa3dcb71732157caffc8de0`
+passed all 11 active jobs in [full run 37022764709](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37022764709);
+three focused-only jobs were intentionally skipped because the complete gate ran.
+All 283 published blob hashes and modes match tree
+`c0d15371b60ebf62be45bfa68b90282405f07273`. The gate includes all production
+adapters, prior Windows parity suites, Pester 21/21, relocated portable packaging,
+modern Chrome 8/8 and legacy Chrome 11/11. Core passed 355 tests with 89 explicit
+platform/browser skips; Windows CDP passed 55 with 11 browser-only skips.
+Subsequent implementation batches require their own exact-commit full gate.
 
 ## What moved
 
@@ -81,7 +87,7 @@ other pure operations retain their smaller request limit.
 
 ## Remaining work and acceptance boundaries
 
-The tracked inventory still contains 823,078 PowerShell bytes. Major remaining
+The accepted checkpoint still contains 823,078 PowerShell bytes. Major remaining
 work includes leaf UIA/OCR/window acquisition, IME/clipboard/drag/multi-edit,
 application/process/registry/system macros, recorder/audit/profile acquisition,
 helper lifecycle and IPC, optional vision/provider plumbing, the original workflow
@@ -95,7 +101,7 @@ The current integration intentionally removes those signals before matching,
 locator construction and output, while preserving ordinary labels and current
 visible button captions. Thirty-two original synthetic exposure cases and eleven additional textarea
 scenarios characterize that divergence; ordinary parity assertions and the read side-effect guard remain.
-Four legacy and one modern owned-browser privacy cases require the current full
+Four legacy and one modern owned-browser privacy cases passed that full
 gate. The modern observation path also excludes textarea defaults from direct
 and ancestor text while keeping references, label matching and explicit typing.
 This focused
@@ -113,3 +119,20 @@ Before the final zero-execution gate, replace temporary PowerShell oracle calls
 with provenance-backed expected fixtures and independent Python/C# tests. Linking
 the PowerShell SDK, retaining encoded bootstraps, or deleting unported operations
 does not satisfy the target. See [the zero-PowerShell gates](zero-powershell-acceptance.md).
+
+## Next bounded batch
+
+The next independent scopes contain 119,960 bytes of exact current function
+extents: interaction/target planners 55,093; diagnostics/report assembly 54,053;
+file-image/OCR processing 10,814. These are scope measurements, not promised net
+retirement. Shared OCR helpers keep their contracts for retained screen/fusion
+callers. Candidate code reuses the qualified typed effects, startup authority and
+chunked wire transport. Original bodies stay until candidate and actual-adapter
+gates pass; temporary qualification scripts remain counted in the inventory.
+
+The initial candidate checkpoint adds 32,096 bytes of visible PowerShell oracle
+and adapter fixtures, while leaving the accepted production bodies intact. Its
+all-source total is 855,174 bytes (158,304 below baseline); the last accepted
+production cutover remains the 190,400-byte net reduction at `56be343c`. No new
+retirement is claimed from these candidates. Fixture overhead stays in the
+inventory and must be replaced or removed at its appropriate qualification gate.
