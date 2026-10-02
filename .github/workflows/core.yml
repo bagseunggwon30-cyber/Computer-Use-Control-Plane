@@ -156,9 +156,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: App-profile captured-reply and culture qualification (candidate only)
+      - name: Build native app-profile bridge
+        id: build_profile_native
+        run: dotnet build pcucp-next/dotnet/PcuCp.NativeHost -c Release -warnaserror
+      - name: App-profile captured-reply and actual bridge qualification
+        if: ${{ !cancelled() && steps.build_profile_native.outcome == 'success' }}
         shell: pwsh
         run: |
+          $env:CUCP_APP_PROFILE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
           dotnet run --project pcucp-next/dotnet/PcuCp.LegacyAppProfile.ContractTests -c Release -- --self-test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s tests/python -p test_legacy_app_profile_parity.py -v

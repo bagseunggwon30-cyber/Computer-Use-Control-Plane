@@ -2386,7 +2386,7 @@ function _Macro-NotImplemented {
 }
 
 function _Invoke-LegacyCompatibility {
-  param([ValidateSet('safety-classify','coord-map','workflow-plan-from-parsed','task-preset-prepare','task-preset-complete','task-plan-prepare','task-plan-assemble','task-plan-complete','form-plan-prepare','form-plan-complete','smart-plan-advance')][string]$Operation, [hashtable]$Arguments, [switch]$PreserveInvalidArguments)
+  param([ValidateSet('safety-classify','coord-map','workflow-plan-from-parsed','task-preset-prepare','task-preset-complete','task-plan-prepare','task-plan-assemble','task-plan-complete','form-plan-prepare','form-plan-complete','smart-plan-advance','app-profile-advance')][string]$Operation, [hashtable]$Arguments, [switch]$PreserveInvalidArguments)
   # Compatibility only: pure logic now lives in bounded C# kernels. No shell or desktop calls.
   $native = $env:CUCP_NATIVE_HOST
   if (-not $native) { $native = Join-Path $PSScriptRoot '..\pcucp-next\bin\native\PcuCp.NativeHost.exe' }
@@ -9557,458 +9557,99 @@ function _AppStrategy-Append {
   }
 }
 
-function _AppProfile-StrategyScore {
-  param(
-    [string]$AppType,
-    [string[]]$RouteOrder,
-    $CdpProbe,
-    $UiaProbe,
-    [string[]]$Labels,
-    $PersistedStrategy,
-    [bool]$BrowserLike,
-    [bool]$OfficeLike,
-    [bool]$NoProbe
-  )
-
-  $scores = @{}
-  $reasons = @{}
-  function _ScoreAdd {
-    param([string]$Route, [int]$Points, [string]$Reason)
-    if (-not $Route) { return }
-    $routeKey = _AppStrategy-NormalizeRoute -Strategy $Route
-    if (-not $routeKey) { return }
-    if (-not $scores.ContainsKey($routeKey)) { $scores[$routeKey] = 0; $reasons[$routeKey] = New-Object System.Collections.ArrayList }
-    $scores[$routeKey] += [int]$Points
-    if ($Reason) { [void]$reasons[$routeKey].Add($Reason) }
-  }
-
-  $rank = 0
-  foreach ($route in @($RouteOrder)) {
-    $rank++
-    _ScoreAdd -Route $route -Points ([Math]::Max(4, 24 - ($rank * 3))) -Reason "base_route_rank_$rank"
-  }
-
-  if ($CdpProbe) {
-    if ([bool]$CdpProbe.available) { _ScoreAdd -Route "cdp_dom" -Points 45 -Reason "cdp_probe_available" }
-    else { _ScoreAdd -Route "cdp_dom" -Points -18 -Reason "cdp_probe_unavailable:$($CdpProbe.reason)" }
-  } elseif ($BrowserLike -and $NoProbe) {
-    _ScoreAdd -Route "cdp_dom" -Points 18 -Reason "browser_like_cdp_probe_skipped"
-  }
-
-  if ($UiaProbe) {
-    if ([bool]$UiaProbe.available) {
-      _ScoreAdd -Route "uia_pattern" -Points 28 -Reason "uia_affordances_available"
-      _ScoreAdd -Route "uia_click" -Points 16 -Reason "uia_affordances_available"
-      try {
-        $labelHits = @($UiaProbe.label_hits | Where-Object { $_.found -eq $true }).Count
-        if ($labelHits -gt 0) { _ScoreAdd -Route "uia_pattern" -Points ([Math]::Min(20, $labelHits * 6)) -Reason "uia_label_hits=$labelHits" }
-      } catch { }
-      try {
-        if ([int]$UiaProbe.small_icon_count -gt 0) {
-          _ScoreAdd -Route "precision_point" -Points 14 -Reason "uia_small_icon_targets=$($UiaProbe.small_icon_count)"
-        }
-      } catch { }
-    } else {
-      _ScoreAdd -Route "ocr" -Points 18 -Reason "uia_probe_unavailable"
-      _ScoreAdd -Route "precision_point" -Points 8 -Reason "uia_probe_unavailable"
-    }
-  } else {
-    _ScoreAdd -Route "uia_pattern" -Points 10 -Reason "uia_not_probed"
-  }
-
-  if ($OfficeLike) {
-    _ScoreAdd -Route "uia_value_or_pattern" -Points 24 -Reason "document_or_mail_app"
-    _ScoreAdd -Route "safe_type_guarded" -Points 16 -Reason "document_or_mail_app"
-  } else {
-    _ScoreAdd -Route "precision_point" -Points 10 -Reason "generic_window_coordinate_fallback"
-    _ScoreAdd -Route "ocr" -Points 8 -Reason "generic_visual_text_fallback"
-  }
-
-  if ($PersistedStrategy) {
-    $persistedRoute = _AppStrategy-NormalizeRoute -Strategy "$($PersistedStrategy.strategy)"
-    if ($persistedRoute) {
-      _ScoreAdd -Route $persistedRoute -Points 18 -Reason "persisted_last_good_strategy"
-    }
-  }
-
-  $routeScores = New-Object System.Collections.ArrayList
-  foreach ($k in $scores.Keys) {
-    [void]$routeScores.Add([pscustomobject]@{
-      route = "$k"
-      score = [int]([Math]::Max(0, [Math]::Min(100, $scores[$k])))
-      reasons = @($reasons[$k])
-    })
-  }
-  $ordered = @($routeScores | Sort-Object @{ Expression = { -1 * [int]$_.score } }, route)
-  $best = @($ordered | Select-Object -First 1)[0]
-  $score = if ($best) { [int]$best.score } else { 0 }
-  $confidence = if ($score -ge 75) { "high" } elseif ($score -ge 50) { "medium" } elseif ($score -ge 25) { "low" } else { "none" }
-  return [pscustomobject]@{
-    schema = "cucp.app-profile-strategy-score/v1"
-    app_type = $AppType
-    recommended_strategy = if ($best) { "$($best.route)" } else { "none" }
-    confidence = $confidence
-    total_score = $score
-    route_order = @($ordered | ForEach-Object { "$($_.route)" })
-    route_scores = @($ordered)
-    evidence = [pscustomobject]@{
-      cdp_probe = if ($CdpProbe) { [pscustomobject]@{ available = [bool]$CdpProbe.available; reason = "$($CdpProbe.reason)"; port = [int]$CdpProbe.port } } else { $null }
-      uia_probe = if ($UiaProbe) { [pscustomobject]@{ available = [bool]$UiaProbe.available; affordance_count = [int]$UiaProbe.affordance_count; small_icon_count = [int]$UiaProbe.small_icon_count } } else { $null }
-      label_count = [int](@($Labels | Where-Object { -not [string]::IsNullOrWhiteSpace("$_") } | Select-Object -Unique).Count)
-      persisted_strategy = $PersistedStrategy
-    }
-  }
-}
-
 function Invoke-MacroAppProfile {
   param([string[]]$Rest)
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  if (-not $match) { $match = _Read-OptValue -Rest $Rest -Name "--window" }
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $includeAffordances = _Read-Switch -Rest $Rest -Name "--include-affordances"
-  $autoProbe = (_Read-Switch -Rest $Rest -Name "--auto-probe") -or (_Read-Switch -Rest $Rest -Name "--probe")
-  $probeCdpRequested = $autoProbe -or (_Read-Switch -Rest $Rest -Name "--probe-cdp")
-  $probeUiaRequested = $autoProbe -or (_Read-Switch -Rest $Rest -Name "--probe-uia")
-  $noProbe = _Read-Switch -Rest $Rest -Name "--no-probe"
-  $recordStrategy = (_Read-Switch -Rest $Rest -Name "--record-strategy") -or (_Read-Switch -Rest $Rest -Name "--remember-strategy")
-  $noStrategyHistory = _Read-Switch -Rest $Rest -Name "--no-strategy-history"
-  $cdpPort = [int](_Read-OptValue -Rest $Rest -Name "--cdp-port")
-  if ($cdpPort -le 0) { $cdpPort = [int](_Read-OptValue -Rest $Rest -Name "--port") }
-  if ($cdpPort -le 0) { $cdpPort = 9222 }
-  $uiaProbeLimit = [int](_Read-OptValue -Rest $Rest -Name "--probe-uia-limit")
-  if ($uiaProbeLimit -le 0) { $uiaProbeLimit = 120 }
-  $labels = @(_Read-AllOptValues -Rest $Rest -Name "--label")
-  foreach ($clickLabel in @(_Read-AllOptValues -Rest $Rest -Name "--click-label")) { $labels += $clickLabel }
-  foreach ($fieldSpec in @(_Read-AllOptValues -Rest $Rest -Name "--field")) {
-    if ($fieldSpec -and "$fieldSpec".Contains("=")) {
-      $fieldLabel = "$fieldSpec".Substring(0, "$fieldSpec".IndexOf("=")).Trim()
-      if ($fieldLabel) { $labels += $fieldLabel }
+  $historyFile=$Script:AppStrategyFile
+  $recordRequested=(_Read-Switch -Rest $Rest -Name '--record-strategy') -or (_Read-Switch -Rest $Rest -Name '--remember-strategy')
+  $historyEnabled=-not (_Read-Switch -Rest $Rest -Name '--no-strategy-history')
+  $jsonOnly=_Read-Switch -Rest $Rest -Name '--json-only'
+  $captures=New-Object Collections.ArrayList
+  $arguments=@{rest=@($Rest);brief=[bool]$Brief;culture=[Globalization.CultureInfo]::CurrentCulture.Name;history_file=$historyFile;elapsed_ms=0;cdp_elapsed_ms=0;uia_elapsed_ms=0;captured_replies=@()}
+  $recordAttempted=$false;$evaluations=0;$facadeCalls=0;$recordCompletion=$null
+  $sw=[Diagnostics.Stopwatch]::StartNew()
+  for ($probe=0;$probe -le 7;$probe++) {
+    if ($null -ne $recordCompletion) { $state=$recordCompletion }
+    else {
+      if ($facadeCalls -ge 7) { throw 'App-profile exceeded its facade call budget.' }
+      $facadeCalls++
+      $arguments.captured_replies=@($captures)
+      $state=_Invoke-LegacyCompatibility -Operation 'app-profile-advance' -Arguments $arguments
+      if ($state.facade -cne 'cucp.app-profile-controller/v1' -or $state.kernel_evaluations -notin @(1,2)) { throw 'Missing app-profile controller validation.' }
+      $evaluations += [int]$state.kernel_evaluations
+      if ($evaluations -gt 8) { throw 'App-profile exceeded its pure evaluation budget.' }
     }
-  }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $allWindows = @(_Enumerate-Win32Windows)
-  $allVisible = @($allWindows | Where-Object { $_.visible })
-  $candidates = if ($match) { @(_Enumerate-Win32Windows -Match $match | Where-Object { $_.visible }) } else { @($allVisible) }
-  $eligible = @($candidates | Where-Object { -not $_.minimized })
-  if ($eligible.Count -eq 0) { $eligible = @($candidates) }
-  $target = $eligible | Sort-Object `
-    @{ Expression = { if ($_.foreground) { 0 } else { 1 } } }, `
-    @{ Expression = { if ($_.title) { 0 } else { 1 } } }, `
-    @{ Expression = { -1 * [int]$_.rect.width * [int]$_.rect.height } } |
-    Select-Object -First 1
-
-  $sample = @($allVisible | Select-Object -First 10 | ForEach-Object {
-    [pscustomobject]@{
-      title = $_.title
-      process = $_.process
-      class = $_.class
-      foreground = [bool]$_.foreground
-      minimized = [bool]$_.minimized
-      rect = $_.rect
+    if ($state.state -ceq 'error') { throw [string]$state.error }
+    if (-not [object]::Equals($Script:AppStrategyFile,$historyFile)) { throw 'App-profile history destination changed during acquisition.' }
+    if ($state.state -ceq 'complete') {
+      if ($state.queries -isnot [array] -or $state.queries.Count -ne $captures.Count) { throw 'Invalid app-profile completion trace.' }
+      $sw.Stop();$elapsed=[int]$sw.Elapsed.TotalMilliseconds
+      $state.payload.elapsed_ms=$elapsed
+      if ($Brief -and -not $jsonOnly) { [Console]::Out.WriteLine(($state.brief -replace 'elapsed_ms=\d+$',"elapsed_ms=$elapsed")) }
+      else { [Console]::Out.WriteLine(($state.payload | ConvertTo-Json -Depth ([int]$state.json_depth))) }
+      return [int]$state.exit
     }
-  })
-
-  if (-not $target) {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.app-profile/v1"
-      status = "partial"
-      reason = if ($match) { "no_matching_window" } else { "no_visible_window" }
-      match = $match
-      window_count = [int]$allVisible.Count
-      selected_window = $null
-      recommended_strategy = "not_found"
-      route_order = @()
-      strategy_score = [pscustomobject]@{
-        schema = "cucp.app-profile-strategy-score/v1"
-        app_type = "unknown"
-        recommended_strategy = "not_found"
-        confidence = "none"
-        total_score = 0
-        route_order = @()
-        route_scores = @()
-        evidence = [pscustomobject]@{
-          cdp_probe = $null
-          uia_probe = $null
-          label_count = [int](@($labels | Where-Object { -not [string]::IsNullOrWhiteSpace("$_") } | Select-Object -Unique).Count)
-          persisted_strategy = $null
+    $query=$state.query
+    if ($probe -ge 7 -or $state.state -cne 'query' -or $state.queries -isnot [array] -or $state.queries.Count -ne ($captures.Count+1) -or $query.argv -isnot [array]) { throw 'Invalid app-profile acquisition state.' }
+    $authorization=$state.record_authorization
+    if ($query.kind -ceq 'record') {
+      # Independent side-effect gate: user flags, fixed destination, controller
+      # preflight, score threshold, matching argv, and no previous append attempt.
+      $score=$authorization.strategy_score
+      $expectedConfidence=if ($score.total_score -ge 75) {'high'} else {'medium'}
+      if (-not $recordRequested -or -not $historyEnabled -or $recordAttempted -or
+          $state.kernel_evaluations -ne 2 -or
+          $authorization.schema -cne 'cucp.app-profile-record-authorization/v1' -or
+          $state.record_completion.state -cne 'complete' -or
+          $state.record_completion.payload.schema -cne 'cucp.app-profile/v1' -or
+          $state.record_completion.queries.Count -ne ($captures.Count+1) -or
+          -not [object]::Equals($authorization.history_file,$historyFile) -or
+          $score.total_score -isnot [int] -or $score.total_score -lt 50 -or $score.total_score -gt 100 -or
+          $score.confidence -cne $expectedConfidence -or $query.argv.Count -ne 8 -or
+          -not [string]::Equals((ConvertTo-Json -InputObject @($authorization.query.argv) -Compress),
+            (ConvertTo-Json -InputObject @($query.argv) -Compress),[StringComparison]::Ordinal)) {
+        throw 'App-profile record lacks a valid explicit authorization.'
+      }
+      $ready=$state.record_completion
+    } elseif ($null -ne $authorization -or $null -ne $state.record_completion -or $state.kernel_evaluations -ne 1) { throw 'Unexpected app-profile record authorization.' }
+    if ($query.kind -ceq 'history' -and -not $historyEnabled) { throw 'App-profile history is disabled.' }
+    $capture=@{kind=$query.kind;argv=@($query.argv)}
+    try {
+      switch -CaseSensitive ($query.kind) {
+        'windows' {
+          if ($query.argv.Count -eq 0) { $capture.result=@(_Enumerate-Win32Windows) }
+          else { $capture.result=@(_Enumerate-Win32Windows -Match $query.argv[1]) }
         }
-      }
-      strategy_persistence = [pscustomobject]@{
-        enabled = -not $noStrategyHistory
-        app_key = "not_found"
-        history_file = $Script:AppStrategyFile
-        last_good_strategy = $null
-        record_requested = [bool]$recordStrategy
-        recorded = $false
-        record = $null
-        skipped_reason = if ($recordStrategy) { "no_matching_window" } else { "" }
-      }
-      recommended_task_options = @()
-      probe_commands = @()
-      windows_sample = @($sample)
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      next_action = if ($match) { "Run macro windows --json-only to inspect available windows, then retry app-profile with a narrower --match." } else { "Open or focus the target app, then run macro app-profile again." }
-    }
-    if ($Brief -and -not $jsonOnly) { [Console]::Out.WriteLine("partial app-profile reason=$($payload.reason) windows=$($payload.window_count)") }
-    else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 12)) }
-    return 2
-  }
-
-  $title = if ($target.title) { "$($target.title)" } else { "" }
-  $process = if ($target.process) { "$($target.process)" } else { "" }
-  $class = if ($target.class) { "$($target.class)" } else { "" }
-  $titleLower = $title.ToLowerInvariant()
-  $processLower = $process.ToLowerInvariant()
-  $classLower = $class.ToLowerInvariant()
-  $identity = (($titleLower + " " + $processLower + " " + $classLower).Trim())
-  $targetMatch = if ($match) { $match } elseif ($title) { $title } elseif ($process) { $process } else { "$($target.hwnd)" }
-
-  function _AppProfileProbeCdp {
-    param([int]$Port)
-    $pSw = [System.Diagnostics.Stopwatch]::StartNew()
-    $available = $false
-    $status = "partial"
-    $reason = "cdp_port_closed"
-    $browser = $null
-    $protocol = $null
-    $pageCount = 0
-    if (Test-CdpPortQuick -Port $Port -TimeoutMs 120) {
-      $r = Invoke-NativeHelper -ArgList @("-Action","cdp-detect","-CdpPort","$Port")
-      if ($r.Json -and $r.Json.status -eq "ok") {
-        $available = $true
-        $status = "ok"
-        $reason = ""
-        $browser = $r.Json.browser
-        $protocol = $r.Json.protocol_version
-        try { $pageCount = [int]$r.Json.page_count } catch { $pageCount = 0 }
-      } else {
-        $reason = if ($r.Json -and $r.Json.reason) { "$($r.Json.reason)" } else { "cdp_detect_failed" }
-      }
-    }
-    $pSw.Stop()
-    return [pscustomobject]@{
-      kind = "cdp"
-      enabled = $true
-      status = $status
-      available = [bool]$available
-      port = [int]$Port
-      browser = $browser
-      protocol_version = $protocol
-      page_count = [int]$pageCount
-      reason = $reason
-      elapsed_ms = [int]$pSw.Elapsed.TotalMilliseconds
-    }
-  }
-
-  function _AppProfileProbeUia {
-    param([string]$FocusedWindow, [string[]]$WantedLabels, [int]$Limit, [int64]$Hwnd)
-    $pSw = [System.Diagnostics.Stopwatch]::StartNew()
-    $items = @(_Get-UIAffordances -FocusedWindow $FocusedWindow -MaxElements $Limit -MinSize 6 -Hwnd $Hwnd)
-    $roles = @($items | Group-Object -Property role | Sort-Object Count -Descending | Select-Object -First 8 | ForEach-Object {
-      [pscustomobject]@{ role = "$($_.Name)"; count = [int]$_.Count }
-    })
-    $labelHits = New-Object System.Collections.ArrayList
-    foreach ($label in @($WantedLabels | Where-Object { -not [string]::IsNullOrWhiteSpace("$_") } | Select-Object -Unique)) {
-      $needle = "$label".ToLowerInvariant()
-      $hit = $false
-      foreach ($it in $items) {
-        $hay = New-Object System.Collections.ArrayList
-        if ($it.text) { [void]$hay.Add("$($it.text)") }
-        if ($it.synonyms) {
-          foreach ($s in @($it.synonyms)) { if ($s) { [void]$hay.Add("$s") } }
+        'cdp_port' {
+          $cdpWatch=[Diagnostics.Stopwatch]::StartNew()
+          $capture.result=Test-CdpPortQuick -Port ([int]$query.argv[0]) -TimeoutMs 120
+          if (-not $capture.result) { $cdpWatch.Stop() }
         }
-        foreach ($s in @($hay)) {
-          $sl = "$s".ToLowerInvariant()
-          if ($sl -eq $needle -or $sl.Contains($needle) -or $needle.Contains($sl)) { $hit = $true; break }
+        'native' { $capture.result=Invoke-NativeHelper -ArgList @('-Action','cdp-detect','-CdpPort',$query.argv[3]);$cdpWatch.Stop() }
+        'uia' {
+          $uiaWatch=[Diagnostics.Stopwatch]::StartNew()
+          $capture.result=@(_Get-UIAffordances -FocusedWindow $query.argv[1] -MaxElements ([int]$query.argv[3]) -MinSize 6 -Hwnd ([int64]$query.argv[7]))
+          $uiaWatch.Stop();$arguments.uia_elapsed_ms=[int]$uiaWatch.Elapsed.TotalMilliseconds
         }
-        if ($hit) { break }
+        'history' { $capture.result=_AppStrategy-LastGood -AppKey $query.argv[0] }
+        'record' {
+          $recordAttempted=$true
+          $capture.result=_AppStrategy-Append -AppKey $query.argv[0] -AppType $query.argv[1] -Strategy $query.argv[2] -Confidence $query.argv[3] -Score ([int]$query.argv[4]) -Process $query.argv[5] -Class $query.argv[6] -Title $query.argv[7]
+          # Preserve the original raw value and PowerShell truth rule. The target,
+          # score and all other output were validated before the single write.
+          $ready.payload.strategy_persistence.record=$capture.result
+          $ready.payload.strategy_persistence.recorded=[bool]($capture.result -and -not $capture.result.error)
+          $recordCompletion=$ready
+        }
+        default { throw 'Unsupported app-profile acquisition kind.' }
       }
-      [void]$labelHits.Add([pscustomobject]@{ label = "$label"; found = [bool]$hit })
+    } catch {
+      if ($query.kind -ceq 'record') { throw }
+      [void]$capture.Remove('result');$capture.error=$_.Exception.Message
     }
-    $pSw.Stop()
-    return [pscustomobject]@{
-      kind = "uia"
-      enabled = $true
-      status = if ($items.Count -gt 0) { "ok" } else { "partial" }
-      available = [bool]($items.Count -gt 0)
-      affordance_count = [int]$items.Count
-      small_icon_count = [int](@($items | Where-Object { $_.small_icon }).Count)
-      roles = @($roles)
-      label_hits = @($labelHits)
-      sample = @($items | Select-Object -First 8 -Property text,role,rect,small_icon,confidence)
-      elapsed_ms = [int]$pSw.Elapsed.TotalMilliseconds
-    }
+    if ($cdpWatch -and -not $cdpWatch.IsRunning) { $arguments.cdp_elapsed_ms=[int]$cdpWatch.Elapsed.TotalMilliseconds }
+    [void]$captures.Add($capture)
   }
-
-  $appType = "win32_desktop"
-  $routeOrder = @("uia_pattern","uia_click","precision_point","ocr")
-  $notes = New-Object System.Collections.ArrayList
-  $taskOptions = New-Object System.Collections.ArrayList
-  function _AppProfileAddOptions {
-    param([string[]]$Items)
-    foreach ($it in @($Items)) {
-      if ($null -ne $it -and "$it" -ne "") { [void]$taskOptions.Add("$it") }
-    }
-  }
-
-  _AppProfileAddOptions -Items @("--match",$targetMatch,"--precision-points","--settle-ms","150","--verify-after-step","--retry-failed-step","1")
-
-  $browserLike = ($processLower -match '^(chrome|msedge|brave|firefox|electron|cursor|code|windsurf)$') -or ($classLower -like '*chrome_widgetwin*')
-  $officeLike = ($identity -match 'winword|excel|powerpnt|outlook|onenote|hwp|wordpad|notepad')
-  $runCdpProbe = (-not $noProbe) -and ($probeCdpRequested -or $browserLike)
-  $runUiaProbe = (-not $noProbe) -and $probeUiaRequested
-  $cdpProbe = $null
-  $uiaProbe = $null
-  if ($runCdpProbe) { $cdpProbe = _AppProfileProbeCdp -Port $cdpPort }
-  if ($runUiaProbe) { $uiaProbe = _AppProfileProbeUia -FocusedWindow $targetMatch -WantedLabels $labels -Limit $uiaProbeLimit -Hwnd ([int64]$target.hwnd) }
-  $cdpAvailable = ($cdpProbe -and [bool]$cdpProbe.available)
-  $useCdp = $false
-
-  if ($browserLike) {
-    $appType = "browser_or_electron"
-    if ($cdpAvailable -or $noProbe) {
-      $routeOrder = @("cdp_dom","uia_pattern","uia_click","ocr","precision_point")
-      _AppProfileAddOptions -Items @("--allow-cdp")
-      if ($cdpPort -ne 9222) { _AppProfileAddOptions -Items @("--cdp-port","$cdpPort") }
-      $useCdp = $true
-      if ($cdpAvailable) { [void]$notes.Add("CDP probe succeeded; prefer DOM actions because they avoid mouse movement and coordinate drift.") }
-      else { [void]$notes.Add("CDP probing was skipped by --no-probe; keep CDP in the route as an opt-in assumption.") }
-    } else {
-      $routeOrder = @("uia_pattern","uia_click","precision_point","ocr")
-      [void]$notes.Add("CDP probe did not confirm an available DevTools port, so the recommended route starts with UIA and precision points.")
-    }
-    [void]$notes.Add("For Chrome/Electron, enable remote debugging when DOM-grade control is required.")
-  } elseif ($officeLike) {
-    $appType = "document_or_mail_app"
-    $routeOrder = @("uia_value_or_pattern","safe_type_guarded","shortcut","precision_point","ocr")
-    [void]$notes.Add("Document/mail apps usually benefit from direct UIA value/pattern actions, guarded typing, and verification after each step.")
-  } else {
-    [void]$notes.Add("Generic Win32 route: try UIA actions first, then guarded precision points, then OCR only when labels are not exposed.")
-  }
-
-  if ($uiaProbe -and -not [bool]$uiaProbe.available) {
-    [void]$notes.Add("UIA probe found no exposed affordances; expect OCR or guarded coordinate routes to matter more for this app.")
-  } elseif ($uiaProbe -and [int]$uiaProbe.small_icon_count -gt 0) {
-    [void]$notes.Add("UIA probe found small icon affordances; precision-point routes are useful for tiny toolbar controls.")
-  }
-
-  $appKey = _AppStrategy-Key -Process $process -Class $class -AppType $appType
-  $lastGoodStrategy = $null
-  if (-not $noStrategyHistory) {
-    try { $lastGoodStrategy = _AppStrategy-LastGood -AppKey $appKey } catch { $lastGoodStrategy = $null }
-  }
-  if ($lastGoodStrategy) {
-    [void]$notes.Add("Last good app strategy found in app-strategy history: $($lastGoodStrategy.strategy).")
-  }
-  $strategyScore = _AppProfile-StrategyScore `
-    -AppType $appType `
-    -RouteOrder $routeOrder `
-    -CdpProbe $cdpProbe `
-    -UiaProbe $uiaProbe `
-    -Labels $labels `
-    -PersistedStrategy $lastGoodStrategy `
-    -BrowserLike $browserLike `
-    -OfficeLike $officeLike `
-    -NoProbe $noProbe
-  $routeOrder = @($strategyScore.route_order)
-  $recordedStrategy = $null
-  $recordSkippedReason = ""
-  if ($recordStrategy -and -not $noStrategyHistory) {
-    if (@("medium","high") -contains "$($strategyScore.confidence)") {
-      $recordedStrategy = _AppStrategy-Append `
-        -AppKey $appKey `
-        -AppType $appType `
-        -Strategy "$($strategyScore.recommended_strategy)" `
-        -Confidence "$($strategyScore.confidence)" `
-        -Score ([int]$strategyScore.total_score) `
-        -Process $process `
-        -Class $class `
-        -Title $title
-    } else {
-      $recordSkippedReason = "confidence_below_medium"
-    }
-  } elseif ($recordStrategy -and $noStrategyHistory) {
-    $recordSkippedReason = "disabled_by_no_strategy_history"
-  }
-
-  $probeCommands = New-Object System.Collections.ArrayList
-  foreach ($label in @($labels | Where-Object { -not [string]::IsNullOrWhiteSpace("$_") } | Select-Object -Unique)) {
-    $cmd = @("macro","smart-plan","--label","$label","--match",$targetMatch,"--precision-points")
-    if ($useCdp) {
-      $cmd += "--allow-cdp"
-      if ($cdpPort -ne 9222) { $cmd += @("--cdp-port","$cdpPort") }
-    }
-    $cmd += "--json-only"
-    [void]$probeCommands.Add([pscustomobject]@{
-      label = "$label"
-      command = @($cmd)
-      command_line = _TaskPlan-StepString -Command $cmd
-      purpose = "Read-only route probe for this label before any live control."
-    })
-  }
-
-  $affordanceCommand = $null
-  if ($includeAffordances) {
-    $affCmd = @("macro","list-affordances","--window",$targetMatch,"--limit","40","--json-only")
-    $affordanceCommand = [pscustomobject]@{
-      command = @($affCmd)
-      command_line = _TaskPlan-StepString -Command $affCmd
-      purpose = "Optional read-only UIA affordance inventory for label discovery."
-    }
-  }
-
-  $taskPrefix = @("macro","task-plan") + @($taskOptions)
-  $sw.Stop()
-  $payload = [pscustomobject]@{
-    schema = "cucp.app-profile/v1"
-    status = "ok"
-    match = $match
-    selected_window = [pscustomobject]@{
-      title = $title
-      process = $process
-      class = $class
-      hwnd = $target.hwnd
-      pid = $target.pid
-      foreground = [bool]$target.foreground
-      minimized = [bool]$target.minimized
-      rect = $target.rect
-    }
-    app_type = $appType
-    recommended_strategy = $strategyScore.recommended_strategy
-    route_order = @($routeOrder)
-    strategy_score = $strategyScore
-    strategy_persistence = [pscustomobject]@{
-      enabled = -not $noStrategyHistory
-      app_key = $appKey
-      history_file = $Script:AppStrategyFile
-      last_good_strategy = $lastGoodStrategy
-      record_requested = [bool]$recordStrategy
-      recorded = [bool]($recordedStrategy -and -not $recordedStrategy.error)
-      record = $recordedStrategy
-      skipped_reason = $recordSkippedReason
-    }
-    capability_probes = [pscustomobject]@{
-      cdp = $cdpProbe
-      uia = $uiaProbe
-    }
-    recommended_task_options = @($taskOptions)
-    suggested_task_plan_prefix = @($taskPrefix)
-    suggested_task_plan_prefix_line = _TaskPlan-StepString -Command $taskPrefix
-    probe_commands = @($probeCommands)
-    affordance_probe = $affordanceCommand
-    windows_sample = @($sample)
-    notes = @($notes)
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    next_action = "Append the task-specific fields/click labels/text to suggested_task_plan_prefix, run the returned plan or probe commands as read-only, then use task-run --dry-run before live control."
-  }
-  if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine("ok app-profile type=$appType strategy=$($payload.recommended_strategy) labels=$($probeCommands.Count) elapsed_ms=$($payload.elapsed_ms)")
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 14))
-  }
-  return 0
+  throw 'App-profile did not finish within its acquisition bound.'
 }
 
 function _Invoke-LegacyReadOnlyQuery {

@@ -65,9 +65,10 @@ for every unconstrained private PowerShell helper input.
 
 ## Private helper retirement boundary
 
-Repository-wide production call-site audit finds exactly one caller of
-`_AppProfile-StrategyScore`: `Invoke-MacroAppProfile`. Once that complete public
-macro is migrated and qualified, the unused private Score body can be removed.
+The production call-site audit found exactly one caller of
+`_AppProfile-StrategyScore`: `Invoke-MacroAppProfile`. The current public macro
+replacement removes that sole-use private helper directly, with all 523 actual
+app-profile bridge cases required as the release gate.
 `_AppStrategy-NormalizeRoute` also remains called by `_AppStrategy-Append` when
 constructing recorded history, so it must remain while that adapter uses it.
 Pinned-original test references are not production callers.

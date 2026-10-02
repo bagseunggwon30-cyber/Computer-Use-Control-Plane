@@ -1,10 +1,85 @@
-# App-profile captured-reply candidate
+# App-profile assembly with retained acquisition
 
-`pcucp-next/dotnet/PcuCp.LegacyAppProfile/LegacyAppProfileKernel.cs` is an isolated
-qualification candidate. NativeHost does not compile or register it. The
-15,623-byte original `Invoke-MacroAppProfile` remains authoritative. Nothing in
-this stage retires PowerShell, enumerates a real window, probes a browser/UIA
-provider, launches an application, or reads/writes history.
+The complete candidate qualification passed at commit `0d5fa6bb87c2b61b2756e2897046fc4dde03e5dd`,
+[run 36963644280, job 110702561228](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36963644280/job/110702561228).
+That terminal Windows job passed 496 complete app-profile cases, every captured
+acquisition prefix, the fresh/warmed culture-cache characterization, 344 complete
+strategy scores, 144 direct QuoteToken/StepString pairs, 144 direct .NET Framework
+casing triples, and 34 managed boundary checks. Both Python suites reported
+three tests OK with no skips. This qualifies the captured kernel and shared text
+semantics; a production adapter replacement still needs its independent actual
+bridge and exact Console differential before retirement is claimed.
+
+`Invoke-MacroAppProfile` in `scripts/cucp.ps1` is now a thin acquisition/formatting
+shim, replacing the original builder and its sole-use private score helper. The pure `LegacyAppProfileController` shares the
+kernel's canonical parsing, legacy selection/sort, classification, key derivation,
+selected-window projection and record truth/array rules. It validates the closed
+acquisition schedule, every exact descriptor/trace, the full target identity,
+complete score, route consistency, record result and Brief text. No C# component
+performs acquisition or persistence. The shim calls only the original fixed
+legacy helpers, retains the three timing seams and Console formatting, and keeps
+an independent explicit-record/history/score-threshold/one-Append gate. Its history
+destination is the script-owned value captured at entry. Generated commands
+remain output data.
+
+The facade is the same closed `app-profile-advance` operation, now mapped to
+`LegacyAppProfileController.Advance`. Original kernel inputs/outputs and direct
+oracle remain intact. The facade adds `facade: "cucp.app-profile-controller/v1"`
+and `kernel_evaluations` to every response. There are at most seven acquisitions,
+seven facade/transport calls and eight kernel evaluations. A pending record query
+internally replays a null-result placeholder once to obtain complete score proof;
+this performs no acquisition. Only then does that response include
+`record_authorization` and a fully validated `record_completion`. Missing or
+unsolicited authorization/completion fields fail closed. The shim performs the
+one append, assigns only the two existing `strategy_persistence.record` and
+`recorded` fields using the original raw value and PowerShell truth expression,
+then renders this prepared completion. It never calls the facade after entering
+Append, even if Append returns an error object or throws. The original property
+order remains intact and elapsed time includes the append.
+
+The receipt has exactly `schema`, `query`, `selected_window`, `app_type`, `app_key`,
+`history_file`, `strategy_score`, `strategy_score_sha256` and `context_sha256`.
+Its schema is `cucp.app-profile-record-authorization/v1`; `strategy_score` contains
+only `recommended_strategy`, `confidence` and `total_score`. A canonical digest
+binds the full preflight score, including every losing route and raw evidence.
+The context digest binds effective culture, original options and prior captures;
+only measured durations and the actual append result are excluded. Digests are
+deterministic consistency checks, not credentials or additional authority. The
+current target and complete score are recomputed before authorization is issued.
+The validated completion fixes the full target and score before persistence;
+only the raw record result, its original truth flag and elapsed time change
+locally afterward. Shallow score metadata avoids duplicate history in the
+response. Pure receipt-replay verification remains covered by the standalone
+guard tests, but the production shim never resends a receipt or record result.
+The bounded receipt is checked for exact fields and nested duplicates.
+
+`CUCP_APP_PROFILE_TEST_HOST` enables the actual transport/adapter differential.
+`CUCP_APP_PROFILE_ADAPTER_SOURCE` optionally selects the external draft; without
+it the runner extracts the production macro. Both paths execute the extracted
+real `_Invoke-LegacyCompatibility` transport. A transparent counter wrapper
+forwards its exact arguments and reply, asserting at most seven facade calls,
+eight kernel evaluations and one append. Only the acquisition stubs contribute
+to the observed query trace.
+The existing 496 cases and all previous comparisons remain, with 24 additional
+record-boundary cases in both pure and actual-bridge modes. These force record
+result shapes, thrown append, history errors, explicit gates, null/empty history
+destinations and the full seven-query/eight-evaluation high-confidence path.
+Two additional deep-history cases are preserved. A new near-1-MiB case has a
+pre-record frame below the transport limit and an actual record result that
+would push a hypothetical final frame above it, for 523 cases. All retain fresh
+per-culture oracle processes, exact Console/payload/error/exit comparisons and
+elapsed-only normalization. Every recorded case
+asserts that the final facade-call counter equals the counter captured when the
+Append stub was entered, including returned error objects and thrown failures.
+The wrapper also refuses any attempted post-Append transport. These added gates
+are pending Windows qualification; the earlier 496-case proof does not imply they
+already passed.
+
+The initial kernel qualification was isolated. Central integration now links the
+kernel/controller and registers only the closed compatibility operation. The
+current shim requires exact-commit Windows qualification before behavioral parity
+is claimed. Fixtures never enumerate a real window, probe a browser/UIA provider,
+launch an application, or read/write history.
 
 The standalone net8 harness is
 `pcucp-next/dotnet/PcuCp.LegacyAppProfile.ContractTests`. It links the existing
@@ -41,14 +116,14 @@ measured durations; the pure kernel does not manufacture wall-clock timings.
 
 The record descriptor is emitted only when `--record-strategy` or
 `--remember-strategy` was explicitly supplied, history is enabled, and the
-computed confidence is medium/high. A future acquisition adapter must
-independently check these gates and the descriptor's score/recommendation before
+computed confidence is medium/high. The acquisition shim independently checks
+these gates and the descriptor's score/recommendation before
 calling the original append function. It must retain original append behavior,
 including timestamp generation, the 400-record tail, failure reply and exact
 history destination. Captured fixtures return a fixed record and never write it.
 
-The future adapter must retain actual acquisition and console serialization. It
-must not execute arbitrary descriptor commands or generated probe/task commands.
+The shim retains actual acquisition and console serialization. It does not
+execute arbitrary descriptor commands or generated probe/task commands.
 The advertised task flags and route suggestions remain output data, not live
 control authority. This stage does not add a tool or new access.
 
@@ -68,8 +143,9 @@ zero in the original; no other field, error, or Console output is normalized.
 The full payload, query sequence/argv, error, exit and actual original Console
 text are compared. Candidate output is rendered through the same legacy
 PowerShell JSON/Brief formatting boundary. Every captured prefix must request
-exactly the next original query. This is candidate qualification, not an
-actual-adapter test; a later source replacement needs its own real bridge test.
+exactly the next original query. The separate actual-bridge mode runs the same
+523 cases through the retained shim and real native transport, comparing the
+original Console text directly; its three timing expressions alone become zero.
 
 The corpus covers option aliases/duplicates/control-like values, no targets,
 match/all-window divergence, minimized windows, 2–33-way ties, window/property
@@ -105,70 +181,36 @@ python -m unittest discover -s tests/python -p test_legacy_strategy_culture_alia
 The managed self-tests and source checks are portable. Both strict differential
 tests require Windows PowerShell 5.1. A Linux pass does not qualify selection,
 NLS/regex, PowerShell conversion/exception strings or Console serialization.
-No production link, dispatcher operation, adapter change or inventory retirement
-is included. After strict Windows proof, central integration would require the
-NativeHost compile link/closed registry operation, a bounded acquisition adapter,
-its independent validation, an actual-adapter differential, and the inventory
-and migration-matrix update. Main-branch merge remains a separate approval.
+The original isolated stage did not include a production link or retirement.
+The controller/shim stage requires its full actual-adapter differential and
+inventory/migration-matrix updates. The managed harness now also covers 63
+controller guards: exact/missing/unsolicited/duplicate receipts, context/target/
+full-score mutations, low or disabled permission, actual record shapes/failures,
+Unicode encoding equivalence, 600 KB history without receipt duplication, and
+the full prevalidated completion and near-limit request regression. Production
+uses at most seven acquisitions/seven facade calls/eight evaluations; the retained
+pure replay-only tests also cover the historical nine-evaluation receipt path. Main-branch merge
+remains a separate approval.
 
-At `96f1f2a4` / run `36959747063`, the independent Windows job passed all 296
-Unicode alias score comparisons and 29 managed app-profile contracts. The first
-app-profile oracle exposed a capture-harness variable collision: PowerShell
-`$brief` output text overwrote the case-insensitive `$Brief` boolean before the
-candidate arguments were serialized. The harness now uses a distinct text
-variable and records the original fixture's explicitly cast boolean. All payload,
-error, Console and query assertions remain unchanged. Full app-profile parity
-still awaits the corrected Windows run; the original implementation is retained.
+## Historical qualification findings
 
+Early candidate runs exposed a PowerShell case-insensitive `$Brief` capture-name
+collision, first-seen UIA group-order ties, legacy versus modern regex casing,
+and culture-contaminated oracle batching. Repairs preserved every assertion.
+The public script dispatches one macro and exits; the old [PowerShell regex
+cache](https://raw.githubusercontent.com/PowerShell/PowerShell/v6.0.0/src/System.Management.Automation/engine/lang/parserutils.cs)
+keys patterns without culture. The suite therefore explicitly characterizes
+fresh/warmed behavior and runs each culture in a fresh oracle process.
 
-At `015de0e2` / run `36960182124`, 454 of 496 complete cases matched; the 42
-remaining cases exposed first-seen UIA group order, NLS versus ICU invariant
-casing, wildcard casing, case-insensitive bare-token quoting, and an oracle
-batching issue. The captured-prefix assertion also stopped at the first culture
-mismatch. The assertions remain exact.
+The `7961bf50` Windows oracle established that invariant NLS casing already
+matched, while named cultures needed `LCMAP_LINGUISTIC_CASING`. Kelvin and Turkish
+I quoting failures required the [Framework fixed character-class rule](https://raw.githubusercontent.com/microsoft/referencesource/main/System/regex/system/text/regularexpressions/RegexCharClass.cs),
+not modern regex equivalence classes. The shared text helper preserves original
+valid characters, replacement-run collapsing and terminal-LF anchor behavior;
+buffer sizing and casing flags follow the [LCMapStringEx contract](https://learn.microsoft.com/en-us/windows/win32/api/winnls/nf-winnls-lcmapstringex).
 
-The original public script dispatches one top-level macro and exits; it never
-changes `CurrentCulture`. The initial fixture alone mixed cultures in one
-PowerShell process. The inherited [PowerShell regex cache implementation](https://raw.githubusercontent.com/PowerShell/PowerShell/v6.0.0/src/System.Management.Automation/engine/lang/parserutils.cs)
-keys case-insensitive patterns without culture. A new explicit fresh/warmed
-characterization runs before the complete comparison and asserts the observed
-cache difference. The complete suite then retains all cases, grouped into fresh
-per-culture oracle processes, matching the public call boundary. No failing case
-or assertion is removed. Original output is still captured twice to verify
-Console determinism.
-
-The candidate now retains first-seen role-group order before Count sorting.
-Its invariant casing is shared with strategy normalization through Windows NLS
-`LCMapStringEx`; a direct .NET Framework comparison covers Kelvin sign, long s,
-dotted/dotless I, sigma, combining sequences and supplementary letters under
-four cultures, for whole strings and individual UTF-16 characters. That direct
-comparison must pass before claiming casing parity. The shared TaskPreset
-quoter now preserves original case-insensitive, current-culture `-match`; a
-separate exact original QuoteToken/StepString comparison covers the same corpus.
-The existing task/preset/form/SmartPlan assertions are unchanged. All shared
-changes still require their next exact-commit Windows qualification.
-
-The direct oracle at `7961bf50` / run `36962431015` established that invariant
-NLS casing already matched every supplied value. Sixteen named-culture casing
-triples differed because plain `LCMAP_LOWERCASE` uses filesystem casing.
-`LegacyTextKernel` now uses `LCMAP_LINGUISTIC_CASING` for named cultures while
-retaining the proven invariant flag, and queries the required output length
-before allocating the destination. The same run matched 109/112 quoting pairs;
-the exceptions were Turkish `I`/dotless-i and invariant Kelvin sign.
-
-The shared text helper implements only the two fixed ASCII character-class
-predicates, using NLS character lowercase followed by the original allowed set.
-It preserves replacement-run collapsing, raw valid character spelling and the
-historical regex end-anchor allowance for a terminal LF. This follows the
-[Framework character-class algorithm](https://raw.githubusercontent.com/microsoft/referencesource/main/System/regex/system/text/regularexpressions/RegexCharClass.cs),
-whose range mapping differs from modern Regex equivalence classes. It is not a
-generic regex replacement or a per-character exception table. Buffer sizing and
-linguistic flags follow the [LCMapStringEx contract](https://learn.microsoft.com/en-us/windows/win32/api/winnls/nf-winnls-lcmapstringex).
-
-All earlier assertions remain. Direct coverage expands to 36 values in four
-cultures: 144 exact quote/step pairs and 144 casing triples, including LF/CRLF,
-control characters and all bare-token punctuation. The app-profile matrix
-remains 496 complete cases, plus every acquisition prefix and explicit regex
-cache characterization. Shared strategy coverage remains 344 complete scores.
-The new managed harness passes 34 checks; the final NLS/predicate repair still
-requires its own exact-commit Windows run.
+The successful `0d5fa6bb` gate covered 496 profiles, 344 scores, 144 quote/step
+pairs, 144 casing triples and 34 managed checks. It proves that earlier kernel
+checkpoint only. Canonical helper extraction, controller guards, the compact
+score-digest receipt, and the retained shim need the current source's own Windows
+523-case qualification before claiming actual-adapter parity.

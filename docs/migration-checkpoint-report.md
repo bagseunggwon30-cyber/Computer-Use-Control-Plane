@@ -3,7 +3,7 @@
 ## Result and limit
 
 This is a **partial, parity-tested migration**, not completion of the request to
-make PowerShell the smallest language or remove its runtime entirely. The work is
+reach zero PowerShell source and execution. The work is
 on `migration/python-csharp-runtime`; `main` has not been merged or replaced.
 
 The provider-neutral core runs through Python and C# without PowerShell. Its 52
@@ -19,11 +19,16 @@ The baseline is published commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tre
 
 | Canonical tracked PS source | Baseline | This milestone |
 | --- | ---: | ---: |
-| All `.ps1` source and tests | 1,013,478 bytes | 934,934 bytes |
-| Three legacy runtime scripts | 858,937 bytes | 784,125 bytes |
-| Actual all-source reduction | — | **78,544 bytes (7.75%)** |
+| All `.ps1` source and tests | 1,013,478 bytes | 921,272 bytes |
+| Three legacy runtime scripts | 858,937 bytes | 770,463 bytes |
+| Actual all-source reduction | — | **92,206 bytes (9.10%)** |
 
-There are still 292 top-level legacy function entries. Function count is not a
+The earlier 78,544-byte planner reduction is qualified at aadbc58 / run
+36957910828. The additional 13,662-byte app-profile replacement in this source
+is release-gated by its exact-commit 523-case actual-bridge suite. Physical source
+retirement and verified behavior are separate evidence.
+
+There are still 291 top-level legacy function entries. Function count is not a
 feature-completion percentage: several retained functions are now thin adapters,
 and many large functions contain multiple capabilities.
 
@@ -56,6 +61,13 @@ embedded copy. No Linguist exclusion or language-statistics padding is used.
   with task/form planning. It retains one read-only planning query,
   timing, errors, formatting and exit behavior. Central bridge overhead is included
   in the aggregate reduction above
+- **App-profile assembly:** target selection, strategy scoring, probe command
+  construction and report assembly moved into C#. A thin adapter retains the
+  original acquisitions and optional history append. Its pure controller checks
+  the full target/score and explicit record request before one append, then
+  preserves the original record fields without further transport. The 523-case
+  actual-bridge release gate
+  covers exact payloads, errors, exits, Console output and acquisition order
 - **User installer:** implementation moved to Python. The small PS compatibility
   entry preserves the legacy default and original flags. Explicit core/portable
   launchers invoke no PowerShell

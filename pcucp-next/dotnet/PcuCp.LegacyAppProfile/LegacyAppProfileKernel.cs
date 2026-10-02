@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-// Qualification-only captured-reply replay. Descriptors are data, never executable commands.
+// Pure captured-reply replay. Descriptors are data, never executable commands.
 internal static class LegacyAppProfileKernel
 {
     private sealed class NeedReply(object query) : Exception { internal object Query = query; }
@@ -140,7 +140,7 @@ internal static class LegacyAppProfileKernel
         catch (NeedReply next) { return D("state", "query", "query", next.Query, "queries", queries); }
         catch (Exception ex) { return D("state", "error", "error", ex.Message, "queries", queries); }
     }
-    private static object Replay(JsonElement args, List<object> queries)
+    private static string[] ReadRest(JsonElement args)
     {
         if (args.ValueKind != JsonValueKind.Object || args.GetRawText().Length > 4194304) throw new ArgumentException("Expected bounded app-profile object.");
         var fields = new HashSet<string> { "rest", "brief", "culture", "elapsed_ms", "cdp_elapsed_ms", "uia_elapsed_ms", "history_file", "captured_replies" };
@@ -148,38 +148,48 @@ internal static class LegacyAppProfileKernel
         if (!args.TryGetProperty("rest", out var raw) || raw.ValueKind != JsonValueKind.Array || raw.GetArrayLength() > 4096) throw new ArgumentException("rest must be a bounded array.");
         string[] rest = raw.EnumerateArray().Select(j => j.ValueKind == JsonValueKind.String ? j.GetString()! : j.ValueKind == JsonValueKind.Null ? "" : throw new ArgumentException("rest must contain strings or null.")).ToArray();
         if (rest.Sum(s => s.Length) > 262144) throw new ArgumentException("rest exceeds 262144 UTF-16 units.");
-        string? V(string name) { for (int i = 0; i + 1 < rest.Length; i++) if (Eq(rest[i], name)) return rest[i + 1]; return null; }
-        string[] All(string name) { var values = new List<string>(); for (int i = 0; i + 1 < rest.Length; i++) if (Eq(rest[i], name)) values.Add(rest[++i]); return values.ToArray(); }
-        bool B(string name) => rest.Any(s => Eq(s, name));
-        string? match = V("--match"); if (!T(match)) match = V("--window");
-        bool jsonOnly = B("--json-only"), auto = B("--auto-probe") || B("--probe"), noProbe = B("--no-probe");
-        bool recordRequested = B("--record-strategy") || B("--remember-strategy"), noHistory = B("--no-strategy-history");
-        int port = I(V("--cdp-port")); if (port <= 0) port = I(V("--port")); if (port <= 0) port = 9222;
-        int limit = I(V("--probe-uia-limit")); if (limit <= 0) limit = 120;
-        var labels = All("--label").Concat(All("--click-label")).ToList();
-        foreach (string spec in All("--field")) if (spec.Contains('=')) { var label = spec[..spec.IndexOf('=')].Trim(); if (label.Length > 0) labels.Add(label); }
+        return rest;
+    }
+    private static string? Option(string[] rest, string name) { for (int i = 0; i + 1 < rest.Length; i++) if (Eq(rest[i], name)) return rest[i + 1]; return null; }
+    private static string[] AllOptions(string[] rest, string name) { var values = new List<string>(); for (int i = 0; i + 1 < rest.Length; i++) if (Eq(rest[i], name)) values.Add(rest[++i]); return values.ToArray(); }
+    private static bool Switch(string[] rest, string name) => rest.Any(s => Eq(s, name));
+    private static string? WindowMatch(string[] rest) { string? match = Option(rest, "--match"); return T(match) ? match : Option(rest, "--window"); }
+    private static bool RecordRequested(string[] rest) => Switch(rest, "--record-strategy") || Switch(rest, "--remember-strategy");
+    private static CultureInfo ReadCulture(JsonElement args)
+    {
         CultureInfo culture = CultureInfo.CurrentCulture;
         if (args.TryGetProperty("culture", out var cultureValue))
         {
             if (cultureValue.ValueKind != JsonValueKind.String || cultureValue.GetString()!.Length > 128) throw new ArgumentException("culture must be a bounded string.");
             culture = CultureInfo.GetCultureInfo(cultureValue.GetString()!);
         }
-        int Milliseconds(string name)
-        {
-            if (!args.TryGetProperty(name, out var value)) return 0;
-            if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out int n) || n < 0) throw new ArgumentException(name + " must be a nonnegative Int32.");
-            return n;
-        }
-        int elapsed = Milliseconds("elapsed_ms"), cdpElapsed = Milliseconds("cdp_elapsed_ms"), uiaElapsed = Milliseconds("uia_elapsed_ms");
-        if (args.TryGetProperty("brief", out var briefArg) && briefArg.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new ArgumentException("brief must be boolean.");
-        bool brief = T(P(args, "brief")) && !jsonOnly;
+        return culture;
+    }
+    private static object? ReadHistoryFile(JsonElement args)
+    {
         var historyFile = P(args, "history_file");
         if (historyFile is JsonElement hf && hf.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)) throw new ArgumentException("history_file must be a string or null.");
-        if (args.TryGetProperty("captured_replies", out var captured) && captured.ValueKind != JsonValueKind.Array) throw new ArgumentException("captured_replies must be an array.");
-        var replies = captured.ValueKind == JsonValueKind.Array ? captured.EnumerateArray().ToArray() : [];
-        if (replies.Length > 7) throw new ArgumentException("At most seven captured replies are allowed.");
-        int cursor = 0;
-        object? Query(string kind, params string[] argv)
+        return historyFile;
+    }
+    private static bool ReadBrief(JsonElement args, bool jsonOnly)
+    {
+        if (args.TryGetProperty("brief", out var briefArg) && briefArg.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new ArgumentException("brief must be boolean.");
+        return T(P(args, "brief")) && !jsonOnly;
+    }
+    private sealed class CaptureReader
+    {
+        private readonly JsonElement[] replies;
+        private readonly List<object> queries;
+        private int cursor;
+        internal CaptureReader(JsonElement args, List<object> queries)
+        {
+            this.queries = queries;
+            if (args.TryGetProperty("captured_replies", out var captured) && captured.ValueKind != JsonValueKind.Array) throw new ArgumentException("captured_replies must be an array.");
+            replies = captured.ValueKind == JsonValueKind.Array ? captured.EnumerateArray().ToArray() : [];
+            if (replies.Length > 7) throw new ArgumentException("At most seven captured replies are allowed.");
+        }
+        internal bool HasUnusedReplies => cursor != replies.Length;
+        internal object? Query(string kind, params string[] argv)
         {
             var descriptor = D("kind", kind, "argv", argv); queries.Add(descriptor);
             if (cursor >= replies.Length) throw new NeedReply(descriptor);
@@ -202,20 +212,110 @@ internal static class LegacyAppProfileKernel
             }
             return result.Clone();
         }
-        object Complete(Dictionary<string, object?> payload, int exit, int depth, string summary)
-        {
-            if (cursor != replies.Length) throw new ArgumentException("Unused captured replies.");
-            return D("state", "complete", "payload", payload, "exit", exit, "brief", brief ? summary : null, "json_depth", depth, "queries", queries);
-        }
-        object?[] all = A(Query("windows"));
+    }
+    private static (object?[] Visible, object? Target) SelectWindow(string? match, Func<string, string[], object?> query)
+    {
+        object?[] all = A(query("windows", []));
         object?[] visible = all.Where(w => T(P(w, "visible"))).ToArray();
-        object?[] candidates = T(match) ? A(Query("windows", "-Match", match!)).Where(w => T(P(w, "visible"))).ToArray() : visible;
+        object?[] candidates = T(match) ? A(query("windows", ["-Match", match!])).Where(w => T(P(w, "visible"))).ToArray() : visible;
         object?[] eligible = candidates.Where(w => !T(P(w, "minimized"))).ToArray(); if (eligible.Length == 0) eligible = candidates;
         // Evaluate each source sort key once, matching Sort-Object's key capture.
         var windows = eligible.Select(w => (Window: w, Foreground: T(P(w, "foreground")) ? 0 : 1, Title: T(P(w, "title")) ? 0 : 1,
             Area: -(double)I(P(P(w, "rect"), "width")) * I(P(P(w, "rect"), "height")))).ToArray();
         LegacySort(windows, (left, right) => { int c = left.Foreground.CompareTo(right.Foreground); if (c == 0) c = left.Title.CompareTo(right.Title); return c == 0 ? left.Area.CompareTo(right.Area) : c; });
         object? target = windows.FirstOrDefault().Window;
+        return (visible, target);
+    }
+    private static string Lower(string value) => LegacyStrategyKernel.LowerValue(value, CultureInfo.InvariantCulture);
+    private static (string Title, string Process, string Class, string TargetMatch, bool Browser, bool Office) IdentifyWindow(object? target, string? match, CultureInfo culture)
+    {
+        string title = T(P(target, "title")) ? S(P(target, "title")) : "", process = T(P(target, "process")) ? S(P(target, "process")) : "", @class = T(P(target, "class")) ? S(P(target, "class")) : "";
+        string titleLower = Lower(title), processLower = Lower(process), classLower = Lower(@class);
+        string identity = (titleLower + " " + processLower + " " + classLower).Trim();
+        string targetMatch = T(match) ? match! : T(title) ? title : T(process) ? process : S(P(target, "hwnd"));
+        bool Match(string value, string pattern)
+        {
+            var previous = CultureInfo.CurrentCulture;
+            try { CultureInfo.CurrentCulture = culture; return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)); }
+            finally { CultureInfo.CurrentCulture = previous; }
+        }
+        // The source wildcard has only leading/trailing stars. Its literal
+        // characters are lowercased with the current culture before matching.
+        bool browser = Match(processLower, "^(chrome|msedge|brave|firefox|electron|cursor|code|windsurf)$") ||
+            LegacyStrategyKernel.LowerValue(classLower, culture).Contains(LegacyStrategyKernel.LowerValue("chrome_widgetwin", culture), StringComparison.Ordinal);
+        bool office = Match(identity, "winword|excel|powerpnt|outlook|onenote|hwp|wordpad|notepad");
+        return (title, process, @class, targetMatch, browser, office);
+    }
+    private static string AppType(bool browser, bool office) => browser ? "browser_or_electron" : office ? "document_or_mail_app" : "win32_desktop";
+    private static string AppKey(string process, string @class, string appType, CultureInfo culture)
+    {
+        string KeyPart(string value)
+        {
+            // PowerShell -replace remains case-insensitive after ToLowerInvariant.
+            // Non-ASCII case equivalents can therefore survive the ASCII range.
+            return LegacyTextKernel.SanitizeAppKeyPart(Lower(value.Trim()), culture);
+        }
+        string appKey = string.Join("|", new[] { process, @class, appType }.Select(KeyPart).Where(s => s.Length > 0));
+        return appKey.Length == 0 ? "unknown-app" : appKey;
+    }
+    private static Dictionary<string, object?> SelectedWindow(object? target, string title, string process, string @class) =>
+        D("title", title, "process", process, "class", @class, "hwnd", P(target, "hwnd"), "pid", P(target, "pid"), "foreground", T(P(target, "foreground")), "minimized", T(P(target, "minimized")), "rect", P(target, "rect"));
+    private static object? EvidenceCapture(object? value) => value is JsonElement { ValueKind: JsonValueKind.Array } array ? D("value", array, "Count", array.GetArrayLength()) : value;
+    private static bool Recorded(object? value) => T(value) && !T(P(value, "error"));
+    internal static JsonElement RecordOutcome(JsonElement value) => JsonSerializer.SerializeToElement(D("recorded", Recorded(value), "record", EvidenceCapture(value)));
+    // Called only after Advance has consumed every required windows capture.
+    // This reuses captured data and never requests acquisition from the caller.
+    internal static JsonElement RecordBinding(JsonElement args)
+    {
+        string[] rest = ReadRest(args);
+        string? match = WindowMatch(rest);
+        CultureInfo culture = ReadCulture(args);
+        object? historyFile = ReadHistoryFile(args);
+        var captures = new CaptureReader(args, []);
+        var (_, target) = SelectWindow(match, captures.Query);
+        string appType = "unknown", appKey = "not_found";
+        object? selectedWindow = null;
+        if (T(target))
+        {
+            var (title, process, @class, _, browser, office) = IdentifyWindow(target, match, culture);
+            appType = AppType(browser, office);
+            appKey = AppKey(process, @class, appType, culture);
+            selectedWindow = SelectedWindow(target, title, process, @class);
+        }
+        return JsonSerializer.SerializeToElement(D("record_requested", RecordRequested(rest), "no_history", Switch(rest, "--no-strategy-history"),
+            "history_file", historyFile, "app_type", appType, "app_key", appKey, "selected_window", selectedWindow, "brief_enabled", ReadBrief(args, Switch(rest, "--json-only"))));
+    }
+    private static object Replay(JsonElement args, List<object> queries)
+    {
+        string[] rest = ReadRest(args);
+        string? V(string name) => Option(rest, name);
+        string[] All(string name) => AllOptions(rest, name);
+        bool B(string name) => Switch(rest, name);
+        string? match = WindowMatch(rest);
+        bool jsonOnly = B("--json-only"), auto = B("--auto-probe") || B("--probe"), noProbe = B("--no-probe");
+        bool recordRequested = RecordRequested(rest), noHistory = B("--no-strategy-history");
+        int port = I(V("--cdp-port")); if (port <= 0) port = I(V("--port")); if (port <= 0) port = 9222;
+        int limit = I(V("--probe-uia-limit")); if (limit <= 0) limit = 120;
+        var labels = All("--label").Concat(All("--click-label")).ToList();
+        foreach (string spec in All("--field")) if (spec.Contains('=')) { var label = spec[..spec.IndexOf('=')].Trim(); if (label.Length > 0) labels.Add(label); }
+        CultureInfo culture = ReadCulture(args);
+        int Milliseconds(string name)
+        {
+            if (!args.TryGetProperty(name, out var value)) return 0;
+            if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out int n) || n < 0) throw new ArgumentException(name + " must be a nonnegative Int32.");
+            return n;
+        }
+        int elapsed = Milliseconds("elapsed_ms"), cdpElapsed = Milliseconds("cdp_elapsed_ms"), uiaElapsed = Milliseconds("uia_elapsed_ms");
+        bool brief = ReadBrief(args, jsonOnly);
+        var historyFile = ReadHistoryFile(args);
+        var captures = new CaptureReader(args, queries);
+        object? Query(string kind, params string[] argv) => captures.Query(kind, argv);
+        object Complete(Dictionary<string, object?> payload, int exit, int depth, string summary)
+        {
+            if (captures.HasUnusedReplies) throw new ArgumentException("Unused captured replies.");
+            return D("state", "complete", "payload", payload, "exit", exit, "brief", brief ? summary : null, "json_depth", depth, "queries", queries);
+        }
+        var (visible, target) = SelectWindow(match, Query);
         var sample = visible.Take(10).Select(w => D("title", P(w, "title"), "process", P(w, "process"), "class", P(w, "class"), "foreground", T(P(w, "foreground")), "minimized", T(P(w, "minimized")), "rect", P(w, "rect"))).ToArray();
         string[] uniqueLabels = Unique(labels, culture);
         if (!T(target))
@@ -231,23 +331,8 @@ internal static class LegacyAppProfileKernel
                 "next_action", T(match) ? "Run macro windows --json-only to inspect available windows, then retry app-profile with a narrower --match." : "Open or focus the target app, then run macro app-profile again.");
             return Complete(payload, 2, 12, $"partial app-profile reason={reason} windows={visible.Length}");
         }
-        string title = T(P(target, "title")) ? S(P(target, "title")) : "", process = T(P(target, "process")) ? S(P(target, "process")) : "", @class = T(P(target, "class")) ? S(P(target, "class")) : "";
-        string Lower(string value) => LegacyStrategyKernel.LowerValue(value, CultureInfo.InvariantCulture);
-        string titleLower = Lower(title), processLower = Lower(process), classLower = Lower(@class);
-        string identity = (titleLower + " " + processLower + " " + classLower).Trim();
-        string targetMatch = T(match) ? match! : T(title) ? title : T(process) ? process : S(P(target, "hwnd"));
-        bool Match(string value, string pattern)
-        {
-            var previous = CultureInfo.CurrentCulture;
-            try { CultureInfo.CurrentCulture = culture; return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)); }
-            finally { CultureInfo.CurrentCulture = previous; }
-        }
+        var (title, process, @class, targetMatch, browser, office) = IdentifyWindow(target, match, culture);
         string Step(IEnumerable<string> command) => LegacyTaskPresetKernel.StepString(command, culture);
-        // The source wildcard has only leading/trailing stars. Its literal
-        // characters are lowercased with the current culture before matching.
-        bool browser = Match(processLower, "^(chrome|msedge|brave|firefox|electron|cursor|code|windsurf)$") ||
-            LegacyStrategyKernel.LowerValue(classLower, culture).Contains(LegacyStrategyKernel.LowerValue("chrome_widgetwin", culture), StringComparison.Ordinal);
-        bool office = Match(identity, "winword|excel|powerpnt|outlook|onenote|hwp|wordpad|notepad");
         object? cdp = null, uia = null;
         if (!noProbe && (auto || B("--probe-cdp") || browser))
         {
@@ -295,13 +380,12 @@ internal static class LegacyAppProfileKernel
                 "small_icon_count", items.Count(it => T(P(it, "small_icon"))), "roles", roles.Take(8).ToArray(), "label_hits", hits,
                 "sample", items.Take(8).Select(it => D("text", P(it, "text"), "role", P(it, "role"), "rect", P(it, "rect"), "small_icon", P(it, "small_icon"), "confidence", P(it, "confidence"))).ToArray(), "elapsed_ms", uiaElapsed);
         }
-        string appType = "win32_desktop"; string[] routes = ["uia_pattern", "uia_click", "precision_point", "ocr"];
+        string appType = AppType(browser, office); string[] routes = ["uia_pattern", "uia_click", "precision_point", "ocr"];
         var notes = new List<string>(); var options = new List<string> { "--match", targetMatch, "--precision-points", "--settle-ms", "150", "--verify-after-step", "--retry-failed-step", "1" };
         options.RemoveAll(s => s.Length == 0); // Original nested option adder drops empty values.
         bool useCdp = false, cdpAvailable = T(cdp) && T(P(cdp, "available"));
         if (browser)
         {
-            appType = "browser_or_electron";
             if (cdpAvailable || noProbe)
             {
                 routes = ["cdp_dom", "uia_pattern", "uia_click", "ocr", "precision_point"]; options.Add("--allow-cdp"); if (port != 9222) options.AddRange(["--cdp-port", S(port)]); useCdp = true;
@@ -312,20 +396,13 @@ internal static class LegacyAppProfileKernel
         }
         else if (office)
         {
-            appType = "document_or_mail_app"; routes = ["uia_value_or_pattern", "safe_type_guarded", "shortcut", "precision_point", "ocr"];
+            routes = ["uia_value_or_pattern", "safe_type_guarded", "shortcut", "precision_point", "ocr"];
             notes.Add("Document/mail apps usually benefit from direct UIA value/pattern actions, guarded typing, and verification after each step.");
         }
         else notes.Add("Generic Win32 route: try UIA actions first, then guarded precision points, then OCR only when labels are not exposed.");
         if (T(uia) && !T(P(uia, "available"))) notes.Add("UIA probe found no exposed affordances; expect OCR or guarded coordinate routes to matter more for this app.");
         else if (T(uia) && I(P(uia, "small_icon_count")) > 0) notes.Add("UIA probe found small icon affordances; precision-point routes are useful for tiny toolbar controls.");
-        string KeyPart(string value)
-        {
-            // PowerShell -replace remains case-insensitive after ToLowerInvariant.
-            // Non-ASCII case equivalents can therefore survive the ASCII range.
-            return LegacyTextKernel.SanitizeAppKeyPart(Lower(value.Trim()), culture);
-        }
-        string appKey = string.Join("|", new[] { process, @class, appType }.Select(KeyPart).Where(s => s.Length > 0));
-        if (appKey.Length == 0) appKey = "unknown-app";
+        string appKey = AppKey(process, @class, appType, culture);
         object? history = noHistory ? null : Query("history", appKey);
         if (T(history)) notes.Add($"Last good app strategy found in app-strategy history: {S(P(history, "strategy"))}.");
         var scoreInput = D("app_type", appType, "route_order", routes, "cdp_probe", cdp, "uia_probe", uia, "labels", labels.ToArray(),
@@ -334,7 +411,6 @@ internal static class LegacyAppProfileKernel
         var strategyScore = score.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
         var evidence = score.GetProperty("evidence").EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
         // The typed strategy helper sees a normalized strategy string; evidence keeps the complete capture.
-        object? EvidenceCapture(object? value) => value is JsonElement { ValueKind: JsonValueKind.Array } array ? D("value", array, "Count", array.GetArrayLength()) : value;
         evidence["persisted_strategy"] = EvidenceCapture(history); strategyScore["evidence"] = evidence;
         object? record = null; string skipped = "", confidence = S(P(strategyScore, "confidence")), recommended = S(P(strategyScore, "recommended_strategy"));
         if (recordRequested && !noHistory)
@@ -358,10 +434,10 @@ internal static class LegacyAppProfileKernel
         }
         string[] prefix = new[] { "macro", "task-plan" }.Concat(options).ToArray();
         var final = D("schema", "cucp.app-profile/v1", "status", "ok", "match", match,
-            "selected_window", D("title", title, "process", process, "class", @class, "hwnd", P(target, "hwnd"), "pid", P(target, "pid"), "foreground", T(P(target, "foreground")), "minimized", T(P(target, "minimized")), "rect", P(target, "rect")),
+            "selected_window", SelectedWindow(target, title, process, @class),
             "app_type", appType, "recommended_strategy", recommended, "route_order", P(strategyScore, "route_order"), "strategy_score", strategyScore,
             "strategy_persistence", D("enabled", !noHistory, "app_key", appKey, "history_file", historyFile, "last_good_strategy", EvidenceCapture(history), "record_requested", recordRequested,
-                "recorded", T(record) && !T(P(record, "error")), "record", EvidenceCapture(record), "skipped_reason", skipped),
+                "recorded", Recorded(record), "record", EvidenceCapture(record), "skipped_reason", skipped),
             "capability_probes", D("cdp", cdp, "uia", uia), "recommended_task_options", options.ToArray(), "suggested_task_plan_prefix", prefix,
             "suggested_task_plan_prefix_line", Step(prefix), "probe_commands", commands, "affordance_probe", affordance,
             "windows_sample", sample, "notes", notes.ToArray(), "elapsed_ms", elapsed,

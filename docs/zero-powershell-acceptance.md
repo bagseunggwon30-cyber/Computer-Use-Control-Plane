@@ -7,11 +7,14 @@ feature branch; merging into main needs separate approval.
 
 At the qualified planner checkpoint `aadbc58aa9dcc2254a3361cf8963429197859f22`,
 78,544 of the original 1,013,478 tracked PowerShell bytes were actually retired.
-The remaining 934,934 bytes are:
+That checkpoint left 934,934 bytes. The current app-profile source replacement
+removes another 13,662 bytes, bringing the total reduction to 92,206 bytes and
+remaining source to 921,272 bytes. Its exact-commit actual-adapter CI gate is
+required before claiming that replacement qualified. Current source groups are:
 
 | Remaining source group | Bytes |
 | --- | ---: |
-| Main legacy wrapper and macros, `scripts/cucp.ps1` | 590,805 |
+| Main legacy wrapper and macros, `scripts/cucp.ps1` | 577,143 |
 | Native helper, `scripts/cucp-native-helper.ps1` | 165,893 |
 | Resident helper server | 27,427 |
 | Four PowerShell test files | 135,171 |
@@ -24,12 +27,12 @@ excluded, renamed, embedded elsewhere or padded to change the metric.
 
 ## Ordered implementation families
 
-1. **Deterministic planning and observations.** Finish app-profile and remove its
-   score helper only when its sole production caller is replaced. Continue image
+1. **Deterministic planning and observations.** Qualify the current app-profile
+   acquisition adapter and removed sole-use score helper. Continue image
    comparison, history scoring, profiles and recorder/recovery report assembly.
    Use captured queries and generated files for exact Windows comparisons. The
-   current app-profile candidate must pass full payload, error, query, exit and
-   actual output checks before replacing its PowerShell body.
+   current app-profile replacement must pass full payload, error, query, exit and
+   actual output checks before it is considered qualified.
 2. **Execution coordination.** Migrate workflow, task, form, watch, recovery and
    replay state machines into Python/C#. Preserve startup authority, target
    binding, confirmation gates, cancellation, partial outcomes, time budgets and

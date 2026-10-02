@@ -30,6 +30,7 @@ internal static class LegacyCompatibilityDispatcher
             "form-plan-prepare" => LegacyTaskFormKernel.PrepareForm(args),
             "form-plan-complete" => LegacyTaskFormKernel.CompleteForm(args),
             "smart-plan-advance" => EvaluateSmartPlan(args),
+            "app-profile-advance" => LegacyAppProfileController.Advance(args),
             _ => throw CommandOptions.Invalid("Unsupported pure compatibility operation.")
         };
     }

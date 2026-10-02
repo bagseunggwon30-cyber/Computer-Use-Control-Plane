@@ -1,6 +1,6 @@
 {
   "baseline_commit": "9ffa354b9904235835a7bc6eb78ed8d3d76317c8",
-  "note": "Current retained legacy function navigation after qualified pure-builder retirement and compiled interop extraction. Original tokenization, acquisition and execution remain where required. Current task/form/smart adapters require exact Windows qualification; Git history holds the baseline.",
+  "note": "Current retained legacy navigation after staged Python/C# migration. Original acquisition, workflow tokenization and unported execution remain. Every new adapter requires its current-commit Windows differential gate; normal Git history holds the baseline.",
   "files": [
     {
       "path": "scripts/cucp-helper-server.ps1",
@@ -312,7 +312,7 @@
     },
     {
       "path": "scripts/cucp.ps1",
-      "lines": 13316,
+      "lines": 12957,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -1019,172 +1019,168 @@
           "line": 9517
         },
         {
-          "name": "_AppProfile-StrategyScore",
+          "name": "Invoke-MacroAppProfile",
           "line": 9560
         },
         {
-          "name": "Invoke-MacroAppProfile",
-          "line": 9663
-        },
-        {
           "name": "_Invoke-LegacyReadOnlyQuery",
-          "line": 10014
+          "line": 9655
         },
         {
           "name": "Invoke-MacroTaskPreset",
-          "line": 10067
+          "line": 9708
         },
         {
           "name": "Invoke-MacroTaskPlan",
-          "line": 10117
+          "line": 9758
         },
         {
           "name": "Invoke-MacroTaskRun",
-          "line": 10150
+          "line": 9791
         },
         {
           "name": "Invoke-MacroFormPlan",
-          "line": 10291
+          "line": 9932
         },
         {
           "name": "Invoke-MacroFormRun",
-          "line": 10320
+          "line": 9961
         },
         {
           "name": "Invoke-MacroSmartClick",
-          "line": 10560
+          "line": 10201
         },
         {
           "name": "Invoke-MacroWatch",
-          "line": 11064
+          "line": 10705
         },
         {
           "name": "Invoke-MacroOcrScreen",
-          "line": 11137
+          "line": 10778
         },
         {
           "name": "Invoke-MacroOcrImage",
-          "line": 11166
+          "line": 10807
         },
         {
           "name": "Invoke-MacroOcrFindText",
-          "line": 11190
+          "line": 10831
         },
         {
           "name": "Invoke-MacroOcrClick",
-          "line": 11233
+          "line": 10874
         },
         {
           "name": "Invoke-MacroOcrUiaFuse",
-          "line": 11307
+          "line": 10948
         },
         {
           "name": "Invoke-MacroOcrUiaInvoke",
-          "line": 11350
+          "line": 10991
         },
         {
           "name": "Invoke-MacroScreenshotDiff",
-          "line": 11392
+          "line": 11033
         },
         {
           "name": "Invoke-MacroClickAndVerifyScreen",
-          "line": 11431
+          "line": 11072
         },
         {
           "name": "Invoke-MacroAutoDo",
-          "line": 11528
+          "line": 11169
         },
         {
           "name": "_Trajectory-Append",
-          "line": 11637
+          "line": 11278
         },
         {
           "name": "_Trajectory-Read",
-          "line": 11661
+          "line": 11302
         },
         {
           "name": "_Trajectory-Clear",
-          "line": 11675
+          "line": 11316
         },
         {
           "name": "_History-Append",
-          "line": 11699
+          "line": 11340
         },
         {
           "name": "_History-PickBestStrategy",
-          "line": 11738
+          "line": 11379
         },
         {
           "name": "_History-Stats",
-          "line": 11785
+          "line": 11426
         },
         {
           "name": "_Helper-IsUp",
-          "line": 11822
+          "line": 11463
         },
         {
           "name": "_Helper-Ensure",
-          "line": 11827
+          "line": 11468
         },
         {
           "name": "Invoke-MacroSession",
-          "line": 11848
+          "line": 11489
         },
         {
           "name": "_Cucp-RedactSecrets",
-          "line": 12066
+          "line": 11707
         },
         {
           "name": "Invoke-MacroCdpDeepFind",
-          "line": 12090
+          "line": 11731
         },
         {
           "name": "Invoke-MacroImePaste",
-          "line": 12143
+          "line": 11784
         },
         {
           "name": "Invoke-MacroSafeTypeIme",
-          "line": 12195
+          "line": 11836
         },
         {
           "name": "Invoke-MacroModalDetect",
-          "line": 12275
+          "line": 11916
         },
         {
           "name": "Invoke-MacroRecoveryPlan",
-          "line": 12308
+          "line": 11949
         },
         {
           "name": "Invoke-MacroRecoveryRun",
-          "line": 12413
+          "line": 12054
         },
         {
           "name": "Invoke-MacroPrecisionValidate",
-          "line": 12512
+          "line": 12153
         },
         {
           "name": "Invoke-MacroBenchmark",
-          "line": 12608
+          "line": 12249
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 12749
+          "line": 12390
         },
         {
           "name": "Invoke-MacroCdpProseMirrorInsert",
-          "line": 12863
+          "line": 12504
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 12937
+          "line": 12578
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 13052
+          "line": 12693
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 13148
+          "line": 12789
         }
       ]
     }
@@ -1238,6 +1234,12 @@
       "name": "_CoordMap-MakePoint",
       "replacement": "pcucp-next/dotnet/PcuCp.NativeHost/LegacyCoordinateKernel.cs",
       "evidence": "115 exact captured-input Windows cases at b6a29f05ec270f49172bafb06b91fac82710a004, run36897093256; retained acquisition bridge qualification follows"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_AppProfile-StrategyScore",
+      "replacement": "pcucp-next/dotnet/PcuCp.NativeHost/LegacyStrategyKernel.cs",
+      "evidence": "496 full public captured cases and shared culture/text gates passed at 0d5fa6bb87c2b61b2756e2897046fc4dde03e5dd / run 36963644280. Replacement is release-gated by all 523 kernel and actual-adapter cases, exact Console/query/error/exit comparisons, and 63 controller guards in test_legacy_app_profile_parity.py."
     }
   ],
   "compiled_interop": {
@@ -1253,8 +1255,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 934934,
-    "removed": 78544,
+    "current": 921272,
+    "removed": 92206,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
@@ -1307,6 +1309,13 @@
       "replacement": "pcucp-next/dotnet/PcuCp.LegacySmartPlan/LegacySmartPlanKernel.cs",
       "adapter": "original history, port and native read-only acquisition retained under exact descriptor and trace checks",
       "evidence": "23 managed checks, all 201 pure SmartPlan cases with captured-prefix traces, and all 201 actual retained-adapter comparisons including unchanged raw Console text passed at aadbc58aa9dcc2254a3361cf8963429197859f22 / run 36957910828."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroAppProfile",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyAppProfile/LegacyAppProfileKernel.cs",
+      "adapter": "bounded original acquisition and one explicit history append; complete C# preflight, followed only by original record fields/formatting, with no post-Append transport",
+      "evidence": "496 full public captured cases and shared culture/text gates passed at 0d5fa6bb87c2b61b2756e2897046fc4dde03e5dd / run 36963644280. Replacement is release-gated by all 523 kernel and actual-adapter cases, exact Console/query/error/exit comparisons, and 63 controller guards in test_legacy_app_profile_parity.py."
     }
   ]
 }

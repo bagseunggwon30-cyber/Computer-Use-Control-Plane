@@ -87,7 +87,7 @@ Legacy OCR callers now require a matching `PcuCp.NativeHost.exe` published to `p
 Native NLS semantics follow [Microsoft's comparison/search API](https://learn.microsoft.com/en-us/windows/win32/api/winnls/nf-winnls-findnlsstringex); legacy tie ordering follows the [documented runtime compatibility branch in .NET reference source](https://github.com/microsoft/referencesource/blob/main/mscorlib/system/collections/generic/arraysorthelper.cs). This compatibility kernel deliberately does not replace the safer modern matcher’s explicit ambiguity reporting.
 
 
-The user-scope installer was also migrated to Python after its actual Windows Unicode/argument fixtures passed in run `36886830685` at `fc05aa01a0632b36af930a522efe8c623037300b`. `install.ps1` now only discovers Python and forwards the original flags; its default remains the legacy backend. Core/portable launcher routes do not invoke PowerShell. This removes another **3,857 PS bytes** (5,376 → 1,519). Combined actual source reduction is **7,236 bytes**, before any future retirement. The shim's own forwarding fixture and the OCR bridge BOM handling are checked by the next exact-commit CI.
+The user-scope installer was also migrated to Python after its actual Windows Unicode/argument fixtures passed in run `36886830685` at `fc05aa01a0632b36af930a523efe8c623037300b`. `install.ps1` now only discovers Python and forwards the original flags; its default remains the legacy backend. Core/portable launcher routes do not invoke PowerShell. This removes another **3,857 PS bytes** (5,376 → 1,519). Combined actual source reduction is **7,236 bytes**, before any future retirement. The shim's own forwarding fixture and the OCR bridge BOM handling are checked by the next exact-commit CI.
 
 ## Optional browser adapter
 
@@ -121,10 +121,10 @@ Strategy retirement still waits for additional en-US/ko-KR/tr-TR/invariant cultu
 See [the checkpoint report](migration-checkpoint-report.md) for the coherent
 architecture, measured source retirement and explicit remaining acceptance scope.
 The qualified preset body is now a thin planning-query adapter; aggregate tracked
-PS is 934,934 bytes, down 78,544 bytes from baseline including bridge overhead.
+PS is 921,272 bytes, down 92,206 bytes from baseline including bridge overhead.
 This does not meet the lowest/zero-PowerShell goal. Actual planner adapters and
-output formatting passed at aadbc58 / run 36957910828. Strategy, app-profile and
-image PS bodies remain; no further family is retired on candidate-only evidence.
+output formatting passed at aadbc58 / run 36957910828. The app-profile builder and its sole-use score helper are now replaced under
+the separate actual-bridge gate below. Image diff remains a candidate.
 
 ### Captured planning boundaries
 
@@ -143,6 +143,14 @@ passed all 367 task/form and 201 SmartPlan actual-adapter comparisons: real
 Console text, exact child/workflow/native query traces and current native bridge
 execution. A prior pure-kernel pass alone was not the adapter release gate.
 
-App-profile remains an isolated candidate with 496 captured-reply cases and 344
-Unicode/culture strategy comparisons awaiting Windows qualification. Its current
-PowerShell acquisition, decisions and optional history persistence remain intact.
+App-profile selection, classification, scoring, command construction and result
+assembly now run in C#. Its 496-case candidate and shared Unicode/culture gates
+passed at 0d5fa6bb / run 36963644280. The original builder and sole-use private
+score helper are replaced by a 6,301-byte acquisition adapter, removing 13,662
+net PS bytes including registry overhead. Current-source release requires all
+523 pure and actual-adapter comparisons, exact Console/query/error/exit evidence,
+and 63 controller checks. The pure controller validates the acquisition sequence,
+target and full score before one explicitly requested history append. The shim
+then updates only the original record/recorded fields, with no post-Append
+transport or result reconstruction. The shim retains real acquisition, the fixed
+history destination and output formatting; no interactive GUI proof is implied.
