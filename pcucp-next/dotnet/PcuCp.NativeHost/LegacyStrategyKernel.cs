@@ -62,14 +62,24 @@ internal static class LegacyStrategyKernel
         if (value.ValueKind != JsonValueKind.Object) throw CommandOptions.Invalid($"{key} must be an object or null.");
         return value;
     }
-    internal static string NormalizeValue(string? strategy)
+    internal static string NormalizeValue(string? strategy, CultureInfo? culture = null)
     {
         if (string.IsNullOrEmpty(strategy)) return string.Empty;
         if (strategy.Length > 4096) throw CommandOptions.Invalid("Strategy name exceeds 4096 UTF-16 units.");
         var value = Regex.Replace(strategy, @"\+.*$", "", RegexOptions.None, TimeSpan.FromSeconds(1)).ToLowerInvariant();
-        foreach (var alias in Aliases)
-            if (Regex.IsMatch(value, alias.Pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1))) return alias.Value;
-        return value; // Do not trim unknown routes: legacy whitespace is significant.
+        // PowerShell switch -Regex uses current-culture regex case folding, which
+        // is not interchangeable with NLS linguistic comparison. Regex has no
+        // public CultureInfo argument. Scope only this synchronous match so an
+        // explicit score culture is honored even under a different host culture.
+        var previous = CultureInfo.CurrentCulture;
+        try
+        {
+            if (culture is not null) CultureInfo.CurrentCulture = culture;
+            foreach (var alias in Aliases)
+                if (Regex.IsMatch(value, alias.Pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1))) return alias.Value;
+            return value; // Do not trim unknown routes: legacy whitespace is significant.
+        }
+        finally { CultureInfo.CurrentCulture = previous; }
     }
     internal static object Normalize(JsonElement args)
     {
@@ -108,7 +118,7 @@ internal static class LegacyStrategyKernel
         var scores = new List<Route>();
         void Add(string route, int points, string reason)
         {
-            var key = NormalizeValue(route);
+            var key = NormalizeValue(route, culture);
             if (key.Length == 0) return;
             var item = scores.FirstOrDefault(existing => CompareText(existing.Name, key, true, culture) == 0);
             if (item is null) { item = new Route(key); scores.Add(item); }
