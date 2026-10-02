@@ -1,9 +1,10 @@
 # Diagnostic and reporting assembly candidate
 
 This isolated candidate moves nine report/orchestration bodies into
-`PcuCp.LegacyDiagnostics/LegacyDiagnosticCoordinator`. Production PowerShell,
-startup routing, portable publication and retirement are unchanged. It is **not**
-a qualified adapter or a claim that PowerShell has been eliminated.
+`PcuCp.LegacyDiagnostics/LegacyDiagnosticCoordinator`. The original production macro bodies and routing remain unchanged. The new
+`scripts/cucp-legacy-diagnostic-adapter.ps1` is an unpromoted acquisition adapter
+that reuses the shared host; it is **not** a qualified retirement or a claim that
+PowerShell has been eliminated.
 
 The accepted-source tree is `c0d15371b60ebf62be45bfa68b90282405f07273`, reachable
 from remote commit `56be343c786027d27fa3dcb71732157caffc8de0`. The older baseline
@@ -48,10 +49,13 @@ session transport:
 - Argv: the original typed argument array for the fixed read-only target, else empty
 - Data: `{name: <fixed suboperation>, value: <effect-specific data>}`
 
-There is no second PowerShell bridge or new chunk/framing implementation. Shared
+There is no second process bridge or new chunk/framing implementation. The
+new PowerShell adapter contains only closed acquisition/validation hooks and
+uses `_Invoke-LegacyExecutionHost` for its process and frame lifecycle. Shared
 `LegacyExecutionWire` preserves true arrays and ordinary `{value,Count}` objects.
 The trusted host can use its new session factory to construct this coordinator;
-external startup registration remains closed until qualification.
+the dedicated diagnostic startup schema is independently validated by the
+host while original public macro routing remains unpromoted.
 
 | Diagnostic enum | Suboperation / value | Captured reply |
 | --- | --- | --- |
@@ -67,13 +71,14 @@ external startup registration remains closed until qualification.
 | ReadText | empty / requested baseline path | raw baseline JSON text |
 | ResolvePath | empty / immutable changelog path | resolved path string or null |
 | TailBytes | empty / `{path,max_bytes}` | `{total_bytes,tail_bytes,text}` after one bounded read; tail_bytes is allocation/request length, not bytes actually returned |
-| Processes | empty / null | snapshot array `{id,name,private_bytes,started_at,cpu_ms,priority}`; individually inaccessible properties omitted |
+| Processes | empty / null | stable identity rows `{id,name}`; two lists of native Process objects stay in host state |
+| ProcessMetrics | empty / `{current_ordinal,previous_ordinal}` | per-process `{private_bytes,started_at,current_cpu_ms,previous_cpu_ms,priority}`; each inaccessible getter group omitted independently |
 | ProcessorCount | empty / null | processor count |
 | Windows | empty / null | captured Win32 window rows |
 | Sleep | empty / requested sample ms | ignored |
 | EnsureWin32, EnsureUia, HelperUp | empty / null | original truth value |
 | FindCodex | empty / null | original path or null; empty string is still non-null |
-| AssertAuthorized | empty / null; one of two fixed self-test argument arrays | success or captured exception, never an input dispatch |
+| AssertAuthorized | empty / null; one of two fixed self-test argument arrays | completed Boolean blocked; the host catches the original policy assertion, never invokes input |
 | Appshot | empty / `{match,semantic,no_cache,cache_max_seconds}` | original captured self-test appshot value |
 | CacheKey | empty / selftest-cache | key string |
 | Uia | empty / `{focused_window:"",max_elements:50}` | captured fallback affordances |
@@ -98,16 +103,25 @@ reply explicitly reporting mutation uncertainty becomes a terminal protocol
 error without retry; no owned write is replayed to recover a lost result.
 
 The shared session's trusted mutation classification must include diagnostic
-`AuditProbe`, `ClearAppshotCache`, and every `Appshot` (a warm cache read can miss).
-It must also conservatively include `Macro` suboperations `health-quick` and
-`find-label`, and `Cli` argv starting `observe appshot` or `observe screenshot`:
-these nested calls can create owned probe/cache/capture artifacts. This is
+`AuditProbe`, `ClearAppshotCache`, every `Appshot` (a warm cache read can miss),
+`Notice`, and every `Native`/`Cli` call. The retained native/CLI wrappers write
+owned log/capture files even for read-only provider operations. It must also
+include `Macro` suboperations `health-quick` and `find-label`, which can create
+owned probe/cache/capture artifacts. `HelperUp` and only `Macro windows` with
+exact argv `["--rich"]` also invoke the retained CLI. `AssertAuthorized` logs a
+notice; its original catch-any rejection is represented as a completed Boolean
+blocked reply, so an expected policy rejection is not an uncertain error envelope.
+A lost reply after that dispatch remains uncertain. This is
 separate from desktop-live permission. Pre-dispatch validation/serialization is
 known-unmodified; a lost or malformed reply, terminal assembly failure or stream
 failure after dispatch is uncertain and must retain `automatic_retry:false`.
 An explicit, trustworthy proof that a request did not dispatch can retain the
 original caught acquisition-failure behavior. The host owns this classification;
 request/reply data cannot supply a permission or clear a recorded dispatch.
+A caught read-only acquisition failure after an acknowledged owned write keeps
+its original fallback behavior. Cumulative prior owned dispatch matters for an
+uncaught terminal/assembly/transport failure; the currently failing owned write
+is itself uncertain and stops immediately.
 
 ## Compatibility decisions
 
@@ -117,10 +131,19 @@ request/reply data cannot supply a permission or clear a recorded dispatch.
   claiming a single iteration. Clearing occurs once, before the pair
 - Benchmark uses nearest-rank p50/p95 over successful samples, banker-rounded
   average, inclusive SLO boundaries and the accepted all-samples-success rule
+- Perf's large warning threshold is multiplied with promotion and converted using
+  the legacy Int32 compatibility path at the nested FailMs binding boundary,
+  after every sample. Three finite boundary cases retain exact error comparison
 - Lag uses T0, sleep, T1, then date/CPU acquisition; negative CPU deltas clamp to
   zero and CPU percentage uses requested sampling time, not measured elapsed
-- Individual inaccessible process properties preserve other partial process data.
-  Singleton PID lists preserve the original scalar shape
+- Native memory/start/current CPU/previous CPU/priority getters run only after
+  sleep, timestamp and processor-count acquisition, in original grouped process
+  order. Strict ordinal references select only the two retained process lists;
+  there is no PID reopen. Independent getter failures preserve other fields.
+  Singleton PID lists preserve the original scalar shape. Original wall-clock
+  DateTime age subtraction is retained across explicit offsets/DST, rather than
+  normalizing the two offsets. Retained Process objects are disposed best-effort
+  in the family wrapper finally block, without replacing an original outcome
 - Lag cache/log statistics retain their original nesting under temp-root existence;
   recent timeout tail acquisition remains independent
 - Health pressure and timeout failures are advisory. Optional detail components
@@ -147,13 +170,13 @@ annotation from its immutable operation.
 
 ## Qualification evidence and remaining gates
 
-Local managed compilation uses warnings as errors. The portable suite runs 303
+Local managed compilation uses warnings as errors. The portable suite runs 321
 finite cases, including 100 reached captured exceptions, all nine operations,
 brief/JSON-only modes, typed owned-path descriptors, option errors, exact source
 hashes, sample math, partial results and all-samples SLO protection. Fourteen
 additional managed contracts cover representative report and codec behavior.
-The targeted local suite has six passing tests plus one explicitly skipped
-Windows-only test. No live acquisition is used.
+The targeted local suite has twelve passing tests plus three explicitly skipped
+Windows-only tests. No live acquisition is used.
 
 The Windows test extracts the nine definitions and required pure helpers from
 accepted Git source, replacing exact bounded acquisition seams before invocation.
@@ -170,8 +193,79 @@ matching the PS5.1 ConvertFrom-Json detail is a known pending compatibility repa
 The corpus also characterizes exact/case-folded duplicate audit keys, whose legacy
 parser acceptance and last-key behavior must be reconciled before promotion.
 These cases remain full equality assertions in the Windows gate, not exclusions.
-A real, retained adapter has not been implemented or qualified. Production
-routing, host acquisition checks, exact adapter tests, portable packaging and the
-integrator's bundled full regression must pass before retirement/publication.
+The new real adapter is implemented but **not yet Windows-qualified**. Its
+actual-adapter test requires `CUCP_DIAGNOSTICS_TEST_HOST` and compares the entire
+finite corpus against the pinned source. It preserves full equality for ordinary
+cases, and requires exact effect prefixes, exact consumed replies, terminal
+uncertainty and no further effects for deliberate owned-write failure corrections.
+The guard fixture separately exercises strict decoded descriptor validation,
+operation-only Hashtable reconstruction, native getter order/partial failures
+and disposable owned-directory probe/cache helpers. All source with non-ASCII
+text has an explicit UTF-8 BOM for Windows PowerShell 5.1.
+
+The temporary guard scaffold was genuinely ported to Python: its original
+42,879 bytes / 570 PowerShell lines are now an 11,770-byte / 129-line fixed
+boundary driver, a reduction of 31,109 PowerShell bytes (72.6%). The old staged
+draft is preserved for review as Git blob
+`cba1ae30ad482b5271faf7617e95113ea537fcce`; it was not a published runtime
+dependency. Python generates the cases, checks raw observations, and creates,
+inspects and removes the disposable files. No PowerShell program is embedded in
+Python or copied into an alternate source file. This reduces temporary fixture
+overhead; it does not retire any original runtime function.
+
+The exact expanded check inventory is unchanged:
+
+| Original check IDs | Checks | Boundary |
+| --- | ---: | --- |
+| 1–40 | 40 | Accepted decoded descriptors |
+| 41–77 | 37 | State copies, authority, envelope and tagged wire |
+| 78–122 | 45 | Constrained operation, argument and payload denials |
+| 123–135 | 13 | Repetition, iteration limits and retained paths |
+| 136–153 | 18 | Retained process ordinals and sample sequencing |
+| 154–168 | 15 | Operation-owned Hashtable formatting and identity |
+| 169–182 | 14 | Native getter order, caught failures, nulls and timestamps |
+| 183–195 | 13 | Captured owned-path acquisition and mutations |
+| 196 | 1 | Real disposable files, junctions, probe and cache cleanup |
+
+All 196 IDs/names and the 85 accepted/denied descriptor rows were independently
+compared with that blob. The Python gate pins the exact identity-list digest,
+checks category counts and requires every check to execute; the former
+`checks >= 40` floor is gone. Multiple native calls remain grouped under the same
+logical check, including all three path-equality comparisons and every real
+filesystem observation. Raw Console/error/exit/effect comparisons for all 321
+diagnostic adapter cases remain separate and unchanged.
+
+The driver accepts only inert JSON and six closed modes. Captured filesystem
+leaves are installed at the same script scope as the actual loaded definitions.
+A source-helper sentinel probe verifies that lookup resolves those leaves before
+write-capable captured cases can run; captured and real owned requests cannot
+mix. Real I/O accepts only a marked Python-created root and fixed child paths.
+Python unlinks its junction non-recursively before temporary-directory cleanup.
+Local validation passes 14 portable tests and 14 managed checks; the three
+Windows-only gates, including the rewritten driver, still require actual
+Windows PowerShell 5.1 execution. These counts are not Windows parity approval.
+
+The adapter accepts only its configured audit/cache roots. It refuses reparse
+ancestors for owned writes and skips directory/reparse entries matching an
+appshot filename. This intentional ownership constraint prevents a matching name
+from authorizing unrelated deletion. Immediate-parent identity uses normalized
+Windows paths with ordinal case-insensitive comparison, including trailing
+separators; comparison never becomes an unrestricted prefix match.
+
+Production routing, host acquisition checks, exact adapter tests, portable
+packaging and the integrator's bundled full regression must pass before
+retirement/publication.
 Interactive Windows qualification and eventual tests with PowerShell absent
 remain separate acceptance requirements.
+
+## Enumerated process identity cache
+
+The identity-only DTO is read at enumeration because the .NET Framework
+`GetProcesses` constructor receives populated ProcessInfo and stores the ID.
+`Id` uses the stored ID; `ProcessName` uses cached processInfo. The latter's
+module lookup exception applies only before Windows XP, outside this runtime's
+supported Windows platforms. `EnsureState` reloads process information only when
+it is absent. No Refresh call is introduced here. Consequently eager ID/name
+projection adds no later native query on the supported path; timing-sensitive
+getters remain in ProcessMetrics and retained objects are never reopened by PID.
+See [Microsoft's .NET Framework reference source](https://github.com/microsoft/referencesource/blob/main/System/services/monitoring/system/diagnosticts/Process.cs).

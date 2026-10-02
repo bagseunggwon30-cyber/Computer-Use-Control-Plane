@@ -95,3 +95,10 @@ solution. Its accepted syntax and error behavior remain a separate release gate.
 
 A green incremental checkpoint establishes only its documented coverage. The
 zero-PowerShell goal is not complete while any of these final gates remains open.
+
+The staged interaction/diagnostic/file-image batch still retains original bodies.
+Its adapter and oracle scaffolding is fully counted (934,772 current staged PS
+bytes). The temporary diagnostic guard was reduced by 31,109 PS bytes through a
+real Python case/assertion/fixture-I/O port, not an embedded or renamed PS
+program. Remaining fixed PS boundary drivers are explicit temporary dependencies
+and are subject to the same final zero-execution requirement.

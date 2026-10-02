@@ -55,4 +55,46 @@ var large=Read(Payload("--step",new string('x',1200000)));Check(large.Rest[1].Le
 var originalCulture=CultureInfo.CurrentCulture;Read(Payload());Check(ReferenceEquals(originalCulture,CultureInfo.CurrentCulture),"Parsing changed process culture");
 var confirmed=JsonSerializer.SerializeToElement(LegacyExecutionStartup.Confirmation(JsonSerializer.SerializeToElement(new{original_argv=new[]{"--label","--confirm-sensitive"}})));
 Check(!confirmed.GetProperty("confirmed").GetBoolean(),"Pure confirmation helper granted data consent");
+// The process entry point chooses the family; request data cannot cross it.
+Dictionary<string, object?> FamilyPayload(string family, string operation)
+{
+    var p = Payload("--label", "--confirm-sensitive"); p["operation"] = operation;
+    p["schema"] = family == "interaction" ? "cucp.interaction-start/v1" : "cucp.diagnostic-start/v1";
+    if (family == "interaction") { p["double"] = false; p["right_click"] = false; }
+    else p["context"] = new Dictionary<string, object?> { ["audit_directory"] = @"C:\owned\audit", ["cache_directory"] = @"C:\owned\cache",
+        ["wrapper_log"] = @"C:\owned\wrapper.log", ["cli_path"] = null, ["changelog_path"] = @"C:\source\CHANGELOG.md", ["temp_root"] = @"C:\temp",
+        ["benchmark_schema"] = "cucp.benchmark/v1", ["release_schema"] = "cucp.release-notes/v1" };
+    return p;
+}
+LegacyExecutionStartup ReadFamily(object value, string family, params string[] options) => LegacyExecutionStartup.Read(options, new StringReader(Wire(value)), family);
+foreach (var family in new[] { "interaction", "diagnostics" })
+{
+    var op = family == "interaction" ? "find-label" : "health-quick";
+    var p = FamilyPayload(family, op);
+    var v = ReadFamily(p, family, "--allow-live-control", "--confirm-sensitive");
+    Check(v.Family == family && v.Operation == op && v.Authority.AllowLiveControl && !v.Authority.ConfirmSensitive, "Family startup changed consent semantics");
+    Reject(() => Read(p), "A new family entered legacy execution startup");
+    Reject(() => ReadFamily(Payload(), family), "Old execution request entered a new family");
+    foreach (var authorityField in new[] { "live", "authority", "confirm_sensitive", "family" })
+    { var modified = FamilyPayload(family, op); modified[authorityField] = true; Reject(() => ReadFamily(modified, family), "Reply-style authority field accepted"); }
+    p["operation"] = "workflow-run"; Reject(() => ReadFamily(p, family), "Cross-family operation accepted");
+}
+foreach (var name in new[] { "double", "right_click" })
+{
+    foreach (var bad in new object?[] { "true", 1, null, new[] { true } })
+    { var p = FamilyPayload("interaction", "click-label"); p[name] = bad; Reject(() => ReadFamily(p, "interaction"), "Coerced click flag accepted"); }
+    var valid = FamilyPayload("interaction", "click-label"); valid[name] = true;
+    Check(name == "double" ? ReadFamily(valid, "interaction").Double : ReadFamily(valid, "interaction").RightClick, "Explicit click option lost");
+    valid["operation"] = "find-label"; Reject(() => ReadFamily(valid, "interaction"), "Click option applied outside click-label");
+}
+var diagnostic = FamilyPayload("diagnostics", "health-quick");
+Check(ReadFamily(diagnostic, "diagnostics").Context.GetProperty("cli_path").ValueKind == JsonValueKind.Null, "Missing CLI path became empty string");
+foreach (var name in new[] { "audit_directory", "cache_directory", "wrapper_log", "cli_path", "changelog_path", "temp_root", "benchmark_schema", "release_schema" })
+{
+    var p = FamilyPayload("diagnostics", "health-quick"); var context = (Dictionary<string, object?>)p["context"]!;
+    context[name] = 12; Reject(() => ReadFamily(p, "diagnostics"), "Numeric owned context accepted");
+    context[name] = "bad\0path"; Reject(() => ReadFamily(p, "diagnostics"), "NUL owned context accepted");
+    context.Remove(name); Reject(() => ReadFamily(p, "diagnostics"), "Missing owned context accepted");
+}
+Reject(() => ReadFamily(FamilyPayload("diagnostics", "health-quick"), "arbitrary"), "Unknown trusted entry family accepted");
 Console.WriteLine($"PASS: {passed} execution startup authority and framing checks; no effects executed.");

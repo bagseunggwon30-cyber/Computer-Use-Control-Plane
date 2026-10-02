@@ -122,13 +122,13 @@ internal sealed partial class LegacyExecutionCoordinator
             }
         }
         Trace("click", D("source", "native_click_point", "x", x, "y", y, "button", button, "target_match", target, "target_hwnd", hwnd,
-            "refine", refine, "micro_refine", microEvidence, "auto_micro_refine", autoMicro, "anchor_reuse", T(anchor) ? P(anchor, "reuse_history") : null, "exit", ExitOf(clicked)));
+            "refine", refine, "micro_refine", microEvidence, "auto_micro_refine", autoMicro, "anchor_reuse", T(anchor) ? P(anchor, "reuse_history") : null, "exit", ExitValue(clicked)));
         if (brief)
         {
             string guardSuffix = T(precheck) ? $" fast_guard={S(P(precheck, "match_reason"))}" : ""; var json = Parsed(clicked); var me = J(microEvidence);
-            string refineSuffix = T(P(json, "refined_by")) ? $" refined=({S(P(json, "x"))},{S(P(json, "y"))}) source={S(P(json, "refined_point_source"))}" : "";
+            string refineSuffix = T(Member(json, "refined_by")) ? $" refined=({S(Member(json, "x"))},{S(Member(json, "y"))}) source={S(Member(json, "refined_point_source"))}" : "";
             string microSuffix = T(me) && Eq(P(me, "status"), "ok") ? $" micro_refine=({originalX},{originalY})->({S(P(me, "refined_x"))},{S(P(me, "refined_y"))}) confidence={S(P(me, "confidence"))}" : "";
-            return Silent(ExitOf(clicked), Ok(clicked) ? $"ok click-point @({x},{y}) button={button} elapsed_ms={S(P(clicked, "ElapsedMs"))}{guardSuffix}{microSuffix}{refineSuffix}" : $"err click-point exit={ExitOf(clicked)}");
+            return Silent(ExitOf(clicked), Ok(clicked) ? $"ok click-point @({x},{y}) button={button} elapsed_ms={S(P(clicked, "ElapsedMs"))}{guardSuffix}{microSuffix}{refineSuffix}" : $"err click-point exit={S(ExitValue(clicked))}");
         }
         if (T(Parsed(clicked)))
         {

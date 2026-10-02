@@ -12,9 +12,13 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 FAMILIES = ("execution", "precision", "cdp", "interaction", "diagnostics", "file-images")
 NEXT_BATCH = ("interaction", "diagnostics", "file-images")
-# Explicit temporary qualification stage. These kernels have no registered
-# production adapter yet, and cannot be marked promoted in the manifest.
-CANDIDATE_ONLY = frozenset({"interaction", "diagnostics"})
+# Keep explicit staging support: a kernel-only gate cannot imply adapter parity.
+# Both new families now require their actual shared-session draft suites.
+CANDIDATE_ONLY: frozenset[str] = frozenset()
+DRAFT_ADAPTERS = {
+    "interaction": "scripts/cucp-legacy-interaction-adapter.ps1",
+    "diagnostics": "scripts/cucp-legacy-diagnostic-adapter.ps1",
+}
 REQUIRED_ADAPTER_TESTS = {
     "interaction": "test_legacy_interaction_adapters.py",
     "diagnostics": "test_legacy_diagnostics_adapters.py",
@@ -23,8 +27,8 @@ PROJECTS = {
     "execution": ("PcuCp.LegacyExecution.ContractTests", "PcuCp.LegacyExecution.StartupTests"),
     "precision": ("PcuCp.LegacyPrecision.ContractTests",),
     "cdp": (),
-    "interaction": ("PcuCp.LegacyInteraction.ContractTests",),
-    "diagnostics": ("PcuCp.LegacyDiagnostics.ContractTests",),
+    "interaction": ("PcuCp.LegacyInteraction.ContractTests", "PcuCp.LegacyExecution.StartupTests", "PcuCp.LegacyExecution.ContractTests"),
+    "diagnostics": ("PcuCp.LegacyDiagnostics.ContractTests", "PcuCp.LegacyExecution.StartupTests", "PcuCp.LegacyExecution.ContractTests"),
     "file-images": ("PcuCp.LegacyFileOcr.ContractTests",),
     "foundation": ("PcuCp.LegacyPure.ContractTests", "PcuCp.LegacyTaskForm.ContractTests"),
 }
@@ -43,6 +47,7 @@ ADAPTER_ENV = {
     "cdp": "CUCP_LEGACY_CDP_TEST_PYTHON",
     "interaction": "CUCP_INTERACTION_TEST_DLL",
     "file-images": "CUCP_LEGACY_IMAGES_TEST_DLL",
+    "diagnostics": "CUCP_DIAGNOSTICS_TEST_HOST",
 }
 
 
@@ -76,10 +81,21 @@ def enabled_adapters(root: Path = ROOT) -> set[str]:
     return set(values)
 
 
+def print_preview(text: str, *, end: str = "\n", flush: bool = False) -> None:
+    """Console encoding must never mask the actual command's exit status.
+
+    The artifact retains the exact bytes. On a legacy Windows console, only its
+    bounded preview escapes characters the destination cannot represent.
+    """
+    if encoding := getattr(sys.stdout, "encoding", None):
+        text = text.encode(encoding, errors="backslashreplace").decode(encoding)
+    print(text, end=end, flush=flush)
+
+
 def run_logged(argv: list[str], *, cwd: Path, env: dict[str, str], log_path: Path) -> None:
     """Keep the complete command output while bounding its inline CI rendering."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Running {argv!r}; complete output: {log_path}", flush=True)
+    print_preview(f"Running {argv!r}; complete output: {log_path}", flush=True)
     with log_path.open("wb") as stream:
         result = subprocess.run(argv, cwd=cwd, env=env, stdout=stream, stderr=subprocess.STDOUT)
     with log_path.open("rb") as stream:
@@ -88,8 +104,8 @@ def run_logged(argv: list[str], *, cwd: Path, env: dict[str, str], log_path: Pat
         stream.seek(max(0, size - 65536))
         tail = stream.read()
     if size > len(tail):
-        print(f"[Inline output limited to the last {len(tail)} bytes; full output is in the log artifact]", flush=True)
-    print(tail.decode("utf-8", errors="replace"), end="", flush=True)
+        print_preview(f"[Inline output limited to the last {len(tail)} bytes; full output is in the log artifact]", flush=True)
+    print_preview(tail.decode("utf-8", errors="replace"), end="", flush=True)
     result.check_returncode()
 
 
@@ -107,8 +123,11 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
             raise ValueError(f"Missing exact adapter tests: {required.name}; kernel parity alone cannot qualify promotion.")
     env = dict(os.environ)
     env["PYTHONPATH"] = str(ROOT / "pcucp-next/python")
+    # Fixture reports contain Unicode; keep redirected Python stdout/stderr
+    # UTF-8 without changing file decoding or PowerShell culture semantics.
+    env["PYTHONIOENCODING"] = "utf-8"
     for name in (*ADAPTER_ENV.values(), "CUCP_EXECUTION_STARTUP_TEST_HOST", "CUCP_EXECUTION_ADAPTER_SOURCE",
-                 "CUCP_PRECISION_ADAPTER_DRAFT", "CUCP_LEGACY_CDP_ADAPTER_MODE"):
+                 "CUCP_PRECISION_ADAPTER_DRAFT", "CUCP_LEGACY_CDP_ADAPTER_MODE", "CUCP_INTERACTION_TEST_HOST"):
         env.pop(name, None)
     command_index = 0
     def run(argv: list[str]) -> None:
@@ -143,6 +162,7 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
             env[ADAPTER_ENV[family]] = str(ROOT / "pcucp-next/bin/legacy/PcuCp.LegacyImages.dll")
         elif family == "interaction":
             env[ADAPTER_ENV[family]] = str(ROOT / "pcucp-next/dotnet/PcuCp.LegacyInteraction.ContractTests/bin/Release/net8.0/PcuCp.LegacyInteraction.ContractTests.dll")
+            env["CUCP_INTERACTION_TEST_HOST"] = str(host)
         elif family in ADAPTER_ENV:
             env[ADAPTER_ENV[family]] = sys.executable if family == "cdp" else str(host)
         if family in FAMILIES:
@@ -158,7 +178,7 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
                     env["CUCP_LEGACY_CDP_ADAPTER_MODE"] = "production"
                 print(f"Running candidate and promoted {family} adapter gates", flush=True)
             else:
-                draft = ROOT / "tests/fixtures" / f"legacy-{family}-adapter.ps1"
+                draft = ROOT / DRAFT_ADAPTERS.get(family, f"tests/fixtures/legacy-{family}-adapter.ps1")
                 if not draft.is_file():
                     raise ValueError(f"Missing exact {family} adapter draft; refusing to skip its gate.")
                 if family == "execution":

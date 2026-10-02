@@ -7,7 +7,8 @@ using System.Text.Json;
 // grant ceilings; captured replies and plan contents never enter this parser.
 internal sealed record LegacyExecutionStartup(string Operation, string[] Rest,
     LegacyExecutionAuthority Authority, bool Brief, int CacheSeconds,
-    bool VisionAvailable, CultureInfo Culture)
+    bool VisionAvailable, CultureInfo Culture, string Family = "execution",
+    bool Double = false, bool RightClick = false, JsonElement Context = default)
 {
     internal static object Confirmation(JsonElement args)
     {
@@ -39,8 +40,9 @@ internal sealed record LegacyExecutionStartup(string Operation, string[] Rest,
             if (!seen.Add(p.Name) || !expected.Contains(p.Name)) throw CommandOptions.Invalid("Unexpected or duplicate execution startup field.");
         if (seen.Count != expected.Length) throw CommandOptions.Invalid("Missing execution startup field.");
     }
-    internal static LegacyExecutionStartup Read(string[] options, TextReader input)
+    internal static LegacyExecutionStartup Read(string[] options, TextReader input, string family = "execution")
     {
+        if (family is not ("execution" or "interaction" or "diagnostics")) throw CommandOptions.Invalid("Unknown execution startup family.");
         var flags = new HashSet<string>(StringComparer.Ordinal);
         foreach (var flag in options)
             if (flag is not ("--allow-live-control" or "--confirm-sensitive") || !flags.Add(flag))
@@ -75,11 +77,19 @@ internal sealed record LegacyExecutionStartup(string Operation, string[] Rest,
         }
         using var doc = JsonDocument.Parse(new UTF8Encoding(false, true).GetString(buffer.ToArray()), new JsonDocumentOptions { MaxDepth = 8 });
         var root = doc.RootElement;
-        Exact(root, "schema", "operation", "rest", "brief", "cache_seconds", "vision_available", "culture");
-        if (root.GetProperty("schema").ValueKind != JsonValueKind.String || root.GetProperty("schema").GetString() != "cucp.execution-start/v1")
+        string[] common = ["schema", "operation", "rest", "brief", "cache_seconds", "vision_available", "culture"];
+        Exact(root, family switch { "interaction" => [..common, "double", "right_click"], "diagnostics" => [..common, "context"], _ => common });
+        string schema = family switch { "interaction" => "cucp.interaction-start/v1", "diagnostics" => "cucp.diagnostic-start/v1", _ => "cucp.execution-start/v1" };
+        if (root.GetProperty("schema").ValueKind != JsonValueKind.String || root.GetProperty("schema").GetString() != schema)
             throw CommandOptions.Invalid("Unsupported execution startup schema.");
         var operation = root.GetProperty("operation");
-        if (operation.ValueKind != JsonValueKind.String || operation.GetString() is not ("workflow-run" or "task-run" or "form-run" or "smart-click" or "watch" or "recovery-plan" or "recovery-run"))
+        string[] operations = family switch
+        {
+            "interaction" => ["find-label", "click-point", "click-label", "safe-type", "icon-find", "icon-click", "ocr-click", "precision-validate"],
+            "diagnostics" => ["perf", "diagnose-lag", "health-quick", "health-detail", "log-tail", "benchmark", "self-test", "audit-summary", "release-notes"],
+            _ => ["workflow-run", "task-run", "form-run", "smart-click", "watch", "recovery-plan", "recovery-run"]
+        };
+        if (operation.ValueKind != JsonValueKind.String || !operations.Contains(operation.GetString(), StringComparer.Ordinal))
             throw CommandOptions.Invalid("Unknown execution family operation.");
         var rest = root.GetProperty("rest");
         if (rest.ValueKind != JsonValueKind.Array || rest.EnumerateArray().Any(v => v.ValueKind != JsonValueKind.String))
@@ -92,9 +102,30 @@ internal sealed record LegacyExecutionStartup(string Operation, string[] Rest,
         CultureInfo culture;
         try { culture = CultureInfo.GetCultureInfo(cultureValue.GetString()!); }
         catch (CultureNotFoundException) { throw CommandOptions.Invalid("Unsupported execution culture."); }
+        bool doubleClick = false, rightClick = false;
+        JsonElement context = default;
+        if (family == "interaction")
+        {
+            foreach (var name in new[] { "double", "right_click" })
+                if (root.GetProperty(name).ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw CommandOptions.Invalid("Interaction startup flags must be booleans.");
+            doubleClick = root.GetProperty("double").GetBoolean(); rightClick = root.GetProperty("right_click").GetBoolean();
+            if (operation.GetString() != "click-label" && (doubleClick || rightClick)) throw CommandOptions.Invalid("Click options require click-label.");
+        }
+        if (family == "diagnostics")
+        {
+            context = root.GetProperty("context");
+            Exact(context, "audit_directory", "cache_directory", "wrapper_log", "cli_path", "changelog_path", "temp_root", "benchmark_schema", "release_schema");
+            foreach (var property in context.EnumerateObject())
+            {
+                if (property.Name == "cli_path" && property.Value.ValueKind == JsonValueKind.Null) continue;
+                if (property.Value.ValueKind != JsonValueKind.String || property.Value.GetString()!.Contains('\0'))
+                    throw CommandOptions.Invalid("Diagnostic owned context must contain strings without NUL, with only cli_path nullable.");
+            }
+            context = context.Clone();
+        }
         var originalRest = rest.EnumerateArray().Select(v => v.GetString()!).ToArray();
         return new(operation.GetString()!, originalRest,
             new(flags.Contains("--allow-live-control"), flags.Contains("--confirm-sensitive") && LegacyExecutionConsent.HasStandaloneConfirmation(originalRest)),
-            root.GetProperty("brief").GetBoolean(), cache, root.GetProperty("vision_available").GetBoolean(), culture);
+            root.GetProperty("brief").GetBoolean(), cache, root.GetProperty("vision_available").GetBoolean(), culture, family, doubleClick, rightClick, context);
     }
 }

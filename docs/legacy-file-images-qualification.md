@@ -125,3 +125,13 @@ On the dot Linux computer, the new net48 DLL builds with zero warnings/errors,
 the 47 managed contracts pass, and three Python source contracts pass. Windows
 parity and OS recognition are **pending**. New adapter coverage is not yet a
 retirement result, and no net PowerShell reduction is claimed.
+
+The first focused Windows attempt, `6fc7c882` / run `37037485035`, passed
+all 110 screenshot-diff comparisons, 11 captured conversion comparisons and the
+generated-file action/load comparisons. The OCR test command still failed: its
+engine snapshot used PowerShell's automatic `$Error` variable, and its wait
+fixture stored a WinRT object in `$operation`, colliding with its typed
+`[string]$Operation` parameter. The corrected fixture uses distinct names and
+retains every original assertion and the same 167 comparisons. Runtime and
+adapter sources are unchanged; installed-language and recognition evidence is
+pending this corrected run.

@@ -130,9 +130,40 @@ callers. Candidate code reuses the qualified typed effects, startup authority an
 chunked wire transport. Original bodies stay until candidate and actual-adapter
 gates pass; temporary qualification scripts remain counted in the inventory.
 
-The initial candidate checkpoint adds 32,096 bytes of visible PowerShell oracle
+The published `6fc7c882` candidate checkpoint adds 32,096 bytes of visible PowerShell oracle
 and adapter fixtures, while leaving the accepted production bodies intact. Its
 all-source total is 855,174 bytes (158,304 below baseline); the last accepted
 production cutover remains the 190,400-byte net reduction at `56be343c`. No new
 retirement is claimed from these candidates. Fixture overhead stays in the
 inventory and must be replaced or removed at its appropriate qualification gate.
+
+### Staged actual-adapter qualification
+
+Focused run [37037485035](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37037485035)
+passed fast contracts but failed the three new family gates. All 110 image-diff
+kernel/actual-adapter comparisons passed; two OCR fixture variable collisions
+blocked the remaining intended observations. Diagnostic source decoding and
+root-array nesting errors, six interaction compatibility causes, and a console
+preview encoding error have staged repairs. No failed comparison was removed.
+
+Interaction now requires the real NativeHost and shared PS host for all 870
+ordinary cases (the original 854 plus 16 numeric boundary cases), 12 uncertainty
+cases, and its forged-descriptor matrix. Diagnostics requires 321 complete cases,
+196 guard/filesystem/getter checks, and its fixed actual acquisition adapter.
+Both reuse the existing framed transport with closed family startup and immutable
+ceilings. Owned-state accounting covers cache/log writes without granting live
+input authority. Original production functions still remain in place.
+
+The diagnostic guard's case generation and assertions were genuinely moved to
+Python: its PS driver fell from 42,879 to 11,770 bytes, preserving all 196 checks.
+This is a reduction of temporary new test scaffolding, not additional legacy
+runtime retirement. Current staged tracked PS is **934,772 bytes**, or 78,706
+below the original baseline, including every adapter and test fixture. The last
+accepted production cutover remains `56be343c` with 823,078 bytes. These totals
+must be measured again after actual adapters qualify and original bodies retire.
+
+Local combined discovery passes 491 tests with 102 explicit platform/browser
+skips. The staged shared session has 994 managed checks, startup has 110, and
+interaction has 106 locally (109 on Windows). Windows actual-adapter checks are
+still pending; local results do not establish those gates or interactive GUI
+acceptance.

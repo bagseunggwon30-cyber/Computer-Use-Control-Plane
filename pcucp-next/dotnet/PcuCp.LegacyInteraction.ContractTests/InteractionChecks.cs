@@ -99,6 +99,54 @@ internal static class InteractionChecks
             Assert(session.Run(e => new LegacyExecutionCoordinator(e, new(true, false), ["--x", "1", "--y", "2"]).RunInteraction("click-point")) == 0, "large captured reply crosses bounded frames");
             Assert(writer.ToString().Split('\n').Where(v => v.Length > 0).All(v => v.Length <= 66000), "interaction frame bound retained");
         }
+        // Regressions observed by the pinned PS5.1 gate at 6fc7c882.
+        object Element(string text = "Save", object? confidence = null) => new { text, confidence = confidence ?? "high", window = "Editor", role = "Button",
+            rect = new { x = 10, y = 20, width = 20, height = 20 }, affordance_id = text };
+        object Shot(object[] grounded) => new { Grounded = grounded, FusedElements = Array.Empty<object>(), Items = Array.Empty<object>(), ObservationId = "fixture", FromCache = false };
+        var label = Evaluate("find-label", ["--label", "Save"], [Shot([Element()])]);
+        Assert(label.GetProperty("payload").GetProperty("candidates").GetProperty("sources").GetString() == "grounded", "conditional source array unrolls its single item");
+        var decimalConfidence = Evaluate("find-label", ["--label", "Save"], [Shot([Element(confidence: .5)])]);
+        Assert(decimalConfidence.GetProperty("payload").GetProperty("score").GetInt32() == 104, "PS5 fractional JSON confidence is Decimal, not Double");
+        var integerConfidence = Evaluate("find-label", ["--label", "Save"], [Shot([Element(confidence: 1)])]);
+        Assert(integerConfidence.GetProperty("payload").GetProperty("score").GetInt32() == 109, "PS5 Int32 confidence keeps its boost");
+        foreach (int confidence in new[] { 429496729, 429496730, -429496729, 2147483647 })
+        {
+            var boundary = Evaluate("find-label", ["--label", "Save"], [Shot([Element(confidence: confidence)])]);
+            if (confidence is 429496730 or 2147483647)
+            {
+                string product = ((double)confidence * 5).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                Assert(boundary.GetProperty("error").GetString() == $"Cannot convert value \"{product}\" to type \"System.Int32\". Error: \"Value was either too large or too small for an Int32.\"", "confidence conversion retains the PS Int32 cast error");
+            }
+            else
+            {
+                var payload = boundary.GetProperty("payload");
+                Assert(payload.GetProperty("score").GetDouble() == (double)confidence * 5 + 104, "confidence score promotes without wrapping");
+                Assert(payload.GetProperty("score").GetRawText() == (confidence > 0 ? "2147483749.0" : "-2147483541"), "confidence promotion retains integral Double JSON spelling");
+            }
+            var iconBoundary = Evaluate("icon-find", ["--label", "Save"], [new object[] { Element(confidence: confidence) }]);
+            Assert(iconBoundary.GetProperty("payload").GetProperty("top").GetProperty("score").GetInt32() == 100, "IconFind ignores numeric confidence at Int32 boundaries");
+        }
+        var emptyExplain = Evaluate("find-label", ["--label", "Save", "--explain"], [Shot([])]);
+        Assert(emptyExplain.GetProperty("payload").GetProperty("data").GetProperty("candidates").GetRawText() == "{}", "empty Select-Object pipeline retains its empty PS object");
+        var oneIcon = Evaluate("icon-find", ["--label", "Save", "--limit", "1"], [new object[] { Element(), Element("Save now") }]);
+        Assert(oneIcon.GetProperty("payload").GetProperty("candidates").ValueKind == JsonValueKind.Array && oneIcon.GetProperty("payload").GetProperty("candidates").GetArrayLength() == 1,
+            "indexed icon truncation retains a singleton array");
+        var oneJson = Evaluate("click-point", ["--x", "10", "--y", "20"], [Reply(new object[] { new { status = "ok" } })], brief: true);
+        Assert(oneJson.GetProperty("brief").GetString() == "ok click-point @(10,20) button=left elapsed_ms=17", "singleton native JSON member projection");
+        var manyJson = Evaluate("click-point", ["--x", "10", "--y", "20"], [Reply(new object[] { new { status = "ok" }, new { status = "partial" } })], brief: true);
+        Assert(manyJson.GetProperty("brief").GetString() == "ok click-point @(10,20) button=left elapsed_ms=17 refined=( , ) source= ", "multi-item member projection preserves null slots and any-equality");
+        var noExit = Evaluate("ocr-click", ["--text", "Save"], [null], brief: true);
+        Assert(noExit.GetProperty("brief").GetString() == "partial ocr-click 'Save' reason=no_text_match exit=", "missing exit remains empty in legacy text");
+        var noExitPoint = Evaluate("click-point", ["--x", "10", "--y", "20"], [new { score = 75 }]);
+        Assert(noExitPoint.GetProperty("effects")[1].GetProperty("data").GetProperty("exit").ValueKind == JsonValueKind.Null, "uncast trajectory exit preserves null");
+        var noExitDouble = Evaluate("click-label", ["--label", "Save"], [Shot([Element()]), new { }], brief: true, doubleClick: true);
+        Assert(noExitDouble.GetProperty("effects").EnumerateArray().Count(e => e.GetProperty("live").GetBoolean()) == 1, "missing exit is not successful and cannot trigger second click");
+        if (OperatingSystem.IsWindows())
+        {
+            Assert(!LegacyInteractionText.Equal("한글", "한글".Normalize(System.Text.NormalizationForm.FormD)), "Windows NLS does not equate composed/decomposed Hangul");
+            Assert(!LegacyInteractionText.ContainsPrefix("한글".Normalize(System.Text.NormalizationForm.FormD), "한글"), "Windows NLS prefix match must not add a decomposed Hangul candidate");
+            Assert(LegacyInteractionText.Equal("café", "cafe\u0301"), "Windows NLS still equates composed/decomposed Latin");
+        }
         Console.WriteLine($"{checks} interaction contracts passed; no actual input, model, clipboard or sleep executed.");
     }
 }

@@ -40,7 +40,20 @@ def reply(status="ok", exit=0, **fields):
 def cases():
     result=[]
     def add(operation, rest=(), replies=(), **kw):
-        result.append(dict(operation=operation,rest=list(rest),replies=copy.deepcopy(list(replies)),**kw))
+        replies=copy.deepcopy(list(replies))
+        if operation=="diagnose-lag":
+            first,second=replies[:2];by_id={p["id"]:p for p in first};metrics=[]
+            groups=[{"codex"},{"electron","code","cursor","windsurf"},{"node"},{"powershell","pwsh"},{"chrome","msedge","brave","whale"},{"cucp-helper","windows-mcp-helper"}]
+            for group in groups:
+                for current in second:
+                    if current["name"].lower() not in group:continue
+                    value={k:current[k] for k in ("private_bytes","started_at","priority") if k in current}
+                    previous=by_id.get(current["id"])
+                    if previous is not None and "cpu_ms" in current and "cpu_ms" in previous:value.update(current_cpu_ms=current["cpu_ms"],previous_cpu_ms=previous["cpu_ms"])
+                    metrics.append(value)
+            replies[:2]=[[{k:p[k] for k in ("id","name")} for p in snapshot] for snapshot in (first,second)]
+            replies[3:3]=metrics
+        result.append(dict(operation=operation,rest=list(rest),replies=replies,**kw))
     for quick in (True,False):
         for cold in (True,False):
             for iters in (1,2):
@@ -55,6 +68,9 @@ def cases():
             rs=[reply() for _ in range(count*4)]
             if mixed:rs[0]=reply(exit=1)
             add("benchmark",["--iters",iters],rs,clocks=[10,40,30,20,700,80,2,4,6,800]*4)
+    for threshold in (536870911,536870912,2147483647):
+        add("perf",["--iters","1","--quick","--warn-fast-ms",str(threshold)],
+            [reply(),reply(),0,1,0,2,2],clocks=[17,18,19,20,21,22,23])
     base=dict(results=[dict(name="windows",p50_ms=100,p95_ms=200),dict(name="health",p50_ms=5,p95_ms=5),dict(name="focused",p50_ms=None)])
     for raw in (json.dumps(base),"{}","{broken"):
         add("benchmark",["--iters","1","--baseline","C:\\fixture\\baseline.json"],[reply()]*4+[True,raw])
@@ -63,6 +79,8 @@ def cases():
             add("health-detail",[],[dict(exit=0 if node else 1,output=" v22.0.0 "),True,reply(version="1.8.0"),optional,optional,"codex.cmd" if optional else None,None])
             add("health-quick",[],[dict(exit=0 if node else 1,output=" v22.0.0 "),True,None,True,True,[dict(length=1)]*(1001 if optional else 1),True,[],True,dict(length=67108865 if optional else 1),True,dict(text="TIMEOUT\n"*(6 if optional else 1))])
     add("health-quick",[],[dict(exit=0,output="v1"),None,True,False,False,False,False],context=dict(cli_path=""))
+    add("health-quick",[],[dict(exit=0,output="v1"),None,True,False,False,False,False],context=dict(cli_path=None))
+    add("health-detail",[],[dict(exit=0,output="v1"),reply(version="1"),False,False,None,None],context=dict(cli_path=None))
     for deep in (True,False):
         for strict in (True,False):
             for helper in (True,False):
@@ -70,11 +88,15 @@ def cases():
                 if helper:rs += [reply(),{},"key",True,dict(FromCache=True)]
                 if deep:rs += [[dict(name="button")]]+([dict(ObservationId="o1",Affordances=[dict(name="button")])] if helper else [])
                 add("self-test",(["--deep"] if deep else [])+(["--strict"] if strict else []),rs)
+    for blocked in (True,False):
+        add("self-test",[],[blocked,blocked,reply(version="1"),reply(status="partial",exit=2)])
     for sample in ("0","1","3000","9000"):
         first=[dict(id=1,name="Code",private_bytes=100,started_at="2026-10-01T23:59:00Z",cpu_ms=100,priority="Normal"),dict(id=2,name="node",cpu_ms=400)]
         second=[dict(id=1,name="Code",private_bytes=9*1024**3,started_at="2026-10-01T23:59:00Z",cpu_ms=10000,priority="Normal"),dict(id=2,name="node",private_bytes=200,cpu_ms=200,priority=""),dict(id=3,name="node",private_bytes=300,priority="Idle")]
         add("diagnose-lag",["--sample-ms",sample],[first,second,4,[dict(foreground=True,title="fixture 한국어")],True,[dict(length=1)]*1001,True,[],True,dict(length=67108865),True,dict(text="TIMEOUT Timeout TIMEOUT")])
     add("diagnose-lag",[],[[],[],0,[],False,False])
+    add("diagnose-lag",[],[[],[dict(id=9,name="node",started_at="2026-10-01T23:00:00-07:00",private_bytes=None,priority="")],1,[],False,False])
+    add("diagnose-lag",["--sample-ms","1000"],[[dict(id=5,name="node",cpu_ms=None)],[dict(id=5,name="node",cpu_ms=100,priority="Normal")],1,[],False,False])
     add("diagnose-lag",[],[[],[dict(id=i,name="chrome",private_bytes=1,priority="Normal") for i in range(26)],1,[],False,False])
     audit_lines=[json.dumps(dict(ts="2026-10-01T23:59:00Z",macro="click",exit_code=0,sensitive=True)),json.dumps(dict(ts="2026-10-01T20:00:00Z",macro="CLICK",exit_code=3,status="blocked")),"malformed",json.dumps(dict(ts="invalid",action="type",reason="not-sensitive")),"",json.dumps(dict(action="windows"))]
     for rest in ([],["--since-minutes","30"],["--since-minutes","bad"],["--since-minutes","-10"]):
@@ -137,7 +159,7 @@ class DiagnosticPortableTests(unittest.TestCase):
         self.assertEqual({f["operation"] for f in fixtures},{"perf","benchmark","health-quick","health-detail","self-test","diagnose-lag","audit-summary","log-tail","release-notes"})
         for source in (PROJECT.parent/"PcuCp.LegacyDiagnostics").glob("*.cs"):
             for token in ("Process.Start(","ProcessStartInfo","File.Read","File.Write","DllImport","SendKeys","Management.Automation"):
-                self.assertNotIn(token,source.read_text(),str(source))
+                self.assertNotIn(token,source.read_text(encoding="utf-8-sig"),str(source))
     def test_portable_corpus_and_failure_reachability(self):
         fixtures=cases();actual=run_candidate(fixtures)
         self.assertEqual(len(actual),len(fixtures))
@@ -173,6 +195,27 @@ class DiagnosticPortableTests(unittest.TestCase):
         self.assertEqual(health["exit"],0);self.assertFalse(health["payload"]["components"]["temp_pressure"]["ok"])
         strict=next(r for f,r in pairs if f["operation"]=="self-test" and f["rest"]==["--strict"] and not f.get("brief") and r["payload"]["skipped"]>0)
         self.assertEqual(strict["exit"],1);self.assertEqual(strict["payload"]["failed"],0)
+        age=next(r for f,r in pairs if f["operation"]=="diagnose-lag" and any(isinstance(v,dict) and v.get("started_at")=="2026-10-01T23:00:00-07:00" for v in f["replies"]) and not f.get("brief"))
+        self.assertEqual(age["payload"]["processes"][0]["oldest_age_sec"],3600)
+        nullable=next(r for f,r in pairs if f["operation"]=="diagnose-lag" and f["rest"]==["--sample-ms","1000"] and not f.get("brief"))
+        self.assertEqual(nullable["payload"]["processes"][0]["cpu_delta_pct"],10)
+        for f,r in pairs:
+            if f["operation"] in ("health-quick","health-detail") and f.get("context",{}).get("cli_path","sentinel") is None and r["state"]=="complete":
+                self.assertIsNone(r["payload"]["components"]["cli"]["path"])
+    def test_slo_fail_threshold_conversion_follows_all_samples(self):
+        selected=[f for f in cases() if f["operation"]=="perf" and "--warn-fast-ms" in f["rest"] and not f.get("brief")]
+        self.assertEqual(len(selected),3)
+        for fixture,result in zip(selected,run_candidate(selected)):
+            threshold=int(fixture["rest"][-1])
+            self.assertEqual(result["consumed"],7)
+            self.assertEqual(sum(e["kind"]=="Clock" and e["name"]=="stop" for e in result["effects"]),7)
+            if threshold==536870911:
+                self.assertEqual(result["state"],"complete")
+                self.assertEqual(result["payload"]["slo"][0]["fail_ms"],2147483644)
+            else:
+                self.assertEqual(result["state"],"error")
+                self.assertEqual(result["effects"][-1]["kind"],"Clock")
+                self.assertEqual(result["error"],f'Cannot process argument transformation on parameter \'FailMs\'. Cannot convert value "{threshold*4}" to type "System.Int32". Error: "Value was either too large or too small for an Int32."')
 
 @unittest.skipUnless(sys.platform=="win32","Windows PowerShell 5.1 pinned differential qualification")
 class DiagnosticWindowsParityTests(unittest.TestCase):

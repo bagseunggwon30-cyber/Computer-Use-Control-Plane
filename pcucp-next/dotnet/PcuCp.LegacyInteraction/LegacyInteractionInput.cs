@@ -16,7 +16,7 @@ internal sealed partial class LegacyExecutionCoordinator
         maximum = maximum <= 0 ? 1 : Math.Min(maximum, 10);
         int x = hasX ? I(xr) : 0, y = hasX ? I(yr) : 0;
         var windows = INative("-Action", "windows");
-        var candidates = ExitOf(windows) == 0 && Ok(windows) ? A(P(Parsed(windows), "windows")).Where(w =>
+        var candidates = ExitIsZero(windows) && Ok(windows) ? A(P(Parsed(windows), "windows")).Where(w =>
             (hwnd <= 0 || Long(P(w, "hwnd")) == hwnd) && (!Has(tm) || T(P(w, "title")) && S(P(w, "title")).Contains(tm!, StringComparison.OrdinalIgnoreCase))).ToArray() : [];
         string reason = ""; int attempts = 0; bool success = false; bool? dispatched = false;
         if (candidates.Length != 1) reason = candidates.Length > 1 ? "ambiguous_target" : "target_unavailable";
@@ -27,21 +27,21 @@ internal sealed partial class LegacyExecutionCoordinator
             {
                 attempts++;
                 var focus = INative("-Action", "focus", "-WindowHwnd", hwnd.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                if (!(ExitOf(focus) == 0 && T(Parsed(focus)) && T(P(Parsed(focus), "verified")) && Long(P(Parsed(focus), "target_hwnd")) == hwnd))
+                if (!(ExitIsZero(focus) && T(Parsed(focus)) && T(P(Parsed(focus), "verified")) && Long(P(Parsed(focus), "target_hwnd")) == hwnd))
                 { reason = "focus_failed"; continue; }
                 if (hasX)
                 {
                     var click = INative("-Action", "click", "-X", Num(x), "-Y", Num(y), "-TargetHwnd", hwnd.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                    if (!(ExitOf(click) == 0 && Ok(click))) { reason = "click_blocked_or_failed"; break; }
+                    if (!(ExitIsZero(click) && Ok(click))) { reason = "click_blocked_or_failed"; break; }
                 }
                 dispatched = null;
                 var type = INative("-Action", "type", "-Text", text!, "-TargetHwnd", hwnd.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                if (!(ExitOf(type) == 0 && Ok(type))) { reason = "main_type_blocked_or_failed"; break; }
+                if (!(ExitIsZero(type) && Ok(type))) { reason = "main_type_blocked_or_failed"; break; }
                 dispatched = true;
                 if (enter || ctrlEnter)
                 {
                     var send = INative("-Action", "shortcut", "-Keys", ctrlEnter ? "ctrl+enter" : "enter", "-TargetHwnd", hwnd.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                    if (!(ExitOf(send) == 0 && Ok(send))) { reason = "send_blocked_or_failed"; break; }
+                    if (!(ExitIsZero(send) && Ok(send))) { reason = "send_blocked_or_failed"; break; }
                 }
                 success = true;
             }
@@ -67,16 +67,16 @@ internal sealed partial class LegacyExecutionCoordinator
             if (parts.Length == 4) args.AddRange(["-ScreenshotX", parts[0].Trim(), "-ScreenshotY", parts[1].Trim(), "-ScreenshotW", parts[2].Trim(), "-ScreenshotH", parts[3].Trim()]);
         }
         var found = INative(args.ToArray());
-        if (!Ok(found)) return Silent(2, $"partial ocr-click '{text}' reason=no_text_match exit={ExitOf(found)}");
+        if (!Ok(found)) return Silent(2, $"partial ocr-click '{text}' reason=no_text_match exit={S(ExitValue(found))}");
         var top = P(Parsed(found), "top");
         if (I(P(top, "score")) < minimum) return Silent(2, $"partial ocr-click '{text}' low_confidence score={S(P(top, "score"))} min={minimum} matched='{S(P(top, "text"))}'");
         int x = I(P(top, "cx")), y = I(P(top, "cy"));
         args = ["-Action", "click", "-X", Num(x), "-Y", Num(y), "-Button", button!, "-ClickRefine", "uia-safe"];
         if (Has(target)) args.AddRange(["-TargetMatch", target!]);
         var click = INative(args.ToArray());
-        Trace("click", D("source", "ocr_click", "x", x, "y", y, "button", button, "text", text, "matched_text", P(top, "text"), "score", P(top, "score"), "exit", ExitOf(click)));
+        Trace("click", D("source", "ocr_click", "x", x, "y", y, "button", button, "text", text, "matched_text", P(top, "text"), "score", P(top, "score"), "exit", ExitValue(click)));
         return RawResult(click, Ok(click) ? $"ok ocr-click '{text}' matched='{S(P(top, "text"))}' score={S(P(top, "score"))} @({x},{y}) button={button} elapsed_ms={S(P(click, "ElapsedMs"))}"
-            : $"err ocr-click '{text}' click_failed exit={ExitOf(click)}");
+            : $"err ocr-click '{text}' click_failed exit={S(ExitValue(click))}");
     }
     private LegacyExecutionResult PrecisionValidate()
     {
@@ -95,7 +95,7 @@ internal sealed partial class LegacyExecutionCoordinator
                 if (Has(target)) argv.AddRange(["-TargetMatch", target!]);
                 var scan = INative(argv.ToArray()); int elapsed = Stop("precision-validate"); total += elapsed;
                 int? bx = null, by = null; int score = 0; var json = Parsed(scan); var point = P(json, "recommended_point");
-                if (ExitOf(scan) == 0 && Ok(scan) && T(point))
+                if (ExitIsZero(scan) && Ok(scan) && T(point))
                 {
                     if (P(point, "x").ValueKind != JsonValueKind.Null) bx = I(P(point, "x"));
                     if (P(point, "y").ValueKind != JsonValueKind.Null) by = I(P(point, "y"));

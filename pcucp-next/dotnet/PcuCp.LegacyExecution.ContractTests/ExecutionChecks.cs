@@ -78,6 +78,7 @@ internal static class ExecutionChecks
         Check(session.Run("workflow-run", [], new(false, false)) == 1, "Out-of-order effect reply accepted");
         writer = new StringWriter(); session = new(new StringReader(""), writer);
         Check(session.Run("workflow-run", [], new(false, false)) == 1, "Disconnected effect stream must fail without retry");
+        SessionDispatchChecks.Run(Check);
         Console.WriteLine($"Passed {checks} execution family checks; no live input, child command, history write or sleep executed.");
     }
 }

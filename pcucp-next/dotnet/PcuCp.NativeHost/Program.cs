@@ -33,18 +33,31 @@ if (command is "legacy-precision-session" or "legacy-precision-storage")
         return 2;
     }
 }
-if (command == "legacy-execution-session")
+if (command is "legacy-execution-session" or "legacy-interaction-session" or "legacy-diagnostic-session")
 {
     try
     {
         using var input = LegacySessionInput.Open(Console.OpenStandardInput());
-        var startup = LegacyExecutionStartup.Read(args.Skip(1).ToArray(), input);
+        var family = command switch { "legacy-interaction-session" => "interaction", "legacy-diagnostic-session" => "diagnostics", _ => "execution" };
+        var startup = LegacyExecutionStartup.Read(args.Skip(1).ToArray(), input, family);
         var previousCulture = CultureInfo.CurrentCulture;
         try
         {
             CultureInfo.CurrentCulture = startup.Culture;
-            return new LegacyExecutionSession(input, Console.Out).Run(startup.Operation, startup.Rest,
-                startup.Authority, startup.Brief, startup.CacheSeconds, startup.VisionAvailable);
+            var session = new LegacyExecutionSession(input, Console.Out);
+            if (family == "interaction")
+                return session.Run(effects => new LegacyExecutionCoordinator(effects, startup.Authority, startup.Rest,
+                    startup.Brief, startup.CacheSeconds, startup.VisionAvailable).RunInteraction(startup.Operation, startup.Double, startup.RightClick));
+            if (family == "diagnostics")
+                return session.Run(effects =>
+                {
+                    string Text(string name) => startup.Context.GetProperty(name).GetString()!;
+                    var context = new LegacyDiagnosticContext(Text("audit_directory"), Text("cache_directory"), Text("wrapper_log"),
+                        startup.Context.GetProperty("cli_path").GetString(), Text("changelog_path"), Text("temp_root"), Text("benchmark_schema"), Text("release_schema"));
+                    var result = new LegacyDiagnosticCoordinator(new LegacyDiagnosticExecutionAdapter(effects), startup.Rest, context, startup.Brief).Run(startup.Operation);
+                    return new LegacyExecutionResult(result.Payload, result.Exit, result.JsonDepth, result.Brief, result.EmitJson);
+                });
+            return session.Run(startup.Operation, startup.Rest, startup.Authority, startup.Brief, startup.CacheSeconds, startup.VisionAvailable);
         }
         finally { CultureInfo.CurrentCulture = previousCulture; }
     }

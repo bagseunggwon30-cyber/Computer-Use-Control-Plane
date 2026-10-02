@@ -7,19 +7,29 @@ using System.IO;
 internal sealed class LegacyExecutionSession(TextReader input, TextWriter output) : ILegacyExecutionEffects
 {
     private long sequence;
-    private bool liveEffectSent;
+    private bool potentialStateChangeSent;
     private const int ChunkBytes = 49152;
     private static readonly JsonSerializerOptions Options = new() { MaxDepth = 128 };
-    private void Frame(object value) { output.WriteLine(JsonSerializer.Serialize(value, Options)); output.Flush(); }
-    private void Send(string kind, long id, object value)
+    private void Frame(string serialized) { output.WriteLine(serialized); output.Flush(); }
+    private void Send(string kind, long id, object value, bool mayChangeState = false)
     {
+        // Preflight the entire message, including all frame serialization, before
+        // any bytes leave this process. The host cannot dispatch a partial value.
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(value, Options);
+        var parts = new List<string>();
         for (int offset = 0; offset < bytes.Length; offset += ChunkBytes)
         {
             int length = Math.Min(ChunkBytes, bytes.Length - offset);
-            Frame(new { kind = "part", target = kind, id, data = Convert.ToBase64String(bytes, offset, length) });
+            parts.Add(JsonSerializer.Serialize(new { kind = "part", target = kind, id, data = Convert.ToBase64String(bytes, offset, length) }, Options));
         }
-        Frame(new { kind = "end", target = kind, id });
+        string end = JsonSerializer.Serialize(new { kind = "end", target = kind, id }, Options);
+        foreach (string part in parts) Frame(part);
+        // Sending the terminator can make host dispatch possible even if its write
+        // or flush throws. Earlier encoding/part failures cannot dispatch this effect.
+        // A rejected preflight must not consume an ID that the host never received.
+        sequence = id;
+        if (mayChangeState) potentialStateChangeSent = true;
+        Frame(end);
     }
     private string ReadReplyFrame()
     {
@@ -35,10 +45,9 @@ internal sealed class LegacyExecutionSession(TextReader input, TextWriter output
     }
     public JsonElement Invoke(LegacyExecutionEffect effect)
     {
-        long id = ++sequence;
-        if (effect.Live) liveEffectSent = true;
+        long id = sequence + 1;
         Send("effect", id, new { kind = effect.Kind.ToString(), name = effect.Name, argv = effect.Argv, data = LegacyExecutionWire.Encode(effect.Data),
-            live = effect.Live, quiet = effect.Quiet, brief = effect.Brief, confirm_sensitive = effect.ConfirmSensitive });
+            live = effect.Live, quiet = effect.Quiet, brief = effect.Brief, confirm_sensitive = effect.ConfirmSensitive }, LegacyExecutionEffectSemantics.MayChangeState(effect));
         using var buffer = new MemoryStream();
         while (true)
         {
@@ -84,14 +93,14 @@ internal sealed class LegacyExecutionSession(TextReader input, TextWriter output
         try
         {
             var result = operation(this);
-            Send("complete", ++sequence, new { payload = LegacyExecutionWire.Encode(result.Payload), exit = result.Exit, json_depth = result.JsonDepth, brief = result.Brief, emit_json = result.EmitJson });
+            Send("complete", sequence + 1, new { payload = LegacyExecutionWire.Encode(result.Payload), exit = result.Exit, json_depth = result.JsonDepth, brief = result.Brief, emit_json = result.EmitJson });
             return result.Exit;
         }
         catch (Exception error)
         {
             // Preserve phase and uncertainty for every failed reply/assembly path.
             // A failure after dispatch must never be mislabeled as startup refusal.
-            try { Send("error", ++sequence, new { message = error.Message, mutation_may_have_occurred = liveEffectSent, automatic_retry = false }); }
+            try { Send("error", sequence + 1, new { message = error.Message, mutation_may_have_occurred = potentialStateChangeSent, automatic_retry = false }); }
             catch (Exception streamError) when (streamError is IOException or ObjectDisposedException) { } // Caller owns uncertainty.
             return 1;
         }

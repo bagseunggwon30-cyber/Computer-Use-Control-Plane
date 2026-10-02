@@ -133,6 +133,38 @@ reply streams preserve `mutation_may_have_occurred: true` and
 host exit cannot erase that warning. Ordinary captured failures before live
 dispatch retain exact original behavior.
 
+## Staged shared-host extension
+
+The next interaction and diagnostic adapters reuse the same chunked process
+session through closed family entry points. Each entry binds its operation,
+original argv, immutable authority ceilings and family context before any reply
+is read. Diagnostic paths come only from that startup context. Interaction click
+options must be actual Boolean values and apply only to `click-label`.
+
+Outcome accounting now separates desktop input authority from possible writes to
+owned cache, capture, audit and log files. Native and CLI wrapper calls also
+count because they can write redirected captures/logs or remove stale locks, even
+when their desktop operation is read-only. A diagnostic authorization self-test
+returns its known blocked outcome as a Boolean reply after the original checker
+finishes; an expected rejection is not confused with a lost outcome. This classification grants no new
+capability. The entire tagged message and all frame strings are serialized before
+output. A rejected preflight sends no effect and consumes no sequence ID. State
+uncertainty starts immediately before the terminal effect frame can permit host
+dispatch. Lost or malformed replies and final encoding failures then prohibit
+whole-operation replay, including after an acknowledged owned write.
+
+For an ordinary callback exception, uncertainty applies to a possibly writing
+current effect or any earlier live input. A known read failure after a successful
+owned write may still follow the original caught-read fallback. An uncaught final
+failure after prior owned writes retains the exact error text with an explicit
+uncertainty prefix. Actual-adapter tests partition only those reached boundaries;
+the original kernel oracle comparisons are unchanged.
+
+Local evidence for this staged extension is 994 execution checks (including the
+original 370), 110 startup checks, and a clean Windows-targeted native build.
+The extended actual-adapter comparisons still require Windows CI. These local
+checks do not establish screen, clipboard, IME or application success.
+
 ## Qualification and remaining gates
 
 The oracle is the original `scripts/cucp.ps1` blob in Git tree
@@ -143,7 +175,7 @@ exact Console output, effects and their order, errors and exits. Ordered-diction
 recovery reports are captured before formatting and are required explicitly.
 No authenticated model or live desktop input is used.
 
-All 462 actual-adapter cases remain, including 32 reached exact non-live failures,
+At the accepted `56be343c` checkpoint, all 462 actual-adapter cases passed, including 32 reached exact non-live failures,
 six unreached injected failures, and 16 deliberate post-dispatch uncertainty
 cases. The unchanged exact-equality path covers 446 cases. Independent contracts
 cover typed inert children, immutable ceilings, true-array roundtrips, malformed

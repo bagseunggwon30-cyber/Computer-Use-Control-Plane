@@ -302,6 +302,15 @@ def cases():
         f['replies'] += [None]*24
     for f in copy.deepcopy(result):
         f['brief']=True;f['case']+='-brief';result.append(f)
+    # Append only the requested confidence conversion/promotion probes, keeping
+    # the original 854 fixtures and their indices unchanged. IconFind accepts
+    # numeric fields but intentionally boosts only string confidence values.
+    for confidence in (429496729,429496730,-429496729,2147483647):
+        pool=[element(confidence=confidence,affordance_id='numeric'),element('Save now',affordance_id='ordinary')]
+        for operation,captures in (('find-label',[appshot(pool)]),('icon-find',[pool])):
+            for brief in (False,True):
+                add(operation,label_args,captures+[None]*24,brief=brief,
+                    label=f'confidence-int32-boundary-{operation}-{confidence}'+('-brief' if brief else ''))
     return result
 
 
@@ -424,7 +433,7 @@ def render_candidate(results):
 class InteractionPortableTests(unittest.TestCase):
     maxDiff=1200
     def test_bounded_corpus_covers_all_eight_functions_and_brief(self):
-        fs=cases();self.assertGreaterEqual(len(fs),700);self.assertLess(len(fs),1500)
+        fs=cases();self.assertEqual(len(fs),870)
         self.assertEqual({f['operation'] for f in fs},OPERATIONS)
         self.assertEqual(sum(bool(f.get('brief')) for f in fs),len(fs)//2)
         self.assertTrue(all(len(f['replies'])<100 for f in fs))

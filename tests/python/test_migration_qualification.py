@@ -32,6 +32,21 @@ class QualificationSelectionTests(unittest.TestCase):
             self.assertIn("full output is in the log artifact", output.getvalue())
             self.assertLess(len(output.getvalue()), 67000)
 
+    def test_legacy_console_cannot_mask_failure_or_change_artifact_bytes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);log=root/'log.txt';console_bytes=io.BytesIO()
+            console=io.TextIOWrapper(console_bytes,encoding='cp1252',errors='strict')
+            payload='한글 😀\n'.encode('utf-8')
+            command=[sys.executable,'-c',f'import os; os.write(1,{payload!r}); raise SystemExit(7)']
+            with patch.object(sys,'stdout',console), self.assertRaises(subprocess.CalledProcessError) as caught:
+                qualification.run_logged(command,cwd=root,env=dict(os.environ),log_path=log)
+            console.flush()
+            self.assertEqual(caught.exception.returncode,7)
+            self.assertEqual(log.read_bytes(),payload)
+            self.assertIn(b'\\ud55c\\uae00',console_bytes.getvalue())
+            self.assertIn(b'\\U0001f600',console_bytes.getvalue())
+            console.close()
+
     def test_logged_success_combines_stdout_and_stderr_without_losing_output(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -63,8 +78,7 @@ class QualificationSelectionTests(unittest.TestCase):
             (root / ".github").mkdir()
             path = root / ".github/migration-adapters.json"
             for data in [[], {"test_adapters": ["unknown"]}, {"test_adapters": [True]},
-                         {"test_adapters": ["cdp", "cdp"]}, {"test_adapters": [], "extra": True},
-                         {"test_adapters": ["interaction"]}, {"test_adapters": ["diagnostics"]}]:
+                         {"test_adapters": ["cdp", "cdp"]}, {"test_adapters": [], "extra": True}]:
                 path.write_text(json.dumps(data))
                 with self.assertRaises(ValueError):
                     qualification.enabled_adapters(root)
@@ -125,6 +139,7 @@ class QualificationSelectionTests(unittest.TestCase):
             (root / 'tests/python/test_legacy_interaction_fixture.py').write_text('# fixture')
             output = io.StringIO()
             with patch.object(qualification, 'ROOT', root), patch.object(qualification.subprocess, 'run'), \
+                    patch.object(qualification, 'CANDIDATE_ONLY', frozenset({'interaction'})), \
                     patch.dict(os.environ, {'GITHUB_STEP_SUMMARY':str(root / 'summary.md')}), \
                     contextlib.redirect_stdout(output):
                 qualification.run_family('interaction')
@@ -137,6 +152,31 @@ class QualificationSelectionTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'Missing exact adapter tests'):
                     qualification.run_family('interaction')
 
+
+    def test_new_family_gates_require_actual_adapter_suite_and_matching_host(self):
+        for family in ('interaction', 'diagnostics'):
+            with self.subTest(family=family), tempfile.TemporaryDirectory() as temp:
+                root=Path(temp)
+                for name in ('tests/python', 'scripts', '.github', 'pcucp-next/dotnet/PcuCp.NativeHost', *(
+                        'pcucp-next/dotnet/'+p for p in qualification.PROJECTS[family])):
+                    (root/name).mkdir(parents=True,exist_ok=True)
+                (root/'.github/migration-adapters.json').write_text('{"test_adapters":[]}')
+                (root/f'tests/python/test_legacy_{family}_parity.py').write_text('# fixture')
+                calls=[]
+                def capture(argv,**kw):calls.append((argv,dict(kw['env'])))
+                with patch.object(qualification,'ROOT',root), patch.object(qualification.subprocess,'run',side_effect=capture), contextlib.redirect_stdout(io.StringIO()):
+                    with self.assertRaisesRegex(ValueError,'Missing exact adapter tests'):
+                        qualification.run_family(family)
+                    self.assertEqual(calls,[])
+                    (root/'tests/python'/qualification.REQUIRED_ADAPTER_TESTS[family]).write_text('# actual adapter fixture')
+                    with self.assertRaisesRegex(ValueError,'Missing exact '+family+' adapter draft'):
+                        qualification.run_family(family)
+                    (root/qualification.DRAFT_ADAPTERS[family]).write_text('# actual draft')
+                    qualification.run_family(family)
+                host=str(root/'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll')
+                self.assertEqual(calls[-1][1]['CUCP_INTERACTION_TEST_HOST' if family=='interaction' else 'CUCP_DIAGNOSTICS_TEST_HOST'],host)
+                self.assertEqual(calls[-1][1]['PYTHONIOENCODING'],'utf-8')
+                self.assertTrue(any('PcuCp.LegacyExecution.StartupTests' in str(args) for args,_ in calls))
 
     def test_execution_draft_and_promoted_modes_run_real_adapter_gates(self):
         with tempfile.TemporaryDirectory() as temp:

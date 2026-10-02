@@ -202,6 +202,36 @@ def contains_uncertainty(value):
     return isinstance(value,list) and any(contains_uncertainty(v) for v in value)
 
 
+def effect_may_change_state(effect):
+    """Outcome classification only; matches the closed session/host descriptor contract."""
+    if effect["live"]:return True
+    kind=effect["kind"];name=effect.get("name","");argv=effect.get("argv",[])
+    if kind in {"HistoryAppend","TrajectoryAppend","RemoveFile","PointCacheWrite","AnchorAppend",
+                "Appshot","Notice","Child","Cucp","Vision"}:return True
+    if kind=="LocalMacro":return name!="icon-find"
+    # The retained Native helper and CLI write logs/capture files independently
+    # of the action's desktop-input classification. Direct UIA/window reads do not.
+    if kind=="Native":return True
+    if kind!="Diagnostic":return False
+    if name in {"AuditProbe","ClearAppshotCache","Appshot","Notice"}:return True
+    if name in {"Native","Cli","HelperUp","AssertAuthorized"}:return True
+    data=effect.get("data")
+    return name=="Macro" and isinstance(data,dict) and isinstance(data.get("name"),str) and (
+        data["name"] in {"health-quick","find-label"} or (data["name"]=="windows" and argv==["--rich"]))
+
+
+def uncertain_failure_effect(failures,effects):
+    # A failed current write has an unknown outcome. Earlier live dispatch retains
+    # its original no-fallback protection. Successful owned writes do not convert
+    # a caught, known read failure into an unknown write; terminal loss is separate.
+    return next((failure for failure in failures if effect_may_change_state(failure["effect"]) or any(
+        e["live"] for e in effects[:failure["trace_index"]+1])),None)
+
+
+def terminal_owned_write_failure(result,effects):
+    return result["state"]=="error" and any(effect_may_change_state(effect) for effect in effects)
+
+
 def run_candidate(fixtures):
     dotnet,dll=built_candidate()
     p=subprocess.run([dotnet,str(dll),"--fixtures"],input=json.dumps(fixtures).encode(),capture_output=True,timeout=120)
@@ -254,6 +284,54 @@ class ExecutionPortableTests(unittest.TestCase):
         self.assertGreater(non_live,0);self.assertGreater(live,0);self.assertGreater(post_live_read,0)
         self.assertEqual(non_live+live+post_live_read+unreached,
                          sum(any(isinstance(r,dict) and "throw" in r for r in f["replies"]) for f in fixtures))
+        ordinary=uncertain=terminal=0
+        for fixture,result in zip(fixtures,captured):
+            failures=captured_failure_effects(fixture,result["effects"])
+            if uncertain_failure_effect(failures,result["effects"]) is not None:uncertain+=1
+            elif terminal_owned_write_failure(result,result["effects"]):terminal+=1
+            else:ordinary+=bool(failures)
+        self.assertGreater(ordinary,0);self.assertGreater(uncertain,0)
+        print(f"Captured actual-partition classification: {ordinary} ordinary failures, {uncertain} uncertain failures, {terminal} terminal owned-write failures")
+
+    def test_actual_partition_distinguishes_current_write_from_completed_owned_write(self):
+        def effect(kind,name="",argv=(),data=None,live=False):
+            return dict(kind=kind,name=name,argv=list(argv),data=data,live=live)
+        writes=[effect(kind) for kind in ("HistoryAppend","TrajectoryAppend","RemoveFile","PointCacheWrite","AnchorAppend","Appshot","Notice","Child","Cucp","Vision")]
+        writes.extend([effect("Native",argv=("-Action","screenshot")),effect("LocalMacro","click-point"),effect("LocalMacro","ICON-FIND")])
+        writes.extend(effect("Diagnostic",name) for name in ("AuditProbe","ClearAppshotCache","Appshot","Notice","HelperUp","AssertAuthorized"))
+        writes.extend(effect("Diagnostic","Macro",data={"name":name}) for name in ("health-quick","find-label"))
+        writes.append(effect("Diagnostic","Macro",argv=("--rich",),data={"name":"windows"}))
+        writes.extend(effect("Diagnostic","Cli",argv=("observe",name)) for name in ("appshot","screenshot"))
+        writes.extend([effect("Native",argv=("-Action","uia-find","-Label","screenshot")),
+                       effect("Native",argv=("-Action","windows")),effect("Native",argv=("-Action","health")),
+                       effect("Native",argv=("-action","screenshot")),effect("Native",argv=("-Action","Screenshot")),
+                       effect("Diagnostic","Native",argv=("-Action","focused")),
+                       effect("Diagnostic","Cli",argv=("version","observe","screenshot")),
+                       effect("Diagnostic","Cli",argv=("observe","context","--label","appshot")),
+                       effect("Diagnostic","Cli",argv=("OBSERVE","appshot"))])
+        reads=[effect("Clock"),effect("HistoryRead"),effect("UIAffordances"),effect("Win32Windows"),effect("LocalMacro","icon-find"),
+               effect("Diagnostic","Macro",data={"name":"windows","value":"health-quick"}),
+               effect("Diagnostic","Macro",data={"value":{"name":"find-label"}}),
+               effect("Diagnostic","auditprobe"),effect("Diagnostic","Macro",data={"name":"HEALTH-QUICK"}),
+               effect("Diagnostic","cli",argv=("observe","appshot")),effect("Diagnostic","native",argv=("-Action","screenshot")),
+               effect("Diagnostic","helperup"),effect("Diagnostic","assertauthorized"),
+               effect("Diagnostic","Macro",argv=("--match","--rich"),data={"name":"windows"}),
+               effect("Diagnostic","Macro",argv=("--rich","--json-only"),data={"name":"windows"}),
+               effect("Diagnostic","Macro",argv=("--rich",),data={"name":"Windows"})]
+        for item in writes:
+            with self.subTest(effect=item):self.assertTrue(effect_may_change_state(item));self.assertFalse(item["live"])
+        for item in reads:
+            with self.subTest(effect=item):self.assertFalse(effect_may_change_state(item))
+        read=effect("HistoryRead");write=effect("HistoryAppend")
+        failure=dict(effect=read,trace_index=1,reply_index=0,message="known read failure")
+        self.assertIsNone(uncertain_failure_effect([failure],[write,read]))
+        self.assertFalse(terminal_owned_write_failure({"state":"complete"},[write,read]))
+        self.assertTrue(terminal_owned_write_failure({"state":"error"},[write,read]))
+        self.assertFalse(terminal_owned_write_failure({"state":"error"},[read]))
+        self.assertIs(uncertain_failure_effect([failure],[effect("Native",live=True),read]),failure)
+        for current in writes:
+            failure=dict(effect=current,trace_index=0)
+            self.assertIs(uncertain_failure_effect([failure],[current]),failure)
 
     def test_large_workflow_preserves_256_steps_six_attempts_and_large_payload(self):
         f=dict(operation="workflow-run",rest=["--continue-on-error","--retry-failed-step","5"],allow_live=False,
@@ -334,26 +412,28 @@ class ExecutionWindowsParityTests(unittest.TestCase):
             def unbrief_key(fixture):
                 return json.dumps({k:v for k,v in fixture.items() if k!="brief"},sort_keys=True)
             unbrief_results={unbrief_key(f):r for f,r in zip(fixtures,new) if not f.get("brief")}
-            exact_failures=0;uncertain_failures=0;diagnostic_shown=False
+            exact_failures=0;uncertain_failures=0;terminal_owned_failures=0;diagnostic_shown=False
             for index,(fixture,before,after) in enumerate(zip(fixtures,old,new)):
                 with self.subTest(case=index,operation=fixture["operation"],rest=fixture["rest"],brief=fixture.get("brief")):
                     if before["state"]=="complete" and not fixture.get("brief") and fixture["operation"] in ("recovery-plan","recovery-run"):
                         self.assertIsNotNone(before["payload"],"The original ordered recovery report must be captured before Console serialization")
                     original_effects=decode_wire(before["effects"])
                     failures=captured_failure_effects(fixture,original_effects)
-                    # Any earlier live dispatch is relevant too: losing a later
-                    # observation must not erase an already dispatched mutation.
-                    uncertain=next((failure for failure in failures if any(
-                        e["live"] for e in original_effects[:failure["trace_index"]+1])),None)
+                    uncertain=uncertain_failure_effect(failures,original_effects)
                     if uncertain is None:
-                        # Includes every captured failure before a live dispatch,
-                        # plus fixture throws that the original never reached.
-                        if after != before and not diagnostic_shown:
+                        # Preserve every original value, effect, Console byte and
+                        # consumed reply. Only an uncaught terminal failure after
+                        # a sent owned write adds the explicit no-retry prefix.
+                        expected=before
+                        if terminal_owned_write_failure(before,original_effects):
+                            expected={**before,"error":"mutation_may_have_occurred=true; automatic_retry=false; "+before["error"]}
+                            terminal_owned_failures+=1
+                        else:exact_failures+=bool(failures)
+                        if after != expected and not diagnostic_shown:
                             diagnostic_shown=True
-                            print(f"First exact adapter mismatch, case {index}, {fixture['operation']}: "+str(first_difference(after,before))+
+                            print(f"First exact adapter mismatch, case {index}, {fixture['operation']}: "+str(first_difference(after,expected))+
                                   "; actual error="+str(after.get("error",""))[:1024],flush=True)
-                        self.assertEqual(after,before)
-                        exact_failures+=bool(failures)
+                        self.assertEqual(after,expected)
                         continue
                     uncertain_failures+=1
                     index=uncertain["trace_index"];failed=uncertain["effect"]
@@ -375,12 +455,13 @@ class ExecutionWindowsParityTests(unittest.TestCase):
                         self.assertEqual(report["status"],"partial");self.assertTrue(contains_uncertainty(report))
                         if fixture.get("brief"):self.assertTrue(after["console"].startswith("partial "),after["console"])
                     else:
-                        # The failing read followed a captured live action. The
-                        # session's deliberate terminal-loss correction is exact.
+                        # A failed current owned write or a read after live input
+                        # terminates with exact cause and explicit uncertainty.
                         self.assertEqual(after["state"],"error")
                         self.assertEqual(after["error"],"mutation_may_have_occurred=true; automatic_retry=false; "+uncertain["message"])
             self.assertGreater(exact_failures,0);self.assertGreater(uncertain_failures,0)
-            print(f"Compared all {len(fixtures)} actual-adapter cases: {exact_failures} exact non-live failure cases and {uncertain_failures} explicit post-dispatch uncertainty cases")
+            print(f"Compared all {len(fixtures)} actual-adapter cases: {exact_failures} exact ordinary failure cases, "
+                  f"{uncertain_failures} current-write/prior-live uncertainty cases and {terminal_owned_failures} terminal owned-write metadata cases")
 
 
 PS_CAPTURE = r'''

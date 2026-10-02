@@ -11,8 +11,10 @@ internal sealed partial class LegacyDiagnosticCoordinator
         var first = A(Effect(LegacyDiagnosticEffectKind.Processes));
         Effect(LegacyDiagnosticEffectKind.Sleep, data: sample);
         var second = A(Effect(LegacyDiagnosticEffectKind.Processes));
-        var byPid = new Dictionary<string, JsonElement>(); foreach (var p in first) byPid[S(P(p, "id"))] = p;
-        DateTimeOffset now = DateTimeOffset.Parse(Now(), CultureInfo.InvariantCulture);
+        var byPid = new Dictionary<string, int>(); for (int index = 0; index < first.Length; index++) byPid[S(P(first[index], "id"))] = index;
+        // PowerShell subtracts the two DateTime wall-clock values. In particular,
+        // it does not normalize a DST-offset change before computing process age.
+        DateTime now = DateTimeOffset.Parse(Now(), CultureInfo.InvariantCulture).DateTime;
         int cpu = I(Effect(LegacyDiagnosticEffectKind.ProcessorCount));
         var results = new List<Dictionary<string, object?>>(); long totalBytes = 0;
         foreach (var group in new[] {
@@ -20,26 +22,29 @@ internal sealed partial class LegacyDiagnosticCoordinator
             ("node", new[] {"node"}), ("powershell", new[] {"powershell", "pwsh"}),
             ("chrome", new[] {"chrome", "msedge", "brave", "whale"}), ("cucp_helper", new[] {"cucp-helper", "windows-mcp-helper"}) })
         {
-            var matching = second.Where(p => group.Item2.Contains(S(P(p, "name")), Comparer)).ToArray();
+            var matching = second.Select((p, index) => (Process: p, Ordinal: index)).Where(row => group.Item2.Contains(S(P(row.Process, "name")), Comparer)).ToArray();
             if (matching.Length == 0) continue;
             long sum = 0; double oldest = 0, deltaSum = 0; var priorities = new Dictionary<string, int>(Comparer);
-            foreach (var p in matching)
+            foreach (var row in matching)
             {
-                // Snapshot accessors omit an inaccessible property independently;
-                // losing one field never discards the whole process or group.
-                if (P(p, "private_bytes").ValueKind != JsonValueKind.Null) sum += L(P(p, "private_bytes"));
-                if (DateTimeOffset.TryParse(S(P(p, "started_at")), CultureInfo.InvariantCulture, DateTimeStyles.None, out var started)) oldest = Math.Max(oldest, (now - started).TotalSeconds);
-                if (byPid.TryGetValue(S(P(p, "id")), out var prev) && P(p, "cpu_ms").ValueKind != JsonValueKind.Null && P(prev, "cpu_ms").ValueKind != JsonValueKind.Null)
-                    deltaSum += Math.Max(0, N(P(p, "cpu_ms")) - N(P(prev, "cpu_ms")));
-                if (P(p, "priority").ValueKind != JsonValueKind.Null)
+                int? previous = byPid.TryGetValue(S(P(row.Process, "id")), out int index) ? index : null;
+                // Original Process property getters run after the sleep/date/CPU
+                // acquisitions, per matching process. Retain host-owned objects;
+                // ordinal references cannot reopen an arbitrary process by PID.
+                var metrics = Effect(LegacyDiagnosticEffectKind.ProcessMetrics, data: D("current_ordinal", row.Ordinal, "previous_ordinal", previous));
+                if (P(metrics, "private_bytes").ValueKind != JsonValueKind.Null) sum += L(P(metrics, "private_bytes"));
+                if (DateTimeOffset.TryParse(S(P(metrics, "started_at")), CultureInfo.InvariantCulture, DateTimeStyles.None, out var started)) oldest = Math.Max(oldest, (now - started.DateTime).TotalSeconds);
+                if (metrics.ValueKind == JsonValueKind.Object && metrics.TryGetProperty("current_cpu_ms", out var currentCpu) && metrics.TryGetProperty("previous_cpu_ms", out var previousCpu))
+                    deltaSum += Math.Max(0, N(currentCpu) - N(previousCpu));
+                if (P(metrics, "priority").ValueKind != JsonValueKind.Null)
                 {
-                    string priority = S(P(p, "priority")); if (string.IsNullOrWhiteSpace(priority)) priority = "unknown";
+                    string priority = S(P(metrics, "priority")); if (string.IsNullOrWhiteSpace(priority)) priority = "unknown";
                     priorities[priority] = priorities.GetValueOrDefault(priority) + 1;
                 }
             }
             totalBytes += sum; double pct = cpu > 0 ? Math.Round(deltaSum / sample * (100d / cpu), 1) : 0;
             // Pipeline assignment collapses one PID to a scalar in the original.
-            object pids = matching.Length == 1 ? P(matching[0], "id") : matching.Select(p => P(p, "id")).ToArray();
+            object pids = matching.Length == 1 ? P(matching[0].Process, "id") : matching.Select(p => P(p.Process, "id")).ToArray();
             results.Add(D("group", group.Item1, "count", matching.Length, "memory_mb", Math.Round(sum / 1048576d, 1),
                 "cpu_delta_pct", pct, "oldest_age_sec", Convert.ToInt32(oldest), "priority_classes", priorities, "pids", pids));
         }

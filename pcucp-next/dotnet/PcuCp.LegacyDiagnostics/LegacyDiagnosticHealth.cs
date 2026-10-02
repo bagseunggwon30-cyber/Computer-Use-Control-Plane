@@ -22,7 +22,7 @@ internal sealed partial class LegacyDiagnosticCoordinator
     {
         Start("health-quick"); string now = Now();
         var (nodeOk, nodeVer) = NodeVersion();
-        bool cliOk = Has(paths.CliPath) && Exists(paths.CliPath);
+        bool cliOk = Has(paths.CliPath) && Exists(paths.CliPath!);
         bool auditOk = AuditProbe(".health-quick-probe-");
         bool win32Ok = T(Effect(LegacyDiagnosticEffectKind.EnsureWin32));
         bool pressureOk = true; int cacheFiles = 0, tempFiles = 0; long logBytes = 0;
@@ -55,7 +55,7 @@ internal sealed partial class LegacyDiagnosticCoordinator
     private LegacyDiagnosticResult HealthDetail()
     {
         string now = Now(); var (nodeOk, nodeVer) = NodeVersion();
-        bool cliOk = Has(paths.CliPath) && Exists(paths.CliPath);
+        bool cliOk = Has(paths.CliPath) && Exists(paths.CliPath!);
         bool verOk = false; string verNum = "";
         try { var r = Cli("version"); if (T(Parsed(r)) && Eq(P(Parsed(r), "status"), "ok")) { verOk = true; verNum = S(P(Parsed(r), "version")); } }
         catch (LegacyDiagnosticEffectException) { }
@@ -84,7 +84,7 @@ internal sealed partial class LegacyDiagnosticCoordinator
             ("coord_gate_requires_after", new[] { "act", "click", "--x", "100", "--y", "100" }, "blocked-without-after") })
         {
             bool blocked = false;
-            try { Effect(LegacyDiagnosticEffectKind.AssertAuthorized, argv: gate.Item2); }
+            try { blocked = T(Effect(LegacyDiagnosticEffectKind.AssertAuthorized, argv: gate.Item2)); }
             catch (LegacyDiagnosticEffectException) { blocked = true; }
             Add(gate.Item1, "wrapper", blocked ? "ok" : "fail", gate.Item3);
         }

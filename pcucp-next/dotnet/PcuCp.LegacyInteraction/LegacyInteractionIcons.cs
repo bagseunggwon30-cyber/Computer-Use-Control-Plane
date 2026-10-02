@@ -37,7 +37,7 @@ internal sealed partial class LegacyExecutionCoordinator
         var payload = D("schema", "cucp.icon-find/v1", "status", status, "collected_at", Effect(LegacyExecutionEffectKind.Timestamp, "o"), "elapsed_ms", elapsed,
             "label", label, "window", window, "match", match, "max_size", maximum, "min_size", minimum,
             "near", hasNear ? D("x", nearX, "y", nearY, "radius", radius) : null, "candidate_count", ranked.Length, "ambiguous", ambiguous,
-            "top", top, "candidates", candidates.Count > limit && limit == 1 ? ranked[0] : ranked, "recoverable_errors", errors);
+            "top", top, "candidates", ranked, "recoverable_errors", errors);
         string line;
         if (top is null) line = $"partial icon-find '{label}' no_icon match='{match}' max_size={maximum} elapsed_ms={elapsed}";
         else
@@ -64,8 +64,8 @@ internal sealed partial class LegacyExecutionCoordinator
         var args = new List<string> { "act", "click", "--x", Num(x), "--y", Num(y), "--after", observationId };
         if (T(P(top, "window"))) args.AddRange(["--target-window", S(P(top, "window"))]);
         var clicked = Act(args);
-        return Silent(ExitOf(clicked), ExitOf(clicked) == 0 ? $"ok icon-click '{S(P(found, "label"))}' @({x},{y}) win='{S(P(top, "window"))}' score={S(P(top, "score"))}"
-            : $"err icon-click '{S(P(found, "label"))}' exit={ExitOf(clicked)}");
+        return Silent(ExitOf(clicked), ExitIsZero(clicked) ? $"ok icon-click '{S(P(found, "label"))}' @({x},{y}) win='{S(P(top, "window"))}' score={S(P(top, "score"))}"
+            : $"err icon-click '{S(P(found, "label"))}' exit={S(ExitValue(clicked))}");
     }
     private LegacyExecutionResult ClickLabel(bool doubleClick, bool rightClick)
     {
@@ -106,13 +106,13 @@ internal sealed partial class LegacyExecutionCoordinator
         string? target = source == "element" ? S(P(el, "window")) : source == "icon_find_fallback" ? S(P(icon, "window")) : window;
         var args = new List<string> { "act", rightClick ? "right-click" : "click", "--x", Num(x), "--y", Num(y), "--after", S(P(shot, "ObservationId")) };
         if (Has(target)) args.AddRange(["--target-window", target!]); var clicked = Act(args);
-        if (doubleClick && ExitOf(clicked) == 0) Act(args);
+        if (doubleClick && ExitIsZero(clicked)) Act(args);
         Dictionary<string, object?> trajectory;
         string success;
         if (source == "element")
         {
             trajectory = D("label", label, "window", P(el, "window"), "role", P(el, "role"), "x", x, "y", y,
-                "observation_id", P(shot, "ObservationId"), "exit", ExitOf(clicked), "double", doubleClick, "right", rightClick);
+                "observation_id", P(shot, "ObservationId"), "exit", ExitValue(clicked), "double", doubleClick, "right", rightClick);
             success = $"ok click-label '{label}' @({x},{y}) win='{target}'";
         }
         else
@@ -120,11 +120,11 @@ internal sealed partial class LegacyExecutionCoordinator
             var acquired = source == "icon_find_fallback" ? icon : vision;
             trajectory = D("label", label, "window", source == "icon_find_fallback" ? P(icon, "window") : window, "source", source, "confidence", S(P(acquired, "confidence")), "x", x, "y", y);
             if (source == "icon_find_fallback") { trajectory["rect_w"] = I(P(P(icon, "rect"), "width")); trajectory["rect_h"] = I(P(P(icon, "rect"), "height")); }
-            trajectory["observation_id"] = P(shot, "ObservationId"); trajectory["exit"] = ExitOf(clicked);
+            trajectory["observation_id"] = P(shot, "ObservationId"); trajectory["exit"] = ExitValue(clicked);
             success = source == "icon_find_fallback" ? $"ok click-label '{label}' @({x},{y}) via=icon-find size={I(P(P(icon, "rect"), "width"))}x{I(P(P(icon, "rect"), "height"))} score={S(P(icon, "score"))}"
                 : $"ok click-label '{label}' @({x},{y}) via=vision conf={S(P(vision, "confidence"))}";
         }
-        Trace("click", trajectory); if (brief) Pipeline(ExitOf(clicked) == 0 ? success : $"err click-label '{label}' exit={ExitOf(clicked)}");
+        Trace("click", trajectory); if (brief) Pipeline(ExitIsZero(clicked) ? success : $"err click-label '{label}' exit={S(ExitValue(clicked))}");
         return Silent(ExitOf(clicked));
     }
 }

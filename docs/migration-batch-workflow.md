@@ -156,3 +156,13 @@ already requires its real adapter draft and both image-diff and file-OCR suites.
 A candidate-only result is printed in logs and the CI summary and never qualifies
 source retirement. Actual adapter work proceeds alongside these initial oracle
 runs; the production cutover still requires its own bundled full regression.
+
+The subsequent adapter checkpoint removes the two temporary candidate-only stage
+declarations. It requires each exact adapter test module, each fixed draft, and
+the matching NativeHost; missing files or host configuration cannot silently skip
+the adapter gate. Both families run shared startup/session checks too. No new
+family is marked promoted in the manifest until its original-body cutover.
+Python child reports use explicit UTF-8; a bounded preview escapes characters an
+older console cannot encode while the artifact preserves every original byte and
+the child exit status. All three new families are qualified together before the
+single full regression for retirement.

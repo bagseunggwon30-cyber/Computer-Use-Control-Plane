@@ -57,8 +57,18 @@ internal sealed partial class LegacyExecutionCoordinator
     private void Notice(string level, string message) => IE(LegacyExecutionEffectKind.Notice, message, name: level);
     private void Pipeline(string message) => IE(LegacyExecutionEffectKind.PipelineOutput, message);
     private void Trace(string kind, object payload) => IE(LegacyExecutionEffectKind.TrajectoryAppend, payload, name: kind);
-    private static int ExitOf(JsonElement reply) => I(P(reply, "ExitCode").ValueKind == JsonValueKind.Null ? P(reply, "exit") : P(reply, "ExitCode"));
-    private static bool Ok(JsonElement reply) => T(Parsed(reply)) && Eq(P(Parsed(reply), "status"), "ok");
+    private static JsonElement ExitValue(JsonElement reply) => P(reply, "ExitCode").ValueKind == JsonValueKind.Null ? P(reply, "exit") : P(reply, "ExitCode");
+    private static int ExitOf(JsonElement reply) => I(ExitValue(reply));
+    private static bool ExitIsZero(JsonElement reply) => ExitValue(reply).ValueKind != JsonValueKind.Null && ExitOf(reply) == 0;
+    private static JsonElement Member(JsonElement value, string name)
+    {
+        if (value.ValueKind != JsonValueKind.Array) return P(value, name);
+        var members = value.EnumerateArray().Select(v => Member(v, name)).ToArray();
+        return members.Length == 1 ? members[0] : J(members);
+    }
+    private static bool EqualAny(JsonElement value, string text) => value.ValueKind == JsonValueKind.Array
+        ? value.EnumerateArray().Any(v => EqualAny(v, text)) : Eq(value, text);
+    private static bool Ok(JsonElement reply) => T(Parsed(reply)) && EqualAny(Member(Parsed(reply), "status"), "ok");
     private static string Num(int n) => n.ToString(CultureInfo.InvariantCulture);
     private static long Long(JsonElement value) => LegacyPrecisionKernel.L(value);
     private static double Number(JsonElement value) => LegacyPrecisionKernel.N(value);

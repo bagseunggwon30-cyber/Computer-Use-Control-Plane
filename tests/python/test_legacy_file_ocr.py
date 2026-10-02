@@ -81,12 +81,12 @@ try {
     [Console]::Out.WriteLine((ConvertTo-Json -InputObject $result -Depth 32 -Compress));exit 0
   }
   if($Operation -eq 'engine'){
-    $available=_Ensure-OCR;$engine=$Script:_OCREngine;$error=$Script:_OCRError
+    $available=_Ensure-OCR;$engine=$Script:_OCREngine;$initialOcrError=$Script:_OCRError
     $OcrLanguage='not_a_language';$again=_Ensure-OCR
     $language=$null;$engineType=$null
     if($engine){$language=$engine.RecognizerLanguage.LanguageTag;$engineType=$engine.GetType().FullName}
     $languages=@([Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages|ForEach-Object{$_.LanguageTag})
-    $data=[ordered]@{available=$available;loaded=$Script:_OCRLoaded;error=$error;engine_type=$engineType;language=$language;installed_languages=$languages;cached_available=$again;same_engine=[object]::ReferenceEquals($engine,$Script:_OCREngine);same_error=($error -ceq $Script:_OCRError)}
+    $data=[ordered]@{available=$available;loaded=$Script:_OCRLoaded;error=$initialOcrError;engine_type=$engineType;language=$language;installed_languages=$languages;cached_available=$again;same_engine=[object]::ReferenceEquals($engine,$Script:_OCREngine);same_error=($initialOcrError -ceq $Script:_OCRError)}
     [Console]::Out.WriteLine((ConvertTo-Json -InputObject $data -Depth 16 -Compress));exit 0
   }
   if($Operation -eq 'wait'){
@@ -95,8 +95,8 @@ try {
     if($c.state -eq 'error'){$completion.SetException((New-Object InvalidOperationException 'owned async failure'))}
     elseif($c.state -eq 'cancelled'){$completion.SetCanceled()}else{$completion.SetResult(42)}
     $asOperation=[WindowsRuntimeSystemExtensions].GetMethods()|Where-Object{$_.Name -eq 'AsAsyncOperation' -and $_.IsGenericMethod -and $_.GetParameters().Count -eq 1}|Select-Object -First 1
-    $operation=$asOperation.MakeGenericMethod([int]).Invoke($null,@($completion.Task))
-    $result=_Wait-AsyncOp $operation ([int])
+    $asyncOperation=$asOperation.MakeGenericMethod([int]).Invoke($null,@($completion.Task))
+    $result=_Wait-AsyncOp $asyncOperation ([int])
     [Console]::Out.WriteLine((ConvertTo-Json -InputObject ([ordered]@{value=$result;type=$result.GetType().FullName}) -Compress));exit 0
   }
   if($Operation -eq 'load'){
@@ -190,6 +190,7 @@ class FileOcrWindowsParityTests(unittest.TestCase):
         for language in ('', 'en-US', 'ko-KR', 'zz-ZZ', 'not_a_language', ' '):
             with self.subTest(language=language):
                 result = self.compare('engine', dict(language=language))
+                self.assertIn('loaded', result, result)
                 self.assertTrue(result['loaded'] and result['same_engine'] and result['same_error'])
                 self.assertEqual(result['available'], result['cached_available'])
                 print('Owned-file OCR language availability: ' + json.dumps(result, ensure_ascii=True))
@@ -206,6 +207,7 @@ class FileOcrWindowsParityTests(unittest.TestCase):
                 result = self.compare('action', case)
                 self.assertEqual(result['action'], 'ocr-image')
                 self.assertEqual(result['elapsed_ms'], 125)
+                print('Owned-file OCR action evidence: ' + json.dumps(dict(case=case, status=result.get('status'), reason=result.get('reason'), engine_language=result.get('engine_language'), line_count=result.get('line_count')), ensure_ascii=True))
             if case['path']:
                 with self.subTest(helper='load', case=case):
                     self.compare('load', case)

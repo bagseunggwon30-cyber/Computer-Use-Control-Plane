@@ -1,4 +1,4 @@
-param([string]$Source,[string]$InputPath)
+﻿param([string]$Source,[string]$InputPath,[string]$AdapterSource,[string]$BridgeSource)
 # The caller supplies the pinned original source. Parse definitions only: never
 # dot-source the wrapper, invoke its dispatcher, or acquire a real diagnostic file.
 $ErrorActionPreference='Stop'
@@ -7,7 +7,7 @@ if($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[ref]$errors)
 if($errors.Count){throw 'Pinned diagnostic source did not parse'}
-$fixtures=@(Microsoft.PowerShell.Management\Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json)
+$fixtures=Microsoft.PowerShell.Management\Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json
 
 function Encode-Wire($Value) {
  if($null -eq $Value){return @{kind='scalar';value=$null}}
@@ -51,7 +51,7 @@ function Get-Date {
  $timestamp=Capture-Effect 'Timestamp' -Name 'o'
  return [DateTime]::Parse($timestamp,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::RoundtripKind)
 }
-function Test-Path {param([string]$LiteralPath) Capture-Effect 'FileExists' -Data $LiteralPath}
+function Test-Path {param([string]$LiteralPath,[string]$PathType) if($PathType -eq 'Leaf'){return Microsoft.PowerShell.Management\Test-Path -LiteralPath $LiteralPath -PathType Leaf};Capture-Effect 'FileExists' -Data $LiteralPath}
 function Get-ChildItem {
  param([string]$LiteralPath,[string]$Filter,[string]$ErrorAction,[switch]$Recurse,[switch]$File)
  $items=Capture-Effect 'ListFiles' -Data ([ordered]@{path=$LiteralPath;recurse=[bool]$Recurse;filter=$Filter;file=[bool]$File})
@@ -76,7 +76,7 @@ function ConvertTo-Json {
  [CmdletBinding()]param([Parameter(ValueFromPipeline=$true)]$InputObject,[int]$Depth=2,[switch]$Compress)
  process{
   # Capture the raw PowerShell object independently of public depth-limited JSON.
-  $script:payload=Encode-Wire $InputObject
+  if($InputObject.schema -in @('cucp.audit-summary/v1','cucp.release-notes/v1','cucp.observation/v1')){$script:payload=Encode-Wire $InputObject}
   Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $InputObject -Depth $Depth -Compress:$Compress
  }
 }
@@ -118,6 +118,38 @@ $capturedTail = Capture-Effect 'TailBytes' -Data ([ordered]@{path=$logPath;max_b
  . ([scriptblock]::Create($text))
 }
 
+
+# Load exact shared transport and adapter definitions. Only leaf acquisitions and
+# deterministic context/clock providers below are replaced for this fixture.
+if($AdapterSource){
+ foreach($load in @(@{path=$BridgeSource;bridge=$true},@{path=$AdapterSource;bridge=$false})){
+  $t=$null;$e=$null;$a=[Management.Automation.Language.Parser]::ParseFile($load.path,[ref]$t,[ref]$e)
+  if($e.Count){throw 'Adapter qualification source failed to parse'}
+  $nodes=@($a.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst]},$true))
+  foreach($node in $nodes){
+   $take=if($load.bridge){$node.Name -like '_Execution-*' -or $node.Name -in @('_Invoke-LegacyExecutionHost','_Invoke-LegacyExecutionEffectLoop')}else{$node.Name -like '_Diagnostic-*' -or $node.Name -eq '_Invoke-LegacyDiagnosticFamily'}
+   if($take){. ([scriptblock]::Create($node.Extent.Text))}
+  }
+ }
+ function _Diagnostic-Clock($State,[string]$Name,[string]$Scope){Capture-Effect Clock -Name $Name -Data $Scope}
+ function _Diagnostic-NodeVersion {Capture-Effect NodeVersion}
+ function _Diagnostic-TailBytes([string]$Path,[int]$Maximum){Capture-Effect TailBytes -Data ([ordered]@{path=$Path;max_bytes=$Maximum})}
+ function _Diagnostic-AuditProbe([string]$Directory,[string]$Prefix){Capture-Effect AuditProbe -Name $Prefix -Data $Directory | Out-Null}
+ function _Diagnostic-ClearAppshotCache([string]$Directory){Capture-Effect ClearAppshotCache -Name 'appshot-*.json' -Data $Directory | Out-Null}
+ function _Diagnostic-ProcessorCount {Capture-Effect ProcessorCount}
+ function _Diagnostic-ProcessMetrics($State,[int]$CurrentOrdinal,$PreviousOrdinal){Capture-Effect ProcessMetrics -Data ([ordered]@{current_ordinal=$CurrentOrdinal;previous_ordinal=$PreviousOrdinal})}
+ function _Diagnostic-CapturedMacro([string]$Name,[string[]]$Argv){Capture-Effect Macro -Name $Name -Argv $Argv}
+ function _Diagnostic-GetContext {
+  $cl='C:\fixture\CHANGELOG.md';$temp='C:\fixture\computer-use-control-plane'
+  if($script:fixture.context){
+   if($script:fixture.context.PSObject.Properties['changelog_path']){$cl=$script:fixture.context.changelog_path}
+   if($script:fixture.context.PSObject.Properties['temp_root']){$temp=$script:fixture.context.temp_root}
+  }
+  return [pscustomobject][ordered]@{audit_directory=$Script:AuditDir;cache_directory=$Script:CacheDir;wrapper_log=$Script:WrapperLog;
+    cli_path=$Script:CliPath;changelog_path=$cl;temp_root=$temp;benchmark_schema='cucp.benchmark/v1';release_schema='cucp.release-notes/v1'}
+ }
+}
+
 function Context-Value {
  param([string]$Name,[string]$Fallback)
  if($null -ne $script:fixture.context -and $null -ne $script:fixture.context.PSObject.Properties[$Name]){
@@ -134,14 +166,14 @@ foreach($fixture in $fixtures){
  $Script:AuditDir=Context-Value 'audit_dir' 'C:\fixture\audit'
  $Script:CacheDir=Context-Value 'cache_dir' 'C:\fixture\cache'
  $Script:WrapperLog=Context-Value 'wrapper_log' 'C:\fixture\wrapper.log'
- $Script:CliPath=Context-Value 'cli_path' 'C:\fixture\cli.mjs'
+ $Script:CliPath=Context-Value 'cli_path' 'C:\fixture\cli.mjs';if($fixture.context -and $fixture.context.PSObject.Properties['cli_path'] -and $null -eq $fixture.context.cli_path){$Script:CliPath=$null}
  $script:changelogPath=Context-Value 'changelog_path' 'C:\fixture\CHANGELOG.md'
  $Script:CucpV14Schema=@{ReleaseNotes='cucp.release-notes/v1';Benchmark='cucp.benchmark/v1'}
  # Original wrapper invocations each initialize their own compiled regex cache.
  $Script:_LogRedactRegex=$null
  $oldCulture=[Threading.Thread]::CurrentThread.CurrentCulture
- $culture=if($fixture.culture){[string]$fixture.culture}else{'en-US'}
- [Threading.Thread]::CurrentThread.CurrentCulture=[Globalization.CultureInfo]::GetCultureInfo($culture)
+ $fixtureCulture='en-US';if($null -ne $fixture.PSObject.Properties['culture'] -and $fixture.culture -is [string]){$fixtureCulture=$fixture.culture}
+ [Threading.Thread]::CurrentThread.CurrentCulture=[Globalization.CultureInfo]::GetCultureInfo($fixtureCulture)
  $writer=New-Object IO.StringWriter;$old=[Console]::Out;[Console]::SetOut($writer)
  try{
   $function=switch($fixture.operation){
@@ -150,7 +182,7 @@ foreach($fixture in $fixtures){
    'release-notes'{'Invoke-MacroReleaseNotes'}
    default{throw "Unsupported file diagnostic fixture: $($fixture.operation)"}
   }
-  $exit=& $function -Rest @($fixture.rest)
+  $exit=if($AdapterSource){_Invoke-LegacyDiagnosticFamily -Operation ([string]$fixture.operation) -Rest @($fixture.rest)}else{& $function -Rest @($fixture.rest)}
   $result=@{state='complete';payload=$script:payload;exit=[int]$exit;console=$writer.ToString();effects=(Encode-Wire @($script:trace));consumed=$script:cursor}
  }catch{
   $result=@{state='error';error=$_.Exception.Message;console=$writer.ToString();effects=(Encode-Wire @($script:trace));consumed=$script:cursor}

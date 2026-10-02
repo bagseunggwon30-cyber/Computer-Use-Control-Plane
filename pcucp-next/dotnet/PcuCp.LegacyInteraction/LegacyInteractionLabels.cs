@@ -4,19 +4,37 @@ internal sealed partial class LegacyExecutionCoordinator
 {
     private static bool FilterElement(JsonElement el, string? window, string? role) => T(P(el, "text")) && T(P(el, "rect")) &&
         (!Has(window) || !T(P(el, "window")) || System.Text.RegularExpressions.Regex.IsMatch(Lower(S(P(el, "window"))), System.Text.RegularExpressions.Regex.Escape(Lower(window!)), System.Text.RegularExpressions.RegexOptions.IgnoreCase)) &&
-        (!Has(role) || !T(P(el, "role")) || Comparer.Equals(Lower(S(P(el, "role"))), Lower(role!)));
+        (!Has(role) || !T(P(el, "role")) || LegacyInteractionText.Equal(Lower(S(P(el, "role"))), Lower(role!)));
     private static (int Score, string Reason) LabelScore(string hay, string needle, int prefixLength, int prefixScore)
     {
-        if (Comparer.Equals(hay, needle)) return (100, "exact");
+        if (LegacyInteractionText.Equal(hay, needle)) return (100, "exact");
         if (System.Text.RegularExpressions.Regex.IsMatch(hay, System.Text.RegularExpressions.Regex.Escape(needle), System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return (60 + Math.Max(0, 40 - Math.Abs(hay.Length - needle.Length)), "substring");
-        if (needle.Length >= prefixLength && hay.IndexOf(needle[..prefixLength], StringComparison.CurrentCulture) >= 0) return (prefixScore, "prefix");
+        if (needle.Length >= prefixLength && LegacyInteractionText.ContainsPrefix(hay, needle[..prefixLength])) return (prefixScore, "prefix");
         return (0, "");
     }
     private static int ConfidenceBoost(JsonElement c, int high = 4, int medium = 2)
     {
         if (c.ValueKind == JsonValueKind.String) return Lower(S(c)) switch { "high" => high, "medium" => medium, "low" => 1, _ => 0 };
-        return c.ValueKind == JsonValueKind.Number ? Round(c.GetDouble() * 5) : 0;
+        // The retained JSON acquisition parses fractional numbers as Decimal in
+        // PS5. Its original `-is [double] -or -is [int]` excludes Decimal.
+        return c.ValueKind == JsonValueKind.Number && c.TryGetInt32(out int number) ? LegacyPrecisionKernel.I((double)number * 5) : 0;
     }
+    // PS promotes overflowing Int32 addition to Double. Preserve both the
+    // comparison value and its JSON spelling; an integral Double renders .0.
+    private static object AddScore(object left, object right)
+    {
+        double sum = LegacyPrecisionKernel.N(left) + LegacyPrecisionKernel.N(right);
+        if (left is int && right is int && sum >= int.MinValue && sum <= int.MaxValue) return (int)sum;
+        return sum;
+    }
+    private static object ScoreWire(object value)
+    {
+        if (value is not double number) return value;
+        using var document = JsonDocument.Parse(number.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
+        return document.RootElement.Clone();
+    }
+    private static double ScoreNumber(object? value) => LegacyPrecisionKernel.N(value);
+    private static string ScoreText(object? value) => ScoreNumber(value).ToString(System.Globalization.CultureInfo.InvariantCulture);
     private static IEnumerable<string> Hays(JsonElement el)
     {
         var hays = new List<string> { Lower(S(P(el, "text"))) };
@@ -28,14 +46,14 @@ internal sealed partial class LegacyExecutionCoordinator
     private static JsonElement FindElement(JsonElement shot, string label, string? window, string? role)
     {
         string needle = Lower(label).Trim();
-        var hits = new List<(JsonElement Element, int Score, int Tier)>(); int tier = 0;
+        var hits = new List<(JsonElement Element, double Score, int Tier)>(); int tier = 0;
         foreach (string pool in new[] { "Grounded", "FusedElements", "Items" })
         {
             tier++;
             foreach (var el in A(P(shot, pool)))
             {
                 if (!FilterElement(el, window, role)) continue;
-                int score = Hays(el).Select(h => LabelScore(h, needle, 3, 20).Score).DefaultIfEmpty(0).Max();
+                double score = Hays(el).Select(h => LabelScore(h, needle, 3, 20).Score).DefaultIfEmpty(0).Max();
                 score += ConfidenceBoost(P(el, "confidence")); if (T(P(el, "small_icon"))) score += 3;
                 if (el.ValueKind == JsonValueKind.Object && el.EnumerateObject().Any(p => Comparer.Equals(p.Name, "enabled")) && !T(P(el, "enabled"))) score -= 5;
                 if (score > 0) hits.Add((el, score, tier));
@@ -80,14 +98,14 @@ internal sealed partial class LegacyExecutionCoordinator
             {
                 if (!FilterElement(el, window, role)) continue;
                 string hay = Normal(S(P(el, "text"))); var score = LabelScore(hay, needle, 3, 20); if (score.Score == 0) continue;
-                int conf = boost + ConfidenceBoost(P(el, "confidence"));
+                object conf = AddScore(boost, ConfidenceBoost(P(el, "confidence")));
                 candidates.Add(D("text", P(el, "text"), "normalized", hay, "role", P(el, "role"), "window", P(el, "window"), "rect", P(el, "rect"),
-                    "affordance_id", P(el, "affordance_id"), "score", score.Score + conf, "tier", tier, "match_reason", score.Reason, "confidence_boost", conf,
-                    "sources", T(P(el, "sources")) ? A(P(el, "sources")).Cast<object>().ToArray() : new object[] { tier }));
+                    "affordance_id", P(el, "affordance_id"), "score", ScoreWire(AddScore(score.Score, conf)), "tier", tier, "match_reason", score.Reason, "confidence_boost", ScoreWire(conf),
+                    "sources", Pipe(T(P(el, "sources")) ? A(P(el, "sources")).Cast<object>() : new object[] { tier })));
             }
         }
-        var ranked = LegacyInteractionRanking.Sort(candidates, (a, b) => ((int)b["score"]!).CompareTo((int)a["score"]!)); int elapsed = Stop("find-label");
-        var top = ranked.FirstOrDefault(); bool ambiguous = ranked.Length > 1 && (int)ranked[0]["score"]! - (int)ranked[1]["score"]! < ambiguity;
+        var ranked = LegacyInteractionRanking.Sort(candidates, (a, b) => ScoreNumber(b["score"]).CompareTo(ScoreNumber(a["score"]))); int elapsed = Stop("find-label");
+        var top = ranked.FirstOrDefault(); bool ambiguous = ranked.Length > 1 && ScoreNumber(ranked[0]["score"]) - ScoreNumber(ranked[1]["score"]) < ambiguity;
         var sources = new List<object> { "appshot" }; if (T(P(shot, "Grounded")) && A(P(shot, "Grounded")).Length > 0) sources.Add("uia");
         bool fromCache = T(P(shot, "FromCache")); if (fromCache) sources.Add("cache");
         var cache = D("hit", fromCache, "age_ms", null, "max_age_ms", cacheSeconds * 1000, "key", $"appshot::match={match}", "reason", fromCache ? "cache_fresh" : "live_capture");
@@ -95,13 +113,13 @@ internal sealed partial class LegacyExecutionCoordinator
         if (explain)
         {
             string status = top is not null && !ambiguous ? "ok" : "partial";
-            string confidence = top is null ? "low" : (int)top["score"]! >= 100 ? "high" : (int)top["score"]! >= 60 ? "medium" : "low";
+            string confidence = top is null ? "low" : ScoreNumber(top["score"]) >= 100 ? "high" : ScoreNumber(top["score"]) >= 60 ? "medium" : "low";
             object[] recover = top is null ? [D("code", "no_match", "message", $"no candidate matched '{label}'", "recommended_action", $"Try 'cucp macro list-affordances --window \"{match}\" --limit 30' to see available labels.")]
                 : ambiguous ? [D("code", "ambiguous_target", "message", $"top two candidates within {ambiguity} score points", "recommended_action", "Narrow with --window or --role, or use the affordance_id from the candidates list.")] : [];
             var data = D("label", label, "window", window, "role", role, "ambiguous", ambiguous, "ambiguity_window", ambiguity, "top", top,
-                "candidates", Pipe(ranked.Take(8)), "candidate_count", ranked.Length);
+                "candidates", ranked.Length == 0 ? D() : Pipe(ranked.Take(8)), "candidate_count", ranked.Length);
             string line = top is null ? $"partial find-label '{label}' no_match candidates=0 elapsed_ms={elapsed}" :
-                $"{status} find-label '{label}' top='{S(J(top["text"]))}' score={top["score"]} reason={top["match_reason"]} ambiguous={ambiguous} candidates={ranked.Length} elapsed_ms={elapsed}";
+                $"{status} find-label '{label}' top='{S(J(top["text"]))}' score={ScoreText(top["score"])} reason={top["match_reason"]} ambiguous={ambiguous} candidates={ranked.Length} elapsed_ms={elapsed}";
             return Result(Envelope(status, elapsed, data, sources.ToArray(), confidence, recover, S(P(shot, "ObservationId")), foreground, cache), status == "ok" ? 0 : 2, 8, line);
         }
         if (top is not null && !ambiguous)
@@ -110,7 +128,7 @@ internal sealed partial class LegacyExecutionCoordinator
             return Result(D("status", "ok", "schema", "cucp.find-label/v2", "label", label, "window", top["window"], "role", top["role"], "text", top["text"],
                 "rect", top["rect"], "center", D("X", point.X, "Y", point.Y), "observation_id", P(shot, "ObservationId"), "from_cache", fromCache, "sources", sources,
                 "score", top["score"], "candidates", Pipe(ranked.Take(5)), "elapsed_ms", elapsed), 0, 8,
-                $"ok find-label '{label}' @({point.X},{point.Y}) win='{S(J(top["window"]))}' score={top["score"]}");
+                $"ok find-label '{label}' @({point.X},{point.Y}) win='{S(J(top["window"]))}' score={ScoreText(top["score"])}");
         }
         if (top is not null)
             return Result(D("status", "partial", "schema", "cucp.find-label/v2", "label", label, "reason", "ambiguous_target", "candidates", Pipe(ranked.Take(5)),

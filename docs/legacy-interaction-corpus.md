@@ -1,6 +1,6 @@
 # Interaction oracle corpus
 
-The interaction qualification corpus contains **854 deterministic source-parity fixtures** for eight functions. Each source scenario runs in normal and `-Brief` modes. Twelve additional boundary fixtures verify explicitly uncertain live replies and post-click readback failures separately from the source-parity gate. The corpus has a bounded reply list and bounded precision/focus loops; it does not sample randomly.
+The interaction qualification corpus contains **870 deterministic source-parity fixtures** for eight functions. Each source scenario runs in normal and `-Brief` modes. Twelve additional boundary fixtures verify explicitly uncertain live replies and post-click readback failures separately from the source-parity gate. The corpus has a bounded reply list and bounded precision/focus loops; it does not sample randomly.
 
 | Operation | Fixtures |
 | --- | ---: |
@@ -76,4 +76,4 @@ A skipped platform/runtime check is not a parity pass. This corpus by itself doe
 
 ## Current verification
 
-The 854-case candidate corpus executes without fixture exhaustion on the local .NET fixture runner; the 12 explicit boundary assertions also pass. All eight portable test methods pass. Windows PowerShell 5.1 is unavailable in this environment, so the exact accepted-oracle differential and exact console gate remain pending; their platform skip is reported explicitly.
+The 870-case candidate corpus executes without fixture exhaustion on the local .NET fixture runner; the 12 explicit boundary assertions also pass. All eight portable test methods pass. Windows PowerShell 5.1 is unavailable in this environment, so the exact accepted-oracle differential and exact console gate remain pending; their platform skip is reported explicitly.

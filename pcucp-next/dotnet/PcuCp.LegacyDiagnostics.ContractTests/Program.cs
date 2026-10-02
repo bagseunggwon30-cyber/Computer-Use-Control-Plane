@@ -40,8 +40,9 @@ internal sealed class DiagnosticFixture(JsonElement fixture) : ILegacyDiagnostic
     internal static LegacyDiagnosticContext Context(JsonElement fixture)
     {
         var c = P(fixture, "context"); string Value(string name, string fallback) => P(c, name).ValueKind == JsonValueKind.String ? S(P(c, name)) : fallback;
+        string? cli = c.ValueKind == JsonValueKind.Object && c.TryGetProperty("cli_path", out var cliValue) && cliValue.ValueKind == JsonValueKind.Null ? null : Value("cli_path", "C:\\fixture\\cli.mjs");
         return new(Value("audit_dir", "C:\\fixture\\audit"), Value("cache_dir", "C:\\fixture\\cache"),
-            Value("wrapper_log", "C:\\fixture\\wrapper.log"), Value("cli_path", "C:\\fixture\\cli.mjs"),
+            Value("wrapper_log", "C:\\fixture\\wrapper.log"), cli,
             Value("changelog_path", "C:\\fixture\\CHANGELOG.md"), Value("temp_root", "C:\\fixture\\computer-use-control-plane"));
     }
     internal static object Evaluate(JsonElement fixture)

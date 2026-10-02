@@ -2,6 +2,14 @@ using System.Text.Json;
 
 internal sealed partial class LegacyDiagnosticCoordinator
 {
+    private static int DiagnosticSloFailThreshold(int warnMilliseconds)
+    {
+        // PS promotes the multiply, then binds the nested _SloEval [int] FailMs
+        // parameter. Preserve the conversion/binding error after all samples.
+        try { return I(J((double)warnMilliseconds * 4)); }
+        catch (NativeFailure error)
+        { throw CommandOptions.Invalid("Cannot process argument transformation on parameter 'FailMs'. " + error.Message); }
+    }
     private sealed record PerfTarget(string Id, string Kind, string[] Argv, int[] Accepted, string Macro = "", bool FindLabel = false);
     private LegacyDiagnosticResult Perf()
     {
@@ -59,7 +67,7 @@ internal sealed partial class LegacyDiagnosticCoordinator
             Run(new("appshot_warm", "cli", ["observe", "appshot"], [0, 1, 2]));
         }
         var warnings = new List<string>(); var slo = new List<object>();
-        foreach (var budget in new[] { ("windows_fast", warnFast, checked(warnFast * 4)), ("windows_no_match", 500, 2000), ("macro_health_quick", 1000, 3000), ("find_label_no_match_fast", 800, 3000) })
+        foreach (var budget in new[] { ("windows_fast", warnFast, DiagnosticSloFailThreshold(warnFast)), ("windows_no_match", 500, 2000), ("macro_health_quick", 1000, 3000), ("find_label_no_match_fast", 800, 3000) })
         {
             var target = results.Single(r => Equals(r["id"], budget.Item1)); int avg = (int)target["avg_ms"]!;
             if (avg > budget.Item2) warnings.Add($"{budget.Item1} avg={avg}ms exceeded warn threshold {budget.Item2}ms");

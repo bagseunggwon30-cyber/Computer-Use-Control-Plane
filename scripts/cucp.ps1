@@ -8363,6 +8363,8 @@ function _Execution-ValidateEffect($Effect,$State) {
   _Execution-Require (-not $Effect.live -or $State.live) 'Effect exceeds immutable live startup authority.'
   _Execution-Require (-not $Effect.confirm_sensitive -or $State.sensitive) 'Effect exceeds immutable sensitive startup authority.'
   $Effect.data=_Execution-DecodeWire $Effect.data
+  if($State.family -ceq 'interaction'){_Interaction-ValidateEffect $Effect $State;return}
+  if($State.family -ceq 'diagnostics'){_Diagnostic-ValidateEffect $Effect $State;return}
   $a=@($Effect.argv);$d=$Effect.data;$n=$Effect.name;$kind=$Effect.kind
   _Execution-Require ($kind -cin @('WorkflowPlan','Child','Native','LocalMacro','CdpPort','HistoryRead','HistoryAppend','TrajectoryAppend','Sleep','Clock','Timestamp','CachePath','FileExists','RemoveFile','SendEscape','Console')) 'Unknown execution effect.'
   if($kind -ne 'Child'){_Execution-Require (-not $Effect.quiet -and -not $Effect.brief) 'Non-child effect changed child options.'}
@@ -8420,6 +8422,8 @@ function _Execution-SendEscape {
 }
 
 function _Execution-Dispatch($Effect,$State) {
+  if($State.family -ceq 'interaction'){return ,(_Interaction-Dispatch $Effect $State)}
+  if($State.family -ceq 'diagnostics'){return ,(_Diagnostic-Dispatch $Effect $State)}
   $a=[string[]]$Effect.argv;$d=$Effect.data;$n=$Effect.name
   switch -CaseSensitive ($Effect.kind) {
     'WorkflowPlan' {return ,(_Build-WorkflowPlan -Rest $a)}
@@ -8456,6 +8460,21 @@ function _Execution-Dispatch($Effect,$State) {
   }
 }
 
+# This classification records possible owned-state changes; it grants no authority.
+# The validated descriptor has already passed the family-specific ownership checks.
+function _Execution-EffectMayChangeState($Effect) {
+  if($Effect.live){return $true}
+  if($Effect.kind -cin @('Child','HistoryAppend','TrajectoryAppend','RemoveFile','PointCacheWrite','AnchorAppend','Appshot','Vision','Notice','Cucp')){return $true}
+  if($Effect.kind -ceq 'LocalMacro'){return $Effect.name -cne 'icon-find'}
+  if($Effect.kind -ceq 'Native'){return $true} # Retained helper may write cache/log files for every action.
+  if($Effect.kind -ceq 'Diagnostic'){
+    if($Effect.name -cin @('AuditProbe','ClearAppshotCache','Appshot','Notice','HelperUp','AssertAuthorized','Cli','Native')){return $true}
+    if($Effect.name -ceq 'Macro'){return ($Effect.data.name -cin @('health-quick','find-label')) -or
+      ($Effect.data.name -ceq 'windows' -and $Effect.argv.Count -eq 1 -and $Effect.argv[0] -ceq '--rich')}
+  }
+  return $false
+}
+
 function _Invoke-LegacyExecutionEffectLoop {
   param([Diagnostics.Process]$HostProcess,[hashtable]$State)
   $utf8=New-Object Text.UTF8Encoding($false,$true);$sequence=0L
@@ -8464,7 +8483,7 @@ function _Invoke-LegacyExecutionEffectLoop {
     try {
       while($true) {
         $State.diagnostic_phase='read-frame';$State.diagnostic_expected_id=$sequence+1;$State.diagnostic_frame=$null
-        $line=$HostProcess.StandardOutput.ReadLine();if($null -eq $line){if($State.live_effect_seen){throw 'mutation_may_have_occurred=true; automatic_retry=false; execution session disconnected.'};throw 'Execution session disconnected; automatic_retry=false.'}
+        $line=$HostProcess.StandardOutput.ReadLine();if($null -eq $line){if($State.state_effect_seen -or $State.live_effect_seen){throw 'mutation_may_have_occurred=true; automatic_retry=false; execution session disconnected.'};throw 'Execution session disconnected; automatic_retry=false.'}
         $State.diagnostic_frame=$line;$State.diagnostic_phase='parse-frame'
         $frame=$line|ConvertFrom-Json -ErrorAction Stop
         $State.diagnostic_phase='validate-frame'
@@ -8492,9 +8511,10 @@ function _Invoke-LegacyExecutionEffectLoop {
     if($target -ceq 'complete') {
       $State.diagnostic_phase='validate-completion'
       _Execution-Fields $message @('payload','exit','json_depth','brief','emit_json')
-      _Execution-Require ($message.exit -is [int] -and $message.exit -ge 0 -and $message.exit -le 3 -and $message.json_depth -is [int] -and
+      _Execution-Require ($message.exit -is [int] -and ($State.family -ceq 'interaction' -or ($message.exit -ge 0 -and $message.exit -le 3)) -and $message.json_depth -is [int] -and
         $message.json_depth -ge 0 -and $message.json_depth -le 100 -and $message.emit_json -is [bool] -and ($null -eq $message.brief -or $message.brief -is [string])) 'Invalid execution completion envelope.'
       $payload=_Execution-DecodeWire $message.payload
+      if($State.family -ceq 'diagnostics'){$payload=_Diagnostic-PreparePayload $payload $State}
       if($message.emit_json){[Console]::Out.WriteLine((ConvertTo-Json -InputObject $payload -Depth ([int]$message.json_depth)))}
       elseif($null -ne $message.brief){[Console]::Out.WriteLine([string]$message.brief)}
       return [int]$message.exit
@@ -8504,8 +8524,10 @@ function _Invoke-LegacyExecutionEffectLoop {
     _Execution-ValidateEffect $message $State
     $State.diagnostic_phase='dispatch-effect'
     if($message.live){$State.live_effect_seen=$true}
+    $currentMayChangeState=[bool](_Execution-EffectMayChangeState $message)
+    if($currentMayChangeState){$State.state_effect_seen=$true}
     try {$value=_Execution-Dispatch $message $State;$reply=@{state='ok';value=(_Execution-EncodeWire $value)}}
-    catch {$reply=@{state='error';message=$_.Exception.Message;mutation_may_have_occurred=[bool]$State.live_effect_seen}}
+    catch {$reply=@{state='error';message=$_.Exception.Message;mutation_may_have_occurred=[bool]($currentMayChangeState -or $State.live_effect_seen)}}
     _Execution-WriteChunks -Writer $State.writer -Id $id -Target '' -Value $reply
   }
 }
@@ -8518,6 +8540,19 @@ function _Invoke-LegacyExecutionFamily {
   $inherited=Get-Variable -Name CUCP_EXECUTION_SENSITIVE_CEILING -Scope Global -ErrorAction SilentlyContinue
   if($null -ne $inherited -and ($inherited.Value -isnot [bool] -or -not $inherited.Value -or
       -not ($inherited.Options -band [Management.Automation.ScopedItemOptions]::Constant))){$sensitiveCeiling=$false}
+  $startup=[ordered]@{schema='cucp.execution-start/v1';operation=$Operation;rest=@($Rest);brief=[bool]$Brief;
+    cache_seconds=[int]$CacheSeconds;vision_available=[bool]$Script:CliPath;culture=[Globalization.CultureInfo]::CurrentCulture.Name}
+  $state=@{family='execution';operation=$Operation;rest=@($Rest);state_effect_seen=$false;live=$liveCeiling;sensitive=$sensitiveCeiling;script_path=$ScriptPath;cache_dir=$Script:CacheDir;paths=@{};clocks=@{};writer=$null;live_effect_seen=$false}
+  return _Invoke-LegacyExecutionHost -EntryPoint 'legacy-execution-session' -Startup $startup -State $state
+}
+
+function _Invoke-LegacyExecutionHost {
+  param([ValidateSet('legacy-execution-session','legacy-interaction-session','legacy-diagnostic-session')][string]$EntryPoint,
+    $Startup,[hashtable]$State)
+  _Execution-Require ($State.live -is [bool] -and $State.sensitive -is [bool]) 'Host authority ceilings must be booleans.'
+  $expectedFamily=switch($EntryPoint){'legacy-execution-session'{'execution'};'legacy-interaction-session'{'interaction'};'legacy-diagnostic-session'{'diagnostics'}}
+  _Execution-Require ($State.family -ceq $expectedFamily -and $State.operation -ceq $Startup.operation) 'Host family or operation context mismatch.'
+  $State.state_effect_seen=$false;$State.live_effect_seen=$false
   $native=$env:CUCP_NATIVE_HOST
   if(-not $native){$native=Join-Path $PSScriptRoot '..\pcucp-next\bin\native\PcuCp.NativeHost.exe'}
   $native=[IO.Path]::GetFullPath($native)
@@ -8526,21 +8561,18 @@ function _Invoke-LegacyExecutionFamily {
   switch ([IO.Path]::GetExtension($native).ToLowerInvariant()) {
     '.dll' {
       if($native.Contains('"') -or $native.Contains("`r") -or $native.Contains("`n")){throw 'Invalid execution runtime DLL path.'}
-      $psi.FileName=(Get-Command dotnet.exe -CommandType Application -ErrorAction Stop).Source
-      $psi.Arguments='"'+$native+'" legacy-execution-session'
+      $psi.FileName=(Get-Command dotnet.exe -CommandType Application -TotalCount 1 -ErrorAction Stop).Source
+      $psi.Arguments='"'+$native+'" '+$EntryPoint
     }
-    '.exe' {$psi.FileName=$native;$psi.Arguments='legacy-execution-session'}
+    '.exe' {$psi.FileName=$native;$psi.Arguments=$EntryPoint}
     default {throw 'Execution runtime must be an executable or DLL, never a shell script.'}
   }
-  if($liveCeiling){$psi.Arguments+=' --allow-live-control'}
-  if($sensitiveCeiling){$psi.Arguments+=' --confirm-sensitive'}
+  if($State.live){$psi.Arguments+=' --allow-live-control'}
+  if($State.sensitive){$psi.Arguments+=' --confirm-sensitive'}
   $utf8=New-Object Text.UTF8Encoding($false,$true)
   $psi.UseShellExecute=$false;$psi.CreateNoWindow=$true
   $psi.RedirectStandardInput=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true
   $psi.StandardOutputEncoding=$utf8;$psi.StandardErrorEncoding=$utf8
-  $startup=[ordered]@{schema='cucp.execution-start/v1';operation=$Operation;rest=@($Rest);brief=[bool]$Brief;
-    cache_seconds=[int]$CacheSeconds;vision_available=[bool]$Script:CliPath;culture=[Globalization.CultureInfo]::CurrentCulture.Name}
-  $state=@{live=$liveCeiling;sensitive=$sensitiveCeiling;script_path=$ScriptPath;cache_dir=$Script:CacheDir;paths=@{};clocks=@{};writer=$null;live_effect_seen=$false}
   $process=New-Object Diagnostics.Process;$process.StartInfo=$psi;$started=$false;$writer=$null;$stderr=$null
   try {
     $started=$process.Start();if(-not $started){throw 'Execution runtime did not start.'}
@@ -8554,10 +8586,11 @@ function _Invoke-LegacyExecutionFamily {
     if(-not $process.WaitForExit(10000)){throw 'Execution runtime did not exit after its final report; no action was retried.'}
     $err=$stderr.GetAwaiter().GetResult()
     if($process.ExitCode -ne $exit){throw ('Execution runtime exit did not match its final report. '+$err)}
+    if($State.family -ceq 'interaction'){foreach($item in $State.pipeline_output){Write-Output -NoEnumerate $item}}
     return [int]$exit
   } catch {
     _Execution-WriteDiagnostic -State $state -Process $process -Stderr $stderr -ErrorText $_.Exception.Message
-    if($state.live_effect_seen -and $_.Exception.Message -notlike 'mutation_may_have_occurred=true;*'){
+    if(($state.state_effect_seen -or $state.live_effect_seen) -and $_.Exception.Message -notlike 'mutation_may_have_occurred=true;*'){
       throw ('mutation_may_have_occurred=true; automatic_retry=false; '+$_.Exception.Message)
     }
     throw

@@ -99,7 +99,7 @@ FindLabel retains fast-window short circuit, pool confidence, whitespace
 normalization, ambiguity window, exact Console/public shapes, cache provenance,
 and the historical exit-one not-found result. IconFind keeps size/near filters,
 round-to-even coordinate and distance conversions, truncation before ambiguity,
-and PS scalar-versus-array shape when a multi-candidate list is truncated to one.
+and the singleton array shape when a multi-candidate list is truncated to one.
 PS5 median-pivot sorting deliberately swaps equal keys; stable LINQ sorting would
 change target selection. FindElement sorts the full tier/score list together.
 
@@ -129,7 +129,7 @@ uncertainty metadata. Ordinary captured errors remain on the exact parity path.
 ## Evidence and remaining gates
 
 The managed candidate compiles for net8 with zero warnings/errors. The local
-self-test runs 86 independent checks, including immutable live denial, all four
+self-test runs 106 checks on Linux and 109 on Windows, including immutable live denial, all four
 native mutation classifications, uncertainty/no-replay, verified target identity,
 equal-score selection, malformed shared-session frames and a reply larger than
 1MiB split into bounded frames. The Python fixture corpus and exact oracle details
@@ -140,3 +140,41 @@ NLS ordering. The Windows pinned-oracle differential, exact actual-adapter gate,
 production integration and bundled full regression remain required before
 retirement. Actual acquisition/input/IME/clipboard/model leaves remain separate
 Windows acceptance work. No mock result is evidence of interactive desktop input.
+
+## First Windows candidate feedback
+
+Run `37037485035`, interaction job `110939232562`, compiled the host and passed
+86 managed checks, then found 71 exact candidate differential mismatches. Those
+failures identified singleton conditional-source unrolling, an empty
+Select-Object pipeline represented as `{}`, singleton icon array retention, PS5
+Decimal confidence handling, Windows NLS Hangul matching, and native-array
+member projection/missing-exit behavior. The candidate repairs these behaviors
+and adds managed regressions while preserving all 854 exact oracle fixtures and
+12 uncertainty fixtures. The next Windows differential is still required; the
+first failed run is diagnostic evidence, not qualification.
+
+
+## Confidence acquisition and Int32 boundary repair
+
+The confidence type rule follows the production acquisition path, not just the
+fixture decoder. In the pinned accepted tree, `Get-CachedAppshot` and
+`Invoke-Appshot` load cached/fresh artifacts with `ConvertFrom-Json` (lines 1677
+and 1722). `_Build-AppshotResult` assigns Items, FusedElements and Grounded from
+those parsed artifacts (1755–1768), falling back to `_Get-UIAffordances` only when
+the grounded pool is empty. The UIA fallback assigns `$conf` to `medium`, `high`
+or `low` strings (2000–2006), then copies it to each element (2045).
+Consequently acquired JSON fractions are PS5 Decimal values and receive no
+numeric confidence boost; acquired Int32 values retain the original boost.
+Preconstructed in-process Double confidence objects are not represented by this
+JSON acquisition contract and are not claimed as supported inputs.
+
+Sixteen appended oracle cases cover confidence 429496729, 429496730,
+-429496729 and 2147483647 in FindLabel and IconFind, each in normal and Brief
+mode. All original 854 cases retain their indices; the ordinary corpus is now
+870 plus the same 12 uncertainty cases. FindLabel's explicit product-to-Int32
+cast uses the existing `LegacyPrecisionKernel.I` compatibility helper so an
+out-of-range product preserves the original cast error. Subsequent untyped
+confidence/score additions preserve Int32-to-Double promotion, comparison and
+integral Double JSON spelling. The shared FindElement ranking also avoids
+Int32 wrapping. IconFind still ignores numeric confidence. These new probes,
+like the six earlier Windows repairs, require the next exact PS5 oracle gate.
