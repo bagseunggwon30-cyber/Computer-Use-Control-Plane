@@ -75,6 +75,33 @@ Describe "legacy command boundaries" {
     { Invoke-MacroCdpEval -Rest @("--expr", "document.body.remove()") } | Should -Throw "*requires -AllowLiveControl*"
     Assert-MockCalled Invoke-NativeHelper -Times 0 -Exactly
   }
+  It "uses the first Python on PATH when duplicate applications are discoverable" {
+    Mock Invoke-NativeHelper { throw "Must not execute" }
+    $originalPath = $env:PATH
+    $originalCdpHost = $env:CUCP_LEGACY_CDP_HOST
+    $originalCdpPython = $env:CUCP_LEGACY_CDP_PYTHON
+    try {
+      $realPython = (Get-Command python.exe -CommandType Application -TotalCount 1 -ErrorAction Stop).Source
+      Test-Path -LiteralPath $realPython -PathType Leaf | Should -BeTrue
+      $secondDirectory = Join-Path $TestDrive 'secondary-python'
+      [void](New-Item -ItemType Directory -Path $secondDirectory)
+      $inertPython = Join-Path $secondDirectory 'python.exe'
+      [IO.File]::WriteAllBytes($inertPython, [byte[]]@())
+      $env:PATH = ([IO.Path]::GetDirectoryName($realPython), $secondDirectory, $originalPath) -join [IO.Path]::PathSeparator
+      $env:CUCP_LEGACY_CDP_HOST = $null
+      $env:CUCP_LEGACY_CDP_PYTHON = $null
+      $candidates = @(Get-Command python.exe -CommandType Application -ErrorAction Stop)
+      $candidates.Count | Should -BeGreaterOrEqual 2
+      $candidates[0].Source | Should -Be $realPython
+      @($candidates.Source) | Should -Contain $inertPython
+      { Invoke-MacroCdpEval -Rest @("--expr", "document.body.remove()") } | Should -Throw "*requires -AllowLiveControl*"
+      Assert-MockCalled Invoke-NativeHelper -Times 0 -Exactly
+    } finally {
+      $env:PATH = $originalPath
+      $env:CUCP_LEGACY_CDP_HOST = $originalCdpHost
+      $env:CUCP_LEGACY_CDP_PYTHON = $originalCdpPython
+    }
+  }
   It "classifies cdp-eval as a live workflow step" {
     $plan = _Build-WorkflowPlan -Rest @("--step", 'macro cdp-eval --expr 1+1')
     $plan.steps[0].allowed | Should -Be $true

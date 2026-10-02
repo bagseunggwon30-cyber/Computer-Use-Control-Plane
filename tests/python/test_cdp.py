@@ -394,6 +394,41 @@ class ObservationTests(unittest.TestCase):
             self.assertEqual(source_query['unobserved_count'], 1)
             self.assertNotIn(secret, json.dumps(source_query))
 
+    def test_textarea_value_is_private_but_labels_refs_and_freshness_remain(self):
+        with server() as (state, endpoint):
+            default = 'CANARY-TEXTAREA-DEFAULT-OWNED'
+            value = 'CANARY-TEXTAREA-VALUE-OWNED'
+            area = element(20, 'TEXTAREA', {'id':'notes', 'value':value}, [text_node(21, default)])
+            label = element(22, 'LABEL', {'for':'notes'}, [text_node(23, 'Owned notes')])
+            body = state.root['children'][0]
+            body['children'].extend([area, label]); body['childNodeCount'] += 2
+            adapter = CdpAdapter(endpoint, allow_live_control=True)
+            self.addCleanup(adapter.close)
+            observed = adapter.execute('cdp-observe', {'target_id':'page-0'})
+            sid = observed['snapshot_id']
+            public = next(n for n in observed['nodes'] if n['attributes'].get('id') == 'notes')
+            self.assertEqual(public['text'], '')
+            self.assertNotIn('CANARY-', json.dumps(observed))
+            for command in ('cdp-smart-find', 'cdp-smart-type-find', 'cdp-deep-find'):
+                found = adapter.execute(command, {'snapshot_id':sid, 'text':default})
+                self.assertEqual(found['candidate_count'], 0)
+                self.assertNotIn('CANARY-', json.dumps(found))
+            labelled = adapter.execute('cdp-smart-type-find', {'snapshot_id':sid, 'text':'Owned notes'})
+            self.assertEqual(labelled['top']['element_ref'], public['element_ref'])
+            state.query_ids = [20]
+            queried = adapter.execute('cdp-query', {'snapshot_id':sid, 'selector':'#notes'})
+            self.assertEqual(queried['candidates'][0]['element_ref'], public['element_ref'])
+            self.assertNotIn('CANARY-', json.dumps(queried))
+            self.assertTrue(all(r['method'].startswith('DOM.') for r in state.requests))
+            # Private source still participates in the internal stale-reference
+            # check; suppressing output must not discard that safety evidence.
+            area['children'][0]['nodeValue'] = 'CHANGED-OWNED-DEFAULT'
+            with self.assertRaises(CdpError) as raised:
+                adapter.execute('cdp-type', {'snapshot_id':sid, 'element_ref':public['element_ref'],
+                                            'text':'owned', 'clear':True})
+            self.assertEqual(raised.exception.code, 'element_changed')
+            self.assertTrue(all(r['method'].startswith('DOM.') for r in state.requests))
+
     def test_snapshot_expiry_and_replacement(self):
         with server() as (state, endpoint):
             adapter = CdpAdapter(endpoint, snapshot_ttl_s=.05)

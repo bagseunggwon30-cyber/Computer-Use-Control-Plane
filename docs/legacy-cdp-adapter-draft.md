@@ -21,7 +21,13 @@ existing source-mode Python executable. Both are host startup configuration,
 never page content or tool arguments. Portable support remains unqualified until
 the bundle tests exercise the same bridge. In source-mode tests,
 `CUCP_LEGACY_CDP_TEST_PYTHON` supplies this executable. There is no install step.
-The child runs only the fixed module, with Python environment variables ignored.
+The child runs only the fixed module, with Python environment variables ignored. Default
+application discovery explicitly limits `Get-Command` to the first PATH match:
+with `-CommandType Application`, PowerShell can otherwise return several same-name
+executables. A duplicate-Python PATH fixture keeps a real first executable and an
+inert second file, proves both are discoverable, and requires the unchanged
+no-live rejection without a native-helper call. Explicit host/Python overrides
+retain their existing behavior.
 
 Executable source: `scripts/cucp-legacy-cdp-adapter.ps1`, region `cdp-process-bridge`.
 

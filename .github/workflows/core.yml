@@ -105,6 +105,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Legacy boundary regressions (no live input)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $env:CUCP_NATIVE_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
+          Invoke-Pester -Path tests/cucp.LegacyRegression.Tests.ps1 -CI
       - name: Installer Unicode and argv qualification (no actual install)
         if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
         shell: pwsh
@@ -202,13 +209,6 @@ jobs:
           $env:CUCP_LEGACY_IMAGES_TEST_DLL = (Resolve-Path 'pcucp-next/bin/legacy/PcuCp.LegacyImages.dll').Path
           python -m unittest discover -s tests/python -p test_legacy_images.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Legacy boundary regressions (no live input)
-        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
-        shell: pwsh
-        run: |
-          $env:CUCP_NATIVE_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
-          Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
-          Invoke-Pester -Path tests/cucp.LegacyRegression.Tests.ps1 -CI
       # No interactive desktop input tests on hosted runners. See manual Windows checks.
   windows-profile-candidate:
     runs-on: windows-latest

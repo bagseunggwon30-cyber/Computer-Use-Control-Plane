@@ -48,7 +48,9 @@ After integrating a verified batch, a commit beginning with `[full regression]`
 runs the complete core, native, legacy, profile, browser and portable-package
 suite, including every staged migration family. Focused jobs are not duplicated
 in that mode. Normal pull requests and non-migration-branch pushes continue to
-run the full suite. A focused green run never substitutes for this full gate.
+run the full suite. A focused green run never substitutes for this full gate. The existing Pester
+boundary suite runs near the start of the broad Windows job so process-discovery
+failures are visible while the independent differential suites continue.
 
 Fix fixture or implementation failures using the affected focused suite, then
 run one final full gate for the coherent integrated batch. Keep original output,
@@ -113,8 +115,8 @@ The shared CDP host remains an ordinary counted PowerShell file.
 
 The integration replaces 53 original function extents, retaining 42 compatible
 delegates and removing 11 private helpers. Including adapter and test overhead,
-current tracked PowerShell is 821,540 bytes: 100,074 fewer than the prior accepted
-checkpoint and 191,938 fewer than the original baseline. The
+current tracked PowerShell is 823,078 bytes: 98,536 fewer than the prior accepted
+checkpoint and 190,400 fewer than the original baseline. The
 [canonical source inventory](legacy-function-inventory.json) reproduces these
 measurements. These are pending integrated source measurements until the exact
 current commit passes its bundled full regression.
@@ -123,5 +125,5 @@ The full gate also checks promoted central CDP routing, relocated test loaders,
 portable packaging and a narrow intentional privacy correction. Legacy CDP
 search exposed field values and source-only text; the corrected assets exclude
 those signals before matching and output. Synthetic characterization is separate
-from ordinary parity, and four new owned-browser privacy cases must pass. The
+from ordinary parity, and four legacy plus one modern owned-browser privacy cases must pass. The
 existing side-effect guard and ordinary compatibility assertions remain intact.

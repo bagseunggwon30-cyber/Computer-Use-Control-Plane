@@ -3,6 +3,11 @@
 Only synthetic canaries, owned DOM objects and captured loopback CDP replies.
 The pinned deep JS exposed data internally; its old PowerShell envelope defect
 suppressed that result. The corrected public envelope must not disclose it.
+
+Node 22.23.3's inspector rejects guarded NFKC/case conversion and Array.from,
+while Node 24 and the owned Chrome gate accept the complete assets. This optional
+Node harness checks fixed capabilities and both success/fail-closed outcomes;
+it cannot replace the mandatory real-browser success/privacy qualification.
 """
 import json
 import shutil
@@ -230,7 +235,10 @@ class LegacyCdpPrivacyTests(unittest.TestCase):
 
     def test_exact_read_assets_rebuild_public_text_under_v8_side_effect_guard(self):
         # Owned plain DOM objects only; Chrome's binding qualification remains a
-        # separate browser gate. The production JS itself is not rewritten.
+        # separate mandatory browser gate. Node inspectors differ in support for
+        # guarded intrinsics: assert success OR the explicit fail-closed contract
+        # from fixed prerequisite probes, never version-pin, skip, or retry live.
+        # The production JS itself is not rewritten.
         setup=r'''
 globalThis.window={getComputedStyle(){return {display:'block',visibility:'visible',opacity:'1'}}};
 const source={tagName:'SCRIPT',nodeType:1,childNodes:[],textContent:'CANARY-SOURCE'};
@@ -246,28 +254,85 @@ globalThis.document={querySelectorAll(selector){return selector==='iframe,frame'
         program=r'''
 const input=JSON.parse(require('node:fs').readFileSync(0,'utf8'));
 const session=new(require('node:inspector').Session)();session.connect();
-session.post('Runtime.evaluate',{expression:input.setup},(error,response)=>{
-  if(error||response.exceptionDetails)throw Error(JSON.stringify(error||response));
-  const rows=[];
-  for(const expression of input.expressions){
-    session.post('Runtime.evaluate',{expression,throwOnSideEffect:true,awaitPromise:false,
-      returnByValue:true,timeout:1000},(error,response)=>rows.push({error:error||null,response}));
-  }
-  process.stdout.write(JSON.stringify(rows));
-});session.disconnect();
+function post(params){
+  let row;session.post('Runtime.evaluate',params,(error,response)=>{row={error:error||null,response}});
+  if(!row)throw Error('Inspector response was not delivered');return row;
+}
+function guarded(expression){return post({expression,throwOnSideEffect:true,awaitPromise:false,returnByValue:true,timeout:1000})}
+const setup=post({expression:input.setup});
+if(setup.error||setup.response.exceptionDetails)throw Error(JSON.stringify(setup));
+const capabilities=input.probes.map(guarded);
+const snapshot="JSON.stringify({box,source,text,sourceParentIsBox:source.parentElement===box,textParentIsBox:text.parentElement===box},(key,value)=>key==='parentElement'?undefined:value)";
+const before=guarded(snapshot);
+const rows=input.expressions.map(guarded);
+const after=guarded(snapshot);
+process.stdout.write(JSON.stringify({node:process.versions.node,v8:process.versions.v8,capabilities,rows,before,after}));
+session.disconnect();
 '''
+        probes=[('normalize',"'Ｓａｖｅ'.normalize('NFKC')",'Save'),
+                ('lower',"'Public Save'.toLowerCase()",'public save'),
+                ('upper',"'script'.toUpperCase()",'SCRIPT'),
+                ('array_from','Array.from([])',[])]
         expressions=[_expression('smart_read',dict(action='click',needle='Public Save')),
                      _expression('deep_read',dict(needle='Public Save'))]
-        p=subprocess.run(['node','-e',program],input=json.dumps(dict(setup=setup,expressions=expressions)),
+        p=subprocess.run(['node','-e',program],input=json.dumps(dict(setup=setup,expressions=expressions,
+                                                                 probes=[expression for _,expression,_ in probes])),
                          capture_output=True,text=True,encoding='utf-8',timeout=10)
         self.assertEqual(p.returncode,0,p.stderr)
-        rows=json.loads(p.stdout);self.assertEqual(len(rows),2)
-        for row in rows:
+        report=json.loads(p.stdout)
+
+        def rejection(row):
             self.assertIsNone(row['error'])
-            self.assertNotIn('exceptionDetails',row['response'])
+            response=row['response']
+            self.assertEqual(response['exceptionDetails']['exception']['className'],'EvalError')
+            self.assertIn('Possible side-effect in debug-evaluate',response['exceptionDetails']['exception']['description'])
+            self.assertNotIn('value',response['result'])
+            self.assertNotIn('CANARY-',json.dumps(response))
+
+        unsupported=set()
+        self.assertEqual(len(report['capabilities']),len(probes))
+        for (name,_,expected),row in zip(probes,report['capabilities']):
+            if 'exceptionDetails' in row['response']:
+                rejection(row);unsupported.add(name)
+            else:
+                self.assertIsNone(row['error'])
+                self.assertEqual(row['response']['result']['value'],expected)
+        print('LEGACY_CDP_NODE_GUARD_CAPABILITIES '+json.dumps(dict(node=report['node'],v8=report['v8'],
+              rejected=sorted(unsupported))),flush=True)
+        for key in ('before','after'):
+            self.assertIsNone(report[key]['error'])
+            self.assertNotIn('exceptionDetails',report[key]['response'])
+        self.assertEqual(report['before']['response']['result']['value'],report['after']['response']['result']['value'])
+        rows=report['rows'];self.assertEqual(len(rows),2)
+        dependencies=[{'normalize','lower','upper','array_from'},{'lower','upper'}]
+        for index,(row,required) in enumerate(zip(rows,dependencies)):
+            self.assertIsNone(row['error'])
             self.assertNotIn('CANARY-',json.dumps(row['response']))
-        self.assertEqual(rows[0]['response']['result']['value']['matched_text'],'Public Save')
-        self.assertEqual(rows[1]['response']['result']['value']['top_matches'][0]['matched_text'],'Public Save')
+            if not required.intersection(unsupported):
+                self.assertNotIn('exceptionDetails',row['response'])
+                value=row['response']['result']['value']
+                self.assertEqual(value['matched_text'] if index==0 else value['top_matches'][0]['matched_text'],'Public Save')
+                continue
+            rejection(row)
+            # Replay the real inspector rejection through the actual adapter.
+            # A live-enabled process must still keep this read-only and must not
+            # attempt another evaluation or escalate to any input operation.
+            with server() as (state,endpoint):
+                capture(state,[{'result':row['response']}])
+                adapter=LegacyCdpAdapter(endpoint,allow_live_control=True)
+                try:result=adapter.execute('cdp-smart-find' if index==0 else 'cdp-deep-find',{'needle':'Public Save'})
+                finally:adapter.close()
+                self.assertEqual(result.payload['status'],'partial')
+                self.assertEqual(result.payload['reason'],'javascript_exception')
+                self.assertIs(result.payload['automatic_fallback'],False)
+                self.assertIs(result.payload['side_effect_guard'],True)
+                self.assertIs(result.payload['read_only'],True)
+                self.assertFalse(result.payload.get('mutation_may_have_occurred',False))
+                self.assertNotIn('CANARY-',json.dumps(result.payload))
+                self.assertEqual(len(state.requests),1)
+                self.assertEqual(state.requests[0]['method'],'Runtime.evaluate')
+                self.assertIs(state.requests[0]['params']['throwOnSideEffect'],True)
+                self.assertIs(state.requests[0]['params']['awaitPromise'],False)
 
 
 if __name__=='__main__':unittest.main()

@@ -6,9 +6,9 @@ It does not launch a browser, scan ports, enable remote debugging, change browse
 settings, configure persistent access, or connect to a model/account provider.
 Construction validates configuration and does not make a network connection.
 
-The legacy `scripts/cucp-native-helper.ps1` implementations remain intact. This is
-an independently tested migration slice, not proof of browser compatibility or
-full parity with every app-specific PowerShell macro.
+The legacy command surface uses the separate compatibility bridge described in
+[the legacy CDP migration](legacy-cdp-family.md). This core adapter is independently
+tested and does not claim full parity with every app-specific legacy macro.
 
 ## Host integration API
 
@@ -114,7 +114,15 @@ search can inspect the observed nested tree.
 Smart matching retains the legacy normalization, exact/prefix/substring scores,
 role weighting, associated `<label for=...>` text, and ranked selector hints.
 Only inspected attributes and text are used; input `value` is not included in
-public observation metadata. SCRIPT, STYLE, NOSCRIPT and TEMPLATE subtrees are
+public observation metadata. TEXTAREA default text and descendant text are also
+excluded from public text and every ancestor's aggregate. The textarea itself
+keeps its metadata, label associations, selector hints and element reference;
+explicit observed typing remains available. Private default text stays only in
+the internal fingerprint, so changing it still invalidates an old action ref.
+This is an intentional privacy correction: searching a textarea's initial value
+no longer finds the control. Synthetic and owned-browser checks cover observation,
+query/search non-disclosure, DOM-only reads, labels and normal typing. SCRIPT,
+STYLE, NOSCRIPT and TEMPLATE subtrees are
 excluded from public text aggregation at every ancestor (including BODY), and
 receive no public/actionable element references. Raw source may remain only in
 internal semantic fingerprints for change detection. A source-only CSS match

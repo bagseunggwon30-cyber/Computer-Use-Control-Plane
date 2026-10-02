@@ -230,6 +230,16 @@ CUCP_LEGACY_CDP_BROWSER_TEST=1 CUCP_CHROME_TEST=1 python -m unittest discover -s
   defaults and untouched value/default/aggregate getters. The diagnostic test also
   records the new guarded parent/child/text-node getters.
 
+The synthetic inspector check probes a fixed set of prerequisites before running
+the unchanged production assets with `throwOnSideEffect:true`. Official Node
+22.23.3 rejects guarded normalization, case conversion and `Array.from`; Node
+24 accepts them. Unsupported inspectors must reject the full assets with the
+specific `EvalError`, expose no canary or value, leave the fixture unchanged,
+and pass that rejection through the real adapter as read-only partial output
+with no fallback or second evaluation. Supported inspectors retain the exact
+successful-output assertions. Neither path skips the test or changes the assets.
+The mandatory real-Chrome suite independently requires actual guarded success.
+
 Local 2026-10-02: mock and Node fixture checks passed; Windows tests are explicitly
 skipped off Windows. All five enabled browser attempts failed at Chrome startup:
 `process_singleton_posix.cc: socket() failed: Operation not permitted`.

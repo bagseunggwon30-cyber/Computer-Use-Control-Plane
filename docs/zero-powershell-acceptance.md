@@ -12,8 +12,8 @@ removes another 13,320 bytes, bringing the total reduction to 91,864 bytes and
 remaining source to 921,614 bytes. Its exact-commit actual-adapter gate passed in run `36973181910`.
 The three-family kernels and exact adapters passed all focused jobs at `e9e015c6`
 in run `37007340738`. Their production integration replaces 53 original function
-extents and removes duplicate fixtures, leaving **821,540 bytes**: a further
-100,074-byte reduction, and 191,938 bytes below the original baseline. This is an
+extents and removes duplicate fixtures, leaving **823,078 bytes**: a further
+98,536-byte reduction, and 190,400 bytes below the original baseline. This is an
 integrated source measurement; the current commit still requires the bundled full
 regression and its privacy/production routing checks. Current source groups are:
 
@@ -22,8 +22,8 @@ regression and its privacy/production routing checks. Current source groups are:
 | Main legacy wrapper and macros, `scripts/cucp.ps1` | 505,923 |
 | Native helper, `scripts/cucp-native-helper.ps1` | 122,475 |
 | Resident helper server | 27,427 |
-| Shared retained CDP host | 11,931 |
-| Four PowerShell test files | 135,641 |
+| Shared retained CDP host | 11,945 |
+| Four PowerShell test files | 137,165 |
 | Temporary parser-derived migration source map | 2,505 |
 | Audit and verification references | 10,586 |
 | Installer, launchers and publisher shims | 5,052 |

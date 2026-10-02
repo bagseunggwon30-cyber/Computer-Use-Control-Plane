@@ -85,7 +85,10 @@ def main(argv=None):
         work = Path(work)
         run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--console",
              "--noupx", "--name", "CUCP", "--distpath", work / "dist", "--workpath", work / "build",
-             "--collect-data", "pcucp_cli", "--hidden-import", "pcucp_cli.legacy_cdp",
+             # --collect-data runs before Analysis applies --paths. Use the
+             # known source directory so a clean, uninstalled checkout works.
+             "--add-data", f"{ROOT / 'pcucp-next/python/pcucp_cli/legacy_cdp_assets'}:pcucp_cli/legacy_cdp_assets",
+             "--hidden-import", "pcucp_cli.legacy_cdp",
              "--hidden-import", "pcucp_cli.legacy_cdp_entry",
              "--hidden-import", "pcucp_cli.legacy_cdp_bridge",
              "--specpath", work, "--paths", ROOT / "pcucp-next" / "python", PACKAGING / "entry.py"])

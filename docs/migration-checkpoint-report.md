@@ -13,11 +13,11 @@ The baseline is commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tree
 
 | Canonical Git source | Baseline | Prior verified `27400c98` | Current integration |
 | --- | ---: | ---: | ---: |
-| All tracked `.ps1` source/tests | 1,013,478 bytes | 921,614 bytes | 821,540 bytes |
-| Runtime scripts, including the new shared host | 858,937 bytes | 770,805 bytes | 667,756 bytes |
-| Actual all-source reduction | — | 91,864 bytes | **191,938 bytes (18.94%)** |
+| All tracked `.ps1` source/tests | 1,013,478 bytes | 921,614 bytes | 823,078 bytes |
+| Runtime scripts, including the new shared host | 858,937 bytes | 770,805 bytes | 667,770 bytes |
+| Actual all-source reduction | — | 91,864 bytes | **190,400 bytes (18.79%)** |
 
-The current integration removes another **100,074 bytes** relative to the prior
+The current integration removes another **98,536 bytes** relative to the prior
 verified checkpoint, including all adapter and test overhead. It replaces 53
 original function extents: 42 retain compatible delegates and 11 private helpers
 disappear. The duplicate adapter fixtures are removed; shared CDP host code is
@@ -81,7 +81,7 @@ other pure operations retain their smaller request limit.
 
 ## Remaining work and acceptance boundaries
 
-The tracked inventory still contains 821,540 PowerShell bytes. Major remaining
+The tracked inventory still contains 823,078 PowerShell bytes. Major remaining
 work includes leaf UIA/OCR/window acquisition, IME/clipboard/drag/multi-edit,
 application/process/registry/system macros, recorder/audit/profile acquisition,
 helper lifecycle and IPC, optional vision/provider plumbing, the original workflow
@@ -95,7 +95,10 @@ The current integration intentionally removes those signals before matching,
 locator construction and output, while preserving ordinary labels and current
 visible button captions. Thirty-two original synthetic exposure cases and eleven additional textarea
 scenarios characterize that divergence; ordinary parity assertions and the read side-effect guard remain.
-Four new owned-browser privacy cases require the current full gate. This focused
+Four legacy and one modern owned-browser privacy cases require the current full
+gate. The modern observation path also excludes textarea defaults from direct
+and ancestor text while keeping references, label matching and explicit typing.
+This focused
 correction does not establish privacy safety for every remaining legacy surface.
 
 Hosted protocol and generated-data checks do not establish interactive Windows

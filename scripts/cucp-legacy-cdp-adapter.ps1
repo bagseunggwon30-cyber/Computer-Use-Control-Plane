@@ -13,7 +13,7 @@ function _Invoke-LegacyCdpBridge {
     $directory = [IO.Path]::GetDirectoryName($executable)
   } else {
     $python = $env:CUCP_LEGACY_CDP_PYTHON
-    if (-not $python) { $python = (Get-Command python.exe -CommandType Application -ErrorAction Stop).Source }
+    if (-not $python) { $python = (Get-Command python.exe -CommandType Application -TotalCount 1 -ErrorAction Stop).Source }
     $executable = [IO.Path]::GetFullPath($python)
     $prefix = '-E -B -m pcucp_cli.legacy_cdp_bridge'
     $directory = Join-Path $Script:LegacyCdpSourceRoot 'pcucp-next\python'

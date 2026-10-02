@@ -7,8 +7,8 @@ This feature branch starts from published `9ffa354b9904235835a7bc6eb78ed8d3d7631
 Execution, precision/history/cache and legacy CDP kernels plus exact adapters
 passed every focused job at `e9e015c6` / run `37007340738`. Their production
 integration now replaces 53 original function extents, retains qualified host
-effects, and removes the duplicate fixtures. Current tracked PS is 821,540 bytes,
-191,938 below baseline and 100,074 below the prior verified checkpoint. The
+effects, and removes the duplicate fixtures. Current tracked PS is 823,078 bytes,
+190,400 below baseline and 98,536 below the prior verified checkpoint. The
 integrated commit requires the bundled full regression, production interception,
 portable package and explicit privacy checks before release. See the
 [current report](migration-checkpoint-report.md) and [inventory](legacy-function-inventory.json).
@@ -133,7 +133,7 @@ See [the checkpoint report](migration-checkpoint-report.md) for the coherent
 architecture, measured source retirement and explicit remaining acceptance scope.
 At prior verified checkpoint `27400c98`, aggregate tracked PS was 921,614 bytes,
 down 91,864 bytes including bridge overhead. The current integrated three-family
-replacement leaves 821,540 bytes and requires the current-commit full gate. Exact
+replacement leaves 823,078 bytes and requires the current-commit full gate. Exact
 totals are in [the tracked source inventory](legacy-function-inventory.json).
 This does not meet the lowest/zero-PowerShell goal. Actual planner adapters and
 output formatting passed at aadbc58 / run 36957910828. The app-profile builder and its sole-use score helper are now replaced under

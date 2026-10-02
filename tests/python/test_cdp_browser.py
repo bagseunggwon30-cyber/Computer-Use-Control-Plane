@@ -218,6 +218,41 @@ class CdpBrowserTests(unittest.TestCase):
         self.assertEqual(labelled['top']['attributes']['id'], 'message')
         self.assertEqual(self.node(self.observe(adapter), 'click-count')['text'], '0')
 
+    def test_textarea_default_text_is_private_and_labeled_typing_still_works(self):
+        live = self.adapter(live=True)
+        setup = self.observe(live)
+        live.execute('cdp-eval', {'snapshot_id':setup['snapshot_id'], 'expression':"""(()=>{
+          const panel=document.createElement('div');panel.id='owned-notes-panel';
+          const label=document.createElement('label');label.htmlFor='owned-notes';label.textContent='Owned notes';
+          const area=document.createElement('textarea');area.id='owned-notes';
+          area.textContent='CANARY-TEXTAREA-DEFAULT-OWNED';area.value='CANARY-TEXTAREA-CURRENT-OWNED';
+          panel.append(label,area);document.body.append(panel);return true})()"""})
+        adapter = self.adapter()
+        with patch.object(adapter, '_call', wraps=adapter._call) as calls:
+            observed = self.observe(adapter)
+            self.assertNotIn('CANARY-', json.dumps(observed))
+            area = self.node(observed, 'owned-notes')
+            self.assertEqual(area['text'], '')
+            self.assertIn('Owned notes', self.node(observed, 'owned-notes-panel')['text'])
+            for command in ('cdp-smart-find', 'cdp-smart-type-find', 'cdp-deep-find'):
+                found = adapter.execute(command, {'snapshot_id':observed['snapshot_id'], 'text':'CANARY-TEXTAREA'})
+                self.assertEqual(found['candidate_count'], 0)
+                self.assertNotIn('CANARY-', json.dumps(found))
+            labelled = adapter.execute('cdp-smart-type-find', {'snapshot_id':observed['snapshot_id'], 'text':'Owned notes'})
+            self.assertEqual(labelled['top']['element_ref'], area['element_ref'])
+            queried = adapter.execute('cdp-query', {'snapshot_id':observed['snapshot_id'], 'selector':'#owned-notes'})
+            self.assertEqual(queried['candidates'][0]['element_ref'], area['element_ref'])
+            self.assertNotIn('CANARY-', json.dumps(queried))
+        self.assertTrue(all(call.args[1].startswith('DOM.') for call in calls.call_args_list))
+        typing = self.observe(live)
+        result = live.execute('cdp-type', self.action_args(typing, 'owned-notes', text='owned replacement 한글', clear=True))
+        self.assertTrue(result['dispatched'])
+        after = self.observe(live)
+        self.assertNotIn('CANARY-', json.dumps(after))
+        proof = live.execute('cdp-eval', {'snapshot_id':after['snapshot_id'], 'expression':
+            "({value:document.getElementById('owned-notes').value,defaultText:document.getElementById('owned-notes').textContent})"})
+        self.assertEqual(proof['result_value'], {'value':'owned replacement 한글', 'defaultText':'CANARY-TEXTAREA-DEFAULT-OWNED'})
+
     def test_exact_button_click_once_and_consumed_snapshot(self):
         adapter = self.adapter(live=True)
         observed = self.observe(adapter)

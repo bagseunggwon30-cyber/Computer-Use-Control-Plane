@@ -696,7 +696,10 @@ class CdpAdapter:
             shadow_count += sum(kind == "shadow" for _, kind in children)
             frame_count += int(node.get("nodeName", "").upper() in ("IFRAME", "FRAME"))
             inaccessible_frames += int(node.get("nodeName", "").upper() in ("IFRAME", "FRAME") and "contentDocument" not in node)
-            stack.extend((child, depth + 1) for child, _ in reversed(children))
+            # A textarea's children encode its default field value. Keep the
+            # control/reference, but do not expose its value subtree as nodes.
+            if name.upper() != "TEXTAREA":
+                stack.extend((child, depth + 1) for child, _ in reversed(children))
             if node.get("nodeType") != 1:
                 continue
             backend = node.get("backendNodeId")
@@ -713,7 +716,7 @@ class CdpAdapter:
                 name = part.get("nodeName", "")
                 if not isinstance(name, str):
                     _fail("invalid_dom", "DOM node name must be a string")
-                if name.upper() in _SOURCE_ONLY_TAGS:
+                if name.upper() in _SOURCE_ONLY_TAGS or name.upper() == "TEXTAREA":
                     continue
                 if part.get("nodeType") == 3:
                     raw_text.append(str(part.get("nodeValue", ""))[:4096])
