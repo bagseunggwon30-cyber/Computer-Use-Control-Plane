@@ -122,14 +122,14 @@ See [the checkpoint report](migration-checkpoint-report.md) for the coherent
 architecture, measured source retirement and explicit remaining acceptance scope.
 The qualified preset body is now a thin planning-query adapter; aggregate tracked
 PS is 934,934 bytes, down 78,544 bytes from baseline including bridge overhead.
-This does not meet the lowest/zero-PowerShell goal. Its actual adapter and output
-formatting are required checks in the current commit's Windows CI. Strategy and
+This does not meet the lowest/zero-PowerShell goal. Actual planner adapters and
+output formatting passed at aadbc58 / run 36957910828. Strategy, app-profile and
 image PS bodies remain; no further family is retired on candidate-only evidence.
 
-### Captured planning candidates
+### Captured planning boundaries
 
-Task/form and smart-plan candidates are isolated from the production host. Their
-original builders remain while Windows compares exact captured query order,
+Task/form and smart-plan builders now run as registered pure C# operations with
+retained acquisition adapters. Windows compares exact captured query order,
 payloads, errors, formatting, and exits. The common read-only child transport
 keeps control-like values inside a named string array and rejects actuator
 routes. See `legacy-task-form-kernel.md` and `legacy-smart-plan-kernel.md`.
@@ -138,6 +138,11 @@ routes. See `legacy-task-form-kernel.md` and `legacy-smart-plan-kernel.md`.
 
 The task/form and smart-plan kernel corpora passed at a03d2788 / run 36938195037.
 The builder bodies are now replaced by read-only acquisition adapters and the
-six pure registry operations. Current commit qualification additionally compares
-actual Console text, exact child/workflow/native query traces and current native
-bridge execution. A prior pure-kernel pass alone is not the adapter release gate.
+six pure registry operations. Full CI at aadbc58 / run 36957910828 additionally
+passed all 367 task/form and 201 SmartPlan actual-adapter comparisons: real
+Console text, exact child/workflow/native query traces and current native bridge
+execution. A prior pure-kernel pass alone was not the adapter release gate.
+
+App-profile remains an isolated candidate with 496 captured-reply cases and 296
+Unicode/culture strategy comparisons awaiting Windows qualification. Its current
+PowerShell acquisition, decisions and optional history persistence remain intact.

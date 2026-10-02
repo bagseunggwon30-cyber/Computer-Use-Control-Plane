@@ -81,8 +81,9 @@ an earlier green run is not a substitute. The Pester regression suite loads the 
 Two candidates remain deliberately unretired: strategy ranking (including
 cross-culture comparisons) and a net48 image-diff library with 55 generated-file
 and error cases across PNG/BMP/JPEG/GIF/TIFF. Explicit strategy culture currently
-controls its comparers, while alias regex normalization still uses ambient
-culture; that separate compatibility seam must be resolved before retirement.
+controls its comparers. The next isolated candidate also scopes alias regex
+normalization to the requested culture; its new Unicode differential must pass
+before strategy retirement.
 
 ## Planning integration
 
@@ -94,10 +95,11 @@ smart-plan cases, plus each captured-prefix query trace. Exact numeric errors,
 null binding, ordered queries, unsafe-child accumulation, and full outputs remain
 qualification gates. The pure operations are explicitly registered in the production host. Strengthened
 actual-adapter checks compare real Console output, exact query traces and the current
-workflow bridge, not reconstructed output from a test payload. At 6331f361 / run
-36956439482, all 367 task/form adapter cases passed. SmartPlan reported 70 raw
-JSON field-order mismatches; the insertion-order fix must pass all 201 unchanged
-adapter cases before that family is qualified.
+workflow bridge, not reconstructed output from a test payload. At
+[aadbc58 / run 36957910828](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36957910828),
+all four CI jobs passed, including all 367 task/form and 201 SmartPlan actual
+adapter cases. The prior 70 SmartPlan raw JSON field-order mismatches were fixed
+by restoring the original property order; every oracle assertion remained intact.
 
 ## What still prevents full completion
 
@@ -113,9 +115,11 @@ coordinates, cross-integrity/UAC behavior, helper restart/crash handling, and
 application-specific task success. No user desktop, account-connected model, or
 personal documents were used to claim these checks.
 
-The next coherent code slice is app-profile assembly and its strategy helpers,
-continuing to separate captured read-only probes from pure decisions.
-The next acceptance milestone needs an authorized, isolated interactive Windows
-fixture environment. Until those boundaries are proved, retiring the remaining
-legacy surface merely to change language percentages would drop behavior. This
+The next isolated candidate is app-profile assembly and its strategy helpers,
+with 496 captured-reply cases and 296 Unicode/culture comparisons awaiting
+Windows qualification. Its original PowerShell body remains. These pure and
+noninteractive slices can continue in cloud CI. Full retirement of the remaining
+live input and lifecycle boundaries additionally needs an authorized, isolated
+interactive Windows fixture environment. Until those boundaries are proved,
+retiring them merely to change language percentages would drop behavior. This
 milestone is a reviewable foundation, not a completed rewrite or signed release.

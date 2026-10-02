@@ -6,8 +6,9 @@ is outside NativeHost's compile wildcard. Its independent net8 harness is
 process, filesystem, network, desktop or model dependency. The 201-case Windows
 oracle and captured-prefix checks passed at a03d2788 / run 36938195037. NativeHost
 now explicitly links the kernel and registers smart-plan-advance. The feature
-branch adapter preserves read-only acquisition; current-commit actual-adapter
-qualification remains required.
+branch adapter preserves read-only acquisition and passed all 201 exact
+actual-adapter cases at aadbc58 / run 36957910828. Later source changes still
+require their own current-commit qualification.
 
 `Advance({rest, cache_seconds, brief, elapsed_ms, captured_replies})` deterministically
 replays a bounded planning sequence. A missing capture returns
@@ -24,8 +25,8 @@ captures are not interchangeable with a failed probe. The query kinds are:
 - cdp_port: port, timeout `120`; only when the original CDP option gate permits it
 - native: exact original `Invoke-NativeHelper` arguments for CDP, then UIA, then optional OCR
 
-Descriptors are data. A future adapter must keep these existing read-only
-acquisition boundaries and never run arbitrary descriptor commands. Precision
+Descriptors are data. The retained adapter keeps these existing read-only
+acquisition boundaries and never runs arbitrary descriptor commands. Precision
 planning only constructs target-validation/click commands; it performs no query.
 A replay recomputes all earlier choices from the original rest and captures, so it
 cannot introduce an unrequested extra probe or treat a null result as a retry.
@@ -100,3 +101,20 @@ evidence placed invoke_pattern after rect/click_point, while the original places
 it before those fields. The candidate now inserts it in the original position.
 Two managed contracts check both best and candidate evidence order. Full Console
 comparisons and all 201 fixtures remain unchanged for requalification.
+
+## Qualified retained adapter
+
+Commit `aadbc58aa9dcc2254a3361cf8963429197859f22` passed exact
+[CI run 36957910828](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36957910828)
+with all four jobs successful. Windows job `110684909869` explicitly recorded:
+
+- 23 isolated managed SmartPlan captured-reply contracts passed
+- All 201 pinned-kernel payload/error/exit cases and every captured-prefix query check passed
+- All 201 actual retained-adapter comparisons passed, including untouched Console text,
+  complete deterministic payload/errors/exits and exact read-only acquisition traces
+
+The actual adapter test completed at 2026-10-02 03:08:51 UTC; the combined
+SmartPlan step completed at 03:08:58 UTC. Assertions and original oracle output
+were retained through the field-order correction. Only elapsed time was zeroed
+at the documented pre-format seam. This qualifies captured-reply planning and
+adapter behavior; it does not constitute interactive Windows GUI validation.

@@ -1292,21 +1292,21 @@
       "name": "Invoke-MacroTaskPlan",
       "replacement": "pcucp-next/dotnet/PcuCp.LegacyTaskForm/LegacyTaskFormKernel.cs",
       "adapter": "ordered form/smart child queries and original workflow tokenizer retained",
-      "evidence": "832 task/form results from 367 cases and 201 smart-plan cases with captured-prefix checks passed at a03d2788a6b3aa9f206d89ac139fb07b040ec4b4 / run 36938195037. Current retained adapters require the strengthened exact Windows checks."
+      "evidence": "105 managed checks, 832 pure task/form comparisons from 367 cases, and all 367 actual retained-adapter comparisons including real Console output, exact child/workflow queries, errors and exits passed at aadbc58aa9dcc2254a3361cf8963429197859f22 / run 36957910828."
     },
     {
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroFormPlan",
       "replacement": "pcucp-next/dotnet/PcuCp.LegacyTaskForm/LegacyTaskFormKernel.cs",
       "adapter": "ordered smart-plan child queries and output boundary retained",
-      "evidence": "832 task/form results from 367 cases and 201 smart-plan cases with captured-prefix checks passed at a03d2788a6b3aa9f206d89ac139fb07b040ec4b4 / run 36938195037. Current retained adapters require the strengthened exact Windows checks."
+      "evidence": "105 managed checks, 832 pure task/form comparisons from 367 cases, and all 367 actual retained-adapter comparisons including real Console output, exact child/workflow queries, errors and exits passed at aadbc58aa9dcc2254a3361cf8963429197859f22 / run 36957910828."
     },
     {
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroSmartPlan",
       "replacement": "pcucp-next/dotnet/PcuCp.LegacySmartPlan/LegacySmartPlanKernel.cs",
       "adapter": "original history, port and native read-only acquisition retained under exact descriptor and trace checks",
-      "evidence": "832 task/form results from 367 cases and 201 smart-plan cases with captured-prefix checks passed at a03d2788a6b3aa9f206d89ac139fb07b040ec4b4 / run 36938195037. Current retained adapters require the strengthened exact Windows checks."
+      "evidence": "23 managed checks, all 201 pure SmartPlan cases with captured-prefix traces, and all 201 actual retained-adapter comparisons including unchanged raw Console text passed at aadbc58aa9dcc2254a3361cf8963429197859f22 / run 36957910828."
     }
   ]
 }
