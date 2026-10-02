@@ -77,7 +77,7 @@ cases after one acknowledged inert possible-write dispatch. These require the
 same uncertainty marker, no automatic retry, and no premature output. Real
 Windows results for this repaired tree remain pending until its full gate passes.
 
-The repaired index contains 26 tracked PowerShell files totaling **864,373 bytes**,
+The first repaired index at `18807573` contains 26 tracked PowerShell files totaling **864,373 bytes**,
 including **612,709 runtime bytes** and **251,664 other source/test bytes**. That
 is 14,544 more than the initial integration, and 41,295 more than the last accepted
 `56be343c` checkpoint. These temporary regression fixtures are fully counted;
@@ -220,3 +220,16 @@ skips. The staged shared session has 994 managed checks, startup has 110, and
 interaction has 106 locally (109 on Windows). Windows actual-adapter checks are
 still pending; local results do not establish those gates or interactive GUI
 acceptance.
+
+## Guard-fixture follow-up
+
+Run [37066314234](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37066314234)
+passed the previously failing original Windows boundary stage, but its new guard
+matrices found mismatched fixture wire containers, a custom-startup-reader gap,
+PS5 null/PS7 typed-binding assumptions, and a real PS7 buffered-string replay
+shape defect. The strict repairs retain all matrix cases and add raw CLR type
+and wire-readiness checks. Their exact Windows gate is still pending.
+
+This follow-up index contains **866,913 tracked PS bytes**, with the same runtime
+source footprint as the first repair and 2,540 extra temporary test-fixture
+bytes. No additional source retirement or zero-PowerShell completion is claimed.

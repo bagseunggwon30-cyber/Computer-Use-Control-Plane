@@ -67,7 +67,7 @@ includes this file. Run it on Windows with the existing SDK and both shells:
 python -m unittest discover -s tests/python -p test_legacy_execution_completion.py -v
 ```
 
-The required Windows result is three tests passed with zero skips. Linux local
+The required Windows result is four tests passed with zero skips. Linux local
 verification passed the real C# stream fixture test, including unchanged floating
 token bytes and a captured write acknowledgment. The two Windows parser/host tests
 are explicitly skipped on Linux, where neither PowerShell runtime is installed;
@@ -92,3 +92,29 @@ local .NET 8-targeted code used the available .NET 10 runtime with explicit majo
 roll-forward, so the required Windows .NET 8 and PS5.1/PS7 results remain separate
 CI evidence. NuGet vulnerability metadata lookup warned about a read-only user
 cache; it was not a successful package security audit.
+
+## Follow-up from run 37066314234
+
+The first repaired full run exposed additional fixture and replay problems.
+The completion fixture had consumed startup with a custom reader instead of the
+production strict UTF-8 reader and first-BOM-aware startup parser. Its PS5 run
+disconnected before completion; the original failing bytes were not captured.
+It now links and uses both production components with full validated startup
+payloads. Local byte-level tests accept a single initial BOM and reject duplicate
+or late BOMs, malformed UTF-8 and a forged startup schema before any dispatch.
+
+The integer fixture had passed raw Hashtable wire nodes into object guards that
+receive PSCustomObject nodes after production JSON decoding. Its 49 accepted
+wire cases per shell consequently failed before numeric validation, and 71
+negative cases per shell rejected prematurely. The fixture now converts only
+containers recursively, preserving adversarial scalar CLR types. Every wire
+case, including rejected cases, must prove schema readiness and exact target-field
+CLR type after decoding before its numeric result is accepted as evidence.
+
+PS7 also exposed a production replay bug: positional `Write-Output -NoEnumerate`
+wrapped a buffered string in a collection. The host now emits the already
+validated string through named `-InputObject`, matching original scalar output.
+The fixture inspects every collected pipeline element's actual CLR type before
+JSON serialization, preserving exact order, terminal Int32 exit, and no output
+on invalid completion. The 118 completion cases and 259 integer cases per shell
+remain required; these repairs do not weaken validation or uncertainty handling.

@@ -3,6 +3,8 @@
   <ItemGroup>
     <Compile Include="../PcuCp.LegacyExecution/*.cs" Link="%(Filename)%(Extension)" />
     <Compile Include="../PcuCp.NativeHost/Contracts.cs" Link="Contracts.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyExecutionStartup.cs" Link="LegacyExecutionStartup.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacySessionInput.cs" Link="LegacySessionInput.cs" />
     <Compile Include="../PcuCp.NativeHost/LegacySafetyKernel.cs" Link="LegacySafetyKernel.cs" />
     <Compile Include="../PcuCp.NativeHost/LegacyTextKernel.cs" Link="LegacyTextKernel.cs" />
     <Compile Include="../PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs" Link="LegacyTaskPresetKernel.cs" />

@@ -15,17 +15,14 @@ internal static class CompletionTransportFixture
         string log = root.GetProperty("log").GetString()!;
         void Record(string value) => File.AppendAllText(log, value + "\n");
         Record("start");
-        // Consume the production adapter's startup frames, without executing an
-        // operation from them. The real session below owns all effect/reply frames.
-        while (true)
-        {
-            using var frame = JsonDocument.Parse(Console.In.ReadLine() ?? throw new InvalidOperationException("Missing startup."));
-            if (frame.RootElement.GetProperty("id").GetInt64() != 0) throw new InvalidOperationException("Unexpected startup id.");
-            if (frame.RootElement.GetProperty("kind").GetString() == "end") break;
-        }
+        // Use the real UTF-8 reader and startup parser, including its single
+        // leading-BOM rule. Never execute the operation being validated.
+        using var reader = LegacySessionInput.Open(Console.OpenStandardInput());
+        string family = args[0] switch { "legacy-interaction-session" => "interaction", "legacy-diagnostic-session" => "diagnostics", _ => "execution" };
+        _ = LegacyExecutionStartup.Read([], reader, family);
         Record("startup");
         using var writer = new CompletionWriter(Console.Out, root.GetProperty("completion").GetString()!);
-        Environment.ExitCode = new LegacyExecutionSession(Console.In, writer).Run(effects =>
+        Environment.ExitCode = new LegacyExecutionSession(reader, writer).Run(effects =>
         {
             if (root.GetProperty("after_write").GetBoolean())
             {

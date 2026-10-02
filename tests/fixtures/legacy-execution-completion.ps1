@@ -28,6 +28,12 @@ foreach($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Conver
  $depthType=if($null -eq $parsed.json_depth){$null}else{$parsed.json_depth.GetType().FullName}
  $operation=switch($case.family){'execution'{'workflow-run'};'interaction'{'click-point'};'diagnostics'{'perf'}}
  $entry=switch($case.family){'execution'{'legacy-execution-session'};'interaction'{'legacy-interaction-session'};'diagnostics'{'legacy-diagnostic-session'}}
+ $startup=[ordered]@{schema='cucp.execution-start/v1';operation=$operation;rest=@();brief=$false;cache_seconds=5;vision_available=$false;culture=''}
+ if($case.family -ceq 'interaction'){$startup.schema='cucp.interaction-start/v1';$startup['double']=$false;$startup['right_click']=$false}
+ if($case.family -ceq 'diagnostics'){
+  $startup.schema='cucp.diagnostic-start/v1';$startup['context']=[ordered]@{}
+  foreach($key in @('audit_directory','cache_directory','wrapper_log','cli_path','changelog_path','temp_root','benchmark_schema','release_schema')){$startup.context[$key]='fixture'}
+ }
  $state=@{family=[string]$case.family;operation=$operation;live=$false;sensitive=$false;paths=@{};clocks=@{};
   rest=@();pipeline_output=(New-Object Collections.ArrayList)}
  if($case.family -ceq 'interaction'){[void]$state.pipeline_output.Add('buffered pipeline fixture')}
@@ -35,10 +41,10 @@ foreach($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Conver
  $previous=[Console]::Out;$capture=New-Object IO.StringWriter
  try {
   [Console]::SetOut($capture)
-  $pipeline=@(& {try {_Invoke-LegacyExecutionHost -EntryPoint $entry -Startup @{operation=$operation} -State $state}
+  $pipeline=@(& {try {_Invoke-LegacyExecutionHost -EntryPoint $entry -Startup $startup -State $state}
    catch {$script:errorText=$_.Exception.Message}})
  } finally {[Console]::SetOut($previous)}
- [void]$rows.Add(@{case=$case.case;error=$script:errorText;pipeline=$pipeline;console=$capture.ToString();
+ [void]$rows.Add(@{case=$case.case;error=$script:errorText;pipeline=$pipeline;pipeline_types=@(foreach($item in $pipeline){$item.GetType().FullName});console=$capture.ToString();
   dispatches=$script:dispatches;state_effect_seen=$state.state_effect_seen;live_effect_seen=$state.live_effect_seen;
   phase=$state.diagnostic_phase;exit_type=$exitType;depth_type=$depthType})
  $capture.Dispose()

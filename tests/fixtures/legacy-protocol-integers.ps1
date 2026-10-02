@@ -23,8 +23,24 @@ function _PointPlan-CacheKey {param($X,$Y,$Radius,$Step,$ClickInset,$TargetHwnd,
 function _PointPlan-ReadCache {param($Key,$MaxAgeSeconds) Fixture-Leaf}
 function _Invoke-LegacyCompatibility {param($Operation,$Arguments) if($Operation -cne 'app-profile-advance'){throw 'Unexpected pure operation'};return $script:profileState}
 function _AppStrategy-Append {param($AppKey,$AppType,$Strategy,$Confidence,$Score,$Process,$Class,$Title) $script:leafCalls++;return [pscustomobject]@{success=$true}}
+function Fixture-ParserObject($Value){
+ # Reproduce decoded JSON object/array containers without a JSON round-trip,
+ # which would erase the deliberately supplied Int32/Int64/Decimal types.
+ if($Value -is [Collections.IDictionary]){
+  $mapped=[ordered]@{};foreach($key in $Value.Keys){$mapped[$key]=Fixture-ParserObject $Value[$key]}
+  return ,([pscustomobject]$mapped)
+ }
+ if($Value -is [array]){
+  $items=New-Object Collections.ArrayList;foreach($item in $Value){[void]$items.Add((Fixture-ParserObject $item))}
+  return ,([object[]]$items.ToArray())
+ }
+ return ,$Value
+}
 function Fixture-Effect([string]$Kind,$Data,[string[]]$Argv=@(),[string]$Name=''){
- return [pscustomobject]@{kind=$Kind;name=$Name;argv=[object[]]$Argv;data=(_Execution-EncodeWire $Data);live=$false;quiet=$false;brief=$false;confirm_sensitive=$false}
+ $effect=[pscustomobject]@{kind=$Kind;name=$Name;argv=[object[]]$Argv;data=(Fixture-ParserObject (_Execution-EncodeWire $Data));live=$false;quiet=$false;brief=$false;confirm_sensitive=$false}
+ _Execution-Fields $effect @('kind','name','argv','data','live','quiet','brief','confirm_sensitive')
+ $null=_Execution-DecodeWire $effect.data;$script:fixtureWireReady=$true
+ return $effect
 }
 function Fixture-Value($Case){
  switch -CaseSensitive ($Case.representation){
@@ -33,11 +49,18 @@ function Fixture-Value($Case){
   'json' {return ,$Case.value};default {throw 'Unknown inert numeric representation'}
  }
 }
+function Fixture-RecordGuardType($Effect,[string[]]$Path){
+ $target=_Execution-DecodeWire $Effect.data
+ foreach($name in $Path){$target=$target.$name}
+ $script:guardType=if($null -eq $target){'null'}else{$target.GetType().Name}
+}
 function Fixture-Run($Case,$Value){
  $expected=[int]$Case.expected_number
  if($Case.field -cin @('execution_elapsed','execution_sleep')){
   $state=@{family='execution';live=$false;sensitive=$false}
   $effect=if($Case.field -ceq 'execution_elapsed'){Fixture-Effect 'HistoryAppend' ([pscustomobject]@{success=$true;elapsed_ms=$Value}) @('label','match','strategy')}else{Fixture-Effect 'Sleep' $Value}
+  $path=if($Case.field -ceq 'execution_elapsed'){@('elapsed_ms')}else{@()}
+  Fixture-RecordGuardType $effect $path
   _Execution-ValidateEffect $effect $state;return
  }
  if($Case.field -cin @('precision_x','precision_y','precision_age')){
@@ -87,12 +110,16 @@ function Fixture-Run($Case,$Value){
   $state.diagnostic_counts['processor-count']=1;$state.diagnostic_metric_order=@(0)
  }
  $effect=Fixture-Effect 'Diagnostic' ([pscustomobject]@{name='';value=$payload}) @() $kind
+ $path=@('value')
+ $member=switch($Case.field){'diagnostic_tail'{'max_bytes'};'diagnostic_current'{'current_ordinal'};'diagnostic_previous'{'previous_ordinal'};'diagnostic_age'{'cache_max_seconds'};'diagnostic_count'{'max_elements'}}
+ if($member){$path+=@($member)}
+ Fixture-RecordGuardType $effect $path
  _Execution-ValidateEffect $effect $state
 }
 $rows=New-Object Collections.ArrayList
 foreach($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json)){
- $script:leafCalls=0;$value=Fixture-Value $case;$errorText=$null
+ $script:leafCalls=0;$script:fixtureWireReady=$false;$script:guardType=$null;$value=Fixture-Value $case;$errorText=$null
  try{Fixture-Run $case $value}catch{$errorText=$_.Exception.Message}
- [void]$rows.Add([pscustomobject]@{id=$case.id;accepted=($null -eq $errorText);error=$errorText;leaf_calls=$script:leafCalls;type=if($null -eq $value){'null'}else{$value.GetType().Name}})
+ [void]$rows.Add([pscustomobject]@{id=$case.id;accepted=($null -eq $errorText);error=$errorText;leaf_calls=$script:leafCalls;wire_ready=$script:fixtureWireReady;guard_type=$script:guardType;type=if($null -eq $value){'null'}else{$value.GetType().Name}})
 }
 [Console]::Out.WriteLine((ConvertTo-Json -InputObject ([object[]]$rows.ToArray()) -Depth 8 -Compress))

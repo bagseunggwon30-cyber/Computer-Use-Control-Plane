@@ -6489,7 +6489,7 @@ function _Invoke-LegacyExecutionHost {
     if(-not $process.WaitForExit(10000)){throw 'Execution runtime did not exit after its final report; no action was retried.'}
     $err=$stderr.GetAwaiter().GetResult()
     if($process.ExitCode -ne $exit){throw ('Execution runtime exit did not match its final report. '+$err)}
-    if($State.family -ceq 'interaction'){foreach($item in $State.pipeline_output){Write-Output -NoEnumerate $item}}
+    if($State.family -ceq 'interaction'){foreach($item in $State.pipeline_output){Write-Output -InputObject $item}}
     return [int]$exit
   } catch {
     _Execution-WriteDiagnostic -State $state -Process $process -Stderr $stderr -ErrorText $_.Exception.Message

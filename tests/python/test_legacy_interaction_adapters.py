@@ -366,16 +366,21 @@ class InteractionDecodedDescriptorTests(unittest.TestCase):
                 self.assertEqual(result['entry'],f'legacy-{entry_family}-session')
                 self.assertEqual(result['exit'],7)
                 self.assertEqual(result['state_type'],result['expected_state_type'])
-                self.assertTrue(result['state_type'].endswith('[]'))
                 self.assertIs(result['aliases_caller'],False)
+                self.assertEqual(json.loads(result['raw_before']),fixture['rest'])
+                self.assertEqual(result['raw_after'],result['raw_before'])
                 self.assertEqual(result['caller_after'],result['caller_before'])
-                self.assertEqual(json.loads(result['caller_before']),fixture['rest'])
                 self.assertEqual(result['startup_before'],result['expected_startup'])
                 self.assertEqual(result['startup_after'],result['startup_before'])
                 self.assertEqual(result['state_before'],result['expected_state'])
                 state_before=json.loads(result['state_before'])
-                self.assertIsInstance(state_before,list)
-                self.assertEqual(json.loads(result['state_after']),[f'host-mutated-{i}' for i in range(len(state_before))])
+                if state_before is None:
+                    self.assertIsNone(result['state_type'])
+                    self.assertIsNone(json.loads(result['state_after']))
+                else:
+                    self.assertIsInstance(state_before,list)
+                    self.assertTrue(result['state_type'].endswith('[]'))
+                    self.assertEqual(json.loads(result['state_after']),[f'host-mutated-{i}' for i in range(len(state_before))])
 
     def test_forged_descriptors_fail_before_any_captured_leaf(self):
         fixtures = descriptor_cases()

@@ -74,6 +74,9 @@ class ProtocolIntegerWindowsTests(unittest.TestCase):
         for row,value in zip(rows,actual):
             with self.subTest(shell=shell,field=row['field'],variant=row['variant'],value=row['value'],representation=row['representation']):
                 self.assertEqual(value['id'],row['id'])
+                if row['field'].startswith(('execution_', 'diagnostic_')):
+                    self.assertIs(value['wire_ready'], True, value.get('error'))
+                    self.assertEqual(value['guard_type'], value['type'])
                 self.assertEqual(value['accepted'],row['accept'],value.get('error'))
                 self.assertEqual(value['leaf_calls'],row['leaf_calls'])
                 if row['representation'] in ('int32','int64','double','decimal'):

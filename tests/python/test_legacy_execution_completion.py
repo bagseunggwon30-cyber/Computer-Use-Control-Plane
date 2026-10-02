@@ -59,6 +59,11 @@ def fixture_environment(root, path):
     return env
 
 
+def fixture_startup():
+    return dict(schema='cucp.execution-start/v1', operation='workflow-run', rest=[],
+                brief=False, cache_seconds=5, vision_available=False, culture='')
+
+
 class CompletionFixtureTests(unittest.TestCase):
     def test_existing_session_fixture_preserves_uncoerced_completion_bytes_and_write_ack(self):
         dotnet, host = built_candidate()
@@ -67,11 +72,11 @@ class CompletionFixtureTests(unittest.TestCase):
         self.assertEqual(len(selected), 2)
         with tempfile.TemporaryDirectory(prefix='CUCP completion stream ') as temp:
             root = Path(temp)
-            for index, row in enumerate(selected):
-                with self.subTest(case=row['case']):
+            for index, (row, prefix) in enumerate((r, p) for r in selected for p in ('', '\ufeff')):
+                with self.subTest(case=row['case'], initial_bom=bool(prefix)):
                     path, log = root / f'{index}.json', root / f'{index}.log'
                     path.write_text(json.dumps(dict(row, log=str(log))), encoding='utf-8')
-                    stdin = startup_wire(dict(operation='workflow-run'))
+                    stdin = prefix + startup_wire(fixture_startup())
                     if row['after_write']:
                         data = json.dumps(dict(state='ok', value=wire(None))).encode()
                         stdin += json.dumps(dict(kind='part', id=1, data=base64.b64encode(data).decode())) + '\n'
@@ -97,6 +102,28 @@ class CompletionFixtureTests(unittest.TestCase):
                         self.assertFalse(effect['live'])
                     self.assertEqual(log.read_text().splitlines(),
                                      ['start', 'startup'] + (['write-acknowledged'] if row['after_write'] else []))
+
+    def test_fixture_uses_real_startup_validation_and_strict_utf8_before_dispatch(self):
+        dotnet, host = built_candidate()
+        startup = startup_wire(fixture_startup()).encode()
+        samples = [
+            ('duplicate-bom', b'\xef\xbb\xbf\xef\xbb\xbf' + startup),
+            ('late-bom', startup.replace(b'{"kind":"end"', b'\xef\xbb\xbf{"kind":"end"')),
+            ('invalid-utf8', b'\xff' + startup),
+            ('wrong-schema', startup_wire(dict(fixture_startup(), schema='forged')).encode()),
+        ]
+        row = next(r for r in completion_cases() if r['case'] == 'execution:valid-after-write')
+        with tempfile.TemporaryDirectory(prefix='CUCP completion startup ') as temp:
+            root = Path(temp)
+            for index, (label, stdin) in enumerate(samples):
+                with self.subTest(case=label):
+                    path, log = root / f'{index}.json', root / f'{index}.log'
+                    path.write_text(json.dumps(dict(row, log=str(log))), encoding='utf-8')
+                    process = subprocess.run([dotnet, str(host), 'legacy-execution-session'], input=stdin,
+                                             capture_output=True, env=fixture_environment(root, path), timeout=30)
+                    self.assertNotEqual(process.returncode, 0)
+                    self.assertEqual(process.stdout, b'')
+                    self.assertEqual(log.read_text().splitlines(), ['start'])
 
 
 @unittest.skipUnless(sys.platform == 'win32', 'Requires both Windows PowerShell 5.1 and PowerShell 7')
@@ -138,6 +165,8 @@ class CompletionParserHostTests(unittest.TestCase):
                         self.assertIsNone(actual['error'])
                         buffered = ['buffered pipeline fixture'] if case['family'] == 'interaction' else []
                         self.assertEqual(actual['pipeline'], buffered + [case['process_exit']])
+                        self.assertEqual(actual['pipeline_types'],
+                                         (['System.String'] if buffered else []) + ['System.Int32'])
                         self.assertEqual(actual['exit_type'], 'System.Int32' if major == 5 else 'System.Int64')
                         self.assertEqual(actual['depth_type'], 'System.Int32' if major == 5 else 'System.Int64')
                         if json.loads(case['completion'])['emit_json']:
@@ -148,6 +177,7 @@ class CompletionParserHostTests(unittest.TestCase):
                         prefix = 'mutation_may_have_occurred=true; automatic_retry=false; ' if case['after_write'] else ''
                         self.assertEqual(actual['error'], prefix + 'Invalid execution completion envelope.')
                         self.assertEqual(actual['pipeline'], [])
+                        self.assertEqual(actual['pipeline_types'], [])
                         self.assertEqual(actual['console'], '')
 
     def test_windows_powershell_51_completion_parser_and_host(self):

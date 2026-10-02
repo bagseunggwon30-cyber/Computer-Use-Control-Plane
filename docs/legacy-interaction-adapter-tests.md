@@ -130,3 +130,12 @@ all 12 uncertainty cases, exact Console comparisons and descriptor guards remain
 The 18-case null/empty/literal argv ownership matrix is required under both
 Windows PowerShell 5.1 and PowerShell 7 in the Windows lane. The supplemental PS7
 case explicitly resolves `pwsh`; it cannot silently substitute PS5.1.
+
+The ownership fixture records raw JSON input and its typed caller separately.
+PS7 can bind a null array element to an empty string before the constructor runs;
+that conversion is not caller mutation. Both snapshots must remain unchanged.
+The independent original-expression helper may return null under PS5, so null
+state has no mutable storage and needs no array type or element mutation claim.
+Non-null state still requires the exact original array CLR type, independently
+owned storage, every element mutated by the inert host, and unchanged startup.
+All 18 ownership cases and eight public-delegate checks remain in the gate.

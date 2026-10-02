@@ -106,8 +106,8 @@ if($ValidateDescriptors -or $ValidateStartupClone){
    $script:cloneEntry=$EntryPoint
    $script:cloneScriptPath=$State.script_path;$script:cloneOperation=$Startup.operation
    $script:cloneLive=$State.live;$script:cloneSensitive=$State.sensitive
-   $script:cloneStateType=$State.rest.GetType().FullName
-   $script:cloneAliasesCaller=[object]::ReferenceEquals($State.rest,$script:cloneCaller)
+   $script:cloneStateType=if($null -eq $State.rest){$null}else{$State.rest.GetType().FullName}
+   $script:cloneAliasesCaller=($null -ne $State.rest -and [object]::ReferenceEquals($State.rest,$script:cloneCaller))
    $script:cloneStateBefore=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $State.rest -Compress
    $script:cloneStartupBefore=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $Startup.rest -Compress
    for($i=0;$i -lt $State.rest.Count;$i++){$State.rest[$i]="host-mutated-$i"}
@@ -119,11 +119,12 @@ if($ValidateDescriptors -or $ValidateStartupClone){
   $rows=New-Object Collections.ArrayList
   foreach($row in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json)){
    try {
+   $rawBefore=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $row.rest -Compress
    $script:cloneCaller=[string[]]$row.rest;$script:cloneHostCalls=0;$script:cloneCompatibilityCalls=0
    $before=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $script:cloneCaller -Compress
    $originalShape=Get-OriginalCloneShape -Rest $script:cloneCaller
    $expectedState=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $originalShape.rest -Compress
-   $expectedStateType=$originalShape.rest.GetType().FullName
+   $expectedStateType=if($null -eq $originalShape.rest){$null}else{$originalShape.rest.GetType().FullName}
    $expectedStartup=$expectedState
    if($row.public){
     if($row.family -cne 'interaction' -or $row.public -cnotin $publicNames){throw 'Unknown public delegate fixture'}
@@ -139,7 +140,8 @@ if($ValidateDescriptors -or $ValidateStartupClone){
     $exit=_Invoke-LegacyExecutionHost -EntryPoint 'legacy-diagnostic-session' -Startup @{operation='perf';rest=$originalShape.rest} -State $state
    }else{throw 'Unknown startup clone fixture family'}
    $after=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $script:cloneCaller -Compress
-   [void]$rows.Add(@{case=$row.case;family=$row.family;caller_before=$before;caller_after=$after;expected_state=$expectedState;expected_state_type=$expectedStateType;expected_startup=$expectedStartup;
+   $rawAfter=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $row.rest -Compress
+   [void]$rows.Add(@{case=$row.case;family=$row.family;raw_before=$rawBefore;raw_after=$rawAfter;caller_before=$before;caller_after=$after;expected_state=$expectedState;expected_state_type=$expectedStateType;expected_startup=$expectedStartup;
     state_before=$script:cloneStateBefore;state_after=$script:cloneStateAfter;startup_before=$script:cloneStartupBefore;startup_after=$script:cloneStartupAfter;
     script_path=$script:cloneScriptPath;operation=$script:cloneOperation;state_type=$script:cloneStateType;aliases_caller=$script:cloneAliasesCaller;host_calls=$script:cloneHostCalls;compatibility_calls=$script:cloneCompatibilityCalls;
     live=$script:cloneLive;sensitive=$script:cloneSensitive;entry=$script:cloneEntry;exit=$exit})
