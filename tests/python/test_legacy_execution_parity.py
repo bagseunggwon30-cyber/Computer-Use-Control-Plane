@@ -476,11 +476,16 @@ if($AdapterSource){
  $defs=@($aa.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and ($n.Name -like '_Execution-*' -or $n.Name -like '_Invoke-LegacyExecution*' -or $n.Name -in $public)},$true))
  foreach($def in $defs){
   $body=$def.Extent.Text
-  if($def.Name -eq '_Execution-Dispatch'){$body=$body.Replace('[Diagnostics.Stopwatch]::StartNew()','(New-FakeStopwatch)')}
+  if($def.Name -eq '_Execution-Dispatch'){
+   $body=$body.Replace('[Diagnostics.Stopwatch]::StartNew()','(New-FakeStopwatch)')
+   if(-not $body.Contains('[Console]::Out.WriteLine([string]$d)')){throw 'Missing Console effect capture boundary'}
+   $body=$body.Replace('[Console]::Out.WriteLine([string]$d)','Capture-Effect ''Console'' -Data ([string]$d)')
+  }
   . ([scriptblock]::Create($body))
  }
- # Only the child process boundary is captured; session framing, descriptor
- # validation, closed dispatch and original public wrappers execute unchanged.
+ # Child and Escape actions use captured replies; Console effects keep their
+ # trace entry and still write the original text. Session framing, descriptor
+ # validation, dispatch choices and public wrappers execute unchanged.
  function _Invoke-LegacyExecutionChild {
   param([string]$ScriptPath,$Effect,[bool]$LiveCeiling,[bool]$SensitiveCeiling,[switch]$SensitiveCeilingContractVerified)
   Capture-Effect 'Child' -Name $Effect.name -Argv $Effect.argv -Live ([bool]$Effect.live) -Quiet ([bool]$Effect.quiet) -Brief ([bool]$Effect.brief) -Confirm ([bool]$Effect.confirm_sensitive)

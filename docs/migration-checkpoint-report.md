@@ -28,8 +28,8 @@ The earlier 78,544-byte planner reduction is qualified at aadbc58 / run
 suite at `27400c98`, with all five jobs green in
 [run 36973181910](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36973181910).
 The next candidate batch retains the originals while qualifying three exact
-adapters as real `.ps1` fixtures. Its current inventory is 985,215 bytes, including
-63,601 bytes of temporary fixture/guard overhead above the accepted checkpoint.
+adapters as real `.ps1` fixtures. Its current inventory is 987,754 bytes, including
+66,140 bytes of temporary fixture/guard overhead above the accepted checkpoint.
 No new family retirement is claimed until those fixtures pass and are promoted.
 
 There are still 291 top-level legacy function entries. Function count is not a

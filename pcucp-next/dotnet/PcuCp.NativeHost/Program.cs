@@ -56,7 +56,7 @@ if (command == "legacy-execution-session")
         return 2;
     }
 }
-if (command is "legacy-ocr-match" or "legacy-compat")
+if (command is "legacy-ocr-match" or "legacy-compat" or "legacy-execution-confirmation")
 {
     // Pure compatibility entry: bounded stdin JSON, no shell, files or desktop API.
     try
@@ -65,12 +65,15 @@ if (command is "legacy-ocr-match" or "legacy-compat")
         using var input = Console.OpenStandardInput();
         using var buffer = new MemoryStream();
         var chunk = new byte[8192];
+        bool confirmationOnly = command == "legacy-execution-confirmation";
+        int maximumRequestBytes = confirmationOnly ? LegacyExecutionStartup.MaximumStartupBytes : LegacyOcrMatcher.MaximumRequestBytes;
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         while (true)
         {
             var count = await input.ReadAsync(chunk, timeout.Token);
             if (count == 0) break;
-            if (buffer.Length + count > LegacyOcrMatcher.MaximumRequestBytes) throw CommandOptions.Invalid("Legacy OCR request exceeds 1 MiB.");
+            if (buffer.Length + count > maximumRequestBytes) throw CommandOptions.Invalid(confirmationOnly
+                ? "Execution confirmation request exceeds 32 MiB." : "Legacy OCR request exceeds 1 MiB.");
             buffer.Write(chunk, 0, count);
         }
         var utf8 = buffer.ToArray();
@@ -91,7 +94,7 @@ if (command is "legacy-ocr-match" or "legacy-compat")
                 try { CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture.GetString()!); }
                 catch (CultureNotFoundException) { throw CommandOptions.Invalid("Unsupported compatibility culture."); }
             }
-            data = command == "legacy-ocr-match" ? LegacyOcrMatcher.Match(document.RootElement) : LegacyCompatibilityDispatcher.Execute(document.RootElement);
+            data = command == "legacy-ocr-match" ? LegacyOcrMatcher.Match(document.RootElement) : LegacyCompatibilityDispatcher.Execute(document.RootElement, confirmationOnly);
         }
         finally { CultureInfo.CurrentCulture = previousCulture; }
         Console.WriteLine(JsonSerializer.Serialize(NativeResult.Ok(command, data), NativeDispatcher.JsonOptions));

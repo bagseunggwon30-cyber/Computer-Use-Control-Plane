@@ -60,7 +60,7 @@ internal sealed class ExecutionFixture : ILegacyExecutionEffects
             return new { state = "complete", payload = result.Payload, exit = result.Exit, json_depth = result.JsonDepth, brief = result.Brief,
                 emit_json = result.EmitJson, console = capture.console, effects = capture.trace, consumed = capture.cursor };
         }
-        catch (Exception error) when (error is NativeFailure or LegacyExecutionEffectException or LegacyExecutionProtocolException)
+        catch (Exception error) when (error is NativeFailure or LegacyExecutionEffectException or LegacyExecutionProtocolException or LegacyExecutionPostDispatchException)
         { return new { state = "error", error = error.Message, effects = capture.trace, console = capture.console, consumed = capture.cursor }; }
     }
 }

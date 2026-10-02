@@ -49,6 +49,41 @@ def startup(fixture,root):
     return dict(schema='cucp.precision-session/v1',operation=fixture['operation'],args=encode(args),culture='en-US')
 
 
+@unittest.skipUnless(sys.platform=='win32','Requires actual Windows PowerShell tagged codec')
+class PrecisionWireWindowsTests(unittest.TestCase):
+    def test_tagged_arrays_remain_arrays_in_payload_json_and_wire_roundtrip(self):
+        values=[None,False,0,'',[],[1],[None],['한글 😀'],[[],[1],[None]],
+                dict(empty=[],one=[1],nested=dict(items=[None,True,'x'])),
+                dict(value=[],Count=0),dict(value=['macro','click-point'],Count=2),
+                [dict(value=[1],Count=1)],dict(Count=2,value=dict(Count=0,value=[]))]
+        with tempfile.TemporaryDirectory(prefix='CUCP precision wire arrays ') as tmp:
+            root=Path(tmp);data=root/'wire.json';data.write_text(json.dumps([encode(v) for v in values]),encoding='utf-8-sig')
+            script=root/'roundtrip.ps1';script.write_text(r'''param([string]$Source,[string]$InputPath)
+$ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+$tokens=$null;$errors=$null;$ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[ref]$errors)
+if($errors.Count){throw 'Precision adapter did not parse'}
+foreach($name in @('_Precision-Require','_Precision-Fields','_Precision-EncodeWire','_Precision-DecodeWire')){
+ $f=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
+ if($f.Count -ne 1){throw "Expected one function $name"};. ([scriptblock]::Create($f[0].Extent.Text))
+}
+$rows=New-Object Collections.ArrayList
+foreach($wire in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json)){
+ $decoded=_Precision-DecodeWire $wire
+ $isArray=$decoded -is [array];$count=if($isArray){$decoded.Count}else{$null}
+ [void]$rows.Add(@{decoded=$decoded;is_array=$isArray;count=$count;encoded=(_Precision-EncodeWire $decoded)})
+}
+[Console]::Out.WriteLine((ConvertTo-Json -InputObject @($rows) -Depth 100 -Compress))
+''',encoding='utf-8-sig')
+            draft=ROOT/'tests/fixtures/legacy-precision-adapter.ps1'
+            source=os.environ.get('CUCP_PRECISION_ADAPTER_DRAFT') or str(draft if draft.exists() else ROOT/'scripts/cucp.ps1')
+            result=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(script),'-Source',source,'-InputPath',str(data)],capture_output=True,timeout=30)
+            self.assertEqual(result.returncode,0,result.stderr.decode(errors='replace'))
+            rows=json.loads(result.stdout.decode('utf-8-sig'));self.assertEqual(len(rows),len(values))
+            for value,row in zip(values,rows):
+                with self.subTest(value=value):
+                    self.assertEqual(row,dict(decoded=value,is_array=isinstance(value,list),count=len(value) if isinstance(value,list) else None,encoded=encode(value)))
+
+
 @unittest.skipUnless(os.environ.get('CUCP_PRECISION_DOTNET') or shutil.which('dotnet'),'Requires .NET SDK session runner')
 class PrecisionTransportTests(unittest.TestCase):
     @classmethod

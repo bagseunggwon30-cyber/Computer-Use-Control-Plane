@@ -33,6 +33,16 @@ class ExecutionUncertaintyTests(unittest.TestCase):
                             replies=[None,dict(throw="transport closed after input",mutation_may_have_occurred=True)])])[0]
         self.assertEqual(r["exit"],2);self.assertEqual(r["consumed"],2)
         self.assertEqual(r["payload"]["result"]["detail"],"transport closed after input")
+    def test_post_dispatch_read_exception_stops_before_fusion_fallback(self):
+        f=dict(operation="smart-click",rest=["--label","Name","--allow-mouse-fallback"],allow_live=True,
+               replies=[None,reply(dict(status="partial")),reply(dict(status="partial")),
+                        dict(throw="icon read failed after input",mutation_may_have_occurred=True),
+                        reply(dict(status="ok",method="Invoke"))])
+        r=run_candidate([f])[0]
+        self.assertEqual(r["state"],"error");self.assertEqual(r["error"],"icon read failed after input")
+        self.assertEqual(r["consumed"],4)
+        self.assertEqual([(e["kind"],e["name"]) for e in r["effects"]],
+                         [("HistoryRead",""),("Native",""),("Native",""),("LocalMacro","icon-find")])
     def test_workflow_does_not_retry_uncertain_action_or_continue_to_next_step(self):
         f=dict(operation="workflow-run",rest=["--retry-failed-step","5","--retry-live-steps","--continue-on-error","--verify-after-step","--settle-ms","50"],
                allow_live=True,replies=[workflow(2,live=True),uncertain("ok",0)])
@@ -71,6 +81,30 @@ class ExecutionOriginalUncertaintyTests(unittest.TestCase):
 
 
 class ExecutionSessionUncertaintyTests(unittest.TestCase):
+    def test_failed_read_after_live_dispatch_ends_session_without_fallback(self):
+        import base64
+        from test_legacy_execution_parity import built_candidate
+        from test_legacy_execution_transport import wire
+        dotnet,dll=built_candidate()
+        def frames(identifier,envelope):
+            data=json.dumps(envelope).encode()
+            return json.dumps(dict(kind="part",id=identifier,data=base64.b64encode(data).decode()))+"\n"+json.dumps(dict(kind="end",id=identifier))+"\n"
+        startup=dict(operation="smart-click",rest=["--label","Name","--allow-mouse-fallback"],allow_live=True,confirm_sensitive=False)
+        data=json.dumps(startup)+"\n"+"".join(frames(i,dict(state="ok",value=wire(value))) for i,value in
+            enumerate([None,0,reply(dict(status="partial")),reply(dict(status="partial"))],1))
+        data+=frames(5,dict(state="error",message="icon read failed after input",mutation_may_have_occurred=True))
+        p=subprocess.run([dotnet,str(dll),"--session-fixture"],input=data.encode(),capture_output=True,timeout=30)
+        self.assertEqual(p.returncode,1,p.stderr.decode(errors="replace"))
+        parts={};messages=[]
+        for line in p.stdout.splitlines():
+            frame=json.loads(line);key=(frame["target"],frame["id"])
+            if frame["kind"]=="part":parts.setdefault(key,bytearray()).extend(base64.b64decode(frame["data"]))
+            else:messages.append((key[0],json.loads(parts[key])))
+        effects=[value for kind,value in messages if kind=="effect"]
+        self.assertEqual(len(effects),5);self.assertEqual(effects[-1]["name"],"icon-find")
+        self.assertFalse(effects[-1]["live"]);self.assertEqual(sum(e["live"] for e in effects),2)
+        self.assertEqual(messages[-1],("error",dict(message="icon read failed after input",mutation_may_have_occurred=True,automatic_retry=False)))
+
     def test_lost_or_malformed_live_reply_is_terminal_with_explicit_uncertainty(self):
         import base64
         from test_legacy_execution_parity import PROJECT

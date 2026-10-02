@@ -21,13 +21,13 @@ function _Precision-DecodeWire($Wire) {
     'scalar' {
       _Precision-Fields $Wire @('kind','value')
       _Precision-Require ($null -eq $Wire.value -or $Wire.value -is [string] -or $Wire.value -is [ValueType]) 'Invalid scalar wire value.'
-      Write-Output -NoEnumerate $Wire.value;return
+      return ,$Wire.value
     }
     'array' {
       _Precision-Fields $Wire @('kind','items');_Precision-Require ($Wire.items -is [array]) 'Wire array items must be an array.'
       $items=New-Object Collections.ArrayList
       foreach($item in $Wire.items){[void]$items.Add((_Precision-DecodeWire $item))}
-      Write-Output -NoEnumerate ([object[]]$items.ToArray());return
+      return ,([object[]]$items.ToArray())
     }
     'object' {
       _Precision-Fields $Wire @('kind','properties');_Precision-Require ($Wire.properties -is [array]) 'Wire object properties must be an array.'
@@ -36,7 +36,7 @@ function _Precision-DecodeWire($Wire) {
         _Precision-Fields $property @('name','value');_Precision-Require ($property.name -is [string] -and -not $object.Contains($property.name)) 'Invalid or duplicate wire property.'
         $object[$property.name]=_Precision-DecodeWire $property.value
       }
-      Write-Output -NoEnumerate ([pscustomobject]$object);return
+      return ,([pscustomobject]$object)
     }
     default {throw 'Unknown precision wire kind.'}
   }
@@ -132,7 +132,7 @@ function _Precision-ReadEffect($Effect,$State){
     }
     'history-lines' {
       _Precision-Fields $p @('path');_Precision-Require ($p.path -is [string] -and $p.path -ceq $State.history_file -and $State.operation -eq 'coord-anchor' -and $State.reads -eq 1 -and $rest -notcontains '--no-history') 'Invalid history read.'
-      Write-Output -NoEnumerate ([object[]]@(_Precision-HistoryLines -Path $State.history_file));return
+      return ,([object[]]@(_Precision-HistoryLines -Path $State.history_file))
     }
     {$_ -cin @('hit-scan','point-plan-child','cache-read')} {
       $radiusRaw=_Read-OptValue -Rest $rest -Name '--radius';$stepRaw=_Read-OptValue -Rest $rest -Name '--step';$ttlRaw=_Read-OptValue -Rest $rest -Name '--cache-ttl'
@@ -239,7 +239,7 @@ function _Invoke-LegacyPrecision {
 function _Invoke-LegacyPrecisionValue {
   param([string]$Operation,[hashtable]$Arguments,[switch]$Storage)
   $completed=_Invoke-LegacyPrecisionSession -Operation $Operation -Arguments $Arguments -Storage:$Storage
-  Write-Output -NoEnumerate $completed.state.payload
+  return ,$completed.state.payload
 }
 function Invoke-MacroCoordAnchor {param([string[]]$Rest) _Invoke-LegacyPrecision -Operation 'coord-anchor' -Rest $Rest}
 function Invoke-MacroPointPlan {param([string[]]$Rest) _Invoke-LegacyPrecision -Operation 'point-plan' -Rest $Rest}

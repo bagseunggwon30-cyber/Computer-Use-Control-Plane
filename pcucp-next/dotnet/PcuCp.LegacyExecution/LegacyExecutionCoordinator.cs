@@ -88,6 +88,10 @@ internal sealed partial class LegacyExecutionCoordinator
         var descriptor = new LegacyExecutionEffect(kind, name, argv ?? [], J(data), live, quiet, childBrief, confirm);
         JsonElement reply;
         try { reply = effects.Invoke(descriptor).Clone(); }
+        catch (LegacyExecutionEffectException error) when (!live && error.MutationMayHaveOccurred)
+        {
+            throw new LegacyExecutionPostDispatchException(error.Message);
+        }
         catch (LegacyExecutionEffectException error) when (live && error.MutationMayHaveOccurred)
         {
             reply = J(D("exit", 2, "raw", error.Message, "json", D("status", "partial", "reason", "effect_failed_after_possible_mutation", "detail", error.Message, "mutation_may_have_occurred", true)));

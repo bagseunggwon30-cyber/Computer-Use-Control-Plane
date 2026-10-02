@@ -27,6 +27,20 @@ contracts while leaving every differential assertion intact. The actual harness
 also captures a dedicated Escape helper before testing recovery execution; no
 fixture can reach `SendKeys` through the retained dispatch body.
 
+The `f2333bebd53e28e59a05795abfeb90275dc67d09` gate (run `37002020097`)
+passed the complete 462-case pure Windows differential. Its actual adapter ran
+all cases in a 349.794-second test suite and exposed three remaining boundaries:
+PS5's `Write-Output -NoEnumerate` decorated decoded arrays during Console JSON
+serialization; Console writes needed an explicit captured trace entry; and an
+icon observation failure after prior live dispatch entered a legacy fallback.
+The next candidate returns true arrays with unary-comma pipeline preservation,
+captures Console at its actual dispatch seam, and treats explicit post-dispatch
+read failures as terminal uncertainty. Fourteen actual-codec values include
+empty/singleton/nested arrays and genuine `value`/`Count` objects; there is no
+shape-based normalization. Portable coordinator and disposable-session tests
+verify that the failed read emits no second fallback effect and retains the
+uncertain, no-retry terminal outcome. Exact original comparisons are unchanged.
+
 The execution family migrates the coordination bodies of `workflow-run`,
 `task-run`, `form-run`, `smart-click`, `watch`, `recovery-plan`, and `recovery-run`
 as one qualification unit. The oracle is the original `scripts/cucp.ps1` blob in
@@ -142,8 +156,14 @@ standalone flag in original arguments; a label or text value spelling that flag
 does not grant consent. The direct macro safety gate uses the same pure check.
 
 Each startup chunk is at most 48 KiB, each line at most 66,000 characters, and the
-startup request at most 32 MiB. This limit is independent of the accumulated report
-and permits the tested request larger than 1 MiB. Schema keys are exact and unique;
+startup request at most 32 MiB. This limit is independent of the accumulated report.
+The direct startup parser has been tested beyond 1 MiB. The retained confirmation
+preflight previously imposed its own 1 MiB limit; the candidate now uses a closed
+`legacy-execution-confirmation` entry with the same 32 MiB bound. That entry rejects
+every other operation, and ordinary pure operations retain their 1 MiB budget.
+Actual Windows wrapper tests cover a Unicode request beyond 1 MiB and preserve
+option-value versus standalone-consent positions; they must pass before claiming
+the larger wrapper capacity. Schema keys are exact and unique;
 unknown operations, forged authority fields, implicit boolean conversion and
 duplicate process switches fail before any effect. Forty-six portable startup
 checks pass. Windows inert-child/top-level gate checks are release requirements;

@@ -75,13 +75,13 @@ function _Execution-DecodeWire($Wire) {
     'scalar' {
       _Execution-Fields $Wire @('kind','value')
       _Execution-Require ($null -eq $Wire.value -or $Wire.value -is [string] -or $Wire.value -is [ValueType]) 'Invalid scalar wire value.'
-      Write-Output -NoEnumerate $Wire.value;return
+      return ,$Wire.value
     }
     'array' {
       _Execution-Fields $Wire @('kind','items');_Execution-Require ($Wire.items -is [array]) 'Wire array items must be an array.'
       $items=New-Object Collections.ArrayList
       foreach($item in $Wire.items){[void]$items.Add((_Execution-DecodeWire $item))}
-      Write-Output -NoEnumerate ([object[]]$items.ToArray());return
+      return ,([object[]]$items.ToArray())
     }
     'object' {
       _Execution-Fields $Wire @('kind','properties');_Execution-Require ($Wire.properties -is [array]) 'Wire object properties must be an array.'
@@ -90,7 +90,7 @@ function _Execution-DecodeWire($Wire) {
         _Execution-Fields $property @('name','value');_Execution-Require ($property.name -is [string] -and -not $object.Contains($property.name)) 'Invalid or duplicate wire property.'
         $object[$property.name]=_Execution-DecodeWire $property.value
       }
-      Write-Output -NoEnumerate ([pscustomobject]$object);return
+      return ,([pscustomobject]$object)
     }
     default {throw 'Unknown execution wire kind.'}
   }
@@ -191,9 +191,9 @@ function _Execution-SendEscape {
 function _Execution-Dispatch($Effect,$State) {
   $a=[string[]]$Effect.argv;$d=$Effect.data;$n=$Effect.name
   switch -CaseSensitive ($Effect.kind) {
-    'WorkflowPlan' {Write-Output -NoEnumerate (_Build-WorkflowPlan -Rest $a);return}
-    'Child' {Write-Output -NoEnumerate (_Invoke-LegacyExecutionChild -ScriptPath $State.script_path -Effect $Effect -LiveCeiling $State.live -SensitiveCeiling $State.sensitive -SensitiveCeilingContractVerified);return}
-    'Native' {Write-Output -NoEnumerate (Invoke-NativeHelper -ArgList $a);return}
+    'WorkflowPlan' {return ,(_Build-WorkflowPlan -Rest $a)}
+    'Child' {return ,(_Invoke-LegacyExecutionChild -ScriptPath $State.script_path -Effect $Effect -LiveCeiling $State.live -SensitiveCeiling $State.sensitive -SensitiveCeilingContractVerified)}
+    'Native' {return ,(Invoke-NativeHelper -ArgList $a)}
     'LocalMacro' {
       $previous=[Console]::Out;$writer=New-Object IO.StringWriter
       try {
@@ -205,7 +205,7 @@ function _Execution-Dispatch($Effect,$State) {
       return [pscustomobject]@{exit=[int]$exit;raw=$raw;json=$json}
     }
     'CdpPort' {return Test-CdpPortQuick -Port ([int]$a[0]) -TimeoutMs ([int]$a[1])}
-    'HistoryRead' {Write-Output -NoEnumerate (_History-PickBestStrategy -Label $a[0] -Match $a[1] -LookbackN ([int]$a[2]));return}
+    'HistoryRead' {return ,(_History-PickBestStrategy -Label $a[0] -Match $a[1] -LookbackN ([int]$a[2]))}
     'HistoryAppend' {_History-Append -Label $a[0] -Match $a[1] -Strategy $a[2] -Success ([bool]$d.success) -ElapsedMs ([int]$d.elapsed_ms);return}
     'TrajectoryAppend' {$payload=@{};foreach($p in $d.PSObject.Properties){$payload[$p.Name]=$p.Value};_Trajectory-Append -Kind $n -Payload $payload;return}
     'Sleep' {Start-Sleep -Milliseconds ([int]$d);return}
@@ -273,7 +273,7 @@ function _Invoke-LegacyExecutionEffectLoop {
     $State.diagnostic_phase='dispatch-effect'
     if($message.live){$State.live_effect_seen=$true}
     try {$value=_Execution-Dispatch $message $State;$reply=@{state='ok';value=(_Execution-EncodeWire $value)}}
-    catch {$reply=@{state='error';message=$_.Exception.Message;mutation_may_have_occurred=[bool]$message.live}}
+    catch {$reply=@{state='error';message=$_.Exception.Message;mutation_may_have_occurred=[bool]$State.live_effect_seen}}
     _Execution-WriteChunks -Writer $State.writer -Id $id -Target '' -Value $reply
   }
 }

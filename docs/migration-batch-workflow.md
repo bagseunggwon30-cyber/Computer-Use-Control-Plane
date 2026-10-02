@@ -60,6 +60,11 @@ Inline job output shows at most the final 64 KiB of each command so large exact
 comparison failures cannot make the entire job log unreadable. A failed command
 still fails the job; log capture does not alter or suppress test assertions.
 Artifacts are retained for seven days, including on failure.
+Windows artifacts also contain parser-derived function offsets and hashes for
+the current scripts and exact adapter drafts. Those maps parse source without
+executing it, normalize checkout line endings, and identify UTF-16 offsets.
+Before using a range for retirement, verify its whole-file and function hashes
+against the exact candidate, then convert the offsets to UTF-8 byte positions.
 
 The first combined candidate, commit `120b64a605bece965da4637e6510afcbd46fe871`
 (tree `fe6d3c2e2d6dd65b5351072fa20586549a330302`), is preserved in
@@ -100,7 +105,7 @@ percentage. Main remains at `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`.
 
 The three exact adapter fixtures are executable PowerShell files, counted normally
 in the inventory. With original bodies retained, the candidate currently contains
-985,215 PS bytes, 63,601 more than the last accepted checkpoint. This temporary
+987,754 PS bytes, 66,140 more than the last accepted checkpoint. This temporary
 overlap is qualification code, not retirement. After the combined adapter/kernel
 Windows gate, promote the same glue, remove verified original bodies and duplicate
 fixtures, then measure the resulting blobs and run the full regression gate.

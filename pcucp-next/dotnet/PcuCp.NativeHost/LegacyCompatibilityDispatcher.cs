@@ -3,7 +3,7 @@ using System.Text.Json;
 /// <summary>Closed pure-operation registry. No shell, PowerShell, filesystem, network or input.</summary>
 internal static class LegacyCompatibilityDispatcher
 {
-    internal static object Execute(JsonElement request)
+    internal static object Execute(JsonElement request, bool confirmationOnly = false)
     {
         if (request.ValueKind != JsonValueKind.Object) throw CommandOptions.Invalid("Compatibility request must be an object.");
         var fields = new HashSet<string>(StringComparer.Ordinal);
@@ -14,6 +14,8 @@ internal static class LegacyCompatibilityDispatcher
             !request.TryGetProperty("operation", out var operation) || operation.ValueKind != JsonValueKind.String ||
             !request.TryGetProperty("args", out var args) || args.ValueKind != JsonValueKind.Object)
             throw CommandOptions.Invalid("Expected schema, operation and args under cucp.legacy-compat/v1.");
+        if (confirmationOnly && operation.GetString() != "execution-confirmation")
+            throw CommandOptions.Invalid("The execution confirmation entry accepts only execution-confirmation.");
         return operation.GetString() switch
         {
             "execution-confirmation" => LegacyExecutionStartup.Confirmation(args),

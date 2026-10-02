@@ -199,6 +199,42 @@ def unwire(value):
     return value["value"]
 
 
+@unittest.skipUnless(sys.platform=="win32","Windows PowerShell tagged codec")
+class ExecutionWireWindowsTests(unittest.TestCase):
+    def test_true_arrays_and_genuine_value_count_objects_keep_identity(self):
+        values=[None,False,0,"",[],[1],[None],["한글 😀"],[[],[1],[None]],
+                dict(empty=[],one=[1],nested=dict(items=[None,True,"x"])),
+                dict(value=[],Count=0),dict(value=["macro","click-point"],Count=2),
+                [dict(value=[1],Count=1)],dict(Count=2,value=dict(Count=0,value=[]))]
+        with tempfile.TemporaryDirectory(prefix="CUCP execution codec ") as temp:
+            root=Path(temp);inputs=root/"wire.json";inputs.write_text(json.dumps([wire(v) for v in values]),encoding="utf-8-sig")
+            runner=root/"codec.ps1";runner.write_text(r'''
+param([string]$Source,[string]$InputPath)
+$ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+$tokens=$null;$errors=$null;$ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[ref]$errors)
+if($errors.Count){throw 'Execution adapter did not parse'}
+foreach($name in @('_Execution-Require','_Execution-Fields','_Execution-EncodeWire','_Execution-DecodeWire')){
+ $f=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
+ if($f.Count -ne 1){throw "Expected one function $name"};. ([scriptblock]::Create($f[0].Extent.Text))
+}
+$rows=New-Object Collections.ArrayList
+foreach($wire in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json)){
+ $decoded=_Execution-DecodeWire $wire
+ $isArray=$decoded -is [array];$count=if($isArray){$decoded.Count}else{$null}
+ [void]$rows.Add(@{decoded=$decoded;is_array=$isArray;count=$count;encoded=(_Execution-EncodeWire $decoded)})
+}
+[Console]::Out.WriteLine((ConvertTo-Json -InputObject @($rows) -Depth 100 -Compress))
+''',encoding="utf-8-sig")
+            draft=ROOT/"tests/fixtures/legacy-execution-adapter.ps1"
+            source=os.environ.get("CUCP_EXECUTION_ADAPTER_SOURCE",str(draft if draft.exists() else ROOT/"scripts/cucp.ps1"))
+            p=subprocess.run([shutil.which("powershell.exe"),"-NoProfile","-NonInteractive","-File",str(runner),"-Source",source,"-InputPath",str(inputs)],capture_output=True,timeout=30)
+            self.assertEqual(p.returncode,0,p.stderr.decode(errors="replace"))
+            rows=json.loads(p.stdout.decode("utf-8-sig"));self.assertEqual(len(rows),len(values))
+            for value,row in zip(values,rows):
+                with self.subTest(value=value):
+                    self.assertEqual(row,dict(decoded=value,is_array=isinstance(value,list),count=len(value) if isinstance(value,list) else None,encoded=wire(value)))
+
+
 class ExecutionStreamProcessTests(unittest.TestCase):
     def test_disposable_child_stream_preserves_large_reports_without_transcript_replay(self):
         import base64

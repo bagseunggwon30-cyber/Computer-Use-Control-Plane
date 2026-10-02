@@ -126,6 +126,9 @@ internal static class SelfTests
             check(store.HistoryLines().Length == 1, "History append count changed");
             for (int i = 2; i <= 51; i++) store.AppendHistory("{\"n\":" + i + "}", 50);
             check(store.HistoryLines().Length == 50, "History trimming changed");
+            var tinyStore = new LegacyPrecisionStorage(Path.Combine(root, "tiny-history"), cache, () => clock);
+            check(tinyStore.AppendHistory("{\"n\":0}", 1) && tinyStore.AppendHistory("{\"n\":1}", 1), "Tiny-limit append failed");
+            check(tinyStore.HistoryLines().SequenceEqual(new[] { "{\"n\":0}", "{\"n\":1}", "{\"n\":0}", "{\"n\":1}" }), "Negative multi-index history selection must drop out-of-range entries");
             store.WriteCache(key, "{\"status\":\"ok\"}"); File.SetLastWriteTime(store.CachePath(key), clock.AddSeconds(-5));
             var hit = JsonSerializer.SerializeToElement(store.ReadCache(key, 5)); check(hit.GetProperty("AgeMs").GetInt32() == 5000, "TTL equality must hit");
             check(store.ReadCache(key, 4) == null, "Stale cache must miss");

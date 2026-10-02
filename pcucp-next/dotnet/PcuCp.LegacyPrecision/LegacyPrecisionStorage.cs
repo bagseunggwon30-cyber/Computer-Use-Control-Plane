@@ -56,12 +56,12 @@ internal sealed class LegacyPrecisionStorage(string historyFile, string cacheDir
                 if (all.Length > max)
                 {
                     int keep = Math.Max(50, Convert.ToInt32(max * .8)); var tail = new List<string>();
-                    // PowerShell negative indexes wrap, and out-of-range indexes
-                    // yield null entries, which WriteAllLines writes as blanks.
+                    // PowerShell negative indexes wrap. A multi-index selection
+                    // drops out-of-range entries rather than emitting blanks.
                     for (int i = all.Length - keep; i < all.Length; i++)
                     {
                         int index = i < 0 ? all.Length + i : i;
-                        tail.Add(index < 0 || index >= all.Length ? "" : all[index]);
+                        if (index >= 0 && index < all.Length) tail.Add(all[index]);
                     }
                     File.WriteAllLines(historyFile, tail, Utf8Bom);
                 }

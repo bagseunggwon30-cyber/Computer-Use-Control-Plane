@@ -21,6 +21,41 @@ def startup_wire(value):
 
 @unittest.skipUnless(sys.platform == 'win32' and HOST, 'Actual execution startup adapter is not enabled')
 class ExecutionStartupTests(unittest.TestCase):
+    def test_larger_pure_entry_accepts_only_confirmation(self):
+        executable = ['dotnet', HOST] if HOST.endswith('.dll') else [HOST]
+        large = '가' * 400000
+        for command, operation, args, expected in [
+                ('legacy-execution-confirmation', 'execution-confirmation', {'original_argv': ['--label', large, '--confirm-sensitive']}, 0),
+                ('legacy-execution-confirmation', 'safety-classify', {'text': large, 'macro': None}, 2),
+                ('legacy-compat', 'execution-confirmation', {'original_argv': ['--label', large]}, 2)]:
+            with self.subTest(command=command, operation=operation):
+                request = json.dumps(dict(schema='cucp.legacy-compat/v1', operation=operation, args=args), ensure_ascii=False).encode('utf-8')
+                p = subprocess.run(executable + [command], input=request, capture_output=True, timeout=20)
+                self.assertEqual(p.returncode, expected, p.stderr)
+                reply = json.loads(p.stdout.decode('utf-8-sig'))
+                if expected == 0:
+                    self.assertIs(reply['data']['confirmed'], True)
+                else:
+                    self.assertEqual(reply['status'], 'error')
+                    self.assertEqual(reply['errors'][0]['code'], 'invalid_arguments')
+
+    def test_actual_confirmation_wrapper_preserves_large_argv_and_value_positions(self):
+        large = '가' * 400000
+        with tempfile.TemporaryDirectory(prefix='CUCP large consent ') as temp:
+            root = Path(temp)
+            script = root / 'confirm.ps1'
+            script.write_text(CONFIRMATION_RUNNER, encoding='utf-8-sig')
+            data = root / 'argv.json'
+            for rest, expected in [(['--label', large, '--confirm-sensitive'], True),
+                                   (['--label', '--confirm-sensitive', large], False)]:
+                with self.subTest(expected=expected):
+                    data.write_text(json.dumps(rest, ensure_ascii=False), encoding='utf-8-sig')
+                    p = subprocess.run([shutil.which('powershell.exe'), '-NoProfile', '-NonInteractive', '-File',
+                                        str(script), '-Source', str(ROOT / 'scripts/cucp.ps1'), '-InputPath', str(data)],
+                                       env=dict(os.environ, CUCP_NATIVE_HOST=HOST), capture_output=True, timeout=30)
+                    self.assertEqual(p.returncode, 0, p.stderr.decode(errors='replace'))
+                    self.assertIs(json.loads(p.stdout.decode('utf-8-sig'))['confirmed'], expected)
+
     def test_utf8_bom_reaches_first_read_request_without_executing_it(self):
         executable = ['dotnet', HOST] if HOST.endswith('.dll') else [HOST]
         root = dict(schema='cucp.execution-start/v1', operation='recovery-plan', rest=['--match', '한글😀'],
@@ -74,6 +109,20 @@ class ExecutionStartupTests(unittest.TestCase):
                     self.assertEqual(reply['calls'], 1 if expected == 0 else 0)
                     if expected == 3:
                         self.assertEqual(json.loads(reply['console'])['reason'], 'sensitive_action_requires_confirmation')
+
+
+CONFIRMATION_RUNNER = r'''
+param([string]$Source,[string]$InputPath)
+$ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+$tokens=$null;$errors=$null;$ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[ref]$errors)
+foreach($name in @('_Read-StandaloneConfirmation','_Invoke-LegacyCompatibility')) {
+ $fn=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
+ if($fn.Count -ne 1){throw "Missing exact confirmation function $name"};. ([scriptblock]::Create($fn[0].Extent.Text))
+}
+$rest=[IO.File]::ReadAllText($InputPath) | ConvertFrom-Json
+$confirmed=_Read-StandaloneConfirmation -Rest ([string[]]$rest)
+[Console]::Out.WriteLine((ConvertTo-Json -InputObject @{confirmed=$confirmed} -Compress))
+'''
 
 
 GATE_RUNNER = r'''

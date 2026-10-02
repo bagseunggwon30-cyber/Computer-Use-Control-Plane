@@ -127,7 +127,13 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
                 else:
                     env["CUCP_LEGACY_CDP_ADAPTER_MODE"] = "draft"
                 print(f"Running candidate and exact {family} draft adapter gates; production bodies retained", flush=True)
-    run([sys.executable, "-m", "unittest", "discover", "-s", "tests/python", "-p", pattern, "-v"])
+    try:
+        run([sys.executable, "-m", "unittest", "discover", "-s", "tests/python", "-p", pattern, "-v"])
+    finally:
+        if not browser and log_dir is not None:
+            run(["powershell.exe", "-NoProfile", "-NonInteractive", "-File",
+                 str(ROOT / "tests/fixtures/migration-source-map.ps1"), "-Root", str(ROOT),
+                 "-OutputPath", str(log_dir / "source-map.json")])
 
 
 def available_families(root: Path = ROOT) -> list[str]:

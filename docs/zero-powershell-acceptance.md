@@ -11,7 +11,7 @@ That checkpoint left 934,934 bytes. The accepted app-profile checkpoint `27400c9
 removes another 13,320 bytes, bringing the total reduction to 91,864 bytes and
 remaining source to 921,614 bytes. Its exact-commit actual-adapter gate passed in run `36973181910`.
 The next candidate batch retains original bodies and adds exact adapter fixtures
-and consent guards, temporarily leaving 985,215 bytes. Those fixtures are counted
+and consent guards, temporarily leaving 987,754 bytes. Those fixtures are counted
 and will be removed when their glue is promoted. Accepted checkpoint source groups are:
 
 | Remaining source group | Bytes |

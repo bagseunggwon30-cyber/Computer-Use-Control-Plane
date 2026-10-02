@@ -170,3 +170,15 @@ The storage oracle completed every file operation and timed out while serializin
 test-only `Get-Content` provider metadata. Its line inspection now uses plain
 `File.ReadAllLines` values; exact generated-byte comparisons remain unchanged.
 Actual-adapter and filesystem qualification are still pending the next gate.
+
+At `f2333bebd53e28e59a05795abfeb90275dc67d09`, UTF-8 startup and all three native
+console-code-page cases pass. Candidate/helper comparisons remain green, and the
+filesystem oracle completes with seven of eight cases passing. The remaining
+adapter failures expose PS5 `Write-Output -NoEnumerate` array decoration at the
+tagged decoder boundary; terminal semantic equality correctly rejects affected
+cache writes. Decoder returns now preserve a single true value with unary comma,
+with a 14-value Windows codec test covering empty, singleton-null, nested arrays,
+Unicode, scalars, and genuine objects named `value`/`Count`. No object-shaped
+wrapper inference is used. The remaining filesystem fix drops out-of-range
+negative multi-index selections for a configured maximum of one, preserving the
+legacy repeated valid indices. These repairs await the next actual Windows gate.

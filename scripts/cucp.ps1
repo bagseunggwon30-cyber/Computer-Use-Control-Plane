@@ -2415,20 +2415,25 @@ function _Invoke-LegacyCompatibility {
     throw 'Matching native runtime missing. Publish pcucp-next/packaging/publish_native.py or set CUCP_NATIVE_HOST to the matching executable/DLL.'
   }
   $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $entry = if ($Operation -eq 'execution-confirmation') { 'legacy-execution-confirmation' } else { 'legacy-compat' }
   $extension = [System.IO.Path]::GetExtension($native).ToLowerInvariant()
   if ($extension -eq '.dll') {
     $dotnet = Get-Command dotnet.exe -CommandType Application -ErrorAction Stop
     if ($native.Contains('"') -or $native.Contains("`r") -or $native.Contains("`n")) { throw 'Invalid native DLL path' }
     $psi.FileName = $dotnet.Source
-    $psi.Arguments = '"' + $native + '" legacy-compat'
+    $psi.Arguments = '"' + $native + '" ' + $entry
   } elseif ($extension -eq '.exe') {
     $psi.FileName = $native
-    $psi.Arguments = 'legacy-compat'
+    $psi.Arguments = $entry
   } else { throw 'CUCP_NATIVE_HOST must be an executable or DLL, never a shell script.' }
   $payload = @{schema='cucp.legacy-compat/v1'; operation=$Operation; args=$Arguments; culture=[Globalization.CultureInfo]::CurrentCulture.Name} | ConvertTo-Json -Depth 24 -Compress
   $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
   $bytes = $utf8.GetBytes($payload)
-  if ($bytes.Length -gt 1048576) { throw 'Legacy compatibility request exceeds 1 MiB.' }
+  $requestLimit = if ($Operation -eq 'execution-confirmation') { 33554432 } else { 1048576 }
+  if ($bytes.Length -gt $requestLimit) {
+    if ($Operation -eq 'execution-confirmation') { throw 'Execution confirmation request exceeds 32 MiB.' }
+    throw 'Legacy compatibility request exceeds 1 MiB.'
+  }
   $psi.UseShellExecute = $false
   $psi.CreateNoWindow = $true
   $psi.RedirectStandardInput = $true

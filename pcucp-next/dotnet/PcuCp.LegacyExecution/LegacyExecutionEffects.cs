@@ -23,6 +23,8 @@ internal sealed class LegacyExecutionEffectException(string message, bool mutati
 {
     internal bool MutationMayHaveOccurred { get; } = mutationMayHaveOccurred;
 }
+// A failed observation after possible input cannot enter a legacy read fallback.
+internal sealed class LegacyExecutionPostDispatchException(string message) : Exception(message);
 internal sealed class LegacyExecutionUncertainException(LegacyExecutionEffect effect, JsonElement reply) : Exception("A mutation may have occurred; no fallback or retry was attempted.")
 {
     internal LegacyExecutionEffect Effect { get; } = effect;
