@@ -184,7 +184,7 @@ internal static class LegacySmartPlanKernel
                         if (!string.IsNullOrWhiteSpace(pattern))
                         {
                             var command = new List<string> { "macro", "uia-invoke", "--label", label! }; Opt(command, "--match", match); Opt(command, "--role", role);
-                            var evidence = (Dictionary<string, object?>)Evidence(top, "rect", "click_point")!; evidence["invoke_pattern"] = pattern;
+                            var evidence = (Dictionary<string, object?>)Evidence(top, "invoke_pattern", "rect", "click_point")!; evidence["invoke_pattern"] = pattern;
                             Add("uia_pattern", 1, (long)score + 40, false, command, evidence, "UIA pattern can invoke without mouse movement");
                         }
                         else

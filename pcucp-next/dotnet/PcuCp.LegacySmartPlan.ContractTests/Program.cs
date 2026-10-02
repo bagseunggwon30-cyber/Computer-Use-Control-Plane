@@ -44,6 +44,12 @@ if (args.SequenceEqual(new[] { "--self-test" }))
     var overflowUia = new { kind = "native", argv = new[] { "-Action", "uia-find", "-Label", "Save" }, result = new { Json = new { status = "ok", top = new { score = 2147483648L, invoke_pattern = "Invoke" } } } };
     var overflow = Run(new { rest, captured_replies = new object[] { history, overflowUia } });
     Check(overflow.GetProperty("error").GetString() == "Cannot convert value \"2147483648\" to type \"System.Int32\". Error: \"Value was either too large or too small for an Int32.\"", "Numeric conversion must preserve PS wrapper");
+    var patternUia = new { kind = "native", argv = new[] { "-Action", "uia-find", "-Label", "Save" }, result = new { Json = new { status = "ok", top = new { score = 80, invoke_pattern = "Invoke", rect = new { x = 1 }, click_point = new { x = 2, y = 3 } } } } };
+    var patternPlan = Run(new { rest, captured_replies = new object[] { history, patternUia } });
+    var expectedEvidenceOrder = new[] { "matched_text", "role", "automation_id", "invoke_pattern", "rect", "click_point" };
+    var patternPayload = patternPlan.GetProperty("payload");
+    Check(patternPayload.GetProperty("best").GetProperty("evidence").EnumerateObject().Select(p => p.Name).SequenceEqual(expectedEvidenceOrder), "Best UIA pattern evidence JSON field order changed");
+    Check(patternPayload.GetProperty("candidates")[0].GetProperty("evidence").EnumerateObject().Select(p => p.Name).SequenceEqual(expectedEvidenceOrder), "Candidate UIA pattern evidence JSON field order changed");
     Console.WriteLine($"PASS: {checks} isolated SmartPlan captured-reply contracts; no probes executed.");
     return;
 }

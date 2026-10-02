@@ -88,18 +88,20 @@ culture; that separate compatibility seam must be resolved before retirement.
 
 Task/form plan assembly (22,380 bytes in the pinned baseline) and smart-plan
 composition (17,025 bytes) passed independent Windows qualification and now use C# builders with retained
-read-only PowerShell acquisition adapters. Local managed checks cover 105 task/form contracts and 21
+read-only PowerShell acquisition adapters. Local managed checks cover 105 task/form contracts and 23
 smart-plan contracts; Windows corpora contain 367 task/form cases and 201
 smart-plan cases, plus each captured-prefix query trace. Exact numeric errors,
 null binding, ordered queries, unsafe-child accumulation, and full outputs remain
 qualification gates. The pure operations are explicitly registered in the production host. Strengthened
-actual-adapter checks must pass for the current commit before this integration is
-qualified. They compare real Console output, exact query traces and the current
-workflow bridge, not reconstructed output from a test payload.
+actual-adapter checks compare real Console output, exact query traces and the current
+workflow bridge, not reconstructed output from a test payload. At 6331f361 / run
+36956439482, all 367 task/form adapter cases passed. SmartPlan reported 70 raw
+JSON field-order mismatches; the insertion-order fix must pass all 201 unchanged
+adapter cases before that family is qualified.
 
 ## What still prevents full completion
 
-Roughly 0.96 MB of PS remains. Major callable groups include smart-click and live
+Roughly 0.935 MB of PS remains. Major callable groups include smart-click and live
 fallback routing; app/profile/probe acquisition; task/form/workflow execution;
 persistent history/recording; legacy CDP/vision adapters; IME/clipboard/drag and
 multi-edit; helper lifecycle, UAC/autostart, and system/process/registry macros.

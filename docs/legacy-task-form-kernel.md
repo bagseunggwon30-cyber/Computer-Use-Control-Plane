@@ -3,11 +3,12 @@
 `PcuCp.LegacyTaskForm/LegacyTaskFormKernel.cs` extracts deterministic task/form
 recipe and result assembly. It remains outside the NativeHost wildcard compile
 and is explicitly linked by NativeHost and its independent contract project.
-The kernel passed 832 staged comparisons from 367 original cases at a03d2788 /
-run 36938195037. The feature branch now integrates read-only acquisition adapters;
-their current-commit actual-adapter checks must pass before this replacement is
-qualified. No query, child process, generated command, GUI action, or desktop API
-runs in the kernel.
+The kernel and integrated read-only acquisition adapters passed exact Windows
+qualification at `6331f361f1839b3e32971c44e8f90e9a810e4bc8` / run `36956439482`:
+105 managed checks, 832 pure comparisons from 367 original cases, and all 367
+strict actual-adapter comparisons, with no skips. This task/form family passed;
+the overall run failed in the separate SmartPlan qualification. No query, child
+process, generated command, GUI action, or desktop API runs in the kernel.
 
 The immutable oracle is tree
 `bf895d3120dd5e145f360cb1c41e1d79a061d048`, `scripts/cucp.ps1`. That tree contains
@@ -115,9 +116,15 @@ dotnet run --project pcucp-next/dotnet/PcuCp.LegacyTaskForm.ContractTests -c Rel
 python -m unittest discover -s tests/python -p test_legacy_task_form_parity.py -v
 ```
 
-The current local result is 105 passing managed checks and three passing Python
-source/corpus checks. The Windows PowerShell 5.1 differential is skipped on
-Linux and remains required. The corpus has 367 cases covering both families,
+At exact commit `6331f361f1839b3e32971c44e8f90e9a810e4bc8`,
+[run 36956439482, Windows job 110680307239](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36956439482/job/110680307239)
+passed 105 managed checks, 832 pure preparation/assembly/payload comparisons
+from 367 original cases, and all 367 strict actual-adapter comparisons.
+All four task/form Python tests passed in 145.341 seconds with no skips, with
+`CUCP_TASK_FORM_TEST_HOST` explicitly enabled. This family passed even though
+the overall run failed in the separate SmartPlan qualification. Linux still
+skips the Windows-only differential and cannot substitute for this evidence.
+The corpus has 367 cases covering both families,
 all query/step phases, malformed input, exact order, accumulated errors,
 truth conversions, nested commands, quoting/Unicode/NUL, null/empty options,
 nonzero child exits, numeric boundaries, and en-US/ko-KR/tr-TR/invariant cultures.
@@ -149,8 +156,8 @@ That first Windows checkpoint compared 725 staged results from 317 cases and
 reported 26 failed assertions: empty observe-match preservation, three numeric
 edge cases in four cultures, conditional form command output, and repeated
 console mismatches. The corresponding repairs and 50 added boundary cases
-require a new exact-commit Windows pass. No original task/form body is retired
-on that failed candidate run.
+subsequently passed the exact-commit qualification above. No original task/form
+body was retired on that failed candidate run.
 
 `CUCP_TASK_FORM_TEST_HOST` enables the separate actual-adapter comparison using
 the current native bridge. It imports the entire current task/form functions,

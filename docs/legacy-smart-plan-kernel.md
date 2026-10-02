@@ -93,3 +93,10 @@ the production evaluation wrapper as well as replay-time errors. This adapter
 suite must pass before claiming equivalence of the source replacement.
 
 The registered evaluation wrapper preserves the harness semantic-error boundary before replay. The adapter independently validates exact query order and argv, permits at most five probes and six pure replay calls, and checks completion status/boolean/exit consistency. It never executes recommended commands.
+
+First actual-adapter comparison (6331f361/job110680307239) passed 131/201
+cases. All 70 differences were the same raw JSON field-order issue: UIA pattern
+evidence placed invoke_pattern after rect/click_point, while the original places
+it before those fields. The candidate now inserts it in the original position.
+Two managed contracts check both best and candidate evidence order. Full Console
+comparisons and all 201 fixtures remain unchanged for requalification.
