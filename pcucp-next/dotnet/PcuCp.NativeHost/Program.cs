@@ -21,8 +21,9 @@ if (command is "legacy-precision-session" or "legacy-precision-storage")
     try
     {
         if (args.Length != 1) throw CommandOptions.Invalid("Precision sessions accept only a typed startup frame.");
-        var startup = LegacyPrecisionSession.ReadStartup(Console.In);
-        var session = new LegacyPrecisionSession(Console.In, Console.Out);
+        using var input = LegacySessionInput.Open(Console.OpenStandardInput());
+        var startup = LegacyPrecisionSession.ReadStartup(input);
+        var session = new LegacyPrecisionSession(input, Console.Out);
         return command == "legacy-precision-session" ? session.Run(startup) : session.RunStorage(startup);
     }
     catch (Exception ex)
@@ -36,12 +37,13 @@ if (command == "legacy-execution-session")
 {
     try
     {
-        var startup = LegacyExecutionStartup.Read(args.Skip(1).ToArray(), Console.In);
+        using var input = LegacySessionInput.Open(Console.OpenStandardInput());
+        var startup = LegacyExecutionStartup.Read(args.Skip(1).ToArray(), input);
         var previousCulture = CultureInfo.CurrentCulture;
         try
         {
             CultureInfo.CurrentCulture = startup.Culture;
-            return new LegacyExecutionSession(Console.In, Console.Out).Run(startup.Operation, startup.Rest,
+            return new LegacyExecutionSession(input, Console.Out).Run(startup.Operation, startup.Rest,
                 startup.Authority, startup.Brief, startup.CacheSeconds, startup.VisionAvailable);
         }
         finally { CultureInfo.CurrentCulture = previousCulture; }

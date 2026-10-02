@@ -123,7 +123,7 @@ architecture, measured source retirement and explicit remaining acceptance scope
 At accepted checkpoint `27400c98`, aggregate tracked PS is 921,614 bytes, down
 91,864 bytes from baseline including bridge overhead. The new candidate batch
 retains original bodies plus exact adapter fixtures and consent guards, temporarily
-leaving 985,154 bytes; no new family retirement is claimed.
+leaving 985,215 bytes; no new family retirement is claimed.
 This does not meet the lowest/zero-PowerShell goal. Actual planner adapters and
 output formatting passed at aadbc58 / run 36957910828. The app-profile builder and its sole-use score helper are now replaced under
 the separate actual-bridge gate below. Image diff remains a candidate.

@@ -13,6 +13,20 @@ bounds only displayed unittest diffs; it does not remove cases or assertions.
 A separate inert Windows child characterizes the .NET Framework redirected-input
 writer's initial UTF-8 BOM, even when the subsequent explicit writer uses no BOM.
 
+The next published gate (`a7bffa18b8325fe06f00459324c1f3631f2c896a`, run
+`37000162419`) made the complete execution log downloadable. The 359 execution
+contracts, 52 startup contracts, typed-child/ceiling tests, byte characterization,
+and uncertainty tests passed. All actual-adapter cases stopped before any effect
+because startup used the inherited Windows console decoder; the central entry
+now has a separate strict UTF-8 reader fix awaiting qualification. Four pure
+oracle mismatches identified two specific report/command behaviors: missing
+task/form error properties must appear as `[null]` in direct report arrays, and a
+singleton-null task command must stop as `missing_recommended_command` without a
+second child or trajectory write. The candidate fixes these with 11 added
+contracts while leaving every differential assertion intact. The actual harness
+also captures a dedicated Escape helper before testing recovery execution; no
+fixture can reach `SendKeys` through the retained dispatch body.
+
 The execution family migrates the coordination bodies of `workflow-run`,
 `task-run`, `form-run`, `smart-click`, `watch`, `recovery-plan`, and `recovery-run`
 as one qualification unit. The oracle is the original `scripts/cucp.ps1` blob in

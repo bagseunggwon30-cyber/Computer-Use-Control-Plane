@@ -2,6 +2,10 @@ using System.Text.Json;
 
 internal sealed partial class LegacyExecutionCoordinator
 {
+    // Direct @($value) in a report retains a null element. The generic sequence
+    // helper deliberately treats null as no values for iteration/commands.
+    private static JsonElement[] ReportArray(JsonElement value) => value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined ? [Null] : A(value);
+
     private LegacyExecutionResult TaskRun()
     {
         bool dry = F("--dry-run"), include = F("--include-plan"), confirm = Confirm;
@@ -17,12 +21,16 @@ internal sealed partial class LegacyExecutionCoordinator
         }
         if (!T(P(plan, "safe_to_run")))
         {
-            var p = Base("blocked", "task_plan_not_safe", Stop("total")); p.Add("plan", include ? plan : null); p.Add("plan_errors", A(P(plan, "errors")));
+            var p = Base("blocked", "task_plan_not_safe", Stop("total")); p.Add("plan", include ? plan : null); p.Add("plan_errors", ReportArray(P(plan, "errors")));
             return Result(p, 3, 16, $"blocked task-run reason=task_plan_not_safe errors={A(P(plan, "errors")).Length}");
         }
         bool live = !dry && I(P(plan, "live_step_count")) > 0;
         if (live) Live("macro task-run requires -AllowLiveControl when live steps are present");
-        string[] command = Strings(P(plan, dry ? "dry_run_command" : "recommended_command"));
+        var commandValue = P(plan, dry ? "dry_run_command" : "recommended_command");
+        // The legacy if-expression emits its branch through the pipeline. A
+        // singleton null therefore assigns $null, whose Count is zero.
+        string[] command = commandValue.ValueKind == JsonValueKind.Array && commandValue.GetArrayLength() == 1 && commandValue[0].ValueKind == JsonValueKind.Null
+            ? [] : Strings(commandValue);
         if (command.Length == 0)
         {
             var p = Base("blocked", "missing_recommended_command", Stop("total")); p.Add("plan", include ? plan : null);
@@ -64,7 +72,7 @@ internal sealed partial class LegacyExecutionCoordinator
         {
             int elapsed = Stop("total"); var p = Base("blocked", "plan_not_safe", elapsed);
             p.Add("safe_to_act", false); p.Add("executed_count", 0); p.Add("failed_count", 0); p.Add("plan_exit", P(planReply, "exit"));
-            p.Add("unsafe_steps", A(P(plan, "unsafe_steps"))); p.Add("plan_errors", A(P(plan, "errors"))); p.Add("plan", include ? plan : null); p.Add("steps", Array.Empty<object>());
+            p.Add("unsafe_steps", ReportArray(P(plan, "unsafe_steps"))); p.Add("plan_errors", ReportArray(P(plan, "errors"))); p.Add("plan", include ? plan : null); p.Add("steps", Array.Empty<object>());
             return Result(p, 3, 16, $"blocked form-run reason=plan_not_safe safe={S(P(plan, "safe_step_count"))}/{S(P(plan, "step_count"))} elapsed_ms={elapsed}");
         }
         var commands = A(P(plan, "command_plan"));

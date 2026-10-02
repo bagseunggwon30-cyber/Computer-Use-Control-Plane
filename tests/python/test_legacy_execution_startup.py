@@ -21,6 +21,20 @@ def startup_wire(value):
 
 @unittest.skipUnless(sys.platform == 'win32' and HOST, 'Actual execution startup adapter is not enabled')
 class ExecutionStartupTests(unittest.TestCase):
+    def test_utf8_bom_reaches_first_read_request_without_executing_it(self):
+        executable = ['dotnet', HOST] if HOST.endswith('.dll') else [HOST]
+        root = dict(schema='cucp.execution-start/v1', operation='recovery-plan', rest=['--match', '한글😀'],
+                    brief=False, cache_seconds=2, vision_available=False, culture='en-US')
+        wire = b'\xef\xbb\xbf' + startup_wire(root).encode('utf-8')
+        process = subprocess.run(executable + ['legacy-execution-session'], input=wire,
+                                 capture_output=True, timeout=20)
+        # stdin closes before any effect reply; the native process can only
+        # describe a request. No PowerShell effect dispatcher is present.
+        first = json.loads(process.stdout.decode('utf-8-sig').splitlines()[0])
+        self.assertEqual(first.get('kind'), 'part', process.stdout)
+        self.assertEqual(first.get('target'), 'effect', process.stdout)
+        self.assertEqual(first.get('id'), 1, process.stdout)
+
     def test_forged_startup_authority_is_rejected_before_any_effect(self):
         executable = ['dotnet', HOST] if HOST.endswith('.dll') else [HOST]
         root = dict(schema='cucp.execution-start/v1', operation='workflow-run', rest=[], brief=False,

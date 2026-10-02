@@ -80,8 +80,46 @@ def old_expression(source,asset,args):
     return expression
 
 
+def css_identifier_source():
+    """Extract the exact production read function, never a copied test version."""
+    source=_expression('smart_read',{})
+    start=source.index('  function cssIdent(v) {')
+    end=source.index('  function selectorCandidates(',start)
+    return source[start:end].strip()
+
+
+def css_identifier_cases():
+    rows=[('', ''),('0','\\30 '),('0a','\\30 a'),('-1a','-\\31 a'),('-', '\\-'),
+          ('--','--'),('--1','--1'),('\0','\ufffd'),('a\0b','a\ufffdb'),
+          ('a b','a\\ b'),('a"b','a\\"b'),("a'b","a\\'b"),('a\\b','a\\\\b'),
+          ('한글','한글'),('é','é'),('中','中'),('😀','😀'),('a😀b','a😀b'),
+          ('\ud800','\ud800'),('\udfff','\udfff')]
+    rows.extend((chr(code),'\\'+format(code,'x')+' ') for code in (*range(1,32),127))
+    return rows
+
+
 @unittest.skipUnless(shutil.which('node'),'Node fixture evaluator is optional; production needs only Python')
 class LegacyCdpAssetParityTests(unittest.TestCase):
+    def test_css_identifier_exact_code_is_guarded_and_cssom_equivalent(self):
+        rows=css_identifier_cases()
+        program=r'''
+const fs=require('node:fs');const data=JSON.parse(fs.readFileSync(0,'utf8'));
+const session=new (require('node:inspector').Session)();session.connect();
+session.post('Runtime.evaluate',{expression:data.expression,throwOnSideEffect:true,
+  awaitPromise:false,returnByValue:true,timeout:1000},(error,result)=>{
+    process.stdout.write(JSON.stringify({error:error||null,response:result}));
+});session.disconnect();
+'''
+        expression='('+css_identifier_source()+')'
+        expression='['+','.join(expression+'('+json.dumps(value,ensure_ascii=True)+')' for value,_ in rows)+']'
+        p=subprocess.run(['node','-e',program],input=json.dumps(dict(expression=expression)),text=True,
+            encoding='utf-8',capture_output=True,timeout=10)
+        self.assertEqual(p.returncode,0,p.stderr)
+        result=json.loads(p.stdout)
+        self.assertIsNone(result['error'])
+        self.assertNotIn('exceptionDetails',result['response'])
+        self.assertEqual(result['response']['result']['value'],[want for _,want in rows])
+
     def test_original_and_migrated_algorithms_have_exact_results_and_effects(self):
         source=subprocess.check_output(['git','show',BASELINE_TREE+':scripts/cucp-native-helper.ps1'],cwd=ROOT).decode('utf-8-sig')
         fixture=[dict(tag='BUTTON',text='Save',attrs={'id':'large'},rect=dict(x=2,y=3,width=400,height=500)),

@@ -43,6 +43,20 @@ internal static class ExecutionChecks
             Check(LegacyExecutionConsent.HasStandaloneConfirmation([option, "--confirm-sensitive", "--confirm-sensitive"]), "A genuine following flag was lost");
         }
         Check(LegacyExecutionConsent.HasStandaloneConfirmation(["--CONFIRM-SENSITIVE"]), "Original case-insensitive genuine flag changed");
+        foreach (var operation in new[] { "task-run", "form-run" })
+        {
+            var blocked = Evaluate(new { operation, rest = new[] { "--include-plan" }, allow_live = true, replies = new[] { Reply(new { }, 2) } });
+            var payload = blocked.GetProperty("payload");
+            Check(payload.GetProperty("plan_errors").GetRawText() == "[null]", "Direct report array must preserve the absent errors value as one null");
+            if (operation == "form-run") Check(payload.GetProperty("unsafe_steps").GetRawText() == "[null]", "Direct report array must preserve absent unsafe steps");
+        }
+        foreach (bool dry in new[] { false, true }) foreach (bool brief in new[] { false, true })
+        {
+            var missing = Evaluate(new { operation = "task-run", rest = dry ? new[] { "--include-plan", "--dry-run" } : new[] { "--include-plan" }, brief,
+                replies = new[] { Reply(new { safe_to_run = true, live_step_count = 0, recommended_command = new object?[] { null }, dry_run_command = new object?[] { null } }) } });
+            Check(missing.GetProperty("payload").GetProperty("reason").GetString() == "missing_recommended_command", "Singleton null pipeline command must be blocked");
+            Check(missing.GetProperty("consumed").GetInt32() == 1 && missing.GetProperty("effects").GetArrayLength() == 1, "Singleton null command must not execute or append trajectory");
+        }
         var largeCaptures = new List<object> { Plan(256) }; largeCaptures.AddRange(Enumerable.Repeat(Reply(new { status = "partial", blob = new string('x', 1024) }, 2), 1536));
         var large = Evaluate(new { operation = "workflow-run", rest = new[] { "--continue-on-error", "--retry-failed-step", "5" }, replies = largeCaptures });
         Check(large.GetProperty("consumed").GetInt32() == 1537, "Large workflow capture schedule truncated");

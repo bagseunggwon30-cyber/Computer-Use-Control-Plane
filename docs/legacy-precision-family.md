@@ -157,3 +157,16 @@ its 90-second limit. The next gate keeps exact comparisons and adds a bounded
 initial-frame diagnostic, a Framework child-input byte characterization, and
 noninteractive storage-oracle stage diagnostics. These repairs remain unqualified
 until that Windows run passes.
+
+At repaired commit `a7bffa18b8325fe06f00459324c1f3631f2c896a`, all 174 planner
+cases now pass the candidate payload, Console, error, exit, ordered-query, and
+query-prefix comparisons. Helper differentials, 507 C# assertions, and all 13
+transport tests also pass on Windows. Actual adapters still fail before the first
+acquisition: their native startup error reports byte `0xE2`, because incoming
+UTF-8 is being decoded through the inherited console code page. The production
+entry therefore needs one strict UTF-8 reader shared by startup and replies;
+the new ingress fixture tests CP437 and UTF-8 parents with and without BOMs.
+The storage oracle completed every file operation and timed out while serializing
+test-only `Get-Content` provider metadata. Its line inspection now uses plain
+`File.ReadAllLines` values; exact generated-byte comparisons remain unchanged.
+Actual-adapter and filesystem qualification are still pending the next gate.

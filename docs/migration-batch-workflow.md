@@ -68,6 +68,17 @@ Fast contracts passed; all three Windows family jobs and the browser job failed.
 Those results are diagnostic evidence, not retirement approval. The candidate
 and adapter repairs are qualified together before any original family is removed.
 
+The next combined checkpoint, `a7bffa18b8325fe06f00459324c1f3631f2c896a`,
+passed Windows CDP qualification and the fast contracts in
+[run 37000162419](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37000162419).
+Execution/precision startup still failed because their UTF-8 input was decoded
+through the inherited Windows console code page. Their replacement readers now
+share one strict UTF-8 byte stream without changing console settings; malformed
+bytes and other encodings remain rejected. The browser probes isolated native
+`CSS.escape` as a guarded-evaluation blocker, so the candidate uses a pure
+equivalent with a native browser oracle. These repairs still require the next
+exact Windows/browser run and do not authorize retirement by themselves.
+
 After the full gate passes, verify the published commit/tree and every blob,
 recompute actual PS bytes, and report only the accepted reduction. Interactive
 Windows checks remain separately identified; captured effects and headless
@@ -89,7 +100,7 @@ percentage. Main remains at `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`.
 
 The three exact adapter fixtures are executable PowerShell files, counted normally
 in the inventory. With original bodies retained, the candidate currently contains
-985,154 PS bytes, 63,540 more than the last accepted checkpoint. This temporary
+985,215 PS bytes, 63,601 more than the last accepted checkpoint. This temporary
 overlap is qualification code, not retirement. After the combined adapter/kernel
 Windows gate, promote the same glue, remove verified original bodies and duplicate
 fixtures, then measure the resulting blobs and run the full regression gate.

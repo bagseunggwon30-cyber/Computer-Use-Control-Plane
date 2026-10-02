@@ -36,7 +36,10 @@ foreach($fixture in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Con
  $hit=_PointPlan-ReadCache -Key $key -MaxAgeSeconds ([int]$fixture.ttl)
  [Console]::Error.WriteLine('storage cache read')
  $lines=@();$historyBytes=$null;$cacheBytes=$null
- if(Test-Path -LiteralPath $Script:AnchorHistoryFile){$lines=@(Get-Content -LiteralPath $Script:AnchorHistoryFile -Encoding UTF8);$historyBytes=[Convert]::ToBase64String([IO.File]::ReadAllBytes($Script:AnchorHistoryFile))}
+ # Inspect stored line values directly. Get-Content decorates strings with
+ # PSDrive/PSProvider graphs; serializing that test-only metadata at depth 100
+ # recurses through unrelated filesystem objects after all fixtures complete.
+ if(Test-Path -LiteralPath $Script:AnchorHistoryFile){$lines=[IO.File]::ReadAllLines($Script:AnchorHistoryFile,[Text.Encoding]::UTF8);$historyBytes=[Convert]::ToBase64String([IO.File]::ReadAllBytes($Script:AnchorHistoryFile))}
  if(Test-Path -LiteralPath $cacheFile){$cacheBytes=[Convert]::ToBase64String([IO.File]::ReadAllBytes($cacheFile))}
  [void]$all.Add(@{expected=@{appended=@($appended);lines=$lines;hit=$hit;history_bytes=$historyBytes;cache_bytes=$cacheBytes};request=@{operation='storage-fixture';args=@{root=$root;maximum=[int]$fixture.maximum;create_cache=[bool]$fixture.create_cache;initial_lines=@($fixture.initial_lines);serialized_records=@($serialized);serialized_cache=$serializedCache;age_ms=[double]$fixture.age_ms;ttl=[int]$fixture.ttl}}})
 }

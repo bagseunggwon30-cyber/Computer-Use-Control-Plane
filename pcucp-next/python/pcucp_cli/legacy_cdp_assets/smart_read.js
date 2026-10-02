@@ -102,8 +102,25 @@ function(args){
     return (v || '').toString().replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ');
   }
   function cssIdent(v) {
-    try { if (window.CSS && CSS.escape) return CSS.escape(v); } catch(e) {}
-    return (v || '').toString().replace(/[^a-zA-Z0-9_-]/g, function(ch) { return '\\' + ch; });
+    // CSSOM identifier serialization. Native CSS.escape is rejected by Chrome's
+    // side-effect guard even for a literal; this fixed pure implementation keeps
+    // its output without invoking that binding or page-supplied replacements.
+    // https://drafts.csswg.org/cssom/#serialize-an-identifier
+    const text = String(v);
+    let escaped = '';
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i);
+      const digit = code >= 48 && code <= 57;
+      if (code === 0) escaped += '\uFFFD';
+      else if ((code >= 1 && code <= 31) || code === 127 ||
+               (digit && (i === 0 || (i === 1 && text[0] === '-')))) {
+        escaped += '\\' + code.toString(16) + ' ';
+      } else if (code === 45 && text.length === 1) escaped += '\\-';
+      else if (code >= 128 || code === 45 || code === 95 || digit ||
+               (code >= 65 && code <= 90) || (code >= 97 && code <= 122)) escaped += text[i];
+      else escaped += '\\' + text[i];
+    }
+    return escaped;
   }
   function selectorCandidates(el, matchedText, action) {
     const out = [];

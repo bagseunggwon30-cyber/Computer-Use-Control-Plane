@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from test_legacy_precision_parity import fixtures, runner_command
+from test_legacy_precision_parity import ROOT, fixtures, runner_command
 
 
 def encode(value):
@@ -151,6 +151,31 @@ try{
                 _,i,_=receive(proc);self.reply(proc,i,reply)
             _,i,state=receive(proc);self.reply(proc,i,dict(serialized=json.dumps(state['effects'][0]['args']['record'])))
             target,i,receipt=receive(proc);self.assertEqual(target,'commit-ready');self.reply(proc,i,receipt);target,_,value=receive(proc);self.assertEqual((target,value),('committed',dict(recorded=False)));self.assertEqual(self.finish(proc)[0],0);self.assertEqual((root/'blocked').read_text(),'block')
+
+    @unittest.skipUnless(sys.platform=='win32' and os.environ.get('CUCP_PRECISION_TEST_HOST'),'Requires matching Windows NativeHost for code-page ingress')
+    def test_native_session_utf8_is_independent_of_parent_console_code_page(self):
+        with tempfile.TemporaryDirectory(prefix='CUCP precision console encoding ') as tmp:
+            script=Path(tmp)/'encoding.ps1';script.write_text(r'''param([string]$Source)
+$ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+$tokens=$null;$errors=$null;$ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[ref]$errors)
+if($errors.Count){throw 'Precision adapter did not parse'}
+foreach($f in @($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and ($n.Name -like '_Precision-*' -or $n.Name -like '_Invoke-LegacyPrecision*')},$true))){. ([scriptblock]::Create($f.Extent.Text))}
+$previous=[Console]::InputEncoding;$results=New-Object Collections.ArrayList
+try{
+ foreach($encoding in @([Text.Encoding]::GetEncoding(437),(New-Object Text.UTF8Encoding($true)),(New-Object Text.UTF8Encoding($false)))){
+  [Console]::InputEncoding=$encoding
+  $value=_Invoke-LegacyPrecisionValue -Operation 'child-plan-envelope' -Arguments @{raw_lines=@('{"text":"한글 😀"}');exit_code=2}
+  [void]$results.Add($value)
+ }
+ [Console]::Out.WriteLine((ConvertTo-Json -InputObject @($results) -Depth 20 -Compress))
+}finally{[Console]::InputEncoding=$previous}
+''',encoding='utf-8-sig')
+            source=os.environ.get('CUCP_PRECISION_ADAPTER_DRAFT') or str(ROOT/'scripts/cucp.ps1')
+            env={**os.environ,'CUCP_NATIVE_HOST':os.environ['CUCP_PRECISION_TEST_HOST']}
+            result=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(script),'-Source',source],capture_output=True,timeout=30,env=env)
+            self.assertEqual(result.returncode,0,result.stderr.decode(errors='replace'))
+            expected=dict(exit=2,raw='{"text":"한글 😀"}',json=dict(text='한글 😀'))
+            self.assertEqual(json.loads(result.stdout.decode('utf-8-sig')),[expected]*3)
 
     def test_pure_helper_completes_large_records_without_read_or_write_effects(self):
         record=dict(anchor_id='same',target_match='W',normalized_window_point=dict(x=.5,y=.5),safe_to_reuse=True,coordinate_risk='low',coord_signature='one')

@@ -202,6 +202,13 @@ def run_candidate(fixtures):
 
 
 class ExecutionPortableTests(unittest.TestCase):
+    def test_actual_capture_intercepts_escape_before_any_input(self):
+        source=(ROOT/"tests/fixtures/legacy-execution-adapter.ps1").read_text(encoding="utf-8-sig")
+        dispatch=source.split("function _Execution-Dispatch",1)[1].split("\nfunction ",1)[0]
+        self.assertNotIn("SendKeys",dispatch)
+        self.assertNotIn("Add-Type",dispatch)
+        self.assertIn("function _Execution-SendEscape {Capture-Effect 'SendEscape' -Live $true -Confirm $true | Out-Null}",PS_CAPTURE)
+
     def test_first_difference_reports_nested_path_without_dumping_large_payload(self):
         self.assertIsNone(first_difference({"effects":[]},{"effects":[]}))
         self.assertEqual(first_difference({"effects":[{"live":False}]},{"effects":[{"live":True}]}),
@@ -478,6 +485,7 @@ if($AdapterSource){
   param([string]$ScriptPath,$Effect,[bool]$LiveCeiling,[bool]$SensitiveCeiling,[switch]$SensitiveCeilingContractVerified)
   Capture-Effect 'Child' -Name $Effect.name -Argv $Effect.argv -Live ([bool]$Effect.live) -Quiet ([bool]$Effect.quiet) -Brief ([bool]$Effect.brief) -Confirm ([bool]$Effect.confirm_sensitive)
  }
+ function _Execution-SendEscape {Capture-Effect 'SendEscape' -Live $true -Confirm $true | Out-Null}
 }
 $Script:CucpV14Schema=@{RecoveryPlan='cucp.recovery-plan/v1';RecoveryRun='cucp.recovery-run/v1'};$Script:CacheDir='C:\fixture'
 $all=New-Object Collections.ArrayList

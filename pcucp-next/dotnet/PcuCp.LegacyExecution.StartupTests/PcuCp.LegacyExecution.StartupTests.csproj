@@ -3,6 +3,7 @@
   <ItemGroup>
     <Compile Include="../PcuCp.NativeHost/Contracts.cs" Link="Contracts.cs" />
     <Compile Include="../PcuCp.NativeHost/LegacyExecutionStartup.cs" Link="LegacyExecutionStartup.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacySessionInput.cs" Link="LegacySessionInput.cs" />
     <Compile Include="../PcuCp.LegacyExecution/LegacyExecutionConsent.cs" Link="LegacyExecutionConsent.cs" />
     <Compile Include="../PcuCp.LegacyExecution/LegacyExecutionEffects.cs" Link="LegacyExecutionEffects.cs" />
   </ItemGroup>

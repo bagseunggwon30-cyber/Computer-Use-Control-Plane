@@ -171,7 +171,7 @@ skipped off Windows. All five enabled browser attempts failed at Chrome startup:
 `process_singleton_posix.cc: socket() failed: Operation not permitted`.
 No browser assertions ran locally. No sandbox bypass was attempted. Passing
 ordinary guarded read tests in sandbox-capable CI is a retirement prerequisite;
-if V8 rejects ordinary operations, that remains a feature blocker to solve.
+  if V8 rejects ordinary operations, that remains a feature blocker to solve.
 
 Exact commit `120b64a605bece965da4637e6510afcbd46fe871`, Actions run
 `36997186053`, established that all three live-input/getter-protection browser
@@ -181,6 +181,25 @@ reached by the latter case. Windows also exposed host framing/output defects,
 detect's ignored page-match option, unstable equal-page sorting, and the original
 click partial-branch command error. Repairs and primitive diagnostics require a
 new exact-commit qualification; none of these failures authorize retirement.
+
+The next exact commit `a7bffa18b8325fe06f00459324c1f3631f2c896a`, run
+`37000162419`, passed Windows CDP qualification: 49 tests, 42 passed and seven
+explicit browser/production-promotion skips. The browser job still failed the
+same two smart-read cases. Its fixed probes show that native `CSS.escape('save')`
+alone is rejected, while the complete deep-read algorithm and local scoring
+primitives are accepted. Probes using `getElementById` shared that separate
+acquisition call, so they do not establish which subsequent getter was rejected.
+
+The narrowly scoped repair replaces `smart_read.js`'s CSS identifier escaping
+with fixed pure [CSSOM serialization](https://drafts.csswg.org/cssom/#serialize-an-identifier).
+It retains `throwOnSideEffect`, accepts no page-supplied source, and does not call
+page replacements for `CSS.escape`. Production live smart behavior is unchanged.
+Fifty-two string cases cover empty/leading digits, hyphens, all ASCII controls,
+NUL, quotes/backslashes, BMP, supplementary Unicode and isolated surrogates.
+The exact production function passes guarded V8 Node evaluation against explicit
+expected strings; an owned-browser fixture compares it with native `CSS.escape`
+using explicit fixture-only live authority. That browser gate and the original
+five functional tests must pass at the next exact commit before qualification.
 
 Packaging must include `legacy_cdp_assets/*.js` both in setuptools package data
 and the PyInstaller bundle. The integrator owns these packaging/dispatcher edits.

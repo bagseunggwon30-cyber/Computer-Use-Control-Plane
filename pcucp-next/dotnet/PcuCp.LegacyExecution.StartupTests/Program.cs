@@ -14,6 +14,14 @@ string Wire(object payload) => Frames(JsonSerializer.SerializeToUtf8Bytes(payloa
 LegacyExecutionStartup Read(object payload, params string[] options) => LegacyExecutionStartup.Read(options,new StringReader(Wire(payload)));
 var ordinary = Read(Payload("--step","windows"));
 Check(!ordinary.Authority.AllowLiveControl && !ordinary.Authority.ConfirmSensitive,"Default authority changed");
+using (var byteInput = LegacySessionInput.Open(new MemoryStream(Encoding.UTF8.GetBytes("\uFEFF" + Wire(Payload("--label", "한글😀")) + "reply 한글😀\n"))))
+{
+    var decoded = LegacyExecutionStartup.Read([], byteInput);
+    Check(decoded.Rest[1] == "한글😀", "Protocol inherited a console code page");
+    Check(byteInput.ReadLine() == "reply 한글😀", "Startup did not preserve the shared UTF8 reply reader");
+}
+Reject(() => { using var invalid = LegacySessionInput.Open(new MemoryStream([255,10])); LegacyExecutionStartup.Read([], invalid); }, "Protocol accepted malformed UTF8 bytes");
+Reject(() => { using var utf16 = LegacySessionInput.Open(new MemoryStream([255,254,123,0,10,0])); LegacyExecutionStartup.Read([], utf16); }, "Protocol auto-detected unsupported UTF16");
 var framed = Wire(Payload("--label", "--confirm-sensitive"));
 var prefixed = LegacyExecutionStartup.Read(["--confirm-sensitive"], new StringReader("\uFEFF" + framed));
 Check(!prefixed.Authority.AllowLiveControl && !prefixed.Authority.ConfirmSensitive, "Encoding preamble granted authority");

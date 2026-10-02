@@ -184,6 +184,10 @@ function _Execution-ValidateEffect($Effect,$State) {
     'Console' {_Execution-Require ($n -eq '' -and $a.Count -eq 0 -and $d -is [string]) 'Invalid execution console output.'}
   }
 }
+function _Execution-SendEscape {
+  Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+  [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+}
 function _Execution-Dispatch($Effect,$State) {
   $a=[string[]]$Effect.argv;$d=$Effect.data;$n=$Effect.name
   switch -CaseSensitive ($Effect.kind) {
@@ -215,7 +219,7 @@ function _Execution-Dispatch($Effect,$State) {
     'CachePath' {$path=Join-Path $State.cache_dir ($n+'-'+$d+'.png');$State.paths[$path]=$true;return $path}
     'FileExists' {return Test-Path -LiteralPath ([string]$d)}
     'RemoveFile' {Remove-Item -LiteralPath ([string]$d) -Force -ErrorAction SilentlyContinue;return}
-    'SendEscape' {Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop;[System.Windows.Forms.SendKeys]::SendWait('{ESC}');return}
+    'SendEscape' {_Execution-SendEscape;return}
     'Console' {[Console]::Out.WriteLine([string]$d);return}
     default {throw 'Unknown execution effect.'}
   }

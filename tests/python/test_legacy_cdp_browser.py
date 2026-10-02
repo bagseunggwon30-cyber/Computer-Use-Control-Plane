@@ -10,6 +10,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'pcucp-next/python'))
 from pcucp_cli.legacy_cdp import LegacyCdpAdapter, _expression
 from pcucp_cli.cdp import CdpAdapter
 import test_cdp_browser as fixtures
+from test_legacy_cdp_assets import css_identifier_source, css_identifier_cases
 
 
 @unittest.skipUnless(os.environ.get('CUCP_LEGACY_CDP_BROWSER_TEST')=='1',
@@ -38,6 +39,7 @@ class LegacyCdpBrowserTests(unittest.TestCase):
           host.attachShadow({mode:'open'}).innerHTML='<button>Probe</button>';
           const frame=document.createElement('iframe');frame.id='probe-frame';document.body.append(frame);return true})()""")
         primitives={
+            'get_element_by_id':"!!document.getElementById('save')",
             'literal_object':'({ok:true})',
             'nfkc':"'Ｓａｖｅ'.normalize('NFKC').toLowerCase()",
             'unicode_regex':"'Save!'.replace(/[^\\p{L}\\p{N}\\s]+/gu,' ')",
@@ -45,28 +47,28 @@ class LegacyCdpBrowserTests(unittest.TestCase):
             'local_set':'(()=>{const a=new Set();a.add(1);return a.has(1)})()',
             'query_all':"document.querySelectorAll('button').length",
             'query_array_from':"Array.from(document.querySelectorAll('button')).length",
-            'connected':"document.getElementById('save').isConnected",
-            'rect':"document.getElementById('save').getBoundingClientRect().width",
-            'style_object':"!!window.getComputedStyle(document.getElementById('save'))",
-            'style_display':"window.getComputedStyle(document.getElementById('save')).display",
-            'style_visibility':"window.getComputedStyle(document.getElementById('save')).visibility",
-            'style_opacity':"window.getComputedStyle(document.getElementById('save')).opacity",
-            'tag':"document.getElementById('save').tagName",
-            'attribute':"document.getElementById('save').getAttribute('aria-label')",
-            'inner_text':"document.getElementById('save').innerText",
-            'text_content':"document.getElementById('save').textContent",
-            'labels':"document.getElementById('message').labels.length",
-            'label_array_from':"Array.from(document.getElementById('message').labels).length",
+            'connected':"document.querySelector('#save').isConnected",
+            'rect':"document.querySelector('#save').getBoundingClientRect().width",
+            'style_object':"!!window.getComputedStyle(document.querySelector('#save'))",
+            'style_display':"window.getComputedStyle(document.querySelector('#save')).display",
+            'style_visibility':"window.getComputedStyle(document.querySelector('#save')).visibility",
+            'style_opacity':"window.getComputedStyle(document.querySelector('#save')).opacity",
+            'tag':"document.querySelector('#save').tagName",
+            'attribute':"document.querySelector('#save').getAttribute('aria-label')",
+            'inner_text':"document.querySelector('#save').innerText",
+            'text_content':"document.querySelector('#save').textContent",
+            'labels':"document.querySelector('#message').labels.length",
+            'label_array_from':"Array.from(document.querySelector('#message').labels).length",
             'control':"document.querySelector('label').control.id",
-            'disabled':"document.getElementById('save').disabled",
-            'onclick':"document.getElementById('save').onclick===null",
-            'content_editable':"document.getElementById('prosemirror').isContentEditable",
-            'value':"document.getElementById('message').value",
-            'placeholder':"document.getElementById('message').placeholder",
-            'title':"document.getElementById('message').title",
-            'shadow_root':"document.getElementById('save').shadowRoot===null",
-            'shadow_query':"document.getElementById('probe-host').shadowRoot.querySelectorAll('*').length",
-            'content_document':"document.getElementById('probe-frame').contentDocument.querySelectorAll('*').length",
+            'disabled':"document.querySelector('#save').disabled",
+            'onclick':"document.querySelector('#save').onclick===null",
+            'content_editable':"document.querySelector('#prosemirror').isContentEditable",
+            'value':"document.querySelector('#message').value",
+            'placeholder':"document.querySelector('#message').placeholder",
+            'title':"document.querySelector('#message').title",
+            'shadow_root':"document.querySelector('#save').shadowRoot===null",
+            'shadow_query':"document.querySelector('#probe-host').shadowRoot.querySelectorAll('*').length",
+            'content_document':"document.querySelector('#probe-frame').contentDocument.querySelectorAll('*').length",
             'css_escape':"CSS.escape('save')",
             'json_stringify':"JSON.stringify('Save')",
             'complete_smart_click':_expression('smart_read',dict(action='click',needle='Save')),
@@ -82,6 +84,19 @@ class LegacyCdpBrowserTests(unittest.TestCase):
             error=response.get('error') or response.get('result',{}).get('exceptionDetails')
             report[name]='ok' if error is None else json.dumps(error,ensure_ascii=True)[:260]
         print('LEGACY_CDP_GUARDED_PRIMITIVES '+json.dumps(report,sort_keys=True),flush=True)
+
+    def test_css_identifier_matches_native_fixture_oracle(self):
+        values=[value for value,_ in css_identifier_cases()]
+        # Explicit live authority belongs only to this owned fixture oracle.
+        # Production smart-read never invokes native CSS.escape or removes its
+        # mandatory side-effect guard after rejection.
+        expression='('+css_identifier_source()+')'
+        result=self.evaluate('('+json.dumps(values,ensure_ascii=True)+').map(value=>({actual:'+expression+
+            '(value),expected:CSS.escape(value)}))')
+        self.assertEqual(len(result),len(values))
+        for value,row in zip(values,result):
+            with self.subTest(value=repr(value)):
+                self.assertEqual(row['actual'],row['expected'])
 
     def test_rendered_smart_find_and_label_match_with_guard(self):
         adapter=self.adapter()
