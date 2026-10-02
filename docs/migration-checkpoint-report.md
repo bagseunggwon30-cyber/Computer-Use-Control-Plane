@@ -31,10 +31,32 @@ temporary fixtures make total PS 44,084 bytes higher. The older 190,400-byte
 reduction is a dated milestone, not the current total. No files are hidden from
 language accounting, and zero-PowerShell completion remains open.
 
-The next literal-tokenizer changes are candidate-only. Six previously observed
-mismatches are repaired in local replay; 19 known historical gaps remain, and
-202 separately labelled inferred cases still require Windows qualification.
-The production host continues to exclude that candidate and retains PSParser.
+### Literal-tokenizer candidate after the qualified checkpoint
+
+The first candidate `48bb1651499d0857b4886b3f5cd8b2ed04d5e8a0` passed the three
+active jobs in [focused run 37074340659](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37074340659).
+That Windows PS5.1 run confirmed six fixes, with 19 historical normalized gaps
+still open, and found 100 differences in its 202 inferred probes (70 valid-input
+rejections and 30 error-code differences). It established no newly accepted
+invalid syntax within those cases, not full parser parity.
+
+The next combined candidate covers embedded literal scanning, generic-token
+boundaries and syntax-error precedence. Local replay now matches all 25 original
+historical gaps and all 100 later observed results. At local source `fbba0fa`,
+972 managed checks passed; Python discovery ran 531 tests, with 413 passing and
+118 explicit platform skips. The 652 separately labelled inferred contracts
+(388 literal, 213 boundary and 51 diagnostic) still require fresh Windows
+comparison. Exact raw diagnostic text and plan-message equality are separately
+captured and remain unqualified. Mode-sensitive or unknown syntax fails closed.
+The focused foundation gate now requires every workflow test suite and retains
+raw diagnostic evidence even if comparisons fail.
+
+This candidate does not replace production callers or retire any PSParser code.
+The NativeHost project still excludes it. Its explicitly tracked diagnostic
+oracle adds 3,818 PowerShell bytes: the candidate index has 27 `.ps1` files,
+870,980 total bytes (612,709 runtime and 258,271 other), a reduction of 142,498
+bytes from baseline. Temporary oracle source remains counted and must later be
+retired with equivalent provenance-backed coverage.
 
 ## Actual source replacement
 

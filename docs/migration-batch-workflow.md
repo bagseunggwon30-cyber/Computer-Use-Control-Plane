@@ -177,3 +177,9 @@ inferred non-relaxation probes part of actual candidate feedback, without
 switching production callers or removing tests. The complete parser remains
 unqualified while known gaps remain; `CUCP_REQUIRE_WORKFLOW_PARSER_PARITY=1` and
 the final full production gate are still required before tokenizer retirement.
+
+The combined parser batch extends that pattern to `test_legacy_workflow*.py` and
+requires the parity, boundary, diagnostic and embedded-fixture suites explicitly.
+Removing a requested suite fails before any subprocess is started. The raw PS5
+capture driver is a visible, counted `.ps1` fixture; it is not embedded in Python
+or excluded from source accounting. The production parser remains unchanged.

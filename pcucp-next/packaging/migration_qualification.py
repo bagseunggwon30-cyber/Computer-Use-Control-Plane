@@ -19,6 +19,10 @@ DRAFT_ADAPTERS = {
     "interaction": "scripts/cucp-legacy-interaction-adapter.ps1",
     "diagnostics": "scripts/cucp-legacy-diagnostic-adapter.ps1",
 }
+REQUIRED_FOUNDATION_TESTS = (
+    "test_legacy_workflow_parity.py", "test_legacy_workflow_boundaries.py",
+    "test_legacy_workflow_diagnostics.py", "test_legacy_workflow_embedded_fixtures.py",
+)
 REQUIRED_ADAPTER_TESTS = {
     "interaction": "test_legacy_interaction_adapters.py",
     "diagnostics": "test_legacy_diagnostics_adapters.py",
@@ -39,7 +43,7 @@ PATTERNS = {
     "interaction": "test_legacy_interaction*.py",
     "diagnostics": "test_legacy_diagnostics*.py",
     "file-images": ("test_legacy_images.py", "test_legacy_file_ocr.py"),
-    "foundation": ("test_migration_inventory.py", "test_legacy_workflow_parity.py"),
+    "foundation": ("test_migration_inventory.py", "test_legacy_workflow*.py"),
 }
 ADAPTER_ENV = {
     "execution": "CUCP_EXECUTION_TEST_HOST",
@@ -114,6 +118,10 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
         raise ValueError("Unsupported qualification family/platform combination.")
     selected = "test_legacy_cdp_browser*.py" if browser else PATTERNS[family]
     patterns = (selected,) if isinstance(selected, str) else selected
+    if family == "foundation":
+        for name in REQUIRED_FOUNDATION_TESTS:
+            if not (ROOT / "tests/python" / name).is_file():
+                raise ValueError(f"Missing exact foundation tests: {name}; refusing an incomplete parser gate.")
     for pattern in patterns:
         if not list((ROOT / "tests/python").glob(pattern)):
             raise ValueError(f"Missing staged tests {pattern} for {family}; refusing an incomplete pass.")
@@ -126,6 +134,8 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
     # Fixture reports contain Unicode; keep redirected Python stdout/stderr
     # UTF-8 without changing file decoding or PowerShell culture semantics.
     env["PYTHONIOENCODING"] = "utf-8"
+    if family == "foundation" and log_dir is not None:
+        env["CUCP_WORKFLOW_DIAGNOSTIC_CAPTURE"] = str(log_dir / "workflow-parser-raw-diagnostics.json")
     for name in (*ADAPTER_ENV.values(), "CUCP_EXECUTION_STARTUP_TEST_HOST", "CUCP_EXECUTION_ADAPTER_SOURCE",
                  "CUCP_PRECISION_ADAPTER_DRAFT", "CUCP_LEGACY_CDP_ADAPTER_MODE", "CUCP_INTERACTION_TEST_HOST",
                  "CUCP_LEGACY_IMAGES_ADAPTER_SOURCE"):

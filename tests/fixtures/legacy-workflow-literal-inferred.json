@@ -312,7 +312,7 @@
     },
     {
       "id": "here_literal_lf_unicode",
-      "step": "macro type-native --text @'\n\ud55c\uae00\n'@",
+      "step": "macro type-native --text @'\n한글\n'@",
       "candidate": {
         "ok": true,
         "error": "",
@@ -320,7 +320,7 @@
           "macro",
           "type-native",
           "--text",
-          "\ud55c\uae00"
+          "한글"
         ]
       }
     },
@@ -440,7 +440,7 @@
     },
     {
       "id": "here_literal_crlf_unicode",
-      "step": "macro type-native --text @'\r\n\ud55c\uae00\r\n'@",
+      "step": "macro type-native --text @'\r\n한글\r\n'@",
       "candidate": {
         "ok": true,
         "error": "",
@@ -448,7 +448,7 @@
           "macro",
           "type-native",
           "--text",
-          "\ud55c\uae00"
+          "한글"
         ]
       }
     },
@@ -619,9 +619,15 @@
       "id": "here_literal_suffix_word",
       "step": "macro type-native --text @'\nvalue\n'@tail",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "value",
+          "tail"
+        ]
       }
     },
     {
@@ -718,9 +724,14 @@
       "id": "here_literal_bare_cr",
       "step": "macro type-native --text @'\rbody\r'@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "body"
+        ]
       }
     },
     {
@@ -747,7 +758,7 @@
     },
     {
       "id": "here_expandable_lf_unicode",
-      "step": "macro type-native --text @\"\n\ud55c\uae00\n\"@",
+      "step": "macro type-native --text @\"\n한글\n\"@",
       "candidate": {
         "ok": true,
         "error": "",
@@ -755,7 +766,7 @@
           "macro",
           "type-native",
           "--text",
-          "\ud55c\uae00"
+          "한글"
         ]
       }
     },
@@ -875,7 +886,7 @@
     },
     {
       "id": "here_expandable_crlf_unicode",
-      "step": "macro type-native --text @\"\r\n\ud55c\uae00\r\n\"@",
+      "step": "macro type-native --text @\"\r\n한글\r\n\"@",
       "candidate": {
         "ok": true,
         "error": "",
@@ -883,7 +894,7 @@
           "macro",
           "type-native",
           "--text",
-          "\ud55c\uae00"
+          "한글"
         ]
       }
     },
@@ -1054,9 +1065,15 @@
       "id": "here_expandable_suffix_word",
       "step": "macro type-native --text @\"\nvalue\n\"@tail",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "value",
+          "tail"
+        ]
       }
     },
     {
@@ -1153,9 +1170,14 @@
       "id": "here_expandable_bare_cr",
       "step": "macro type-native --text @\"\rbody\r\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "body"
+        ]
       }
     },
     {
@@ -1251,7 +1273,7 @@
       "step": "macro type-native --text \"${}\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1260,7 +1282,7 @@
       "step": "macro type-native --text @\"\n${}\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1269,7 +1291,7 @@
       "step": "macro type-native --text \"${name\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1278,7 +1300,7 @@
       "step": "macro type-native --text @\"\n${name\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1287,7 +1309,7 @@
       "step": "macro type-native --text \"${a{b}\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1296,7 +1318,7 @@
       "step": "macro type-native --text @\"\n${a{b}\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1305,7 +1327,7 @@
       "step": "macro type-native --text \"$name:\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1314,7 +1336,7 @@
       "step": "macro type-native --text @\"\n$name:\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1323,7 +1345,7 @@
       "step": "macro type-native --text \"$env: \"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1332,7 +1354,7 @@
       "step": "macro type-native --text @\"\n$env: \n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1340,18 +1362,28 @@
       "id": "bounded_dollar_multiple_scope_colons",
       "step": "macro type-native --text \"$env::PATH\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$env::PATH"
+        ]
       }
     },
     {
       "id": "bounded_here_dollar_multiple_scope_colons",
       "step": "macro type-native --text @\"\n$env::PATH\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$env::PATH"
+        ]
       }
     },
     {
@@ -1359,7 +1391,7 @@
       "step": "macro type-native --text \"${env:}\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1368,26 +1400,36 @@
       "step": "macro type-native --text @\"\n${env:}\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
     {
       "id": "bounded_dollar_unicode_variable",
-      "step": "macro type-native --text \"$\uc774\ub984\"",
+      "step": "macro type-native --text \"$이름\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$이름"
+        ]
       }
     },
     {
       "id": "bounded_here_dollar_unicode_variable",
-      "step": "macro type-native --text @\"\n$\uc774\ub984\n\"@",
+      "step": "macro type-native --text @\"\n$이름\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$이름"
+        ]
       }
     },
     {
@@ -1395,7 +1437,7 @@
       "step": "macro type-native --text \"$(inspect\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1404,7 +1446,7 @@
       "step": "macro type-native --text @\"\n$(inspect\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1412,54 +1454,84 @@
       "id": "bounded_dollar_nested_subexpression",
       "step": "macro type-native --text \"$($(inspect))\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$($(inspect))"
+        ]
       }
     },
     {
       "id": "bounded_here_dollar_nested_subexpression",
       "step": "macro type-native --text @\"\n$($(inspect))\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$($(inspect))"
+        ]
       }
     },
     {
       "id": "bounded_dollar_quoted_subexpression",
       "step": "macro type-native --text \"$(\"text\")\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(\"text\")"
+        ]
       }
     },
     {
       "id": "bounded_here_dollar_quoted_subexpression",
       "step": "macro type-native --text @\"\n$(\"text\")\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(\"text\")"
+        ]
       }
     },
     {
       "id": "bounded_dollar_operator_subexpression",
       "step": "macro type-native --text \"$(1 + 2)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(1 + 2)"
+        ]
       }
     },
     {
       "id": "bounded_here_dollar_operator_subexpression",
       "step": "macro type-native --text @\"\n$(1 + 2)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(1 + 2)"
+        ]
       }
     },
     {
@@ -1467,7 +1539,7 @@
       "step": "macro type-native --text \"$(if)\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1476,7 +1548,7 @@
       "step": "macro type-native --text @\"\n$(if)\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1485,7 +1557,7 @@
       "step": "macro type-native --text \"$(inspect # comment)\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1494,7 +1566,7 @@
       "step": "macro type-native --text @\"\n$(inspect # comment)\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1502,36 +1574,56 @@
       "id": "bounded_dollar_newline_subexpression",
       "step": "macro type-native --text \"$(inspect\n)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect\n)"
+        ]
       }
     },
     {
       "id": "bounded_here_dollar_newline_subexpression",
       "step": "macro type-native --text @\"\n$(inspect\n)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect\n)"
+        ]
       }
     },
     {
       "id": "bounded_dollar_empty_subexpression",
       "step": "macro type-native --text \"$()\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$()"
+        ]
       }
     },
     {
       "id": "bounded_here_dollar_empty_subexpression",
       "step": "macro type-native --text @\"\n$()\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$()"
+        ]
       }
     },
     {
@@ -1539,7 +1631,7 @@
       "step": "macro type-native --text \"$(\"x)\")\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1548,7 +1640,7 @@
       "step": "macro type-native --text @\"\n$(\"x)\")\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1556,18 +1648,28 @@
       "id": "bounded_dollar_subexpression_arguments",
       "step": "macro type-native --text \"$(inspect item)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect item)"
+        ]
       }
     },
     {
       "id": "bounded_here_dollar_subexpression_arguments",
       "step": "macro type-native --text @\"\n$(inspect item)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect item)"
+        ]
       }
     },
     {
@@ -1638,7 +1740,7 @@
       "step": "macro type-native --text \"$name?:\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1647,7 +1749,7 @@
       "step": "macro type-native --text @\"\n$name?:\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1656,7 +1758,7 @@
       "step": "macro type-native --text \"$name?part:\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1665,7 +1767,7 @@
       "step": "macro type-native --text @\"\n$name?part:\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1673,35 +1775,45 @@
       "id": "bounded_quoted_scoped_question_name",
       "step": "macro type-native --text \"$env:name?part:\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$env:name?part:"
+        ]
       }
     },
     {
       "id": "bounded_here_scoped_question_name",
       "step": "macro type-native --text @\"\n$env:name?part:\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$env:name?part:"
+        ]
       }
     },
     {
       "id": "bounded_quoted_unicode_scope_no_name",
-      "step": "macro type-native --text \"$name\uc774\ub984:\"",
+      "step": "macro type-native --text \"$name이름:\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
     {
       "id": "bounded_here_unicode_scope_no_name",
-      "step": "macro type-native --text @\"\n$name\uc774\ub984:\n\"@",
+      "step": "macro type-native --text @\"\n$name이름:\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1710,7 +1822,7 @@
       "step": "macro type-native --text \"$(enum)\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1719,7 +1831,7 @@
       "step": "macro type-native --text @\"\n$(enum)\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1728,7 +1840,7 @@
       "step": "macro type-native --text \"$(ENUM)\"",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1737,7 +1849,7 @@
       "step": "macro type-native --text @\"\n$(ENUM)\n\"@",
       "candidate": {
         "ok": false,
-        "error": "unsupported_token",
+        "error": "parse_error",
         "tokens": []
       }
     },
@@ -1745,432 +1857,2694 @@
       "id": "bounded_quoted_keyword_public",
       "step": "macro type-native --text \"$(public)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(public)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_public",
       "step": "macro type-native --text @\"\n$(public)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(public)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_Public",
       "step": "macro type-native --text \"$(Public)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Public)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_Public",
       "step": "macro type-native --text @\"\n$(Public)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Public)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_private",
       "step": "macro type-native --text \"$(private)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(private)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_private",
       "step": "macro type-native --text @\"\n$(private)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(private)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_Private",
       "step": "macro type-native --text \"$(Private)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Private)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_Private",
       "step": "macro type-native --text @\"\n$(Private)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Private)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_static",
       "step": "macro type-native --text \"$(static)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(static)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_static",
       "step": "macro type-native --text @\"\n$(static)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(static)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_Static",
       "step": "macro type-native --text \"$(Static)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Static)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_Static",
       "step": "macro type-native --text @\"\n$(Static)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Static)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_interface",
       "step": "macro type-native --text \"$(interface)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(interface)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_interface",
       "step": "macro type-native --text @\"\n$(interface)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(interface)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_Interface",
       "step": "macro type-native --text \"$(Interface)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Interface)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_Interface",
       "step": "macro type-native --text @\"\n$(Interface)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Interface)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_namespace",
       "step": "macro type-native --text \"$(namespace)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(namespace)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_namespace",
       "step": "macro type-native --text @\"\n$(namespace)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(namespace)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_Namespace",
       "step": "macro type-native --text \"$(Namespace)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Namespace)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_Namespace",
       "step": "macro type-native --text @\"\n$(Namespace)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Namespace)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_module",
       "step": "macro type-native --text \"$(module)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(module)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_module",
       "step": "macro type-native --text @\"\n$(module)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(module)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_Module",
       "step": "macro type-native --text \"$(Module)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Module)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_Module",
       "step": "macro type-native --text @\"\n$(Module)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Module)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_type",
       "step": "macro type-native --text \"$(type)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(type)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_type",
       "step": "macro type-native --text @\"\n$(type)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(type)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_Type",
       "step": "macro type-native --text \"$(Type)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Type)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_Type",
       "step": "macro type-native --text @\"\n$(Type)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Type)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_assembly",
       "step": "macro type-native --text \"$(assembly)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(assembly)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_assembly",
       "step": "macro type-native --text @\"\n$(assembly)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(assembly)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_Assembly",
       "step": "macro type-native --text \"$(Assembly)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Assembly)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_Assembly",
       "step": "macro type-native --text @\"\n$(Assembly)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Assembly)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_command",
       "step": "macro type-native --text \"$(command)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(command)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_command",
       "step": "macro type-native --text @\"\n$(command)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(command)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_Command",
       "step": "macro type-native --text \"$(Command)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Command)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_Command",
       "step": "macro type-native --text @\"\n$(Command)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Command)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_hidden",
       "step": "macro type-native --text \"$(hidden)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(hidden)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_hidden",
       "step": "macro type-native --text @\"\n$(hidden)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(hidden)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_Hidden",
       "step": "macro type-native --text \"$(Hidden)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Hidden)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_Hidden",
       "step": "macro type-native --text @\"\n$(Hidden)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Hidden)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_base",
       "step": "macro type-native --text \"$(base)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(base)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_base",
       "step": "macro type-native --text @\"\n$(base)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(base)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_Base",
       "step": "macro type-native --text \"$(Base)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Base)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_Base",
       "step": "macro type-native --text @\"\n$(Base)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Base)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_default",
       "step": "macro type-native --text \"$(default)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(default)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_default",
       "step": "macro type-native --text @\"\n$(default)\n\"@",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(default)"
+        ]
       }
     },
     {
       "id": "bounded_quoted_keyword_Default",
       "step": "macro type-native --text \"$(Default)\"",
       "candidate": {
-        "ok": false,
-        "error": "unsupported_token",
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Default)"
+        ]
       }
     },
     {
       "id": "bounded_here_keyword_Default",
       "step": "macro type-native --text @\"\n$(Default)\n\"@",
       "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Default)"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_question_variable",
+      "step": "macro type-native --text \"$? $name?part\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$? $name?part"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_question_variable",
+      "step": "macro type-native --text @\"\n$? $name?part\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$? $name?part"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_unicode_scope",
+      "step": "macro type-native --text \"$환경:이름\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$환경:이름"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_unicode_scope",
+      "step": "macro type-native --text @\"\n$환경:이름\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$환경:이름"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_question_escaped_colon",
+      "step": "macro type-native --text \"$name?part`:\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$name?part:"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_question_escaped_colon",
+      "step": "macro type-native --text @\"\n$name?part`:\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$name?part:"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_braced_unicode",
+      "step": "macro type-native --text \"${이름}\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${이름}"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_braced_unicode",
+      "step": "macro type-native --text @\"\n${이름}\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${이름}"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_braced_space",
+      "step": "macro type-native --text \"${two words}\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${two words}"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_braced_space",
+      "step": "macro type-native --text @\"\n${two words}\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${two words}"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_braced_hyphen",
+      "step": "macro type-native --text \"${two-words}\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${two-words}"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_braced_hyphen",
+      "step": "macro type-native --text @\"\n${two-words}\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${two-words}"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_braced_question_scope",
+      "step": "macro type-native --text \"${env:name?part:}\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${env:name?part:}"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_braced_question_scope",
+      "step": "macro type-native --text @\"\n${env:name?part:}\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${env:name?part:}"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_nested_empty",
+      "step": "macro type-native --text \"$($())\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$($())"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_nested_empty",
+      "step": "macro type-native --text @\"\n$($())\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$($())"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_deep_nested_command",
+      "step": "macro type-native --text \"$($($(inspect)))\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$($($(inspect)))"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_deep_nested_command",
+      "step": "macro type-native --text @\"\n$($($(inspect)))\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$($($(inspect)))"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_command_multiple_arguments",
+      "step": "macro type-native --text \"$(inspect item another)\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect item another)"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_command_multiple_arguments",
+      "step": "macro type-native --text @\"\n$(inspect item another)\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect item another)"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_command_keyword_argument",
+      "step": "macro type-native --text \"$(inspect if enum)\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect if enum)"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_command_keyword_argument",
+      "step": "macro type-native --text @\"\n$(inspect if enum)\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect if enum)"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_command_quoted_argument",
+      "step": "macro type-native --text \"$(inspect 'text')\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect 'text')"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_command_quoted_argument",
+      "step": "macro type-native --text @\"\n$(inspect 'text')\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect 'text')"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_arithmetic_chain",
+      "step": "macro type-native --text \"$(1 + 2 * 3)\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(1 + 2 * 3)"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_arithmetic_chain",
+      "step": "macro type-native --text @\"\n$(1 + 2 * 3)\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(1 + 2 * 3)"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_arithmetic_negative",
+      "step": "macro type-native --text \"$( -1 + 2 )\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$( -1 + 2 )"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_arithmetic_negative",
+      "step": "macro type-native --text @\"\n$( -1 + 2 )\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$( -1 + 2 )"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_single_quoted_operand",
+      "step": "macro type-native --text \"$('literal')\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$('literal')"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_single_quoted_operand",
+      "step": "macro type-native --text @\"\n$('literal')\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$('literal')"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_inner_escape_spelling",
+      "step": "macro type-native --text \"$(\"line`ntext\")\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(\"line`ntext\")"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_inner_escape_spelling",
+      "step": "macro type-native --text @\"\n$(\"line`ntext\")\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(\"line`ntext\")"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_empty_with_newlines",
+      "step": "macro type-native --text \"$( \t\n)\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$( \t\n)"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_empty_with_newlines",
+      "step": "macro type-native --text @\"\n$( \t\n)\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$( \t\n)"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_trailing_cr",
+      "step": "macro type-native --text \"$(inspect\r)\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect\r)"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_trailing_cr",
+      "step": "macro type-native --text @\"\n$(inspect\r)\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect\r)"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_missing_nested_close",
+      "step": "macro type-native --text \"$($(inspect)\"",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_missing_nested_close",
+      "step": "macro type-native --text @\"\n$($(inspect)\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_missing_command_close",
+      "step": "macro type-native --text \"$(inspect item\"",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_missing_command_close",
+      "step": "macro type-native --text @\"\n$(inspect item\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_arithmetic_missing_operand",
+      "step": "macro type-native --text \"$(1 + )\"",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_arithmetic_missing_operand",
+      "step": "macro type-native --text @\"\n$(1 + )\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_nested_empty_brace",
+      "step": "macro type-native --text \"$(${})\"",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_nested_empty_brace",
+      "step": "macro type-native --text @\"\n$(${})\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_nested_bad_scope",
+      "step": "macro type-native --text \"$($env:)\"",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_nested_bad_scope",
+      "step": "macro type-native --text @\"\n$($env:)\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_quoted_argument_closing_boundary",
+      "step": "macro type-native --text \"$(inspect \"x)\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_quoted_argument_closing_boundary",
+      "step": "macro type-native --text @\"\n$(inspect \"x)\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_nested_keyword",
+      "step": "macro type-native --text \"$($(if))\"",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_nested_keyword",
+      "step": "macro type-native --text @\"\n$($(if))\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_braced_question_empty_scope",
+      "step": "macro type-native --text \"${name?:}\"",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_braced_question_empty_scope",
+      "step": "macro type-native --text @\"\n${name?:}\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_increment_remains_gap",
+      "step": "macro type-native --text \"$(1++2)\"",
+      "candidate": {
         "ok": false,
         "error": "unsupported_token",
         "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_increment_remains_gap",
+      "step": "macro type-native --text @\"\n$(1++2)\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_large_number_remains_gap",
+      "step": "macro type-native --text \"$(9999999999999999999999999999999999999999)\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_large_number_remains_gap",
+      "step": "macro type-native --text @\"\n$(9999999999999999999999999999999999999999)\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_statement_remains_gap",
+      "step": "macro type-native --text \"$(if (1) { x })\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_statement_remains_gap",
+      "step": "macro type-native --text @\"\n$(if (1) { x })\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_pipeline_remains_gap",
+      "step": "macro type-native --text \"$(inspect | item)\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_pipeline_remains_gap",
+      "step": "macro type-native --text @\"\n$(inspect | item)\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_multiple_statements_remain_gap",
+      "step": "macro type-native --text \"$(inspect\nother)\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_multiple_statements_remain_gap",
+      "step": "macro type-native --text @\"\n$(inspect\nother)\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_braced_escape_remains_gap",
+      "step": "macro type-native --text \"${a`}b}\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_braced_escape_remains_gap",
+      "step": "macro type-native --text @\"\n${a`}b}\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_quoted_open_boundary_remains_gap",
+      "step": "macro type-native --text \"$(\"x(\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_quoted_open_boundary_remains_gap",
+      "step": "macro type-native --text @\"\n$(\"x(\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_depth_limit",
+      "step": "macro type-native --text \"$($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($(inspect))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_depth_limit",
+      "step": "macro type-native --text @\"\n$($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($(inspect))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_escaped_invalid_braces",
+      "step": "macro type-native --text \"`${}\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${}"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_escaped_invalid_braces",
+      "step": "macro type-native --text @\"\n`${}\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${}"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_escaped_invalid_subexpression",
+      "step": "macro type-native --text \"`$(1 + )\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(1 + )"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_escaped_invalid_subexpression",
+      "step": "macro type-native --text @\"\n`$(1 + )\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(1 + )"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_literal_mixed_cr_lf",
+      "step": "macro type-native --text @'\rfirst\rsecond\nthird\r'@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "first\rsecond\nthird"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_literal_bare_cr_trailing_blank",
+      "step": "macro type-native --text @'\rfirst\r\r'@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "first\r"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_expandable_mixed_cr_lf",
+      "step": "macro type-native --text @\"\rfirst\rsecond\nthird\r\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "first\rsecond\nthird"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_here_expandable_bare_cr_trailing_blank",
+      "step": "macro type-native --text @\"\rfirst\r\r\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "first\r"
+        ]
+      }
+    },
+    {
+      "id": "strings_batch_quoted_inner_physical_nul",
+      "step": "macro type-native --text \"$(\"x\u0000y\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_inner_escaped_physical_nul",
+      "step": "macro type-native --text \"$(\"x`\u0000y\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_inner_physical_nul",
+      "step": "macro type-native --text @\"\n$(\"x\u0000y\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_inner_escaped_physical_nul",
+      "step": "macro type-native --text @\"\n$(\"x`\u0000y\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_question_literal_suffix",
+      "step": "macro windows \"$?foo\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$?foo"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_quoted_question_literal_scope_suffix",
+      "step": "macro windows \"$?foo:\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$?foo:"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_quoted_question_literal_arithmetic_suffix",
+      "step": "macro windows \"$?foo+1\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$?foo+1"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_quoted_scoped_literal_double_colon",
+      "step": "macro windows \"$a:b::\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$a:b::"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_quoted_scoped_literal_double_colon_name",
+      "step": "macro windows \"$a:b::name\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$a:b::name"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_quoted_ordinary_question_name",
+      "step": "macro windows \"$name?part\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$name?part"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_quoted_special_question_operand",
+      "step": "macro windows \"$( $? )\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$( $? )"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_quoted_special_question_arithmetic",
+      "step": "macro windows \"$( $? + 1 )\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$( $? + 1 )"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_quoted_special_question_word_operand",
+      "step": "macro windows \"$( $?foo )\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_special_question_word_arithmetic",
+      "step": "macro windows \"$( $?foo + 1 )\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_special_question_digit_operand",
+      "step": "macro windows \"$( $?1 )\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_special_question_question_operand",
+      "step": "macro windows \"$( $?? )\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_special_question_nested_operand",
+      "step": "macro windows \"$($( $?foo ))\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_scoped_double_colon_operand",
+      "step": "macro windows \"$( $a:b:: )\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_scoped_double_colon_arithmetic",
+      "step": "macro windows \"$( $a:b:: + 1 )\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_scoped_double_colon_name_operand",
+      "step": "macro windows \"$( $a:b::name )\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_escaped_close_in_string",
+      "step": "macro windows \"$(\"a`)b\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_escaped_open_in_string",
+      "step": "macro windows \"$(\"a`(b\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_escaped_close_in_argument",
+      "step": "macro windows \"$(inspect \"a`)b\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_escaped_open_in_argument",
+      "step": "macro windows \"$(inspect \"a`(b\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_other_special_dollar_operand",
+      "step": "macro windows \"$( $$foo )\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_other_special_caret_operand",
+      "step": "macro windows \"$( $^foo )\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_question_literal_suffix",
+      "step": "macro windows @\"\n$?foo\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$?foo"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_here_question_literal_scope_suffix",
+      "step": "macro windows @\"\n$?foo:\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$?foo:"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_here_question_literal_arithmetic_suffix",
+      "step": "macro windows @\"\n$?foo+1\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$?foo+1"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_here_scoped_literal_double_colon",
+      "step": "macro windows @\"\n$a:b::\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$a:b::"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_here_scoped_literal_double_colon_name",
+      "step": "macro windows @\"\n$a:b::name\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$a:b::name"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_here_ordinary_question_name",
+      "step": "macro windows @\"\n$name?part\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$name?part"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_here_special_question_operand",
+      "step": "macro windows @\"\n$( $? )\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$( $? )"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_here_special_question_arithmetic",
+      "step": "macro windows @\"\n$( $? + 1 )\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$( $? + 1 )"
+        ]
+      }
+    },
+    {
+      "id": "strings_followup_here_special_question_word_operand",
+      "step": "macro windows @\"\n$( $?foo )\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_special_question_word_arithmetic",
+      "step": "macro windows @\"\n$( $?foo + 1 )\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_special_question_digit_operand",
+      "step": "macro windows @\"\n$( $?1 )\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_special_question_question_operand",
+      "step": "macro windows @\"\n$( $?? )\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_special_question_nested_operand",
+      "step": "macro windows @\"\n$($( $?foo ))\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_scoped_double_colon_operand",
+      "step": "macro windows @\"\n$( $a:b:: )\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_scoped_double_colon_arithmetic",
+      "step": "macro windows @\"\n$( $a:b:: + 1 )\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_scoped_double_colon_name_operand",
+      "step": "macro windows @\"\n$( $a:b::name )\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_escaped_close_in_string",
+      "step": "macro windows @\"\n$(\"a`)b\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_escaped_open_in_string",
+      "step": "macro windows @\"\n$(\"a`(b\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_escaped_close_in_argument",
+      "step": "macro windows @\"\n$(inspect \"a`)b\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_escaped_open_in_argument",
+      "step": "macro windows @\"\n$(inspect \"a`(b\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_other_special_dollar_operand",
+      "step": "macro windows @\"\n$( $$foo )\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_other_special_caret_operand",
+      "step": "macro windows @\"\n$( $^foo )\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_escaped_inner_double_quote",
+      "step": "macro windows \"$(\"a`\"b\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_escaped_argument_double_quote",
+      "step": "macro windows \"$(inspect \"a`\"b\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_escaped_double_in_single_quote",
+      "step": "macro windows \"$('a`\"b')\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_doubled_inner_double_quote",
+      "step": "macro windows \"$(\"a\"\"b\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_doubled_argument_double_quote",
+      "step": "macro windows \"$(inspect \"a\"\"b\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_escaped_smart_inner_double_quote",
+      "step": "macro windows \"$(\"a`”b\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_doubled_smart_inner_double_quote",
+      "step": "macro windows \"$(\"a“”b\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_multiple_backtick_quote",
+      "step": "macro windows \"$(\"a```\"b\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_escaped_inner_double_quote",
+      "step": "macro windows @\"\n$(\"a`\"b\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_escaped_argument_double_quote",
+      "step": "macro windows @\"\n$(inspect \"a`\"b\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_escaped_double_in_single_quote",
+      "step": "macro windows @\"\n$('a`\"b')\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_doubled_inner_double_quote",
+      "step": "macro windows @\"\n$(\"a\"\"b\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_doubled_argument_double_quote",
+      "step": "macro windows @\"\n$(inspect \"a\"\"b\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_escaped_smart_inner_double_quote",
+      "step": "macro windows @\"\n$(\"a`”b\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_doubled_smart_inner_double_quote",
+      "step": "macro windows @\"\n$(\"a“”b\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_multiple_backtick_quote",
+      "step": "macro windows @\"\n$(\"a```\"b\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_empty_inner_double_quote",
+      "step": "macro windows \"$(\"\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_empty_inner_smart_double_quote",
+      "step": "macro windows \"$(“”)\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_empty_argument_double_quote",
+      "step": "macro windows \"$(inspect \"\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_1_before_quote",
+      "step": "macro windows \"$(\"a`\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_2_before_quote",
+      "step": "macro windows \"$(\"a``\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_3_before_quote",
+      "step": "macro windows \"$(\"a```\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_4_before_quote",
+      "step": "macro windows \"$(\"a````\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_5_before_quote",
+      "step": "macro windows \"$(\"a`````\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_6_before_quote",
+      "step": "macro windows \"$(\"a``````\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_7_before_quote",
+      "step": "macro windows \"$(\"a```````\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_8_before_quote",
+      "step": "macro windows \"$(\"a````````\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_argument_backtick_run_2_before_quote",
+      "step": "macro windows \"$(inspect \"a``\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_argument_backtick_run_4_before_quote",
+      "step": "macro windows \"$(inspect \"a````\")\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_2_before_smart_quote",
+      "step": "macro windows \"$(\"a``”)\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_4_before_smart_quote",
+      "step": "macro windows \"$(\"a````”)\"",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_plain_inner_double_quote",
+      "step": "macro windows \"$(\"text\")\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"text\")"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_space_inner_double_quote",
+      "step": "macro windows \"$(\" \")\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\" \")"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_empty_inner_single_quote",
+      "step": "macro windows \"$('')\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$('')"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_2_before_text",
+      "step": "macro windows \"$(\"a``b\")\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a``b\")"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_4_before_text",
+      "step": "macro windows \"$(\"a````b\")\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a````b\")"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_6_before_text",
+      "step": "macro windows \"$(\"a``````b\")\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a``````b\")"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_8_before_text",
+      "step": "macro windows \"$(\"a````````b\")\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a````````b\")"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_single_quote_backticks",
+      "step": "macro windows \"$('a``')\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$('a``')"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_empty_inner_double_quote",
+      "step": "macro windows @\"\n$(\"\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_empty_inner_smart_double_quote",
+      "step": "macro windows @\"\n$(“”)\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_empty_argument_double_quote",
+      "step": "macro windows @\"\n$(inspect \"\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_1_before_quote",
+      "step": "macro windows @\"\n$(\"a`\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_2_before_quote",
+      "step": "macro windows @\"\n$(\"a``\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_3_before_quote",
+      "step": "macro windows @\"\n$(\"a```\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_4_before_quote",
+      "step": "macro windows @\"\n$(\"a````\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_5_before_quote",
+      "step": "macro windows @\"\n$(\"a`````\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_6_before_quote",
+      "step": "macro windows @\"\n$(\"a``````\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_7_before_quote",
+      "step": "macro windows @\"\n$(\"a```````\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_8_before_quote",
+      "step": "macro windows @\"\n$(\"a````````\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_argument_backtick_run_2_before_quote",
+      "step": "macro windows @\"\n$(inspect \"a``\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_argument_backtick_run_4_before_quote",
+      "step": "macro windows @\"\n$(inspect \"a````\")\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_2_before_smart_quote",
+      "step": "macro windows @\"\n$(\"a``”)\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_4_before_smart_quote",
+      "step": "macro windows @\"\n$(\"a````”)\n\"@",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_plain_inner_double_quote",
+      "step": "macro windows @\"\n$(\"text\")\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"text\")"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_space_inner_double_quote",
+      "step": "macro windows @\"\n$(\" \")\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\" \")"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_empty_inner_single_quote",
+      "step": "macro windows @\"\n$('')\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$('')"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_2_before_text",
+      "step": "macro windows @\"\n$(\"a``b\")\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a``b\")"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_4_before_text",
+      "step": "macro windows @\"\n$(\"a````b\")\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a````b\")"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_6_before_text",
+      "step": "macro windows @\"\n$(\"a``````b\")\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a``````b\")"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_8_before_text",
+      "step": "macro windows @\"\n$(\"a````````b\")\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a````````b\")"
+        ]
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_single_quote_backticks",
+      "step": "macro windows @\"\n$('a``')\n\"@",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$('a``')"
+        ]
       }
     }
   ]

@@ -150,6 +150,19 @@ foreach (var fixture in observed.GetProperty("historical_gaps").EnumerateArray()
 Check(historicalCount == 25 && targets.Count == 6, "Immutable historical gap and batch target counts");
 Console.WriteLine($"Historical PS5.1 replay: {resolvedCount}/{historicalCount} known gaps now match; {historicalCount - resolvedCount} remain. This is not a new Windows qualification run.");
 
+using var embeddedObservations = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "workflow-ps51-embedded-observed.json")));
+var embeddedObserved = embeddedObservations.RootElement;
+Check(embeddedObserved.GetProperty("provenance").GetProperty("evidence").GetString() == "observed-windows-powershell-5.1", "Embedded observed evidence label");
+var embeddedObservedCount = 0;
+foreach (var fixture in embeddedObserved.GetProperty("observed_gaps").EnumerateArray())
+{
+    embeddedObservedCount++;
+    Check(Matches(LegacyWorkflowKernel.ParseStep(fixture.GetProperty("step").GetString()!), fixture.GetProperty("before")),
+        "Observed PS5.1 embedded replay: " + fixture.GetProperty("id").GetString());
+}
+Check(embeddedObservedCount == 100, "Immutable observed embedded gap count");
+Console.WriteLine($"Embedded PS5.1 replay: {embeddedObservedCount}/{embeddedObservedCount} observed results match. This is not a new Windows qualification run.");
+
 using var inferences = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "workflow-literal-inferred.json")));
 Check(inferences.RootElement.GetProperty("evidence").GetString() == "inferred-unqualified", "Inferred evidence remains distinct");
 var inferredCount = 0;
@@ -165,5 +178,7 @@ Reject("macro type-native --text @'\n" + new string('x', 65536) + "\n'@", "unsup
 var dollarPlan = Plan("--step", "macro type-native --text \"$env:PATH $(inspect)\"");
 Check(dollarPlan.GetProperty("steps")[0].GetProperty("command")[3].GetString() == "$env:PATH $(inspect)", "Dollar text stays literal plan data");
 Console.WriteLine($"Inferred managed literal contracts: {inferredCount}; Windows PowerShell 5.1 qualification remains required.");
+LegacyWorkflowKernel.CheckDiagnosticContracts(Check);
+checks += BoundaryContracts.Run();
 Console.WriteLine($"PASS: {checks} pure workflow candidate checks; no plan was executed. Full PowerShell parser parity is not established.");
 return 0;

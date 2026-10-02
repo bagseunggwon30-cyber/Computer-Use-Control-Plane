@@ -1,0 +1,468 @@
+{
+  "schema": "cucp.workflow-diagnostic-candidate/v1",
+  "provenance": {
+    "evidence": "mixed-explicit-per-case",
+    "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
+    "tested_commit": "48bb1651499d0857b4886b3f5cd8b2ed04d5e8a0",
+    "run_id": "37074340659",
+    "run_url": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37074340659",
+    "log_file": "tokenizer-next-ci-37074340659-foundation.log",
+    "log_sha256": "d7090be7d8bcb52fd4d2a2b156f862c40a5dc66a66a507374916ca009dabb53e",
+    "historical_log_line": 223,
+    "normalization": "Observed results lack exact detail/message fields. No text in this fixture claims observed diagnostic wording."
+  },
+  "cases": [
+    {
+      "id": "observed_top_level_02",
+      "evidence": "observed-windows-powershell-5.1",
+      "step": "process",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error",
+      "observed": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "observed_top_level_03",
+      "evidence": "observed-windows-powershell-5.1",
+      "step": "if",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error",
+      "observed": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "observed_top_level_08",
+      "evidence": "observed-windows-powershell-5.1",
+      "step": "macro windows (",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error",
+      "observed": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "observed_top_level_09",
+      "evidence": "observed-windows-powershell-5.1",
+      "step": "macro windows )",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error",
+      "observed": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "observed_top_level_10",
+      "evidence": "observed-windows-powershell-5.1",
+      "step": "macro windows {",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error",
+      "observed": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "observed_top_level_12",
+      "evidence": "observed-windows-powershell-5.1",
+      "step": "macro windows <# unterminated",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error",
+      "observed": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "observed_top_level_13",
+      "evidence": "observed-windows-powershell-5.1",
+      "step": "macro windows && more",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error",
+      "observed": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "observed_top_level_14",
+      "evidence": "observed-windows-powershell-5.1",
+      "step": "macro windows || more",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error",
+      "observed": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "observed_top_level_15",
+      "evidence": "observed-windows-powershell-5.1",
+      "step": "macro windows < file",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error",
+      "observed": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "inferred_unsupported_prefix_quote",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name value 'unterminated",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_unsupported_prefix_open_parenthesis",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name value (",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_unsupported_prefix_close_parenthesis",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name value )",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_unsupported_prefix_open_brace",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name value {",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_unsupported_prefix_comment",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name value <# unterminated",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_unsupported_prefix_and",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name value && more",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_unsupported_prefix_or",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name value || more",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_unsupported_prefix_input_redirect",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name value < file",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_unsupported_prefix_dollar",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name value \"${}\"",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_unsupported_prefix_here_dollar",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name value @\"\n$name:\n\"@",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_opaque_balanced_group",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows (anything)",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_balanced_block",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows { anything }",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_array",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows @('a','b')",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_hashtable",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows @{x=1}",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_block_comment",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows <# \" $(if) ( < file #>",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_line_comment",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows # \" $(if) ( < file",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_parameter",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name value",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_pipeline",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows | more",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_semicolon",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows; more",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_output_redirect",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows > file",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_literal_angles",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows a<b",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_keyword_argument",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows if process enum",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_quoted_keywords",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows 'if' 'process' 'enum'",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_escaped_keyword",
+      "evidence": "inferred-unqualified",
+      "step": "`if",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_single_dollar",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows '${} $(if)'",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_escaped_dollar",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows \"`${} `$(if)\"",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_embedded_quote",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows \"$(\"text\")\"",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_stop_raw",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows --% \"${} ( { < file ; &",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_stop_quoted_marker",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows '--%' ${} ( { < file ; &",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_stop_escaped_marker",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows `--% ${} ( { < file ; &",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_stop_quoted_pipeline",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows --% \"| ( ${} &&\"",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_stop_smart_quoted_pipeline",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows --% “| ( ${} &&”",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_escaped_group",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows `(anything`)",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_opaque_nested_comment",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows <# <# ( #> ) #>",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_later_newline_keyword",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name value\nif",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_later_semicolon_keyword",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows; process",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_later_group_keyword",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows (if)",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_later_comment_then_error",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows <# balanced #> (",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_later_line_comment_then_error",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows # balanced\n(",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_later_stop_newline",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows --% ${} (\n(",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_later_stop_pipeline",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows --% ${} ( | more (",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_later_stop_and",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows --% ${} ( && more",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_later_escaped_backtick_quote",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows -Name \"a`\"",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_continuation_keyword",
+      "evidence": "inferred-unqualified",
+      "step": "`\nif",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_continuation_argument_keyword",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows `\nif",
+      "preflight_error": ""
+    },
+    {
+      "id": "inferred_unqualified_nul_marker_raw_quote",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows --%\u0000\"unterminated",
+      "preflight_error": "unsupported_token",
+      "candidate_error": "unsupported_token",
+      "oracle_expectation": "capture-only",
+      "qualification": "Physical NUL adjacent to a cooked stop-parsing marker has no fresh Windows observation. Keep the boundary unsupported; do not claim the suffix has a parse error."
+    },
+    {
+      "id": "inferred_unqualified_nul_marker_raw_dollar",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows --%\u0000$(",
+      "preflight_error": "unsupported_token",
+      "candidate_error": "unsupported_token",
+      "oracle_expectation": "capture-only",
+      "qualification": "Physical NUL adjacent to a cooked stop-parsing marker has no fresh Windows observation. Keep the boundary unsupported; do not claim the suffix has a parse error."
+    },
+    {
+      "id": "inferred_unqualified_nul_marker_quoted_marker",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows '--%'\u0000\"unterminated",
+      "preflight_error": "unsupported_token",
+      "candidate_error": "unsupported_token",
+      "oracle_expectation": "capture-only",
+      "qualification": "Physical NUL adjacent to a cooked stop-parsing marker has no fresh Windows observation. Keep the boundary unsupported; do not claim the suffix has a parse error."
+    },
+    {
+      "id": "inferred_unqualified_nul_marker_escaped_marker",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows `--%\u0000$(",
+      "preflight_error": "unsupported_token",
+      "candidate_error": "unsupported_token",
+      "oracle_expectation": "capture-only",
+      "qualification": "Physical NUL adjacent to a cooked stop-parsing marker has no fresh Windows observation. Keep the boundary unsupported; do not claim the suffix has a parse error."
+    },
+    {
+      "id": "inferred_unqualified_nul_marker_literal_suffix",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows --%\u0000literal",
+      "preflight_error": "unsupported_token",
+      "candidate_error": "unsupported_token",
+      "oracle_expectation": "capture-only",
+      "qualification": "Physical NUL adjacent to a cooked stop-parsing marker has no fresh Windows observation. Keep the boundary unsupported; do not claim the suffix has a parse error."
+    },
+    {
+      "id": "inferred_unqualified_nul_marker_pipeline_suffix",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows --%\u0000| more (",
+      "preflight_error": "unsupported_token",
+      "candidate_error": "unsupported_token",
+      "oracle_expectation": "capture-only",
+      "qualification": "Physical NUL adjacent to a cooked stop-parsing marker has no fresh Windows observation. Keep the boundary unsupported; do not claim the suffix has a parse error."
+    }
+  ]
+}

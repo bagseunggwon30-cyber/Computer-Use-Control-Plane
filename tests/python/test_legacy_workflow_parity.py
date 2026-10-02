@@ -108,7 +108,8 @@ def normalized(value):
     if isinstance(value, list):
         return [normalized(item) for item in value]
     if isinstance(value, dict):
-        # Native diagnostics need not reproduce localized PowerShell wording.
+        # Normalized token/code evidence only. Exact localized detail/message
+        # parity remains separate debt, covered by test_legacy_workflow_diagnostics.
         return {key: normalized(item) for key, item in value.items() if key not in {"message", "detail"}}
     return value
 
@@ -315,12 +316,13 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
     def test_broad_parser_probe_never_relaxes_rejected_constructs(self):
         gaps = []
         for fixture, expected, actual in self.differential(syntax_probe_cases()):
+            # Record both sides before assertions so false acceptances remain inspectable.
+            if normalized(expected) != normalized(actual):
+                gaps.append({"step": fixture["step"], "before": normalized(expected), "after": normalized(actual)})
             with self.subTest(fixture=fixture):
                 if actual.get("ok"):
                     self.assertTrue(expected.get("ok"), "Candidate accepted a sequence rejected by PSParser")
                     self.assertEqual(actual["tokens"], expected["tokens"], "Candidate reinterpreted accepted tokens")
-                if normalized(expected) != normalized(actual):
-                    gaps.append({"step": fixture["step"], "before": normalized(expected), "after": normalized(actual)})
         if gaps:
             print("WORKFLOW PARSER NOT QUALIFIED: " + json.dumps(gaps, ensure_ascii=True))
         if os.environ.get("CUCP_REQUIRE_WORKFLOW_PARSER_PARITY") == "1":
@@ -342,13 +344,14 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
         cases = [{"kind": "parse", "step": case["step"]} for case in inferred]
         gaps = []
         for case, (fixture, expected, actual) in zip(inferred, self.differential(cases)):
+            # Record both sides before assertions so false acceptances remain inspectable.
+            if normalized(expected) != normalized(actual):
+                gaps.append({"id": case["id"], "step": fixture["step"], "before": normalized(expected), "after": normalized(actual)})
             with self.subTest(fixture=case["id"]):
                 self.assertEqual(normalized(actual), case["candidate"], "Managed candidate contract changed")
                 if actual.get("ok"):
                     self.assertTrue(expected.get("ok"), "Candidate accepted a sequence rejected by PSParser")
                     self.assertEqual(actual["tokens"], expected["tokens"], "Candidate reinterpreted accepted tokens")
-                if normalized(expected) != normalized(actual):
-                    gaps.append({"id": case["id"], "step": fixture["step"], "before": normalized(expected), "after": normalized(actual)})
         if gaps:
             print("WORKFLOW INFERRED LITERAL EDGES NOT QUALIFIED: " + json.dumps(gaps, ensure_ascii=True))
         if os.environ.get("CUCP_REQUIRE_WORKFLOW_PARSER_PARITY") == "1":

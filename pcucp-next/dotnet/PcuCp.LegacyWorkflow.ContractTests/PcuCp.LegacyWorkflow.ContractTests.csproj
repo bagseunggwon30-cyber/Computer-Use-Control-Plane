@@ -13,5 +13,8 @@
     <Compile Include="../PcuCp.NativeHost/LegacyWorkflowLiteralParser.cs" Link="LegacyWorkflowLiteralParser.cs" />
     <Content Include="../../../tests/fixtures/legacy-workflow-ps51-observed-37058066571.json" Link="workflow-ps51-observed.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../../tests/fixtures/legacy-workflow-literal-inferred.json" Link="workflow-literal-inferred.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-ps51-embedded-observed-37074340659.json" Link="workflow-ps51-embedded-observed.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-diagnostic-candidate.json" Link="workflow-diagnostic-candidate.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-boundary-candidate.json" Link="workflow-boundary-candidate.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

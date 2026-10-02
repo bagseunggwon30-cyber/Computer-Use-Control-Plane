@@ -114,14 +114,18 @@ class QualificationSelectionTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'test_legacy_workflow_parity.py'):
                     qualification.run_family('foundation')
                 self.assertEqual(calls, [])
-                (root / 'tests/python/test_legacy_workflow_parity.py').write_text('# fixture')
+                for index, name in enumerate(qualification.REQUIRED_FOUNDATION_TESTS):
+                    with self.assertRaisesRegex(ValueError, name):
+                        qualification.run_family('foundation')
+                    self.assertEqual(calls, [])
+                    (root / 'tests/python' / name).write_text('# fixture')
                 qualification.run_family('foundation')
             projects = [args[args.index('--project') + 1] for args, _ in calls if '--project' in args]
             self.assertEqual(projects, [str(root / 'pcucp-next/dotnet' / name)
                                        for name in qualification.PROJECTS['foundation']])
             self.assertIn(str(root / 'pcucp-next/dotnet/PcuCp.LegacyWorkflow.ContractTests'), projects)
             suites = [args[args.index('-p') + 1] for args, _ in calls if '-p' in args]
-            self.assertEqual(suites, ['test_migration_inventory.py', 'test_legacy_workflow_parity.py'])
+            self.assertEqual(suites, ['test_migration_inventory.py', 'test_legacy_workflow*.py'])
 
     def test_file_images_requires_and_runs_both_exact_suites_with_matching_dll(self):
         with tempfile.TemporaryDirectory() as temp:
