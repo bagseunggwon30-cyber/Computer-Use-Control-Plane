@@ -101,6 +101,19 @@ def fixtures():
                                                        ('uİa_pattern', 'uıa_pattern', 'vİsİon_precİse')):
         f = add(culture=culture, rest=['--probe-uia', '--label', 'é', '--label', 'e\u0301', '--label', '가', '--label', '가', '--label', 'I', '--label', 'i'], history=dict(strategy=strategy))
         f['windows'][0]['process'] = process
+    # -replace uses case-insensitive regex even after invariant lowercasing.
+    # Preserve the exact original key and classification, including characters
+    # whose regex folding differs from NLS equality or ordinary ASCII matching.
+    for culture, field, value in itertools.product(('en-US', 'ko-KR', 'tr-TR', ''),
+                                                   ('process', 'class', 'title'),
+                                                   ('appİ', 'appı', 'appſ', 'İıſK', 'i\u0307', 'é e\u0301',
+                                                    'fİrefox', 'fırefox', 'wİndſurf', 'wİnword', 'wınword',
+                                                    'Chrome_WidgetWİn_1', 'Chrome_WidgetWın_1')):
+        f = add(culture=culture, rest=['--no-probe'])
+        # Neutralize the base notepad identity so title/class fixtures actually
+        # determine browser/document classification rather than being masked.
+        f['windows'][0].update(title='Fixture', process='fixture', **{'class': 'Fixture'})
+        f['windows'][0][field] = value
     for case in copy.deepcopy(cases[:12] + cases[76:82]):
         case['brief'] = True
         cases.append(case)

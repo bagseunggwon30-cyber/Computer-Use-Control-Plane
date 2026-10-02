@@ -311,7 +311,19 @@ internal static class LegacyAppProfileKernel
         else notes.Add("Generic Win32 route: try UIA actions first, then guarded precision points, then OCR only when labels are not exposed.");
         if (T(uia) && !T(P(uia, "available"))) notes.Add("UIA probe found no exposed affordances; expect OCR or guarded coordinate routes to matter more for this app.");
         else if (T(uia) && I(P(uia, "small_icon_count")) > 0) notes.Add("UIA probe found small icon affordances; precision-point routes are useful for tiny toolbar controls.");
-        string appKey = string.Join("|", new[] { process, @class, appType }.Select(s => Regex.Replace(s.Trim().ToLowerInvariant(), "[^a-z0-9_.-]+", "-", RegexOptions.None, TimeSpan.FromSeconds(1))).Where(s => s.Length > 0));
+        string KeyPart(string value)
+        {
+            // PowerShell -replace remains case-insensitive after ToLowerInvariant.
+            // Non-ASCII case equivalents can therefore survive the ASCII range.
+            var previous = CultureInfo.CurrentCulture;
+            try
+            {
+                CultureInfo.CurrentCulture = culture;
+                return Regex.Replace(value.Trim().ToLowerInvariant(), "[^a-z0-9_.-]+", "-", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+            }
+            finally { CultureInfo.CurrentCulture = previous; }
+        }
+        string appKey = string.Join("|", new[] { process, @class, appType }.Select(KeyPart).Where(s => s.Length > 0));
         if (appKey.Length == 0) appKey = "unknown-app";
         object? history = noHistory ? null : Query("history", appKey);
         if (T(history)) notes.Add($"Last good app strategy found in app-strategy history: {S(P(history, "strategy"))}.");

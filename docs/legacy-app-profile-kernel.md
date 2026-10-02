@@ -77,6 +77,10 @@ truth conversion, malformed/fractional/hex/overflow numeric options and handles,
 CDP reply/status/page-count variants, UIA role ties and synonyms, history errors,
 explicit recording gates and failures, brief/JSON, and en-US/ko-KR/tr-TR/invariant
 culture with Turkish-I, combining accents and Korean normalization variants.
+The app-key sanitizer retains PowerShell's default case-insensitive `-replace`
+under the requested culture even after invariant lowercasing. Separate Unicode
+process/class/title cases exercise exact history-key argv and classification
+without assuming regex folding, NLS equality and wildcard matching coincide.
 Failures must be preserved and repaired in the candidate; never loosen the
 original comparison or replace it with a success-only subset.
 
