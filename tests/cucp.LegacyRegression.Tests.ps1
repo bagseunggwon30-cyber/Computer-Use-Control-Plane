@@ -10,6 +10,10 @@ $wrapperAst = [System.Management.Automation.Language.Parser]::ParseFile($wrapper
 if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
 $helperAst = [System.Management.Automation.Language.Parser]::ParseFile($helperPath, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+$cdpPath = Join-Path $repoRoot "scripts/cucp-legacy-cdp-adapter.ps1"
+$cdpAst = [System.Management.Automation.Language.Parser]::ParseFile($cdpPath, [ref]$tokens, [ref]$parseErrors)
+if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+$Script:LegacyCdpSourceRoot = $repoRoot
 
 function Get-LegacyFunctionText {
   param($Ast, [string]$Name)
@@ -20,9 +24,12 @@ function Get-LegacyFunctionText {
   return $found[0].Extent.Text
 }
 foreach ($name in @("_Invoke-LegacyCompatibility", "_Read-OptValue", "_Read-Switch", "_Parse-WorkflowStepTokens", "_Read-WorkflowStepSpecs",
-    "_Build-WorkflowPlan", "Invoke-MacroCdpEval", "Invoke-MacroSafeType", "Invoke-MacroClickPoint",
+    "_Build-WorkflowPlan", "Invoke-MacroSafeType", "Invoke-MacroClickPoint",
     "Invoke-MacroBenchmark", "Invoke-MacroPrecisionValidate")) {
   . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $wrapperAst -Name $name)))
+}
+foreach ($name in @("_Invoke-LegacyCdpBridge", "_Invoke-LegacyCdpMacro", "Invoke-MacroCdpEval")) {
+  . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $cdpAst -Name $name)))
 }
 function Invoke-NativeHelper { param([string[]]$ArgList) throw "Live helper must be mocked" }
 function _Classify-SafetyFromText { param($Text, $MacroName) return @{ requires_explicit_confirmation=$false } }
@@ -65,7 +72,7 @@ Describe "legacy command boundaries" {
   }
   It "blocks arbitrary JavaScript before touching a CDP target" {
     Mock Invoke-NativeHelper { throw "Must not execute" }
-    { Invoke-MacroCdpEval -Rest @("--expr", "document.body.remove()") } | Should -Throw
+    { Invoke-MacroCdpEval -Rest @("--expr", "document.body.remove()") } | Should -Throw "*requires -AllowLiveControl*"
     Assert-MockCalled Invoke-NativeHelper -Times 0 -Exactly
   }
   It "classifies cdp-eval as a live workflow step" {

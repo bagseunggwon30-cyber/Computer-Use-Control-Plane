@@ -1,194 +1,156 @@
-# Legacy precision family candidate
+# Legacy precision family runtime
 
-This candidate moves the cohesive coordinate-anchor, point-plan, target-validate,
-anchor-history scoring, point-cache identity, and validation calculations into
-`pcucp-next/dotnet/PcuCp.LegacyPrecision`. The differential oracle is the immutable
-Git tree `bf895d3120dd5e145f360cb1c41e1d79a061d048`, `scripts/cucp.ps1`.
+Coordinate-anchor, point-plan, target-validate, anchor-history scoring, cache
+identity, and validation calculations run in
+`pcucp-next/dotnet/PcuCp.LegacyPrecision`. The 15 original PowerShell function
+bodies in `scripts/cucp.ps1` have been replaced by the qualified adapters, with
+14 shared precision transport functions inserted once. The duplicate adapter
+fixture has been removed, and `.github/migration-adapters.json` selects the
+production source for precision qualification.
 
-No existing PowerShell implementation is removed by this candidate. Production
-registration, the actual retained adapters, and their Windows gate must qualify
-before retirement. A successful Linux build does not qualify Windows PowerShell
-semantics or desktop behavior.
+PowerShell still supplies retained window/UIA acquisition and exact legacy JSON
+formatting. The planners do not actuate input. The immutable differential oracle
+remains tree `bf895d3120dd5e145f360cb1c41e1d79a061d048`, `scripts/cucp.ps1`.
 
-## Interfaces and authority
+## Runtime and authority
 
-`LegacyPrecisionKernel.Advance(operation, args)` is a deterministic captured-reply
-oracle interface. Its operations are `coord-anchor`, `point-plan`,
-`target-validate`, `history-read`, `history-distance`, `history-score`,
-`cache-key`, `confidence-rank`, `size-class`, `edge-distance`, and
-`child-plan-envelope`.
+`LegacyPrecisionKernel.Execute(operation, args, IPrecisionReadEffects)` runs one
+complete planner invocation in-process. Its seven fixed read interfaces acquire
+a coordinate map, hit test, coordinate profile, hit scan, child point plan,
+history lines, or cache entry. Typed point, scan, and child-plan records carry
+only those parameters. There is no generic command, shell, or input effect.
+Acquisition retains `_Build-CoordMap`, `_Native-HitTestPoint`,
+`_Build-CoordProfile`, and `Invoke-NativeHelper`. Casing and command-token rules
+use the qualified `LegacyTextKernel`; the `LegacyCoordinateKernel` API remains
+unchanged. Child point-plan acquisition calls the planner directly and captures
+Console output, without a PowerShell child launcher.
 
-The macro operations accept the original `rest` tokens plus explicit
-`cache_seconds`, `brief`, `elapsed_ms`, `now`, `history_file`, `history_max`,
-`cache_dir`, and `captured_replies` seams. Replies require exactly `kind`, `args`,
-and one of `result` or `error`; duplicated/unknown fields, reordered observations,
-changed argument values, and unused replies fail closed. Arrays stay actual JSON
-arrays. An object containing `value` and `Count` is not an array wrapper.
+The NativeHost command `legacy-precision-session` accepts no additional CLI
+arguments. One strict UTF-8 reader serves startup and replies independently of
+the inherited console code page. `ReadStartup` bounds input to 4,194,304 characters
+before parsing. Exactly one initial U+FEFF is permitted for Framework's redirected
+input encoder; repeated, embedded, and later-frame BOMs are rejected.
 
-`LegacyPrecisionKernel.Execute(operation, args, IPrecisionReadEffects)` runs the
-same algorithms in one process. Its seven fixed read interfaces acquire a
-coordinate map, hit test, coordinate profile, hit scan, child point plan, history
-lines, or cache entry. Typed point/scan/child-plan records carry only the parameters
-for those operations. The interface has no generic command, shell, macro, or input
-actuation method. The coordinate-map provider should call the already qualified
-`LegacyCoordinateKernel.Map` after acquiring its snapshot; this candidate does not
-change that kernel's API. Casing and command-token rules use `LegacyTextKernel`.
-
-The production transport is `LegacyPrecisionSession`, exposed through the dedicated
-`legacy-precision-session` host command. `ReadStartup` reads a maximum of 4,194,304
-characters before parsing; the caller must not call an unbounded `ReadLine` first.
-One leading U+FEFF is accepted only at the beginning of this startup line for
-Framework's redirected-input encoder. Repeated/embedded BOMs and BOMs in later
-reply frames are rejected; the same character bound still applies.
-The startup schema is `cucp.precision-session/v1` with exactly `schema`, `operation`,
-`args` (tagged wire value), and `culture`. Planner arguments are exactly `rest`,
+Startup schema `cucp.precision-session/v1` requires exactly `schema`, `operation`,
+`args` (a tagged wire value), and `culture`. Planner operations are `coord-anchor`,
+`point-plan`, and `target-validate`. Their arguments are exactly `rest`,
 `cache_seconds`, `brief`, `now`, `history_file`, `history_max`, `cache_dir`, and
-`elapsed_ms`. The same command permits the eight pure helper operations listed
-above; those immediately complete without filesystem/read effects. The 500-record
-helper fixture exceeds 1MiB but remains below the explicit startup limit. Larger
-startup values fail before any persistence; no truncation or fallback occurs.
+`elapsed_ms`. Eight pure helpers also use this command: `history-read`,
+`history-distance`, `history-score`, `cache-key`, `confidence-rank`, `size-class`,
+`edge-distance`, and `child-plan-envelope`. Helpers complete without read or
+filesystem effects. The 500-record helper fixture exceeds 1MiB and stays below
+the startup limit; larger inputs fail rather than being truncated.
 
 Effect replies use independent 48KiB byte chunks and the shared
-`LegacyExecutionWire` scalar/array/object tags. The precision session imports no
-execution authority, coordinator, or actuator. Sequence, frame shape, and tagged
-value types are validated. Large history observations are acquired once and are
-not resent; a tested history reply exceeds 2MiB.
+`LegacyExecutionWire` scalar, array, and object tags. Precision imports no execution
+authority or coordinator. Frame fields, sequence, and tagged types are checked.
+PowerShell returns preserve real arrays, including empty, singleton-null, and
+nested arrays. Objects with `value` and `Count` properties remain objects.
+History observations are acquired once; a tested reply exceeds 2MiB without
+replaying earlier replies or echoing history in the result.
 
-The complete result contains `payload`, `exit`, `brief`, `json_depth`, `queries`,
-and zero or one terminal `effects`. `cache-write` binds to the retained complete
-payload. `history-append` binds its boolean outcome to
-`payload.reuse_history.recorded`. The session owns a single Stopwatch, stops it after acquisition/assembly, and
-updates the retained elapsed field and brief token before projection/rendering.
-For legacy depth cutoffs it walks the exact retained write value at depth 10/14;
-only cutoff subtrees request the fixed invariant `LanguagePrimitives.ConvertTo`
-string conversion. Every other field, value, array, and property must match the
-prepared serialized JSON recursively. The caller renders the complete Console,
-including both history-success/failure variants, before requesting persistence.
-A SHA-256 receipt binds the exact serialized bytes; the terminal acknowledgement
-cannot alter the record, key, or destination. All possible bounded commit frames
-are serialized before writing. A broken stream after persistence produces an
-uncertain outcome and never a retry or newly assembled report.
-The in-process interface avoids repeated large frames entirely. The legacy bridge
-has a smaller transport budget than the candidate's 4MiB fixture input budget;
-large production observations must use the in-process coordinator.
+## Persistence boundary
+
+Completion contains `payload`, `exit`, `brief`, `json_depth`, `queries`, and zero
+or one terminal `effects`. A cache write binds to the complete payload; a history
+append binds its result to `payload.reuse_history.recorded`. Initial script
+configuration fixes the history path, maximum, and cache directory. Terminal
+messages cannot replace those destinations or request new effects.
+
+The session owns one Stopwatch, stopping it after acquisition and assembly. It
+sets elapsed fields before projection and rendering. Legacy depth cutoffs use
+depth 10 for history and 14 for cache; only cutoff subtrees request the fixed
+invariant `LanguagePrimitives.ConvertTo` string conversion. All remaining
+properties, arrays, values, and types must match the prepared JSON.
+
+The adapter renders all final Console variants before persistence, including
+history success and failure. A SHA-256 receipt binds the exact serialized bytes.
+Every possible bounded commit reply is serialized before writing. After a write,
+the session emits only the prebuilt outcome; a broken stream produces an uncertain
+outcome without retrying persistence or assembling a new report.
 
 `LegacyPrecisionStorage` is separate from the pure registry. Its constructor fixes
-the history file, cache directory, and clock. It permits only those files and
-32-character lowercase MD5 cache keys. It implements missing/corrupt-cache misses,
-TTL boundary/future-clock behavior, UTF-8 BOM/newline writing, history append and
-tail trimming, and legacy suppressed write failures. The separate `legacy-precision-storage` command calls `RunStorage`, with schema
-`cucp.precision-storage/v1`. Its exact allowlist is `history-lines`,
-`history-file-read`, `history-file-score`, `history-append`, `cache-read`,
-`cache-path`, and `cache-write`. The planner/helper command rejects these storage
-operations. Paths and configuration are fixed by the validated startup, and its
-write replies are prebuilt before persistence. Serialization is supplied as
-an explicit boundary: staged adapters retain PS5 `ConvertTo-Json` depth/formatting
-until a standalone serializer has its own qualification. Storage operations must
-not be added to the pure compatibility dispatcher.
+the history file, cache directory, and clock. Cache keys must be 32 lowercase MD5
+characters. It preserves cache TTL and future timestamps, UTF-8 BOMs and newlines,
+history trimming, and suppressed legacy write failures.
+
+The separate `legacy-precision-storage` command calls `RunStorage` with schema
+`cucp.precision-storage/v1`. It permits only `history-lines`, `history-file-read`,
+`history-file-score`, `history-append`, `cache-read`, `cache-path`, and `cache-write`.
+The planner command rejects those storage operations. Storage replies are also
+prepared before writing. Retained PowerShell `ConvertTo-Json` supplies exact
+legacy file formatting. Precision planners and filesystem operations are not
+registered under `legacy-compat`.
 
 ## Behavior retained
 
-- Source screen points must be positive, while mapping snapshots retain negative
-  desktop/window origins and visible clipping. Anchor normalization uses six-digit
-  midpoint-to-even rounding and preserves the selected window's original geometry
-- Point-plan performs hit-test, then coordinate profile, then cache lookup when
-  the precheck permits it, then hit-scan on a miss. A specified mismatching target
-  prevents both scan and cache write. Cache identity includes current root HWND,
-  title, process, and coordinate signature
-- Point-plan keeps its legacy permissive `safe_to_act` result. Target-validate
-  applies the stronger target guard, confidence, high-coordinate-risk, tiny/large
-  element, and inside-rectangle checks. An edge warning alone remains advisory
-- History score uses exact and normalized-near matches, legacy duplicate handling,
-  recent signature comparison, safety ratio, score clamp, and original advice.
-  History writes occur only for explicit record/learn flags and are suppressed by
-  `--no-history`; disabled history does not query the file
-- All planners retain commands as data. None executes `recommended_command`, moves
-  the pointer, clicks, types, opens an authenticated service, or changes permissions
-- PS5 no-output acquisition values remain false during planning and serialize as
-  empty objects when retained as evidence. Ordinary JSON nulls inside returned
-  objects remain null. Object-property array stringification uses `System.Object[]`,
-  and a replaced history `recorded` property moves to the end in raw Console JSON
+- Source screen points must be positive. Acquired geometry retains negative
+  desktop origins and clipping; anchor normalization rounds to six digits using
+  midpoint-to-even rounding
+- Point-plan acquires hit-test, coordinate profile, eligible cache lookup, then
+  hit-scan on a miss. A specified mismatching target prevents scan and cache write
+- Cache identity includes root HWND, title, process, and coordinate signature.
+  Legacy cache payloads keep their schema, including no schema. The adapter accepts
+  that completion only after its matching observed cache read, with the same key,
+  boolean `from_cache=true`, and no terminal effects
+- Target-validate applies guards, confidence, coordinate risk, target size, and
+  inside-rectangle checks. An edge warning remains advisory; point-plan retains
+  its original more permissive `safe_to_act` result
+- History scoring preserves exact/near overlap, duplicates, signature checks,
+  safety ratios, score clamps, and advice. Explicit record/learn flags authorize
+  history writes; `--no-history` suppresses both reading and recording
+- History trimming preserves negative-index wrapping and drops out-of-range
+  indices, including repeated valid indices produced by a maximum of one
+- PS5 no-output acquisition is false during planning and renders as an empty
+  object when retained as evidence. JSON null properties stay null. Object-member
+  arrays stringify as `System.Object[]`; replacing `recorded` moves it to the end
+- Recommended commands remain data. No planner clicks, types, or moves the pointer
 
-## Qualification
+## Qualification and integrated gate
 
-Run the isolated contracts with an installed SDK:
+The exact family passed Windows qualification at commit
+`e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe` in
+[run 37007340738, precision job 110838651637](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37007340738/job/110838651637):
+
+- 509 isolated C# assertions and 21 Python tests, with no skips
+- 174 candidate planner cases and 174 exact actual-adapter cases
+- 138 helper cases and eight byte-for-byte filesystem cases
+- 14 tagged codec values and three native parent-code-page cases
+- Ordered observations, every query prefix, full payloads, errors, exits, brief
+  output, and raw Console comparisons; only elapsed/clock seams are normalized
+- Large history, malformed transport, rejected precommit changes, write failure,
+  and bounded terminal persistence checks
+
+Artifact `11226236687` contains logs and the normalized source map. All 235
+production and 29 draft function extents were independently rehashed before
+promotion. The 29 promoted precision bodies match the qualified draft exactly
+and occur once. The codec test follows the promotion manifest, so it checks
+`scripts/cucp.ps1` after precision is enabled.
+
+That family result qualifies the exact runtime and adapters before integration.
+The promoted source must still pass the production precision gate and the bundled
+full regression on the exact integrated commit. Neither local Linux checks nor
+the earlier family result establishes that integrated result.
+
+Run isolated checks with an installed SDK:
 
 ```text
 dotnet run --project pcucp-next/dotnet/PcuCp.LegacyPrecision.ContractTests -c Release -- --self-test
 python -m unittest discover -s tests/python -p "test_legacy_precision*.py" -v
 ```
 
-The contract runner also consumes a JSON array of `{operation,args}` requests on
-stdin. `CUCP_PRECISION_DOTNET` can select the SDK executable used by Python tests.
-The test-only `storage-fixture` operation is restricted to explicitly named system
-temporary directories and is absent from the production kernel.
+On Windows, run `python pcucp-next/packaging/migration_qualification.py run --family precision`.
+The runner builds the matching host and enables production checks through
+`CUCP_PRECISION_TEST_HOST`. `CUCP_PRECISION_DOTNET` optionally selects the SDK used
+by Python tests. A skipped Windows or adapter test is not qualification evidence.
 
-The Windows candidate suite extracts the actual functions from the pinned tree,
-stubs only external acquisition, and compares full unformatted payloads, ordered
-queries, every query prefix, errors, exits, brief text, and raw Console output.
-The Console comparison independently reuses PS5's retained serializer: a depth
-truncated Console value never substitutes for the full payload oracle. Only
-explicit elapsed and fixed clock seams are normalized. Separate helper tests
-cover history scoring, confidence thresholds, geometry edges, and cache keys.
-Filesystem fixtures compare generated bytes, BOMs/newlines, timestamps/TTL,
-trimming, and failed cache writes against the original functions.
+`LegacyPrecisionKernel.Advance` remains the deterministic captured-reply oracle.
+Replies require exactly `kind`, `args`, and one of `result` or `error`; unknown or
+duplicate fields, changed arguments, reordered observations, and unused replies
+fail closed. The contract runner accepts JSON request arrays on stdin. Its
+`storage-fixture` operation is restricted to named temporary directories and is
+absent from production.
 
-`CUCP_PRECISION_TEST_HOST` enables the additional actual-adapter gate against the
-matching native host. The focused runner uses the exact real PowerShell fixture
-`tests/fixtures/legacy-precision-adapter.ps1` before production promotion, selected
-with `CUCP_PRECISION_ADAPTER_DRAFT`. This retains the pinned acquisition oracle
-while qualifying the session and separate storage command in the same Windows run.
-No pure compatibility registry addition is required. A skipped adapter test is not
-evidence that an adapter qualified. The fixture is counted in the PS inventory
-and is removed when its glue is promoted; current production bodies are retained.
-
-The suite does not operate a live desktop. Real mixed-DPI/window-race and UIA
-provider behavior remain responsibilities of the acquisition layer and later
-Windows acceptance tests. The candidate's successful unit tests do not replace
-that evidence.
-
-The first combined Windows run at commit
-`120b64a605bece965da4637e6510afcbd46fe871` passed 494 isolated contracts, helper
-differentials, and all 11 transport tests. It exposed three candidate payload
-differences and twelve raw Console differences; the no-output, object-string,
-and property-order fixes above address those exact differences. Actual adapters
-rejected their first startup output, and the retained filesystem oracle exceeded
-its 90-second limit. The next gate keeps exact comparisons and adds a bounded
-initial-frame diagnostic, a Framework child-input byte characterization, and
-noninteractive storage-oracle stage diagnostics. These repairs remain unqualified
-until that Windows run passes.
-
-At repaired commit `a7bffa18b8325fe06f00459324c1f3631f2c896a`, all 174 planner
-cases now pass the candidate payload, Console, error, exit, ordered-query, and
-query-prefix comparisons. Helper differentials, 507 C# assertions, and all 13
-transport tests also pass on Windows. Actual adapters still fail before the first
-acquisition: their native startup error reports byte `0xE2`, because incoming
-UTF-8 is being decoded through the inherited console code page. The production
-entry therefore needs one strict UTF-8 reader shared by startup and replies;
-the new ingress fixture tests CP437 and UTF-8 parents with and without BOMs.
-The storage oracle completed every file operation and timed out while serializing
-test-only `Get-Content` provider metadata. Its line inspection now uses plain
-`File.ReadAllLines` values; exact generated-byte comparisons remain unchanged.
-Actual-adapter and filesystem qualification are still pending the next gate.
-
-At `f2333bebd53e28e59a05795abfeb90275dc67d09`, UTF-8 startup and all three native
-console-code-page cases pass. Candidate/helper comparisons remain green, and the
-filesystem oracle completes with seven of eight cases passing. The remaining
-adapter failures expose PS5 `Write-Output -NoEnumerate` array decoration at the
-tagged decoder boundary; terminal semantic equality correctly rejects affected
-cache writes. Decoder returns now preserve a single true value with unary comma,
-with a 14-value Windows codec test covering empty, singleton-null, nested arrays,
-Unicode, scalars, and genuine objects named `value`/`Count`. No object-shaped
-wrapper inference is used. The remaining filesystem fix drops out-of-range
-negative multi-index selections for a configured maximum of one, preserving the
-legacy repeated valid indices. These repairs await the next actual Windows gate.
-
-At `ad8790be0301b5e77ca87d841718bf0fac8fb1e9`, all 509 contracts, candidate and
-helper comparisons, codec cases, native ingress, persistence tests, and all eight
-filesystem fixtures pass on Windows. Four actual-adapter cases remain: original
-point-plan cache hits retain cached objects without requiring a planner schema.
-The adapter now accepts that completion only after the observed matching cache
-read, with the same cache key, true `from_cache`, and zero terminal effects.
-All four original full comparisons are retained for the next gate. The qualified
-source-map artifact from this run includes normalized hashes and UTF-16 function
-extents; promotion must use a map matching the final qualified adapter revision.
+The suite stubs external acquisition and does not operate a live desktop.
+Mixed-DPI/window-race and provider behavior remain responsibilities of the
+acquisition layer and later Windows acceptance tests.

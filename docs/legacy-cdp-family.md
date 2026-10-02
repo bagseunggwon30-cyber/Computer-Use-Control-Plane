@@ -1,10 +1,12 @@
-# Legacy CDP family migration candidate
+# Legacy CDP family and retained host integration
 
 The complete legacy browser family has a Python implementation and used JavaScript
 assets under `pcucp-next/python/pcucp_cli/legacy_cdp*`. It is independent of the modern
-`CdpAdapter` public contract. No PowerShell source was removed or redirected by this
-slice. **Retirement is blocked on Windows differential, real sandboxed-browser
-qualification, and the shared host serializer/adapter qualification.**
+`CdpAdapter` public contract. Both retained PowerShell hosts now load the single
+`scripts/cucp-legacy-cdp-adapter.ps1`; original CDP bodies and the duplicate draft
+fixture are removed. Focused candidate qualification passed at `e9e015c6`.
+**The integrated production/full regression and Windows bundle gate are the next
+required validation; this source cutover is not yet a qualified release.**
 
 ## Host interfaces
 
@@ -59,8 +61,9 @@ A host must execute that trajectory through its existing authorized logging rout
 requires an injected `json_formatter(payload, depth)`: retaining the shared host's
 PS5-compatible formatter preserves depth truncation, property order, whitespace,
 raw-helper serialization and Console behavior. No `json.dumps` imitation is
-silently substituted. The shared formatter and final macro dispatch are outside
-this family. The wrapper differential uses the same retained serializer on the
+silently substituted. The shared formatter remains in the retained host; the
+public CDP macro names now resolve to the shared adapter's fixed delegates.
+The wrapper differential uses the same retained serializer on the
 independently produced payload and compares exact Console strings as well as
 native queries, trajectory payloads and exits.
 
@@ -115,8 +118,8 @@ native queries, trajectory payloads and exits.
    `resp.result.result.value` although `_Cdp-WsCall` returns `resp.response`.
    ProseMirror has the same response-envelope error and historically reaches
    `selector_not_found` even with a real focus reply. New code intentionally fixes
-   these defects. Pinned tests characterize the old failures separately; real
-   corrected success paths must pass browser tests before retirement.
+   these defects. Pinned tests characterize the old failures separately; owned
+   browser tests qualify the corrected success paths.
 5. Corrected ProseMirror also verifies contenteditable state and actual focus
    before `Input.insertText`, stops after domain/focus transport loss, and checks
    the final reply. It preserves old before/after fields and helper's unchanged
@@ -128,16 +131,64 @@ native queries, trajectory payloads and exits.
    Malformed or oversized discovery/protocol responses fail rather than becoming
    successful empty data. Arbitrary exception strings from the old .NET network
    stack are not reproduced by the Python transport.
+7. Public matching now intentionally excludes form `value` attributes/properties
+   and SCRIPT/STYLE/NOSCRIPT/TEMPLATE elements and descendants. This applies before
+   scoring in smart read, live smart and deep read, so rejected text cannot enter
+   `matched_text`, candidate summaries, locator strings, brief output or smart
+   trajectory logs. The only value exception is the current rendered caption of a visible
+   `input` whose type is `button`, `submit` or `reset`; password/hidden inputs,
+   hidden captions, and ordinary filled-field values receive no such exception.
+   A stale button value attribute is never used; a property-only current caption
+   remains searchable. Descriptive labels and ordinary non-source page text remain readable. This is
+   a source-based filter, not a promise to recognize arbitrary secrets deliberately
+   displayed as labels or ordinary page text.
 
-## Shared-reference audit
+   TEXTAREA text is a form value too: its initial/default content can remain in
+   `innerText`/`textContent` after the current `.value` changes. Direct extraction
+   and ancestor reconstruction therefore skip its text subtree. The textarea
+   itself remains an eligible labeled type target: its id, placeholder, descriptive
+   metadata, external/wrapping labels and input behavior are retained. Neither
+   `.value` nor `.defaultValue` is read as a matching signal. This closes the
+   aggregate/default-value alias; it is not a blanket textarea candidate exclusion.
 
-Do not delete `Test-CdpPortQuick` merely because direct CDP wrappers migrated:
-`Invoke-MacroSmartPlan`, `Invoke-MacroHealthDetail`, and `Invoke-MacroSmartClick`
-also use it, including CDP stage zero and compatibility-query acquisition.
-`_Js-StringLiteral` is shared across this native CDP family. `_Cdp-Detect`,
-`_Cdp-FindPage`, `_Cdp-WsCall` and bridge helpers must remain until every native
-CDP action is switched and qualified. Modern `cdp.py`, central dispatch, PowerShell
-sources and CI configuration were not modified by this slice.
+   Source-containing ancestors cannot use aggregate text getters: their text is
+   rebuilt by a fixed, read-only walk that skips excluded subtrees. Unaffected
+   elements retain their native text strings. The filtered walk preserves text
+   order, rendered line/block separators and label association, with at most
+   1,200 visited/queued entries; a budget overflow yields no aggregate text and
+   never falls back to raw source. More than 128 ancestry links are excluded.
+   Mandatory `throwOnSideEffect`, `awaitPromise:false`, timeout, endpoint and
+   authority checks are unchanged. New DOM getters require the owned-browser gate.
+
+   Matching solely on a stored value or source text now gives no candidate; mixed
+   matches can change scores, ordering, counts and selected targets. These are
+   explicit privacy corrections, separate from unchanged ordinary parity. The
+   old deep JS also collected these values, but its original broken envelope hid
+   the result; correcting the envelope made that exposure publicly reachable.
+   Normal parsed `template.content` was never traversed and remains untraversed.
+   TEMPLATE fixtures with source text model ordinary DOM children, which can be
+   attached programmatically and are now excluded along with that entire subtree.
+
+## Retained host architecture and shared references
+
+Both hosts derive `$Script:LegacyCdpSourceRoot` from their trusted script location
+and load the one shared adapter. `Invoke-NativeHelper` validates the leading
+`-Action` pair and intercepts every `cdp-` prefix before the old helper lookup,
+server, cache or untyped child path. The closed Python parser receives all argv
+as data, while live authority comes separately from the outer startup state.
+Standalone native-helper calls use the typed optional `[hashtable]$CdpStartup`
+with one actual boolean `allow_live_control` value. Public wrapper and daemon
+calls use the direct interceptor. See the
+[host contract](legacy-cdp-adapter-draft.md) for startup, process bounds and exact
+production-route tests.
+
+`Test-CdpPortQuick` remains for SmartPlan, HealthDetail and execution acquisition,
+including CDP stage zero. The audit found no references to the old `_Cdp-*`
+helpers or `_Js-StringLiteral` outside the migrated native CDP family; those old
+implementations are removed with the action bodies. Shared delegates preserve
+the ten public macro and ten native action names. The modern `cdp.py` contract
+is unchanged. The retained adapter, shared serializer and host initialization
+are still PowerShell and count in the source inventory.
 
 ## Validation and retirement gates
 
@@ -152,6 +203,13 @@ CUCP_LEGACY_CDP_BROWSER_TEST=1 CUCP_CHROME_TEST=1 python -m unittest discover -s
 - A Node-only test harness runs 22 original and migrated DOM algorithms against
   identical owned DOM/layout/event fixtures, comparing complete results and
   effects. This is test-only; production needs no Node interpreter.
+- A separate privacy suite characterizes 32 original JS exposures and checks the
+  corrected public payload, full/partial result, brief and trajectory boundaries.
+  It preserves visible button captions and ordinary labels, exercises traversal
+  overflow without fallback, and distinguishes inert template content from
+  ordinary TEMPLATE children. Existing ordinary parity assertions are unchanged.
+  Eleven additional textarea cases distinguish default/current values and ancestor
+  text, while exact labeled textarea read/type fixtures preserve legitimate use.
 - Windows PS5 tests extract exact functions from pinned tree
   `bf895d3120dd5e145f360cb1c41e1d79a061d048`, stub only external acquisition, and
   compare helper outputs/exits, ranking and plans. Wrapper cases compare native
@@ -164,14 +222,20 @@ CUCP_LEGACY_CDP_BROWSER_TEST=1 CUCP_CHROME_TEST=1 python -m unittest discover -s
   No account, remote page, existing browser profile or desktop is touched.
   One additional bounded diagnostic test records each fixed read primitive's
   guarded acceptance/rejection, including complete smart and deep algorithms;
-  it does not relax or replace any of the five behavior assertions.
+  it does not relax or replace any of the five behavior assertions. The seventh
+  browser test compares 52 CSS identifier strings with the native fixture oracle.
+  Four additional privacy tests cover full read/live outputs and prove that
+  protected-value and affected ancestor aggregate getters are not invoked. The
+  textarea case checks external/wrapping labels, real input, retained private
+  defaults and untouched value/default/aggregate getters. The diagnostic test also
+  records the new guarded parent/child/text-node getters.
 
 Local 2026-10-02: mock and Node fixture checks passed; Windows tests are explicitly
 skipped off Windows. All five enabled browser attempts failed at Chrome startup:
 `process_singleton_posix.cc: socket() failed: Operation not permitted`.
 No browser assertions ran locally. No sandbox bypass was attempted. Passing
-ordinary guarded read tests in sandbox-capable CI is a retirement prerequisite;
-  if V8 rejects ordinary operations, that remains a feature blocker to solve.
+ordinary guarded read tests in sandbox-capable CI remains required. The successful
+CI results below establish that qualification without bypassing the local sandbox.
 
 Exact commit `120b64a605bece965da4637e6510afcbd46fe871`, Actions run
 `36997186053`, established that all three live-input/getter-protection browser
@@ -179,8 +243,8 @@ cases pass, while the rendered and shadow/frame cases fail at guarded smart
 evaluation with `EvalError: Possible side-effect in debug-evaluate`. Deep was not
 reached by the latter case. Windows also exposed host framing/output defects,
 detect's ignored page-match option, unstable equal-page sorting, and the original
-click partial-branch command error. Repairs and primitive diagnostics require a
-new exact-commit qualification; none of these failures authorize retirement.
+click partial-branch command error. Those failures blocked promotion until the
+repairs passed the later exact-commit qualification below.
 
 The next exact commit `a7bffa18b8325fe06f00459324c1f3631f2c896a`, run
 `37000162419`, passed Windows CDP qualification: 49 tests, 42 passed and seven
@@ -199,7 +263,35 @@ NUL, quotes/backslashes, BMP, supplementary Unicode and isolated surrogates.
 The exact production function passes guarded V8 Node evaluation against explicit
 expected strings; an owned-browser fixture compares it with native `CSS.escape`
 using explicit fixture-only live authority. That browser gate and the original
-five functional tests must pass at the next exact commit before qualification.
+five functional tests passed at exact commit
+`f2333bebd53e28e59a05795abfeb90275dc67d09`, run `37002020097`: seven browser
+tests passed, including the diagnostic and 52-string native oracle. The Windows
+job passed 43 tests with eight explicit skips. Run `37005163979` at
+`ad8790be0301b5e77ca87d841718bf0fac8fb1e9` repeated both green results.
 
-Packaging must include `legacy_cdp_assets/*.js` both in setuptools package data
-and the PyInstaller bundle. The integrator owns these packaging/dispatcher edits.
+The final pre-cutover candidate was
+`e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe`,
+[run 37007340738](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37007340738).
+Windows CDP again passed 43 of 51 tests with eight explicit skips; the owned
+browser passed all seven tests. All focused jobs were green, while the
+full-regression job was skipped. This is candidate qualification evidence.
+It predates the public-text privacy correction described above. That correction
+requires new exact-commit browser/Windows qualification; earlier green results
+do not qualify the added traversal or sensitive-output boundary.
+
+Production integration now has a leading `-Action` pair precondition on the central
+native route. Its case-insensitive CDP prefix intercept sends the complete argv
+to the closed parser with separate outer startup authority, before the old helper
+lookup. Production adapter tests assert malformed-prefix rejection and unknown
+CDP parser failure without old-route fallback, alongside unchanged exact macro
+comparisons. These promoted-host tests, the bundled full regression and Windows
+bundle validation are the next required gates. Source removal has occurred
+locally; candidate browser and Windows results alone do not establish that the
+integrated host or portable release is qualified.
+
+Setuptools package data includes `legacy_cdp_assets/*.js`; the PyInstaller build
+collects that data and the bridge imports. `CUCP.exe legacy-cdp-bridge` and
+`python -m pcucp_cli legacy-cdp-bridge` share the same fixed bridge implementation.
+The Windows bundle smoke gate must validate the packaged assets and startup
+refusal without a runtime on PATH. Portable legacy-macro support remains
+unqualified until the applicable bundle and retained-host checks pass.

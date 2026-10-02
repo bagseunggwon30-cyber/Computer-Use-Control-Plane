@@ -13,12 +13,71 @@ function(args){
     }
     return { score:best, text:bestText };
   }
+  // Public-text boundary: values are not labels, except visible input captions.
+  // Read calls keep this fixed traversal under mandatory throwOnSideEffect.
+  function sourceOnly(el) {
+    return !!el && /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test((el.tagName || '').toUpperCase());
+  }
+  function textExcluded(el) {
+    return sourceOnly(el) || !!el && (el.tagName || '').toUpperCase() === 'TEXTAREA';
+  }
+  function excludedBySource(el) {
+    let node = el;
+    for (let depth = 0; node && depth < 128; depth++, node = node.parentElement) {
+      if (sourceOnly(node)) return true;
+    }
+    return !!node; // Excessive ancestry is excluded, never treated as public.
+  }
+  function publicText(el, rendered) {
+    if (!el || excludedBySource(el) || textExcluded(el)) return '';
+    if (!el.querySelector('script,style,noscript,template,textarea'))
+      return (rendered ? el.innerText : el.textContent) || '';
+    // Aggregate getters would include source-only or textarea value text. Rebuild only this
+    // affected subtree; normal labels retain their original browser text exactly.
+    const stack = [el], parts = [];
+    let visited = 0;
+    while (stack.length && visited < 1200) {
+      const node = stack.pop(); visited++;
+      if (typeof node === 'string') {
+        if (!parts.length || !parts[parts.length - 1].endsWith('\n')) parts.push(node);
+        continue;
+      }
+      if (textExcluded(node)) continue;
+      if (node.nodeType === 3) { parts.push(node.nodeValue || ''); continue; }
+      if (node.nodeType !== 1) continue;
+      if (rendered) {
+        const cs = window.getComputedStyle(node);
+        if (!cs || cs.display === 'none' || /^(hidden|collapse)$/.test(cs.visibility)) continue;
+        if (node.tagName === 'BR') { parts.push('\n'); continue; }
+        if (node !== el && /^(block|flex|grid|list-item|table|table-row)$/.test(cs.display)) {
+          if (!parts.length || !parts[parts.length - 1].endsWith('\n')) parts.push('\n');
+          stack.push('\n');
+        }
+      }
+      const children = node.childNodes;
+      if (children.length + stack.length > 1200) return '';
+      for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+    }
+    if (stack.length) return '';
+    const text = parts.join('');
+    return rendered ? text.replace(/^\n+|\n+$/g, '') : text;
+  }
+  function inputCaption(el) {
+    if (!el || el.tagName !== 'INPUT' ||
+        !/^(button|submit|reset)$/i.test(el.getAttribute('type') || '')) return '';
+    const rect = el.getBoundingClientRect();
+    const cs = window.getComputedStyle(el);
+    if (!rect || rect.width < 1 || rect.height < 1 || !cs || cs.display === 'none' ||
+        /^(hidden|collapse)$/.test(cs.visibility) || Number(cs.opacity || 1) === 0) return '';
+    return el.value || ''; // Current rendered caption, never a stale value attribute.
+  }
   function textParts(el){
+    if (excludedBySource(el)) return [];
     var p=[];
     try{
-      if (el.innerText) p.push(el.innerText);
-      if (el.textContent) p.push(el.textContent);
-      if (el.value) p.push(el.value);
+      var rendered = publicText(el, true); if (rendered) p.push(rendered);
+      var content = publicText(el, false); if (content) p.push(content);
+      var caption = inputCaption(el); if (caption) p.push(caption);
       if (el.placeholder) p.push(el.placeholder);
       if (el.title) p.push(el.title);
       var aria = el.getAttribute && el.getAttribute('aria-label');
@@ -36,6 +95,7 @@ function(args){
     report.total_nodes += all.length;
     for (var i=0;i<all.length && matches.length<25;i++){
       var el = all[i];
+      if (excludedBySource(el)) continue;
       var parts = textParts(el);
       var st = scoreText(parts, NEEDLE);
       if (st.score > 0){

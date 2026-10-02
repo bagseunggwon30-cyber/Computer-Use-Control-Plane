@@ -1,7 +1,7 @@
-"""Opt-in actual external adapter drafts: Windows PS5 -> fixed Python process.
+"""Opt-in actual CDP adapters: Windows PS5 -> fixed Python process.
 
-These tests AST-load the real counted draft source, not a second imitation of its code.
-Central PS sources stay unchanged until the draft and browser gates qualify.
+These tests AST-load the counted candidate or promoted production functions.
+Production mode also loads the actual central route and rejects old-runtime fallback.
 """
 import copy
 import json
@@ -91,8 +91,33 @@ _Invoke-LegacyCdpNative $Action
 '''
 
 
+CENTRAL_REJECTION_RUNNER=INVOKE_RUNNER[:INVOKE_RUNNER.index('$inputData=')]+r'''
+$inputData=Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json
+# The missing path makes even the earliest old-helper return distinguishable.
+# Any later old server/child acquisition is an explicit failure as well.
+$Script:NativeHelperPath=$null
+function _Read-LockSafely {$script:oldCalls++;throw 'old_lock_route_reached'}
+function Invoke-HelperPipe {$script:oldCalls++;throw 'old_pipe_route_reached'}
+function Start-Process {$script:oldCalls++;throw 'old_child_route_reached'}
+$script:realCdpBridge=(Get-Command _Invoke-LegacyCdpBridge -CommandType Function).ScriptBlock
+function _Invoke-LegacyCdpBridge {
+ param([string]$Operation,[hashtable]$Request,[switch]$LiveAuthority,[int]$Port=9222)
+ $script:bridgeCalls+=@{operation=$Operation;live=[bool]$LiveAuthority}
+ & $script:realCdpBridge @PSBoundParameters
+}
+$results=@(foreach($row in @($inputData)){
+ $AllowLiveControl=[bool]$row.live;$script:oldCalls=0;$script:bridgeCalls=@()
+ $result=$null;$errorText=$null
+ try {$result=Invoke-NativeHelper -ArgList $row.argv}
+ catch {$errorText=$_.Exception.Message}
+ @{result=$result;error=$errorText;old_calls=$script:oldCalls;bridge_calls=@($script:bridgeCalls)}
+})
+[Console]::Out.WriteLine((ConvertTo-Json -InputObject $results -Depth 16 -Compress))
+'''
+
+
 @unittest.skipUnless(os.name=='nt' and shutil.which('powershell.exe') and PYTHON,
-    'Enable CUCP_LEGACY_CDP_TEST_PYTHON on Windows for actual external adapter drafts')
+    'Enable CUCP_LEGACY_CDP_TEST_PYTHON on Windows for actual CDP host adapters')
 class LegacyCdpActualDraftTests(unittest.TestCase):
     def run_script(self,text,data,*,blocks=None,root=ROOT,flags=(),timeout=240):
         with tempfile.TemporaryDirectory(prefix='cucp-cdp-actual-adapter-') as folder:
@@ -171,14 +196,48 @@ class LegacyCdpActualDraftTests(unittest.TestCase):
         runner=INVOKE_RUNNER.replace('_Invoke-LegacyCdpNativeArgv -ArgList @($inputData.argv) -LiveAuthority:$LiveAuthority',
             'Invoke-NativeHelper -ArgList @($inputData.argv)')
         for live in (False,True):
-            with self.subTest(live=live),server() as (state,endpoint):
-                capture(state,[response_for('safe')])
-                argv=['-Action','cdp-eval','-CdpExpr','-CdpStartup','-CdpPort',str(state.port)]
-                p=self.run_script(runner,dict(argv=argv),flags=['-LiveAuthority'] if live else [],timeout=30)
-                self.assertEqual(p.returncode,0,p.stderr)
-                result=json.loads(p.stdout)
-                self.assertEqual(result['ExitCode'],0 if live else 3)
-                self.assertEqual(len(state.requests),1 if live else 0)
+            for action_key,expression in (('-Action','-CdpStartup'),('-aCtIoN','-Action')):
+                with self.subTest(live=live,action_key=action_key),server() as (state,endpoint):
+                    capture(state,[response_for('safe')])
+                    argv=[action_key,'cdp-eval','-CdpExpr',expression,'-CdpPort',str(state.port)]
+                    p=self.run_script(runner,dict(argv=argv),flags=['-LiveAuthority'] if live else [],timeout=30)
+                    self.assertEqual(p.returncode,0,p.stderr)
+                    result=json.loads(p.stdout)
+                    self.assertEqual(result['ExitCode'],0 if live else 3)
+                    self.assertEqual(result['Route'],'python-cdp')
+                    self.assertFalse(result['FromHotCache'])
+                    self.assertEqual(len(state.requests),1 if live else 0)
+                    if live:self.assertEqual(state.requests[0]['params']['expression'],expression)
+                    else:self.assertEqual(state.paths,[])
+
+    @unittest.skipUnless(adapter_mode()=='production','Central route gate activates only after production promotion')
+    def test_promoted_central_route_rejects_missing_or_reordered_action_before_old_runtime(self):
+        argv_cases=[None,[],['-Action'],['-Action',''],['cdp-detect'],
+            ['-CdpPort','9222','-Action','cdp-detect'],
+            ['-CdpExpr','-Action','-Action','cdp-eval']]
+        rows=[dict(live=live,argv=argv) for live in (False,True) for argv in argv_cases]
+        p=self.run_script(CENTRAL_REJECTION_RUNNER,rows,timeout=30)
+        self.assertEqual(p.returncode,0,p.stderr)
+        actual=json.loads(p.stdout)
+        self.assertEqual(len(actual),len(rows))
+        for row,result in zip(rows,actual):
+            with self.subTest(**row):
+                self.assertEqual(result,dict(result=None,
+                    error='Native helper requests must begin with -Action and a nonempty action value.',
+                    old_calls=0,bridge_calls=[]))
+
+    @unittest.skipUnless(adapter_mode()=='production','Central route gate activates only after production promotion')
+    def test_promoted_central_route_unknown_cdp_reaches_closed_parser_without_fallback(self):
+        rows=[dict(live=live,argv=['-aCtIoN',action]) for live in (False,True)
+              for action in ('cdp-unknown','CDP-unknown')]
+        p=self.run_script(CENTRAL_REJECTION_RUNNER,rows,timeout=30)
+        self.assertEqual(p.returncode,0,p.stderr)
+        actual=json.loads(p.stdout)
+        self.assertEqual(len(actual),len(rows))
+        for row,result in zip(rows,actual):
+            with self.subTest(**row):
+                self.assertEqual(result,dict(result=None,error='unsupported native CDP action',old_calls=0,
+                    bridge_calls=[dict(operation='native-prepare',live=False)]))
 
     def test_successful_live_dispatch_with_large_reply_or_log_failure_is_uncertain(self):
         runner=INVOKE_RUNNER[:INVOKE_RUNNER.index('$inputData=')]+r'''

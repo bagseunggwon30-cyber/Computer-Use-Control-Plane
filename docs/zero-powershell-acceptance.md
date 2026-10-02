@@ -10,17 +10,21 @@ At the qualified planner checkpoint `aadbc58aa9dcc2254a3361cf8963429197859f22`,
 That checkpoint left 934,934 bytes. The accepted app-profile checkpoint `27400c98`
 removes another 13,320 bytes, bringing the total reduction to 91,864 bytes and
 remaining source to 921,614 bytes. Its exact-commit actual-adapter gate passed in run `36973181910`.
-The next candidate batch retains original bodies and adds exact adapter fixtures
-and consent guards. Its current totals are recorded in the
-[tracked source inventory](legacy-function-inventory.json). Fixtures are counted
-normally and removed when their glue is promoted. Accepted checkpoint source groups are:
+The three-family kernels and exact adapters passed all focused jobs at `e9e015c6`
+in run `37007340738`. Their production integration replaces 53 original function
+extents and removes duplicate fixtures, leaving **821,540 bytes**: a further
+100,074-byte reduction, and 191,938 bytes below the original baseline. This is an
+integrated source measurement; the current commit still requires the bundled full
+regression and its privacy/production routing checks. Current source groups are:
 
 | Remaining source group | Bytes |
 | --- | ---: |
-| Main legacy wrapper and macros, `scripts/cucp.ps1` | 577,485 |
-| Native helper, `scripts/cucp-native-helper.ps1` | 165,893 |
+| Main legacy wrapper and macros, `scripts/cucp.ps1` | 505,923 |
+| Native helper, `scripts/cucp-native-helper.ps1` | 122,475 |
 | Resident helper server | 27,427 |
-| Four PowerShell test files | 135,171 |
+| Shared retained CDP host | 11,931 |
+| Four PowerShell test files | 135,641 |
+| Temporary parser-derived migration source map | 2,505 |
 | Audit and verification references | 10,586 |
 | Installer, launchers and publisher shims | 5,052 |
 
@@ -30,24 +34,22 @@ excluded, renamed, embedded elsewhere or padded to change the metric.
 
 ## Ordered implementation families
 
-1. **Deterministic planning and observations.** Qualify the current app-profile
-   acquisition adapter and removed sole-use score helper. Continue image
-   comparison, history scoring, profiles and recorder/recovery report assembly.
-   Use captured queries and generated files for exact Windows comparisons. The
-   current app-profile replacement must pass full payload, error, query, exit and
-   actual output checks before it is considered qualified.
-2. **Execution coordination.** Migrate workflow, task, form, watch, recovery and
-   replay state machines into Python/C#. Preserve startup authority, target
-   binding, confirmation gates, cancellation, partial outcomes, time budgets and
-   the distinction between a failed observation and an uncertain mutation. Test
-   captured executor sequences before connecting actual Windows actions.
+1. **Remaining deterministic planning and observations.** App-profile, task/form,
+   workflow-plan, SmartPlan, precision and history/cache logic now have qualified
+   replacements. Continue image comparison, remaining profile/recorder logic and
+   the original workflow tokenizer. Preserve exact outputs and acquisition order.
+2. **Retained execution effects.** The seven workflow/task/form/SmartClick/watch/
+   recovery coordinators are now in C#. Their PowerShell child, clock, Console,
+   acquisition and leaf-action adapters remain. Move these effect boundaries
+   while preserving immutable authority, confirmation, cancellation, time budgets
+   and the distinction between observation failure and uncertain mutation.
 3. **Windows acquisition and input.** Replace the native helper and resident
    server, including UIA/OCR/window metadata and authenticated local IPC. Existing
    C# facilities cover part of this surface. Preserve legacy callable operations
    only after their equivalents are qualified. Live input, IME/clipboard, focus
    races, mixed DPI, helper crashes and elevation require an authorized isolated
    interactive Windows fixture environment; mocks do not close those gates.
-4. **Remaining adapters and lifecycle.** Finish legacy CDP/vision routes,
+4. **Remaining adapters and lifecycle.** Finish retained CDP host/vision routes,
    diagnostics, system/process/registry macros, helper lifecycle and optional
    integrations. Keep the host/provider neutral. Tests use owned browser pages,
    captured provider replies and disposable fixture data. They do not require a

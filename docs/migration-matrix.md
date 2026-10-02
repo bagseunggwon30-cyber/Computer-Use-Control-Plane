@@ -2,7 +2,18 @@
 
 This feature branch starts from published `9ffa354b9904235835a7bc6eb78ed8d3d76317c8` (exact tree `bf895d3120dd5e145f360cb1c41e1d79a061d048`). It is not a complete PowerShell rewrite or a signed release. The stages below preserve earlier implementation history. Existing PowerShell sources remain visible and usable where safe. No Linguist exclusions or file hiding are used to change language percentages.
 
-## Implemented in this stage
+## Current integrated batch
+
+Execution, precision/history/cache and legacy CDP kernels plus exact adapters
+passed every focused job at `e9e015c6` / run `37007340738`. Their production
+integration now replaces 53 original function extents, retains qualified host
+effects, and removes the duplicate fixtures. Current tracked PS is 821,540 bytes,
+191,938 below baseline and 100,074 below the prior verified checkpoint. The
+integrated commit requires the bundled full regression, production interception,
+portable package and explicit privacy checks before release. See the
+[current report](migration-checkpoint-report.md) and [inventory](legacy-function-inventory.json).
+
+## Initial core foundation (historical)
 
 | Capability | Python responsibility | C# responsibility | Compatibility / parity status |
 |---|---|---|---|
@@ -16,18 +27,18 @@ This feature branch starts from published `9ffa354b9904235835a7bc6eb78ed8d3d7631
 
 ## Retained legacy families and next work
 
-[Machine-readable function inventory](legacy-function-inventory.json) enumerates the retained top-level PowerShell functions across the three runtime scripts, with source locations. It is a navigation inventory, not a claim every helper is an externally exposed feature. The inventory also records qualified retirements; remaining helper-server dispatch is still legacy.
+[Machine-readable function inventory](legacy-function-inventory.json) enumerates retained top-level PowerShell functions across the original runtimes and shared CDP host, with source locations. It is a navigation inventory, not a claim every helper is an externally exposed feature. The inventory also records qualified retirements; remaining helper-server dispatch is still legacy.
 
 | Legacy family | Current route | Missing before parity / next ownership |
 |---|---|---|
 | UIA label lookup/invoke/set-value/toggle/element IDs | Some read lookup already Python/C#; action macros stay PS | C# observation-generation-bound element references and supported patterns; Python ambiguity/policy; stale-reference tests |
 | OCR search/click, OCR/UIA fusion, screenshot diffs, icon targeting | C# image OCR + Python search exists; combined workflows stay PS | Python deterministic fusion/diff and C# capture, coordinate identity, image fixture tests |
 | Drag, held keys, multi-select/edit, IME clipboard workflows | PS compatibility | C# carefully scoped primitives; Python state and cleanup; real Windows IME/clipboard validation |
-| CDP discovery/query/eval/type | PS compatibility, explicit mutation classification | Optional separate browser adapter; never enable arbitrary eval as a read tool |
-| Long workflow/task/form/profile/recovery/recorder/watch | PS compatibility, new short core batch is not equivalent | Python declarative plan/state/log with explicit failure/stop conditions; preserved fixtures and workload parity |
+| CDP discovery/query/eval/type | Python/JS implementation, shared retained PS host, explicit live gates | Finish host/bootstrap retirement and maintain sensitive-text/guarded-read acceptance; arbitrary eval stays live-only |
+| Long workflow/task/form/profile/recovery/watch | C# planning and coordination with retained PS acquisition/effects | Finish effect/host migration; recorder and other legacy-only families remain |
 | Helper daemon/autostart, process/registry/clipboard/system macros | PS compatibility | Python lifecycle/config plus scoped C# APIs; no always-on remote control or broad credentials |
 | Model-assisted vision | Optional legacy provider adapter only | Host-side vision/tool call adapter, no universal-core model/account dependency |
-| Installer and optional Pi elevation launcher | PS installer/launcher retained | Python packaging/setup where useful; keep normal human-controlled UAC boundary |
+| Installer and optional Pi elevation launcher | Python installer with small PS compatibility/elevation entries | Remove final entry shims after replacement launch/elevation qualification; preserve human-controlled UAC |
 
 ## Safety fixes in retained legacy code
 
@@ -120,11 +131,10 @@ Strategy retirement still waits for additional en-US/ko-KR/tr-TR/invariant cultu
 
 See [the checkpoint report](migration-checkpoint-report.md) for the coherent
 architecture, measured source retirement and explicit remaining acceptance scope.
-At accepted checkpoint `27400c98`, aggregate tracked PS is 921,614 bytes, down
-91,864 bytes from baseline including bridge overhead. The new candidate batch
-retains original bodies plus exact adapter fixtures and consent guards. Its current
-totals are in [the tracked source inventory](legacy-function-inventory.json);
-no new family retirement is claimed.
+At prior verified checkpoint `27400c98`, aggregate tracked PS was 921,614 bytes,
+down 91,864 bytes including bridge overhead. The current integrated three-family
+replacement leaves 821,540 bytes and requires the current-commit full gate. Exact
+totals are in [the tracked source inventory](legacy-function-inventory.json).
 This does not meet the lowest/zero-PowerShell goal. Actual planner adapters and
 output formatting passed at aadbc58 / run 36957910828. The app-profile builder and its sole-use score helper are now replaced under
 the separate actual-bridge gate below. Image diff remains a candidate.

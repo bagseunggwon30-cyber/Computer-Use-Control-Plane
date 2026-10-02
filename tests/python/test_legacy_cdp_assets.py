@@ -18,32 +18,43 @@ HARNESS=r'''
 const vm=require('node:vm');const fs=require('node:fs');const rows=JSON.parse(fs.readFileSync(0,'utf8'));
 function execute(expression,fixture){
  const events=[];
+ function matches(el,selector){
+   if(selector==='*')return true;
+   if(selector[0]==='#')return el.id===selector.slice(1);
+   return selector.split(',').some(s=>{
+     const m=s.match(/^\[([^=\]]+)(?:=([^\]]+))?\]$/);
+     if(m)return m[2]?el.getAttribute(m[1])===m[2].replace(/^['"]|['"]$/g,''):el.getAttribute(m[1])!==null;
+     return el.tagName.toLowerCase()===s;
+   });
+ }
+ function descendants(nodes){
+   const out=[];
+   for(const node of nodes){if(node.nodeType===1){out.push(node);out.push(...descendants(node.childNodes))}}
+   return out;
+ }
  function make(data){
-   const e={tagName:data.tag||'BUTTON',isConnected:true,isContentEditable:!!data.ce,
-     disabled:!!data.disabled,innerText:data.text||'',textContent:data.text||'',value:data.value||'',
+   const e={tagName:data.tag||'BUTTON',nodeType:1,parentElement:null,isConnected:true,isContentEditable:!!data.ce,
+     disabled:!!data.disabled,innerText:data.innerText??data.text??'',textContent:data.textContent??data.text??'',value:data.value||'',
      placeholder:(data.attrs||{}).placeholder||'',title:(data.attrs||{}).title||'',id:(data.attrs||{}).id||'',
      attrs:data.attrs||{},labels:[],onclick:data.onclick?function(){}:null,style:data.style||{},
      rect:data.rect||{x:1,y:2,width:50,height:20},focus(){events.push('focus:'+this.id)},
      scrollIntoView(){events.push('scroll:'+this.id)},click(){events.push('click:'+this.id)},
      dispatchEvent(ev){events.push(ev.type+':'+this.id)},getAttribute(a){return this.attrs[a]??null},
-     getBoundingClientRect(){return {...this.rect,left:this.rect.x,top:this.rect.y}}};
+     getBoundingClientRect(){return {...this.rect,left:this.rect.x,top:this.rect.y}},
+     querySelectorAll(s){return descendants(this.childNodes).filter(n=>matches(n,s))},
+     querySelector(s){return this.querySelectorAll(s)[0]||null}};
+   e.childNodes=(data.children||[]).map(child=>{
+     const node=typeof child==='string'?{nodeType:3,nodeValue:child}:make(child);
+     node.parentElement=e;return node;
+   });
    if(data.shadow)e.shadowRoot=root(data.shadow);
    if(data.frame)e.contentDocument=root(data.frame);
    return e;
  }
  function root(items){
-   const all=items.map(make);
-   for(let i=0;i<all.length;i++){
-     if(items[i].control!=null){all[i].control=all[items[i].control];all[items[i].control].labels.push(all[i])}
-   }
-   function matches(el,selector){
-     if(selector==='*')return true;
-     if(selector[0]==='#')return el.id===selector.slice(1);
-     return selector.split(',').some(s=>{
-       const m=s.match(/^\[([^=\]]+)(?:=([^\]]+))?\]$/);
-       if(m)return m[2]?el.getAttribute(m[1])===m[2].replace(/^['"]|['"]$/g,''):el.getAttribute(m[1])!==null;
-       return el.tagName.toLowerCase()===s;
-     });
+   const top=items.map(make),all=descendants(top);
+   for(let i=0;i<top.length;i++){
+     if(items[i].control!=null){top[i].control=top[items[i].control];top[i].control.labels.push(top[i])}
    }
    return {all,querySelectorAll(s){return all.filter(e=>matches(e,s))},querySelector(s){return this.querySelectorAll(s)[0]||null}};
  }

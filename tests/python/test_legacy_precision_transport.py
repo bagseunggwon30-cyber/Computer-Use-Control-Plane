@@ -75,7 +75,8 @@ foreach($wire in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Conver
 [Console]::Out.WriteLine((ConvertTo-Json -InputObject @($rows) -Depth 100 -Compress))
 ''',encoding='utf-8-sig')
             draft=ROOT/'tests/fixtures/legacy-precision-adapter.ps1'
-            source=os.environ.get('CUCP_PRECISION_ADAPTER_DRAFT') or str(draft if draft.exists() else ROOT/'scripts/cucp.ps1')
+            promoted='precision' in json.loads((ROOT/'.github/migration-adapters.json').read_text(encoding='utf-8'))['test_adapters']
+            source=str(ROOT/'scripts/cucp.ps1') if promoted else os.environ.get('CUCP_PRECISION_ADAPTER_DRAFT') or str(draft)
             result=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(script),'-Source',source,'-InputPath',str(data)],capture_output=True,timeout=30)
             self.assertEqual(result.returncode,0,result.stderr.decode(errors='replace'))
             rows=json.loads(result.stdout.decode('utf-8-sig'));self.assertEqual(len(rows),len(values))

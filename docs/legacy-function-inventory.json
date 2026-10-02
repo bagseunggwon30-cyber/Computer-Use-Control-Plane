@@ -1,6 +1,6 @@
 {
   "baseline_commit": "9ffa354b9904235835a7bc6eb78ed8d3d76317c8",
-  "note": "Current retained legacy navigation after staged Python/C# migration. Original acquisition, workflow tokenization and unported execution remain. Every new adapter requires its current-commit Windows differential gate; normal Git history holds the baseline.",
+  "note": "Current retained legacy navigation after staged Python/C# migration. Original leaf acquisition/input, workflow tokenization and host adapters remain. Exact kernels/adapters passed their Windows/browser gate; integrated production remains subject to the full release gate. Normal Git history holds the baseline.",
   "files": [
     {
       "path": "scripts/cucp-helper-server.ps1",
@@ -54,265 +54,189 @@
     },
     {
       "path": "scripts/cucp-native-helper.ps1",
-      "lines": 4121,
+      "lines": 3001,
       "functions": [
         {
           "name": "_Ensure-Win32Native",
-          "line": 195
+          "line": 200
         },
         {
           "name": "_Ensure-UIA",
-          "line": 221
+          "line": 226
         },
         {
           "name": "_Ensure-OCR",
-          "line": 246
+          "line": 251
         },
         {
           "name": "_Wait-AsyncOp",
-          "line": 291
+          "line": 296
         },
         {
           "name": "_Load-SoftwareBitmapFromFile",
-          "line": 303
+          "line": 308
         },
         {
           "name": "_Convert-OcrResult",
-          "line": 313
+          "line": 318
         },
         {
           "name": "_Capture-ScreenRegionToTempPng",
-          "line": 364
+          "line": 369
         },
         {
           "name": "_Match-OcrCandidates",
-          "line": 417
+          "line": 422
         },
         {
           "name": "_Get-UiaSupportedPatternName",
-          "line": 471
+          "line": 476
         },
         {
           "name": "_New-UiaMatchPayload",
-          "line": 489
+          "line": 494
         },
         {
           "name": "_Get-RoleWeight",
-          "line": 517
+          "line": 522
         },
         {
           "name": "_Clamp-UiaPointToRect",
-          "line": 527
+          "line": 532
         },
         {
           "name": "_Get-UiaPreferredClickPoint",
-          "line": 556
+          "line": 561
         },
         {
           "name": "_Resolve-UiaPointRefinement",
-          "line": 577
+          "line": 582
         },
         {
           "name": "_Find-SmallestUiaElementAtPoint",
-          "line": 646
+          "line": 651
         },
         {
           "name": "_Resolve-OcrUiaFusionCandidate",
-          "line": 670
-        },
-        {
-          "name": "_Cdp-HttpGet",
-          "line": 747
-        },
-        {
-          "name": "_Cdp-WsCall",
-          "line": 771
-        },
-        {
-          "name": "_Cdp-PortOpen",
-          "line": 833
-        },
-        {
-          "name": "_Cdp-NewDomBridgePlan",
-          "line": 852
-        },
-        {
-          "name": "_Cdp-Detect",
-          "line": 919
+          "line": 675
         },
         {
           "name": "_Emit",
-          "line": 970
+          "line": 771
         },
         {
           "name": "_Action-Health",
-          "line": 992
+          "line": 793
         },
         {
           "name": "_Action-Windows",
-          "line": 1023
+          "line": 824
         },
         {
           "name": "_Action-Focused",
-          "line": 1057
+          "line": 858
         },
         {
           "name": "_Action-Focus",
-          "line": 1078
+          "line": 879
         },
         {
           "name": "_Action-Screenshot",
-          "line": 1113
+          "line": 914
         },
         {
           "name": "_Test-CoordsInTarget",
-          "line": 1183
+          "line": 984
         },
         {
           "name": "_Action-HitTest",
-          "line": 1236
+          "line": 1037
         },
         {
           "name": "_Action-HitScan",
-          "line": 1316
-        },
-        {
-          "name": "_Cdp-ScorePages",
-          "line": 1485
-        },
-        {
-          "name": "_Cdp-FindPage",
-          "line": 1552
-        },
-        {
-          "name": "_Js-StringLiteral",
-          "line": 1584
-        },
-        {
-          "name": "_Cdp-RunSmartDomAction",
-          "line": 1590
-        },
-        {
-          "name": "_Action-CdpDetect",
-          "line": 1993
-        },
-        {
-          "name": "_Action-CdpEval",
-          "line": 2022
-        },
-        {
-          "name": "_Action-CdpType",
-          "line": 2094
-        },
-        {
-          "name": "_Action-CdpClick",
-          "line": 2205
-        },
-        {
-          "name": "_Action-CdpSmartClick",
-          "line": 2247
-        },
-        {
-          "name": "_Action-CdpSmartFind",
-          "line": 2251
-        },
-        {
-          "name": "_Action-CdpSmartTypeFind",
-          "line": 2255
-        },
-        {
-          "name": "_Action-CdpSmartType",
-          "line": 2259
+          "line": 1117
         },
         {
           "name": "_Action-Click",
-          "line": 2269
+          "line": 1341
         },
         {
           "name": "_Assert-ForegroundTarget",
-          "line": 2369
+          "line": 1441
         },
         {
           "name": "_Action-Type",
-          "line": 2401
+          "line": 1473
         },
         {
           "name": "_Action-Shortcut",
-          "line": 2432
+          "line": 1504
         },
         {
           "name": "_Action-UiaTree",
-          "line": 2481
+          "line": 1553
         },
         {
           "name": "_Action-UiaFind",
-          "line": 2563
+          "line": 1635
         },
         {
           "name": "_Action-UiaClick",
-          "line": 2682
+          "line": 1754
         },
         {
           "name": "_Resolve-UiaElement",
-          "line": 2715
+          "line": 1787
         },
         {
           "name": "_Action-UiaInvoke",
-          "line": 2815
+          "line": 1887
         },
         {
           "name": "_Action-UiaSetValue",
-          "line": 2906
+          "line": 1978
         },
         {
           "name": "_Action-UiaToggle",
-          "line": 2938
+          "line": 2010
         },
         {
           "name": "_Action-OcrImage",
-          "line": 2970
+          "line": 2042
         },
         {
           "name": "_Action-OcrScreen",
-          "line": 3001
+          "line": 2073
         },
         {
           "name": "_Action-OcrFindText",
-          "line": 3066
+          "line": 2138
         },
         {
           "name": "_Action-OcrUiaFuse",
-          "line": 3191
+          "line": 2263
         },
         {
           "name": "_Action-OcrUiaInvoke",
-          "line": 3332
+          "line": 2404
         },
         {
           "name": "_Action-ScreenshotDiff",
-          "line": 3520
-        },
-        {
-          "name": "_Action-CdpDeepFind",
-          "line": 3670
+          "line": 2592
         },
         {
           "name": "_Action-ImePaste",
-          "line": 3795
-        },
-        {
-          "name": "_Action-CdpProseMirrorInsert",
-          "line": 3884
+          "line": 2760
         },
         {
           "name": "_Action-ModalDetect",
-          "line": 3985
+          "line": 2865
         }
       ]
     },
     {
       "path": "scripts/cucp.ps1",
-      "lines": 12988,
+      "lines": 10887,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -448,743 +372,901 @@
         },
         {
           "name": "Invoke-NativeHelper",
-          "line": 1158
+          "line": 1161
         },
         {
           "name": "Write-Notice",
-          "line": 1401
+          "line": 1412
         },
         {
           "name": "ConvertTo-ProcessArgumentString",
-          "line": 1415
+          "line": 1426
         },
         {
           "name": "Test-Tool",
-          "line": 1432
+          "line": 1443
         },
         {
           "name": "Invoke-Cucp",
-          "line": 1446
+          "line": 1457
         },
         {
           "name": "Test-LiveControlRequest",
-          "line": 1581
+          "line": 1592
         },
         {
           "name": "Test-CoordinateMissingObservation",
-          "line": 1615
+          "line": 1626
         },
         {
           "name": "Assert-Authorized",
-          "line": 1627
+          "line": 1638
         },
         {
           "name": "Get-CacheKey",
-          "line": 1648
+          "line": 1659
         },
         {
           "name": "Get-CachedAppshot",
-          "line": 1656
+          "line": 1667
         },
         {
           "name": "Save-AppshotCache",
-          "line": 1672
+          "line": 1683
         },
         {
           "name": "Invoke-Appshot",
-          "line": 1680
+          "line": 1691
         },
         {
           "name": "_Build-AppshotResult",
-          "line": 1727
+          "line": 1738
         },
         {
           "name": "_Ensure-Win32Loaded",
-          "line": 1790
+          "line": 1801
         },
         {
           "name": "_Enumerate-Win32Windows",
-          "line": 1811
+          "line": 1822
         },
         {
           "name": "_Ensure-UIALoaded",
-          "line": 1853
+          "line": 1864
         },
         {
           "name": "_Slug",
-          "line": 1866
+          "line": 1877
         },
         {
           "name": "_Get-UIAffordances",
-          "line": 1876
+          "line": 1887
         },
         {
           "name": "Find-Element",
-          "line": 2049
+          "line": 2060
         },
         {
           "name": "Find-AffordanceById",
-          "line": 2153
+          "line": 2164
         },
         {
           "name": "Get-ElementCenter",
-          "line": 2161
+          "line": 2172
         },
         {
           "name": "Invoke-Macro",
-          "line": 2170
+          "line": 2181
         },
         {
           "name": "_Read-OptValue",
-          "line": 2338
+          "line": 2349
         },
         {
           "name": "_Read-AllOptValues",
-          "line": 2345
-        },
-        {
-          "name": "_Read-Switch",
           "line": 2356
         },
         {
+          "name": "_Read-Switch",
+          "line": 2367
+        },
+        {
           "name": "_Macro-NotImplemented",
-          "line": 2378
+          "line": 2389
         },
         {
           "name": "_Read-StandaloneConfirmation",
-          "line": 2396
+          "line": 2407
         },
         {
           "name": "_Invoke-LegacyCompatibility",
-          "line": 2408
+          "line": 2419
         },
         {
           "name": "_Classify-SafetyFromText",
-          "line": 2471
+          "line": 2482
         },
         {
           "name": "Invoke-MacroSafetyClassify",
-          "line": 2480
+          "line": 2491
         },
         {
           "name": "_Ensure-NativeDesktopTypes",
-          "line": 2513
+          "line": 2524
         },
         {
           "name": "_Native-FindWindow",
-          "line": 2533
+          "line": 2544
         },
         {
           "name": "_Native-FocusWindow",
-          "line": 2545
+          "line": 2556
         },
         {
           "name": "_Native-SendShortcut",
-          "line": 2563
+          "line": 2574
         },
         {
           "name": "_Native-SetClipboard",
-          "line": 2588
+          "line": 2599
         },
         {
           "name": "_Native-ClickPoint",
-          "line": 2594
+          "line": 2605
         },
         {
           "name": "_Native-HitTestPoint",
-          "line": 2610
+          "line": 2621
         },
         {
           "name": "_CoordProfile-MonitorObject",
-          "line": 2676
+          "line": 2687
         },
         {
           "name": "_CoordProfile-WindowFromPrecheck",
-          "line": 2703
+          "line": 2714
         },
         {
           "name": "_Build-CoordProfile",
-          "line": 2723
+          "line": 2734
         },
         {
           "name": "Invoke-MacroCoordProfile",
-          "line": 2887
+          "line": 2898
         },
         {
           "name": "_CoordMap-ResolveWindow",
-          "line": 2910
-        },
-        {
-          "name": "_Build-CoordMap",
           "line": 2921
         },
         {
+          "name": "_Build-CoordMap",
+          "line": 2932
+        },
+        {
           "name": "Invoke-MacroCoordMap",
-          "line": 2978
+          "line": 2989
+        },
+        {
+          "name": "_Precision-EncodeWire($Value)",
+          "line": 3020
+        },
+        {
+          "name": "_Precision-Require($Condition,[string]$Message)",
+          "line": 3028
+        },
+        {
+          "name": "_Precision-Fields($Value,[string[]]$Names)",
+          "line": 3032
+        },
+        {
+          "name": "_Precision-DecodeWire($Wire)",
+          "line": 3038
+        },
+        {
+          "name": "_Precision-WriteChunks($Writer,[long]$Id,[string]$Target,$Value)",
+          "line": 3065
+        },
+        {
+          "name": "_Precision-StartProcess",
+          "line": 3078
+        },
+        {
+          "name": "_Precision-ReadMessage($Reader,[long]$ExpectedId)",
+          "line": 3099
+        },
+        {
+          "name": "_Precision-Reply($Writer,[long]$Id,$Value,$ErrorMessage)",
+          "line": 3120
+        },
+        {
+          "name": "_Precision-AssertArgv($Actual,[string[]]$Expected)",
+          "line": 3125
+        },
+        {
+          "name": "_Precision-ReadEffect($Effect,$State)",
+          "line": 3130
+        },
+        {
+          "name": "_Invoke-LegacyPrecisionSession",
+          "line": 3195
+        },
+        {
+          "name": "_Invoke-LegacyPrecision",
+          "line": 3265
+        },
+        {
+          "name": "_Invoke-LegacyPrecisionValue",
+          "line": 3273
+        },
+        {
+          "name": "_Precision-HistoryLines",
+          "line": 3279
         },
         {
           "name": "_AnchorHistory-Read",
-          "line": 3009
+          "line": 3281
         },
         {
           "name": "_AnchorHistory-NormDistance",
-          "line": 3024
+          "line": 3283
         },
         {
           "name": "_AnchorHistory-Append",
-          "line": 3034
+          "line": 3285
         },
         {
           "name": "_AnchorHistory-Score",
-          "line": 3055
+          "line": 3291
         },
         {
           "name": "Invoke-MacroCoordAnchor",
-          "line": 3160
+          "line": 3293
         },
         {
           "name": "_Native-Screenshot",
-          "line": 3301
+          "line": 3295
         },
         {
           "name": "Invoke-MacroScreenshot",
-          "line": 3332
+          "line": 3326
         },
         {
           "name": "Invoke-MacroListAffordances",
-          "line": 3344
+          "line": 3338
         },
         {
           "name": "Invoke-MacroClickId",
-          "line": 3452
+          "line": 3446
         },
         {
           "name": "Invoke-MacroWaitLabel",
-          "line": 3479
+          "line": 3473
         },
         {
           "name": "Invoke-MacroFindLabel",
-          "line": 3512
+          "line": 3506
         },
         {
           "name": "Invoke-MacroClickLabel",
-          "line": 3820
+          "line": 3814
         },
         {
           "name": "Invoke-MacroFillLabel",
-          "line": 3959
+          "line": 3953
         },
         {
           "name": "Invoke-MacroFocusWindow",
-          "line": 3992
+          "line": 3986
         },
         {
           "name": "Invoke-MacroWaitWindow",
-          "line": 4018
+          "line": 4012
         },
         {
           "name": "Invoke-MacroShortcut",
-          "line": 4067
+          "line": 4061
         },
         {
           "name": "Invoke-MacroClipboard",
-          "line": 4085
+          "line": 4079
         },
         {
           "name": "Invoke-MacroGoal",
-          "line": 4109
+          "line": 4103
         },
         {
           "name": "Invoke-MacroSelfTest",
-          "line": 4163
+          "line": 4157
         },
         {
           "name": "_Iif",
-          "line": 4314
+          "line": 4308
         },
         {
           "name": "Invoke-MacroTrajectory",
-          "line": 4316
+          "line": 4310
         },
         {
           "name": "Invoke-MacroEnsureHelper",
-          "line": 4360
+          "line": 4354
         },
         {
           "name": "_Get-VisionWorkDir",
-          "line": 4387
+          "line": 4381
         },
         {
           "name": "_Find-CodexCli",
-          "line": 4395
+          "line": 4389
         },
         {
           "name": "_Quote-NativeWindowsArgument",
-          "line": 4416
+          "line": 4410
         },
         {
           "name": "_Invoke-CodexVision",
-          "line": 4424
+          "line": 4418
         },
         {
           "name": "Invoke-MacroVisionFind",
-          "line": 4549
+          "line": 4543
         },
         {
           "name": "Invoke-MacroVisionClick",
-          "line": 4606
+          "line": 4600
         },
         {
           "name": "Invoke-MacroMetrics",
-          "line": 4690
+          "line": 4684
         },
         {
           "name": "_New-ObservationEnvelope",
-          "line": 4751
+          "line": 4745
         },
         {
           "name": "_Get-DesktopSize",
-          "line": 4828
+          "line": 4822
         },
         {
           "name": "Invoke-MacroWindows",
-          "line": 4843
+          "line": 4837
         },
         {
           "name": "Invoke-MacroFocusVerify",
-          "line": 5010
+          "line": 5004
         },
         {
           "name": "Invoke-MacroHealthQuick",
-          "line": 5091
+          "line": 5085
         },
         {
           "name": "Invoke-MacroLogTail",
-          "line": 5203
+          "line": 5197
         },
         {
           "name": "Invoke-MacroDiagnoseLag",
-          "line": 5365
+          "line": 5359
         },
         {
           "name": "Invoke-MacroCleanup",
-          "line": 5622
+          "line": 5616
         },
         {
           "name": "Invoke-MacroIconFind",
-          "line": 5824
+          "line": 5818
         },
         {
           "name": "Invoke-MacroIconClick",
-          "line": 6027
+          "line": 6021
         },
         {
           "name": "_Crop-Bitmap",
-          "line": 6089
+          "line": 6083
         },
         {
           "name": "Invoke-MacroVisionClickPrecise",
-          "line": 6122
+          "line": 6116
         },
         {
           "name": "Invoke-MacroPerf",
-          "line": 6228
+          "line": 6222
         },
         {
           "name": "Invoke-MacroHealthDetail",
-          "line": 6473
+          "line": 6467
         },
         {
           "name": "_Resolve-AppPath",
-          "line": 6559
+          "line": 6553
         },
         {
           "name": "Invoke-MacroAppLaunch",
-          "line": 6617
+          "line": 6611
         },
         {
           "name": "Invoke-MacroAppClose",
-          "line": 6690
+          "line": 6684
         },
         {
           "name": "Invoke-MacroWithApp",
-          "line": 6743
+          "line": 6737
         },
         {
           "name": "_Compute-ImageHash",
-          "line": 6871
+          "line": 6865
         },
         {
           "name": "Invoke-MacroClickAndVerify",
-          "line": 6882
+          "line": 6876
         },
         {
           "name": "Invoke-MacroNativeHealth",
-          "line": 6967
+          "line": 6961
         },
         {
           "name": "Invoke-MacroNativeWindows",
-          "line": 6985
+          "line": 6979
         },
         {
           "name": "Invoke-MacroNativeScreenshot",
-          "line": 7003
+          "line": 6997
         },
         {
           "name": "Invoke-MacroClickPoint",
-          "line": 7033
+          "line": 7027
         },
         {
           "name": "Invoke-MacroTypeNative",
-          "line": 7342
+          "line": 7336
         },
         {
           "name": "Invoke-MacroShortcutNative",
-          "line": 7368
+          "line": 7362
         },
         {
           "name": "Invoke-MacroUiaClickLabel",
-          "line": 7388
+          "line": 7382
         },
         {
           "name": "Invoke-MacroUiaInvoke",
-          "line": 7435
+          "line": 7429
         },
         {
           "name": "Invoke-MacroUiaSetValue",
-          "line": 7467
+          "line": 7461
         },
         {
           "name": "Invoke-MacroUiaToggle",
-          "line": 7494
+          "line": 7488
         },
         {
           "name": "Invoke-MacroHitTest",
-          "line": 7530
+          "line": 7524
         },
         {
           "name": "Invoke-MacroHitTestBatch",
-          "line": 7587
+          "line": 7581
         },
         {
           "name": "Invoke-MacroHitScan",
-          "line": 7669
+          "line": 7663
         },
         {
           "name": "_Set-ObjectProperty",
-          "line": 7710
+          "line": 7704
         },
         {
           "name": "_PointPlan-CacheKey",
-          "line": 7717
+          "line": 7711
         },
         {
           "name": "_PointPlan-CachePath",
-          "line": 7736
+          "line": 7716
         },
         {
           "name": "_PointPlan-ReadCache",
-          "line": 7741
+          "line": 7718
         },
         {
           "name": "_PointPlan-WriteCache",
-          "line": 7759
+          "line": 7720
         },
         {
           "name": "Invoke-MacroPointPlan",
-          "line": 7768
+          "line": 7722
         },
         {
           "name": "_TargetValidate-ConfidenceRank",
-          "line": 7976
+          "line": 7724
         },
         {
           "name": "_TargetValidate-SizeClass",
-          "line": 7986
+          "line": 7726
         },
         {
           "name": "_TargetValidate-PointEdgeDistance",
-          "line": 8002
+          "line": 7728
         },
         {
           "name": "_TargetValidate-InvokePointPlanJson",
-          "line": 8023
+          "line": 7730
         },
         {
           "name": "Invoke-MacroTargetValidate",
-          "line": 8034
+          "line": 7742
         },
         {
           "name": "Invoke-MacroSafeType",
-          "line": 8244
+          "line": 7748
         },
         {
           "name": "Test-CdpPortQuick",
-          "line": 8354
-        },
-        {
-          "name": "New-CdpDomBridgePlan",
-          "line": 8394
-        },
-        {
-          "name": "Emit-CdpPortClosed",
-          "line": 8446
-        },
-        {
-          "name": "Invoke-MacroCdpDetect",
-          "line": 8468
-        },
-        {
-          "name": "Invoke-MacroCdpEval",
-          "line": 8493
-        },
-        {
-          "name": "Invoke-MacroCdpType",
-          "line": 8530
-        },
-        {
-          "name": "Invoke-MacroCdpClick",
-          "line": 8583
-        },
-        {
-          "name": "Invoke-MacroCdpSmartFind",
-          "line": 8625
-        },
-        {
-          "name": "Invoke-MacroCdpSmartTypeFind",
-          "line": 8653
-        },
-        {
-          "name": "Invoke-MacroCdpSmartClick",
-          "line": 8681
-        },
-        {
-          "name": "Invoke-MacroCdpSmartType",
-          "line": 8726
+          "line": 7858
         },
         {
           "name": "Invoke-MacroHistory",
-          "line": 8787
+          "line": 7941
         },
         {
           "name": "Invoke-MacroSmartPlan",
-          "line": 8893
+          "line": 8047
         },
         {
           "name": "_Parse-WorkflowStepTokens",
-          "line": 8990
+          "line": 8144
         },
         {
           "name": "_Read-WorkflowStepSpecs",
-          "line": 9025
+          "line": 8179
         },
         {
           "name": "_Build-WorkflowPlan",
-          "line": 9046
+          "line": 8200
         },
         {
           "name": "Invoke-MacroWorkflowPlan",
-          "line": 9060
+          "line": 8214
+        },
+        {
+          "name": "_Invoke-LegacyExecutionChild",
+          "line": 8227
+        },
+        {
+          "name": "_Execution-EncodeWire($Value)",
+          "line": 8280
+        },
+        {
+          "name": "_Execution-Require($Condition,[string]$Message)",
+          "line": 8288
+        },
+        {
+          "name": "_Execution-Fields($Value,[string[]]$Names)",
+          "line": 8292
+        },
+        {
+          "name": "_Execution-DecodeWire($Wire)",
+          "line": 8298
+        },
+        {
+          "name": "_Execution-WriteChunks($Writer,[long]$Id,[string]$Target,$Value)",
+          "line": 8325
+        },
+        {
+          "name": "_Execution-WriteDiagnostic($State,$Process,$Stderr,[string]$ErrorText)",
+          "line": 8338
+        },
+        {
+          "name": "_Execution-ValidateEffect($Effect,$State)",
+          "line": 8358
+        },
+        {
+          "name": "_Execution-SendEscape",
+          "line": 8417
+        },
+        {
+          "name": "_Execution-Dispatch($Effect,$State)",
+          "line": 8422
+        },
+        {
+          "name": "_Invoke-LegacyExecutionEffectLoop",
+          "line": 8459
+        },
+        {
+          "name": "_Invoke-LegacyExecutionFamily",
+          "line": 8513
         },
         {
           "name": "Invoke-MacroWorkflowRun",
-          "line": 9073
+          "line": 8571
         },
         {
           "name": "_TaskPlan-QuoteToken",
-          "line": 9459
+          "line": 8573
         },
         {
           "name": "_TaskPlan-StepString",
-          "line": 9467
+          "line": 8581
         },
         {
           "name": "_TaskPlan-UnwrapCommand",
-          "line": 9483
+          "line": 8597
         },
         {
           "name": "_AppStrategy-NormalizeRoute",
-          "line": 9491
+          "line": 8605
         },
         {
           "name": "_AppStrategy-Key",
-          "line": 9510
+          "line": 8624
         },
         {
           "name": "_AppStrategy-Read",
-          "line": 9519
+          "line": 8633
         },
         {
           "name": "_AppStrategy-LastGood",
-          "line": 9532
+          "line": 8646
         },
         {
           "name": "_AppStrategy-Append",
-          "line": 9542
+          "line": 8656
         },
         {
           "name": "Invoke-MacroAppProfile",
-          "line": 9585
+          "line": 8699
         },
         {
           "name": "_Invoke-LegacyReadOnlyQuery",
-          "line": 9686
+          "line": 8800
         },
         {
           "name": "Invoke-MacroTaskPreset",
-          "line": 9739
+          "line": 8853
         },
         {
           "name": "Invoke-MacroTaskPlan",
-          "line": 9789
+          "line": 8903
         },
         {
           "name": "Invoke-MacroTaskRun",
-          "line": 9822
+          "line": 8936
         },
         {
           "name": "Invoke-MacroFormPlan",
-          "line": 9963
+          "line": 8938
         },
         {
           "name": "Invoke-MacroFormRun",
-          "line": 9992
+          "line": 8967
         },
         {
           "name": "Invoke-MacroSmartClick",
-          "line": 10232
+          "line": 8969
         },
         {
           "name": "Invoke-MacroWatch",
-          "line": 10736
+          "line": 8984
         },
         {
           "name": "Invoke-MacroOcrScreen",
-          "line": 10809
+          "line": 8998
         },
         {
           "name": "Invoke-MacroOcrImage",
-          "line": 10838
+          "line": 9027
         },
         {
           "name": "Invoke-MacroOcrFindText",
-          "line": 10862
+          "line": 9051
         },
         {
           "name": "Invoke-MacroOcrClick",
-          "line": 10905
+          "line": 9094
         },
         {
           "name": "Invoke-MacroOcrUiaFuse",
-          "line": 10979
+          "line": 9168
         },
         {
           "name": "Invoke-MacroOcrUiaInvoke",
-          "line": 11022
+          "line": 9211
         },
         {
           "name": "Invoke-MacroScreenshotDiff",
-          "line": 11064
+          "line": 9253
         },
         {
           "name": "Invoke-MacroClickAndVerifyScreen",
-          "line": 11103
+          "line": 9292
         },
         {
           "name": "Invoke-MacroAutoDo",
-          "line": 11200
+          "line": 9389
         },
         {
           "name": "_Trajectory-Append",
-          "line": 11309
+          "line": 9498
         },
         {
           "name": "_Trajectory-Read",
-          "line": 11333
+          "line": 9522
         },
         {
           "name": "_Trajectory-Clear",
-          "line": 11347
+          "line": 9536
         },
         {
           "name": "_History-Append",
-          "line": 11371
+          "line": 9560
         },
         {
           "name": "_History-PickBestStrategy",
-          "line": 11410
+          "line": 9599
         },
         {
           "name": "_History-Stats",
-          "line": 11457
+          "line": 9646
         },
         {
           "name": "_Helper-IsUp",
-          "line": 11494
+          "line": 9683
         },
         {
           "name": "_Helper-Ensure",
-          "line": 11499
+          "line": 9688
         },
         {
           "name": "Invoke-MacroSession",
-          "line": 11520
+          "line": 9709
         },
         {
           "name": "_Cucp-RedactSecrets",
-          "line": 11738
-        },
-        {
-          "name": "Invoke-MacroCdpDeepFind",
-          "line": 11762
+          "line": 9927
         },
         {
           "name": "Invoke-MacroImePaste",
-          "line": 11815
+          "line": 9959
         },
         {
           "name": "Invoke-MacroSafeTypeIme",
-          "line": 11867
+          "line": 10011
         },
         {
           "name": "Invoke-MacroModalDetect",
-          "line": 11947
+          "line": 10091
         },
         {
           "name": "Invoke-MacroRecoveryPlan",
-          "line": 11980
+          "line": 10124
         },
         {
           "name": "Invoke-MacroRecoveryRun",
-          "line": 12085
+          "line": 10132
         },
         {
           "name": "Invoke-MacroPrecisionValidate",
-          "line": 12184
+          "line": 10139
         },
         {
           "name": "Invoke-MacroBenchmark",
-          "line": 12280
+          "line": 10235
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 12421
-        },
-        {
-          "name": "Invoke-MacroCdpProseMirrorInsert",
-          "line": 12535
+          "line": 10376
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 12609
+          "line": 10508
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 12724
+          "line": 10623
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 12820
+          "line": 10719
+        }
+      ]
+    },
+    {
+      "path": "scripts/cucp-legacy-cdp-adapter.ps1",
+      "lines": 195,
+      "functions": [
+        {
+          "name": "_Invoke-LegacyCdpBridge",
+          "line": 6
+        },
+        {
+          "name": "_Invoke-LegacyCdpMacro",
+          "line": 100
+        },
+        {
+          "name": "Invoke-MacroCdpDetect",
+          "line": 132
+        },
+        {
+          "name": "Invoke-MacroCdpEval",
+          "line": 133
+        },
+        {
+          "name": "Invoke-MacroCdpType",
+          "line": 134
+        },
+        {
+          "name": "Invoke-MacroCdpClick",
+          "line": 135
+        },
+        {
+          "name": "Invoke-MacroCdpSmartFind",
+          "line": 136
+        },
+        {
+          "name": "Invoke-MacroCdpSmartTypeFind",
+          "line": 137
+        },
+        {
+          "name": "Invoke-MacroCdpSmartClick",
+          "line": 138
+        },
+        {
+          "name": "Invoke-MacroCdpSmartType",
+          "line": 139
+        },
+        {
+          "name": "Invoke-MacroCdpDeepFind",
+          "line": 140
+        },
+        {
+          "name": "Invoke-MacroCdpProseMirrorInsert",
+          "line": 141
+        },
+        {
+          "name": "_Invoke-LegacyCdpNativeArgv",
+          "line": 145
+        },
+        {
+          "name": "_Invoke-LegacyCdpNative",
+          "line": 161
+        },
+        {
+          "name": "_Action-CdpDetect",
+          "line": 185
+        },
+        {
+          "name": "_Action-CdpEval",
+          "line": 186
+        },
+        {
+          "name": "_Action-CdpType",
+          "line": 187
+        },
+        {
+          "name": "_Action-CdpClick",
+          "line": 188
+        },
+        {
+          "name": "_Action-CdpSmartFind",
+          "line": 189
+        },
+        {
+          "name": "_Action-CdpSmartTypeFind",
+          "line": 190
+        },
+        {
+          "name": "_Action-CdpSmartClick",
+          "line": 191
+        },
+        {
+          "name": "_Action-CdpSmartType",
+          "line": 192
+        },
+        {
+          "name": "_Action-CdpDeepFind",
+          "line": 193
+        },
+        {
+          "name": "_Action-CdpProseMirrorInsert",
+          "line": 194
         }
       ]
     }
@@ -1244,6 +1326,72 @@
       "name": "_AppProfile-StrategyScore",
       "replacement": "pcucp-next/dotnet/PcuCp.NativeHost/LegacyStrategyKernel.cs",
       "evidence": "496 full public captured cases and shared culture/text gates passed at 0d5fa6bb87c2b61b2756e2897046fc4dde03e5dd / run 36963644280. Replacement is release-gated by all 523 kernel and actual-adapter cases, exact Console/query/error/exit comparisons, and 63 controller guards in test_legacy_app_profile_parity.py."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "New-CdpDomBridgePlan",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_macro.py",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Emit-CdpPortClosed",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_macro.py",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Cdp-HttpGet",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_transport.py",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Cdp-WsCall",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_transport.py",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Cdp-PortOpen",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_transport.py",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Cdp-NewDomBridgePlan",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_contract.py",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Cdp-Detect",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Cdp-ScorePages",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_contract.py",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Cdp-FindPage",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_contract.py",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Cdp-RunSmartDomAction",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Js-StringLiteral",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
     }
   ],
   "compiled_interop": {
@@ -1259,8 +1407,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 988413,
-    "removed": 25065,
+    "current": 821540,
+    "removed": 191938,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
@@ -1320,6 +1468,300 @@
       "replacement": "pcucp-next/dotnet/PcuCp.LegacyAppProfile/LegacyAppProfileKernel.cs",
       "adapter": "bounded original acquisition and one explicit history append; complete C# preflight, followed only by original record fields/formatting, with no post-Append transport",
       "evidence": "496 full public captured cases and shared culture/text gates passed at 0d5fa6bb87c2b61b2756e2897046fc4dde03e5dd / run 36963644280. Replacement is release-gated by all 523 kernel and actual-adapter cases, exact Console/query/error/exit comparisons, and 63 controller guards in test_legacy_app_profile_parity.py."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroWorkflowRun",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyExecution/LegacyExecutionWorkflow.cs",
+      "adapter": "Qualified execution host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroTaskRun",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyExecution/LegacyExecutionTaskForm.cs",
+      "adapter": "Qualified execution host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroFormRun",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyExecution/LegacyExecutionTaskForm.cs",
+      "adapter": "Qualified execution host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroSmartClick",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyExecution/LegacyExecutionSmartClick.cs",
+      "adapter": "Qualified execution host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroWatch",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyExecution/LegacyExecutionWatchRecovery.cs",
+      "adapter": "Qualified execution host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroRecoveryPlan",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyExecution/LegacyExecutionWatchRecovery.cs",
+      "adapter": "Qualified execution host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroRecoveryRun",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyExecution/LegacyExecutionWatchRecovery.cs",
+      "adapter": "Qualified execution host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_AnchorHistory-Read",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionKernel.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_AnchorHistory-NormDistance",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionKernel.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_AnchorHistory-Append",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionStorage.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_AnchorHistory-Score",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionKernel.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroCoordAnchor",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionPlanners.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_PointPlan-CacheKey",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionKernel.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_PointPlan-CachePath",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionStorage.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_PointPlan-ReadCache",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionStorage.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_PointPlan-WriteCache",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionStorage.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroPointPlan",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionPlanners.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_TargetValidate-ConfidenceRank",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionKernel.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_TargetValidate-SizeClass",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionKernel.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_TargetValidate-PointEdgeDistance",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionKernel.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_TargetValidate-InvokePointPlanJson",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionKernel.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroTargetValidate",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionPlanners.cs",
+      "adapter": "Qualified precision host effects remain in the same public function interface; original coordination/algorithm body removed.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroCdpDetect",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_macro.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroCdpEval",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_macro.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroCdpType",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_macro.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroCdpClick",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_macro.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroCdpSmartFind",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_macro.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroCdpSmartTypeFind",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_macro.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroCdpSmartClick",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_macro.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroCdpSmartType",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_macro.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroCdpDeepFind",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_macro.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroCdpProseMirrorInsert",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp_macro.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Action-CdpDetect",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Action-CdpEval",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Action-CdpType",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Action-CdpClick",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Action-CdpSmartFind",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Action-CdpSmartTypeFind",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Action-CdpSmartClick",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Action-CdpSmartType",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Action-CdpDeepFind",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "name": "_Action-CdpProseMirrorInsert",
+      "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
+      "adapter": "scripts/cucp-legacy-cdp-adapter.ps1 preserves the public delegate; typed startup authority and no-fallback native interception remain.",
+      "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
     }
   ]
 }

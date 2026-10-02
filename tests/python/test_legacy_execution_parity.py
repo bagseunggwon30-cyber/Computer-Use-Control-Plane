@@ -20,6 +20,14 @@ BASELINE_TREE = "bf895d3120dd5e145f360cb1c41e1d79a061d048"
 PROJECT = ROOT / "pcucp-next/dotnet/PcuCp.LegacyExecution.ContractTests"
 
 
+def adapter_source():
+    """Use the configured candidate or the manifest-selected production adapter."""
+    override=os.environ.get("CUCP_EXECUTION_ADAPTER_SOURCE")
+    if override:return Path(override)
+    promoted=json.loads((ROOT/".github/migration-adapters.json").read_text(encoding="utf-8"))["test_adapters"]
+    return ROOT/("scripts/cucp.ps1" if "execution" in promoted else "tests/fixtures/legacy-execution-adapter.ps1")
+
+
 def first_difference(actual, expected, path="$"):
     """Bounded failure context; equality assertions remain the qualification gate."""
     if type(actual) is not type(expected):
@@ -203,7 +211,7 @@ def run_candidate(fixtures):
 
 class ExecutionPortableTests(unittest.TestCase):
     def test_actual_capture_intercepts_escape_before_any_input(self):
-        source=(ROOT/"tests/fixtures/legacy-execution-adapter.ps1").read_text(encoding="utf-8-sig")
+        source=adapter_source().read_text(encoding="utf-8-sig")
         dispatch=source.split("function _Execution-Dispatch",1)[1].split("\nfunction ",1)[0]
         self.assertNotIn("SendKeys",dispatch)
         self.assertNotIn("Add-Type",dispatch)

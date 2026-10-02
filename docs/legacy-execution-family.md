@@ -1,241 +1,166 @@
-# Legacy execution coordination candidate
+# Legacy execution coordination
 
-The first published combined gate (`120b64a605bece965da4637e6510afcbd46fe871`,
-Actions run `36997186053`) reached terminal failure in the execution Windows job.
-The job-log connector repeatedly returned `Transport closed`, and the run had no
-downloadable artifacts. This is not parity qualification. The next gate retains
-every comparison and includes bounded fixture diagnostics: the adapter can emit
-up to four protocol-failure records when `CUCP_EXECUTION_DIAGNOSTICS=1`, containing
-phase/expected ID, the first 16 codepoints and 256 characters of the last frame,
-process exit state, and at most 1,024 stderr characters. Normal execution leaves
-that diagnostic option unset. The harness reports a compact first difference and
-bounds only displayed unittest diffs; it does not remove cases or assertions.
-A separate inert Windows child characterizes the .NET Framework redirected-input
-writer's initial UTF-8 BOM, even when the subsequent explicit writer uses no BOM.
+The coordination bodies of `workflow-run`, `task-run`, `form-run`, `smart-click`,
+`watch`, `recovery-plan`, and `recovery-run` now run in C#. Their seven public
+PowerShell functions in `scripts/cucp.ps1` are thin wrappers around the qualified
+streaming adapter. The duplicate execution adapter fixture has been removed,
+and the migration manifest selects the production definitions for qualification.
 
-The next published gate (`a7bffa18b8325fe06f00459324c1f3631f2c896a`, run
-`37000162419`) made the complete execution log downloadable. The 359 execution
-contracts, 52 startup contracts, typed-child/ceiling tests, byte characterization,
-and uncertainty tests passed. All actual-adapter cases stopped before any effect
-because startup used the inherited Windows console decoder; the central entry
-now has a separate strict UTF-8 reader fix awaiting qualification. Four pure
-oracle mismatches identified two specific report/command behaviors: missing
-task/form error properties must appear as `[null]` in direct report arrays, and a
-singleton-null task command must stop as `missing_recommended_command` without a
-second child or trajectory write. The candidate fixes these with 11 added
-contracts while leaving every differential assertion intact. The actual harness
-also captures a dedicated Escape helper before testing recovery execution; no
-fixture can reach `SendKeys` through the retained dispatch body.
+The kernel and exact retained adapter passed the Windows gate at
+`e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe`,
+[run 37007340738, execution job 110838651590](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37007340738/job/110838651590):
+370 execution contracts, 56 startup contracts, all 35 Python tests, and both
+462-case differentials. The source-map artifact matched six file hashes and 382
+function extents. The 19 promoted execution wrapper/helper extents were then
+verified unchanged and unique in the production source.
 
-The `f2333bebd53e28e59a05795abfeb90275dc67d09` gate (run `37002020097`)
-passed the complete 462-case pure Windows differential. Its actual adapter ran
-all cases in a 349.794-second test suite and exposed three remaining boundaries:
-PS5's `Write-Output -NoEnumerate` decorated decoded arrays during Console JSON
-serialization; Console writes needed an explicit captured trace entry; and an
-icon observation failure after prior live dispatch entered a legacy fallback.
-The next candidate returns true arrays with unary-comma pipeline preservation,
-captures Console at its actual dispatch seam, and treats explicit post-dispatch
-read failures as terminal uncertainty. Fourteen actual-codec values include
-empty/singleton/nested arrays and genuine `value`/`Count` objects; there is no
-shape-based normalization. Portable coordinator and disposable-session tests
-verify that the failed read emits no second fallback effect and retains the
-uncertain, no-retry terminal outcome. Exact original comparisons are unchanged.
-
-At `ad8790be0301b5e77ca87d841718bf0fac8fb1e9` (run `37005163979`), the
-actual codec roundtrips, large confirmation preflight, typed children and all
-uncertainty checks passed. The 54 remaining actual-adapter mismatches were
-recovery reports whose original ordered dictionaries were omitted by the capture
-observer's PSObject-only schema lookup. The observer now recognizes dictionary
-keys too, and both differentials require a full original recovery payload before
-comparing it. This strengthens capture without changing the original functions,
-candidate runtime or expected Console/effect/error/exit equality.
-
-The execution family migrates the coordination bodies of `workflow-run`,
-`task-run`, `form-run`, `smart-click`, `watch`, `recovery-plan`, and `recovery-run`
-as one qualification unit. The oracle is the original `scripts/cucp.ps1` blob in
-Git tree `bf895d3120dd5e145f360cb1c41e1d79a061d048`. The original implementations
-remain in production until the Windows candidate and actual-adapter gates pass.
-This candidate is not an interactive Windows qualification or a completed
-zero-PowerShell migration.
+The integrated commit still requires its bundled full regression, including
+actual-adapter checks against `scripts/cucp.ps1`. The earlier candidate pass is
+not a substitute for that gate. Windows acquisition/input and temporary
+PowerShell child execution remain; this architecture does not complete the
+zero-PowerShell migration or its interactive Windows qualification.
 
 ## State and effects
 
-`LegacyExecutionCoordinator` holds the current run in one process. A synchronous
-`ILegacyExecutionEffects` callback separates planning, child invocation, native
-acquisition/input, local macro calls, port probes, history, trajectory, sleep,
-clocks, timestamps, owned capture paths/cleanup, console lines, and Escape input.
-The coordinator itself has no process, filesystem, network, desktop, or shell API.
-The closed effect enum does not accept arbitrary callable names or code.
+`LegacyExecutionCoordinator` retains the current run in one process. A synchronous
+`ILegacyExecutionEffects` callback separates workflow planning, child invocation,
+native acquisition/input, local macros, CDP port probes, history, trajectory,
+sleep, clocks, timestamps, owned capture paths/cleanup, Console lines and Escape.
+The coordinator has no process, filesystem, network, desktop or shell API. Its
+closed effect enum does not accept arbitrary callable names or code.
 
-`LegacyExecutionAuthority` is immutable constructor context. A plan or effect
-reply cannot alter it. Live descriptors are checked against that context before
-calling the effect adapter. Sensitive confirmation requires a standalone original flag
-and trusted startup confirmation. `LegacyExecutionConsent` skips known option
-values when deriving that flag; a label/text value equal to the flag is not consent. Adapters must independently enforce both
-ceilings; classifier or plan booleans are never authority.
+`LegacyExecutionSession` connects the callback to the dedicated NativeHost
+`legacy-execution-session` entry. The twelve retained private adapter functions
+in `scripts/cucp.ps1` validate descriptors, dispatch closed effects, and own process
+startup, streams and cleanup. The separate `_Execution-SendEscape` helper is an
+explicit input seam that the actual qualification replaces with a captured effect.
 
-Each child descriptor has separate `argv`, `live`, `quiet`, `brief`, and
-`confirm_sensitive` fields. User strings such as `-AllowLiveControl`, `-Brief`,
-`-CucpArgs`, or `--confirm-sensitive` remain data in the named argument array.
-The temporary legacy adapter must bind `-CucpArgs ([string[]]$request.argv)`
-in-process and pass trusted switches separately. Native `powershell -File ...
-@argv` is expressly forbidden for this transport. The child bootstrap requires support marker `cucp.execution-sensitive-ceiling/v1`
-and installs constant Boolean `CUCP_EXECUTION_SENSITIVE_CEILING`. The common switch
-reader rejects sensitive confirmation under a false, malformed, or mutable ceiling.
-The existing read-only planner
-transport stays read-only and is not reused for actuator descriptors.
+Existing dependencies remain: `_Build-WorkflowPlan` and its compatible tokenizer,
+`Invoke-NativeHelper`, `Invoke-MacroClickPoint`, `Invoke-MacroIconFind`,
+`Test-CdpPortQuick`, history and trajectory helpers, fixed clock/sleep operations,
+and owned screenshot paths. These effect implementations are later migration
+work; the retired coordination bodies are not copied into another runtime file.
 
-Report state is retained once, locally, including all 256 steps and six attempts
-per step. No previous replies are retransmitted. `LegacyExecutionSession` offers
-an optional streaming callback adapter for a dedicated NativeHost
-`legacy-execution-session` mode. It is not part of the per-call pure compatibility
-registry. The host supplies operation, initial argv, authority, render mode,
-cache duration, and provider availability before entering the session.
+Report state is retained once, including 256 steps and six attempts per step.
+Previous replies are never retransmitted. The session accumulates its current
+incoming reply and final report in memory; it does not claim constant-memory
+report assembly.
 
-Each session effect/report is split into 48 KiB UTF-8 chunks represented as
-base64 JSONL `part` frames and an `end` frame. Replies use the outstanding sequence
-ID and the same chunk scheme. Wrong IDs, duplicate fields, unknown fields,
-malformed tagged values, disconnection, or oversized individual chunks fail the
-session without retrying an effect. There is no aggregate transcript limit or
-new workflow cap. A chunk limit requires splitting the same payload, not dropping
-results. The session currently accumulates one incoming reply and the final
-report in memory; it does not claim constant-memory report assembly.
+## Immutable authority and typed children
 
-Runtime arrays use explicit `scalar`, `array`, and `object` wire tags. Objects
-carry named property pairs and arrays carry item lists. An ordinary
-`{"value": [...], "Count": 1}` object remains an object. No shape-based
-unwrapping is permitted. The full report object and original depth-limited
-Console serialization remain separate assertions.
+`LegacyExecutionAuthority` is immutable constructor context. Plans, captured
+commands and effect replies cannot grant live input or sensitive confirmation.
+The coordinator and retained adapter independently enforce the startup ceilings.
 
-## Preserved behavior
+Only the NativeHost process switches `--allow-live-control` and
+`--confirm-sensitive` establish upper bounds. Sensitive permission also requires
+an arity-aware standalone flag in the original invocation. `LegacyExecutionConsent`
+skips known option values, so text or a label spelling `--confirm-sensitive` is
+not consent. The top-level macro gate uses the same pure check.
 
-- Workflow gating precedes execution, including dry-run, plan safety, live
-  authority, and sensitive confirmation; verification windows/labels and option
-  aliases retain their original order and numeric coercion
-- At most five requested retries yield at most six attempts; live retries require
-  `--retry-live-steps`; failed command/verification reports remain partial,
-  with exact attempt records and first-failure guidance
-- Task planning, chosen dry-run/recommended commands, propagation of run options,
-  child status mapping, and trajectory placement remain distinct from form runs
-- Form command validation, independent safety classification, per-step blocking,
-  continuation, and original lack of implicit input retry are retained
-- SmartClick retains CDP, UIA invoke, precision points, coordinate fallback, icon,
-  fusion, OCR, and optional vision stages; history hints, low-confidence stopping,
-  label verification, explicit screen-change retries, early-return cleanup and
-  history behavior are preserved, including historical quirks
-- Watch retains each observation and emits brief cycle output before its sleep
-- Recovery planning never executes a recommended command; recovery execution
-  allows only the closed Escape effect after both required startup gates
+Each child descriptor separates `argv`, `live`, `quiet`, `brief`, and
+`confirm_sensitive`. Strings such as `-AllowLiveControl`, `-Brief` and `-CucpArgs`
+remain data in a named `-CucpArgs ([string[]]$request.argv)` parameter. Trusted
+switches are bound separately. Native `powershell -File ... @userArgv` is not used,
+and the read-only planning helper has not been widened into an actuator transport.
 
-The candidate preserves explicit original fallbacks and explicit retry options.
-It does not add automatic retries after failed/disconnected effect transports.
-Callback exceptions that the original catches remain catchable effect failures;
-protocol/authority failures cannot be swallowed into a fallback.
+Before launch, the child adapter requires the exact support marker
+`cucp.execution-sensitive-ceiling/v1` in the child switch reader. Its fixed
+bootstrap installs constant Boolean `CUCP_EXECUTION_SENSITIVE_CEILING`, intersecting
+parent permission with this effect's sensitive grant. The reader rejects a false,
+non-Boolean or mutable present ceiling; an old child without support is refused.
+Absent ceilings preserve existing direct calls. No failure triggers an automatic
+child retry.
 
-## Qualification
+## Startup and streaming protocol
 
-`PcuCp.LegacyExecution.ContractTests --self-test` exercises the whole family and
-tagged streaming boundary without a live executor. Python portable checks cover
-462 captured fixtures, control-like argument data, unchanged runtime object
-shape, and a 256-step/six-attempt workflow whose report exceeds the former 1 MiB
-compatibility bridge.
+The host reads strict UTF-8 directly from standard input, independently of the
+Windows console code page. Original arguments, operation, formatting options,
+cache duration, provider availability and culture arrive through id-zero startup
+chunks. Effects begin at id one; each reply is bound to the outstanding sequence.
 
-On Windows, `test_legacy_execution_parity.py` loads only selected AST definitions
-from the pinned Git blob and replaces every executable, input, sleep, clock,
-file, native, and persistence effect before invoking them. It compares the full
-unformatted object, exact effect order and descriptors, exceptions, exits, and
-original Console output. Timing is fixed at the effect boundary. The original
-function source is read from history at test time, not copied into runtime files.
-All inputs and replies are inert fixtures. No authenticated model or live desktop
-input is used.
+Each decoded chunk is at most 48 KiB, each line at most 66,000 characters, and the
+startup request at most 32 MiB. Exactly one initial UTF-8 BOM is accepted;
+repeated, embedded or later-frame BOMs and malformed UTF-8 are rejected. Duplicate
+or unknown keys, wrong types, forged authority fields and duplicate process
+switches fail before any effect.
 
-The actual temporary PowerShell adapter requires separate qualification using
-`CUCP_EXECUTION_TEST_HOST`. It is not enabled by a pure-candidate pass. A final
-zero-PowerShell release will replace the temporary effect implementation with
-Python/C# and freeze reviewed oracle fixtures, then test with PowerShell absent.
+The confirmation preflight uses the closed `legacy-execution-confirmation` entry
+with a 32 MiB bound and only the `execution-confirmation` operation. Ordinary pure
+compatibility calls retain their 1 MiB budget. Actual Windows wrapper tests cover
+Unicode arguments beyond 1 MiB and distinguish literal option values from a
+standalone consent flag.
 
-## Integrated startup contract (awaiting actual-adapter gate)
+Effect requests, replies and terminal reports use base64 JSONL `part`/`end` frames.
+The chunk limit requires splitting the same value, not truncating results. There
+is no growing transcript frame, aggregate report cap or new workflow step cap.
+Wrong IDs, malformed tags, unexpected fields or disconnection terminate the
+session without replaying an effect.
 
-`legacy-execution-session` is a separate NativeHost entry. Only its fixed process
-switches `--allow-live-control` and `--confirm-sensitive` establish upper bounds.
-Original arguments, operation, formatting flags and culture arrive through id-zero
-startup chunks, followed by the effect stream beginning at id one. Replies cannot
-change startup authority. Sensitive permission also requires an arity-aware
-standalone flag in original arguments; a label or text value spelling that flag
-does not grant consent. The direct macro safety gate uses the same pure check.
+Runtime values have explicit `scalar`, `array` and `object` tags. Object members
+are named pairs; arrays are item lists. The PowerShell decoder returns true arrays
+using unary-comma preservation, avoiding PS5 pipeline decorations during Console
+serialization. Genuine `{value, Count}` objects remain objects. No shape-based
+unwrapping is permitted.
 
-Each startup chunk is at most 48 KiB, each line at most 66,000 characters, and the
-startup request at most 32 MiB. This limit is independent of the accumulated report.
-The direct startup parser has been tested beyond 1 MiB. The retained confirmation
-preflight previously imposed its own 1 MiB limit; the candidate now uses a closed
-`legacy-execution-confirmation` entry with the same 32 MiB bound. That entry rejects
-every other operation, and ordinary pure operations retain their 1 MiB budget.
-Actual Windows wrapper tests cover a Unicode request beyond 1 MiB and preserve
-option-value versus standalone-consent positions; they must pass before claiming
-the larger wrapper capacity. Schema keys are exact and unique;
-unknown operations, forged authority fields, implicit boolean conversion and
-duplicate process switches fail before any effect. Forty-six portable startup
-checks pass. Windows inert-child/top-level gate checks are release requirements;
-the production body replacements remain pending the joint batch gate.
+## Preserved behavior and uncertainty
 
-## Uncertain mutation correction and retained adapter
+- Workflow gates run before execution. Dry runs, plan safety, live permission,
+  sensitive confirmation, observations, labels, numeric coercion and option
+  aliases preserve their original ordering
+- Five requested retries allow six attempts. Live retries require
+  `--retry-live-steps`; partial attempts and first-failure guidance remain visible
+- Task and form planning retain their distinct validation, child options, report
+  shapes and trajectory placement. Direct report arrays preserve missing values
+  as `[null]`, while a singleton-null task command is blocked before execution
+- SmartClick retains CDP, UIA, precision points, coordinate fallback, icon, fusion,
+  OCR and optional vision stages, including history hints, low-confidence stops,
+  label/screen verification, explicit screen retries and historical early returns
+- Watch emits each brief observation before its captured sleep. Recovery planning
+  never executes a recommendation; Escape requires both startup gates
 
-The new native/CDP boundary can report `mutation_may_have_occurred: true` inside
-its captured JSON. SmartClick now stops immediately with a partial outcome when
-that metadata is present, including an otherwise successful status/exit. It does
-not try UIA/OCR fallback or append success history. Workflow records the uncertain
-attempt, skips requested retries and later steps, and explains the uncertainty in
-its failure summary; form and task results remain partial. The separate original
-characterization test demonstrates the old CDP-to-UIA fallthrough rather than
-changing its expected result. Ordinary captured failures retain strict original
-parity assertions.
+Explicit `mutation_may_have_occurred: true` stops SmartClick before fallback or
+success-history writes, even if a reply otherwise reports success. Workflow
+records the uncertain attempt and skips retries and later steps; form and task
+remain partial. The original CDP fallthrough defect is characterized separately
+from ordinary exact-parity cases.
 
-A live effect exception whose adapter cannot establish a pre-dispatch failure
-uses the same conservative uncertainty metadata. A malformed protocol or broken
-session is still a terminal transport error, never an action retry. The adapter
-marks its own live effect failures conservatively; captured fixtures can identify
-known pre-dispatch exceptions separately.
+A live effect exception with no trustworthy pre-dispatch failure proof receives
+conservative uncertainty metadata. A failed observation after prior live dispatch
+is also terminal and cannot enter a legacy read fallback. Lost or malformed
+reply streams preserve `mutation_may_have_occurred: true` and
+`automatic_retry: false`; the adapter maintains its own dispatch record so abrupt
+host exit cannot erase that warning. Ordinary captured failures before live
+dispatch retain exact original behavior.
 
-The retained-adapter candidate now has complete closed dispatch, strict descriptor
-validation, process startup/lifetime management, owned screenshot paths, no-BOM
-chunked stdin, and seven thin public wrappers. Child sensitive authority is the
-intersection of the original invocation ceiling and that particular typed effect's
-sensitive grant. Old children lacking the exact ceiling support marker are refused
-before launch. Direct SmartClick script calls use a distinct child mode so their
-Console output remains observable before the final SmartClick result.
+## Qualification and remaining gates
 
-Actual-adapter tests run the real chunked session, descriptor validation, dispatcher,
-wrappers and Console formatter against captured native/helper/history effects. A
-separate disposable child fixture exercises the actual named-argv bootstrap. No
-Windows interactive input is used by either qualification. The complete temporary
-adapter remains an external integration draft until these gates pass; it is not a
-new hidden runtime dependency or a claim that PowerShell has been retired.
+The oracle is the original `scripts/cucp.ps1` blob in Git tree
+`bf895d3120dd5e145f360cb1c41e1d79a061d048`. Windows tests load selected AST definitions
+from Git history and replace every child, input, native, sleep, clock, file and
+persistence seam before invocation. They compare complete unformatted objects,
+exact Console output, effects and their order, errors and exits. Ordered-dictionary
+recovery reports are captured before formatting and are required explicitly.
+No authenticated model or live desktop input is used.
 
-Session-level transport loss is independently covered: once a live effect has
-been sent, a closed reply stream, wrong sequence, or malformed JSON produces a
-terminal error with `mutation_may_have_occurred: true` and
-`automatic_retry: false`. The retained adapter also keeps its own live-dispatch
-record, so an abrupt host exit or malformed host frame cannot lose that warning.
-The three disposable-process regression variants verify only one live effect
-was sent. This evidence is separate from successful parsing of a child's result.
+All 462 actual-adapter cases remain, including 32 reached exact non-live failures,
+six unreached injected failures, and 16 deliberate post-dispatch uncertainty
+cases. The unchanged exact-equality path covers 446 cases. Independent contracts
+cover typed inert children, immutable ceilings, true-array roundtrips, malformed
+streams and the 256-step/six-attempt report exceeding 1 MiB.
 
-The effect-reply reader also bounds each line before JSON allocation and rejects
-non-numeric sequence identifiers before conversion. Any reply or result assembly
-exception after a live dispatch remains an execution-phase uncertain outcome; it
-cannot fall through as a startup refusal. Portable process tests cover EOF, wrong
-sequence, string sequence, malformed JSON and an oversized line after one live
-effect, and assert that no second live effect is sent. The test runner rebuilds
-its contract assembly once per process so an old DLL cannot mask source edits.
+`CUCP_EXECUTION_TEST_HOST` selects the matching NativeHost for actual tests.
+Diagnostic, codec and Escape-seam readers select an explicit
+`CUCP_EXECUTION_ADAPTER_SOURCE` override or the manifest-enabled production source.
+Tests rebuild the contract assembly once per process to avoid stale DLL evidence.
 
-The actual-session differential now runs every one of the 462 fixtures, including
-all 54 fixtures containing injected exceptions. Failure classification comes from
-the original captured effect identity and its dispatch prefix, not from startup
-live permission or the presence of a `throw` field alone. The portable capture
-partition contains 32 failures before any live dispatch and six injected failures
-that are never reached; all 38 retain complete exact original comparisons. The
-remaining 14 failures at live effects and two read failures after a live dispatch
-have explicit uncertainty assertions, exact trace-prefix and consumption checks,
-and no subsequent action; only partial-result trajectory recording may follow.
-Together with the 408 ordinary cases, that is 446 exact comparisons and 16
-intentional safety-correction comparisons. The independent original-kernel oracle
-assertions remain unchanged.
+Optional `CUCP_EXECUTION_DIAGNOSTICS=1` emits at most four bounded protocol-failure
+records: phase, expected ID, first 16 codepoints/256 characters of the last frame,
+process exit state, and at most 1,024 stderr characters. It is unset in ordinary
+runs and never replaces the original exception or changes protocol decisions.
+Complete qualification logs and read-only parser source maps are downloadable CI
+artifacts; displayed diffs are bounded without dropping assertions.
+
+The next required evidence is the integrated full gate. The final zero-PowerShell
+release additionally needs Python/C# replacements for retained effects and child
+entry points, reviewed frozen oracle fixtures, and testing with PowerShell absent.

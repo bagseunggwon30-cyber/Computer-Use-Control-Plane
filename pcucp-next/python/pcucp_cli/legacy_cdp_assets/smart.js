@@ -41,27 +41,89 @@ function(args){
     catch(e) { el.dispatchEvent(new Event('input', { bubbles: true })); }
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
+  // Public-text boundary: values are not labels, except visible input captions.
+  // Read calls keep this fixed traversal under mandatory throwOnSideEffect.
+  function sourceOnly(el) {
+    return !!el && /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test((el.tagName || '').toUpperCase());
+  }
+  function textExcluded(el) {
+    return sourceOnly(el) || !!el && (el.tagName || '').toUpperCase() === 'TEXTAREA';
+  }
+  function excludedBySource(el) {
+    let node = el;
+    for (let depth = 0; node && depth < 128; depth++, node = node.parentElement) {
+      if (sourceOnly(node)) return true;
+    }
+    return !!node; // Excessive ancestry is excluded, never treated as public.
+  }
+  function publicText(el, rendered) {
+    if (!el || excludedBySource(el) || textExcluded(el)) return '';
+    if (!el.querySelector('script,style,noscript,template,textarea'))
+      return (rendered ? el.innerText : el.textContent) || '';
+    // Aggregate getters would include source-only or textarea value text. Rebuild only this
+    // affected subtree; normal labels retain their original browser text exactly.
+    const stack = [el], parts = [];
+    let visited = 0;
+    while (stack.length && visited < 1200) {
+      const node = stack.pop(); visited++;
+      if (typeof node === 'string') {
+        if (!parts.length || !parts[parts.length - 1].endsWith('\n')) parts.push(node);
+        continue;
+      }
+      if (textExcluded(node)) continue;
+      if (node.nodeType === 3) { parts.push(node.nodeValue || ''); continue; }
+      if (node.nodeType !== 1) continue;
+      if (rendered) {
+        const cs = window.getComputedStyle(node);
+        if (!cs || cs.display === 'none' || /^(hidden|collapse)$/.test(cs.visibility)) continue;
+        if (node.tagName === 'BR') { parts.push('\n'); continue; }
+        if (node !== el && /^(block|flex|grid|list-item|table|table-row)$/.test(cs.display)) {
+          if (!parts.length || !parts[parts.length - 1].endsWith('\n')) parts.push('\n');
+          stack.push('\n');
+        }
+      }
+      const children = node.childNodes;
+      if (children.length + stack.length > 1200) return '';
+      for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+    }
+    if (stack.length) return '';
+    const text = parts.join('');
+    return rendered ? text.replace(/^\n+|\n+$/g, '') : text;
+  }
+  function inputCaption(el) {
+    if (!el || el.tagName !== 'INPUT' ||
+        !/^(button|submit|reset)$/i.test(el.getAttribute('type') || '')) return '';
+    const rect = el.getBoundingClientRect();
+    const cs = window.getComputedStyle(el);
+    if (!rect || rect.width < 1 || rect.height < 1 || !cs || cs.display === 'none' ||
+        /^(hidden|collapse)$/.test(cs.visibility) || Number(cs.opacity || 1) === 0) return '';
+    return el.value || ''; // Current rendered caption, never a stale value attribute.
+  }
   function textParts(el) {
+    if (excludedBySource(el)) return [];
     const parts = [];
-    const attrs = ['aria-label','title','placeholder','alt','name','id','value'];
+    const attrs = ['aria-label','title','placeholder','alt','name','id'];
     for (const a of attrs) {
       const v = el.getAttribute && el.getAttribute(a);
       if (v) parts.push(v);
     }
+    const caption = inputCaption(el);
+    if (caption) parts.push(caption);
     if (el.labels) {
       for (const l of Array.from(el.labels)) {
-        if (l && l.innerText) parts.push(l.innerText);
+        const label = publicText(l, true);
+        if (label) parts.push(label);
       }
     }
     if (el.tagName === 'LABEL' && el.control) {
-      parts.push(el.innerText || '');
+      parts.push(publicText(el, true));
       const c = el.control;
       for (const a of ['aria-label','title','placeholder','name','id']) {
         const v = c.getAttribute && c.getAttribute(a);
         if (v) parts.push(v);
       }
     } else {
-      parts.push(el.innerText || el.textContent || '');
+      parts.push(publicText(el, true) || publicText(el, false));
     }
     return parts.map(p => (p || '').toString()).filter(Boolean);
   }
@@ -216,6 +278,7 @@ function(args){
   for (const el0 of uniqueNodes) {
     let el = el0;
     if (action === 'type' && el0.tagName === 'LABEL' && el0.control) el = el0.control;
+    if (excludedBySource(el0) || excludedBySource(el)) continue;
     if (!visible(el0) && !visible(el)) continue;
     const parts = textParts(el0);
     if (el !== el0) parts.push(...textParts(el));

@@ -4,7 +4,7 @@ The user-approved target remains zero PowerShell source and execution, preservin
 the existing public capabilities. The feature branch is
 `migration/python-csharp-runtime`; a main-branch merge still needs approval.
 
-The next implementation batch covers three independent families in parallel:
+The current integrated batch covers three independent families developed in parallel:
 
 | Family | Existing PS source footprint | Boundary |
 | --- | ---: | --- |
@@ -14,8 +14,9 @@ The next implementation batch covers three independent families in parallel:
 
 These 178,945 bytes include function regions and separators. They are a scope
 inventory, not a promised net reduction. Bridge overhead is included when actual
-retirement is measured. Existing PS bodies remain until replacement behavior is
-qualified; adding candidate code alone does not count as retirement.
+retirement is measured. Original bodies were retained through qualification and
+then replaced with the exact verified adapters; adding candidates alone did not
+count as retirement.
 
 Workers own separate new implementations, contract projects and fixtures. The
 integrator owns shared interfaces, entry points, existing-script replacements,
@@ -81,8 +82,8 @@ through the inherited Windows console code page. Their replacement readers now
 share one strict UTF-8 byte stream without changing console settings; malformed
 bytes and other encodings remain rejected. The browser probes isolated native
 `CSS.escape` as a guarded-evaluation blocker, so the candidate uses a pure
-equivalent with a native browser oracle. These repairs still require the next
-exact Windows/browser run and do not authorize retirement by themselves.
+equivalent with a native browser oracle. These repairs were subsequently qualified with the combined adapters and kernels
+at the checkpoint below; an intermediate repair alone did not authorize retirement.
 
 After the full gate passes, verify the published commit/tree and every blob,
 recompute actual PS bytes, and report only the accepted reduction. Interactive
@@ -101,11 +102,26 @@ controller guards, plus the separate culture/quote/casing suite. It retires
 1,013,478-byte baseline. The remaining 921,614 bytes are not a feature-completion
 percentage. Main remains at `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`.
 
-## Current candidate source accounting
+## Current integration and source accounting
 
-The three exact adapter fixtures are executable PowerShell files, counted normally
-in the [tracked source inventory](legacy-function-inventory.json), which records
-the current exact totals. With original bodies retained, the temporary overlap
-is qualification code, not retirement. After the combined adapter/kernel
-Windows gate, promote the same glue, remove verified original bodies and duplicate
-fixtures, then measure the resulting blobs and run the full regression gate.
+All focused jobs passed at `e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe` in
+[run 37007340738](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37007340738).
+The integrator verified parser-derived source hashes and all function extents
+before copying the qualified adapters into production. The three duplicate
+fixture scripts were removed, and the manifest now selects production sources.
+The shared CDP host remains an ordinary counted PowerShell file.
+
+The integration replaces 53 original function extents, retaining 42 compatible
+delegates and removing 11 private helpers. Including adapter and test overhead,
+current tracked PowerShell is 821,540 bytes: 100,074 fewer than the prior accepted
+checkpoint and 191,938 fewer than the original baseline. The
+[canonical source inventory](legacy-function-inventory.json) reproduces these
+measurements. These are pending integrated source measurements until the exact
+current commit passes its bundled full regression.
+
+The full gate also checks promoted central CDP routing, relocated test loaders,
+portable packaging and a narrow intentional privacy correction. Legacy CDP
+search exposed field values and source-only text; the corrected assets exclude
+those signals before matching and output. Synthetic characterization is separate
+from ordinary parity, and four new owned-browser privacy cases must pass. The
+existing side-effect guard and ordinary compatibility assertions remain intact.

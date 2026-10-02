@@ -15,6 +15,7 @@ BASELINE_TREE="bf895d3120dd5e145f360cb1c41e1d79a061d048"
 @unittest.skipUnless(sys.platform=="win32","Windows PowerShell diagnostic contract")
 class ExecutionAdapterDiagnosticTests(unittest.TestCase):
     def test_adapter_diagnostic_is_opt_in_bounded_and_limited(self):
+        from test_legacy_execution_parity import adapter_source
         with tempfile.TemporaryDirectory(prefix="CUCP protocol diagnostic ") as temp:
             runner=Path(temp)/"diagnostic.ps1"
             runner.write_text(r'''
@@ -29,7 +30,7 @@ $env:CUCP_EXECUTION_DIAGNOSTICS='0';_Execution-WriteDiagnostic $state $null $nul
 $env:CUCP_EXECUTION_DIAGNOSTICS='1'
 1..8|ForEach-Object {_Execution-WriteDiagnostic $state $null $null ('e'*3000)}
 ''',encoding="utf-8-sig")
-            p=subprocess.run([shutil.which("powershell.exe"),"-NoProfile","-NonInteractive","-File",str(runner),"-Source",str(ROOT/"tests/fixtures/legacy-execution-adapter.ps1")],capture_output=True,timeout=30)
+            p=subprocess.run([shutil.which("powershell.exe"),"-NoProfile","-NonInteractive","-File",str(runner),"-Source",str(adapter_source())],capture_output=True,timeout=30)
             self.assertEqual(p.returncode,0,p.stderr.decode(errors="replace"))
             lines=p.stderr.decode("utf-8-sig",errors="replace").splitlines()
             self.assertEqual(len(lines),4)
@@ -202,6 +203,7 @@ def unwire(value):
 @unittest.skipUnless(sys.platform=="win32","Windows PowerShell tagged codec")
 class ExecutionWireWindowsTests(unittest.TestCase):
     def test_true_arrays_and_genuine_value_count_objects_keep_identity(self):
+        from test_legacy_execution_parity import adapter_source
         values=[None,False,0,"",[],[1],[None],["한글 😀"],[[],[1],[None]],
                 dict(empty=[],one=[1],nested=dict(items=[None,True,"x"])),
                 dict(value=[],Count=0),dict(value=["macro","click-point"],Count=2),
@@ -225,8 +227,7 @@ foreach($wire in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Conver
 }
 [Console]::Out.WriteLine((ConvertTo-Json -InputObject @($rows) -Depth 100 -Compress))
 ''',encoding="utf-8-sig")
-            draft=ROOT/"tests/fixtures/legacy-execution-adapter.ps1"
-            source=os.environ.get("CUCP_EXECUTION_ADAPTER_SOURCE",str(draft if draft.exists() else ROOT/"scripts/cucp.ps1"))
+            source=str(adapter_source())
             p=subprocess.run([shutil.which("powershell.exe"),"-NoProfile","-NonInteractive","-File",str(runner),"-Source",source,"-InputPath",str(inputs)],capture_output=True,timeout=30)
             self.assertEqual(p.returncode,0,p.stderr.decode(errors="replace"))
             rows=json.loads(p.stdout.decode("utf-8-sig"));self.assertEqual(len(rows),len(values))

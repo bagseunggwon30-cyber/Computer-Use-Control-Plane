@@ -1,141 +1,112 @@
 # Python/C# migration milestone
 
-## Result and limit
+This remains a partial migration toward zero PowerShell source and execution.
+Work is on `migration/python-csharp-runtime`; main has not been merged or replaced.
+The provider-neutral core exposes 52 MCP/JSONL tools through Python and C# without
+PowerShell, Pi, or an authenticated model provider. The broader legacy surface
+still uses compatibility hosts and unported PowerShell acquisitions/actions.
 
-This is a **partial, parity-tested migration**, not completion of the request to
-reach zero PowerShell source and execution. The work is
-on `migration/python-csharp-runtime`; `main` has not been merged or replaced.
+## Actual source replacement
 
-The provider-neutral core runs through Python and C# without PowerShell. Its 52
-MCP/JSONL tools do not require Pi or an authenticated model provider. The broader
-legacy command surface still enters through PowerShell compatibility adapters.
-Keeping those two scopes distinct avoids claiming that the new core already
-replaces every old macro.
-
-## Reproducible source retirement
-
-The baseline is published commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tree
+The baseline is commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tree
 `bf895d3120dd5e145f360cb1c41e1d79a061d048`.
 
-| Canonical tracked PS source | Baseline | Accepted checkpoint `27400c98` |
-| --- | ---: | ---: |
-| All `.ps1` source and tests | 1,013,478 bytes | 921,614 bytes |
-| Three legacy runtime scripts | 858,937 bytes | 770,805 bytes |
-| Actual all-source reduction | — | **91,864 bytes (9.06%)** |
+| Canonical Git source | Baseline | Prior verified `27400c98` | Current integration |
+| --- | ---: | ---: | ---: |
+| All tracked `.ps1` source/tests | 1,013,478 bytes | 921,614 bytes | 821,540 bytes |
+| Runtime scripts, including the new shared host | 858,937 bytes | 770,805 bytes | 667,756 bytes |
+| Actual all-source reduction | — | 91,864 bytes | **191,938 bytes (18.94%)** |
 
-The earlier 78,544-byte planner reduction is qualified at aadbc58 / run
-36957910828. The additional 13,320-byte app-profile replacement passed its 523-case actual-bridge
-suite at `27400c98`, with all five jobs green in
-[run 36973181910](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36973181910).
-The next candidate batch retains the originals while qualifying three exact
-adapters as real `.ps1` fixtures. The [tracked source inventory](legacy-function-inventory.json)
-records current totals, including all temporary fixture and guard overhead.
-No new family retirement is claimed until those fixtures pass and are promoted.
+The current integration removes another **100,074 bytes** relative to the prior
+verified checkpoint, including all adapter and test overhead. It replaces 53
+original function extents: 42 retain compatible delegates and 11 private helpers
+disappear. The duplicate adapter fixtures are removed; shared CDP host code is
+counted once as PowerShell. No original algorithm is copied into a runtime archive,
+renamed to hide its language, or excluded from statistics. Old source remains in
+normal Git history.
 
-The accepted checkpoint records 291 top-level legacy function entries. Function count is not a
-feature-completion percentage: several retained functions are now thin adapters,
-and many large functions contain multiple capabilities.
+These are source measurements, not a functional-completion percentage or GitHub
+Linguist estimate. Run `python pcucp-next/packaging/check_migration_inventory.py`
+to reproduce the current [inventory](legacy-function-inventory.json). Canonical
+index blobs avoid checkout line-ending differences. Review and stage PS changes
+before using `--update`.
 
-Run `python pcucp-next/packaging/check_migration_inventory.py` to check the exact
-Git-tracked blob totals, retained locations, and retirement records. The check
-uses canonical index blobs, so Windows checkout line endings do not alter the
-metric. Review and stage PS edits before using `--update` to refresh the inventory.
-Original implementations remain in normal Git history, not a renamed archive or
-embedded copy. No Linguist exclusion or language-statistics padding is used.
+## Qualification and integration
 
-## What was actually replaced
+All focused jobs passed at `e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe` in
+[run 37007340738](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37007340738):
 
-- **OCR matching:** four private PS algorithms were retired; the retained matcher
-  delegates to C#. Exact Windows NLS, UTF-16 and legacy tied-candidate ordering
-  were preserved after differential tests exposed real incompatibilities
-- **Win32 declarations:** three runtime-compiled C# definitions moved into a
-  compiled net48 interop library. All 301 public API/PInvoke/marshalling/ABI entries
-  and actual PowerShell 5.1 loaders are checked. This is not a desktop-input test
-- **Safety classification:** rules, category ordering, risk scores, confirmation
-  flags and UTF-16 preview behavior moved into a closed C# operation. Failure
-  remains failure; a missing or malformed runtime reply cannot classify an action
-  as safe
-- **Coordinate math:** clipping, rounding and mapping moved into C#. Original
-  window/hit-test/profile acquisition remains in a small PS adapter
-- **Workflow plan assembly:** allowlists, policy and result construction moved to
-  C#. The exact original PS tokenizer remains. An incomplete literal-parser
-  candidate is excluded from the shipped host
-- **Task presets:** the 17,082-byte builder became an adapter after its
-  recipe and payload comparison passed. Its typed child-query transport is shared
-  with task/form planning. It retains one read-only planning query,
-  timing, errors, formatting and exit behavior. Central bridge overhead is included
-  in the aggregate reduction above
-- **App-profile assembly:** target selection, strategy scoring, probe command
-  construction and report assembly moved into C#. A thin adapter retains the
-  original acquisitions and optional history append. Its pure controller checks
-  the full target/score and explicit record request before one append, then
-  preserves the original record fields without further transport. The 523-case
-  actual-bridge release gate
-  covers exact payloads, errors, exits, Console output and acquisition order
-- **User installer:** implementation moved to Python. The small PS compatibility
-  entry preserves the legacy default and original flags. Explicit core/portable
-  launchers invoke no PowerShell
+| Family | Evidence |
+| --- | --- |
+| Execution coordination | 370 managed checks, 56 startup checks, 35 Windows tests; both 462-case comparisons, including explicit uncertain-action cases |
+| Precision/history/cache | 509 managed checks, 21 Windows tests without skips; 174 candidate and 174 actual-adapter cases, 138 helper cases, eight filesystem cases |
+| Legacy CDP | 43 Windows tests; seven real-browser tests, including the 52-case native CSS escaping oracle and guarded-read tests |
+| Shared contracts | Cross-platform Python suite and strict transport/authority checks |
 
-## Core architecture and evidence
+Windows parser-derived function ranges and SHA-256 hashes were checked against
+all six source/draft files before promotion. The integrated hosts copy the exact
+qualified helper/delegate bodies and preserve bytes outside explicit replacement
+and initialization regions. Production source selection is now enabled for all
+three families. This integration requires the **current commit's bundled full
+regression**, including promoted central routing, prior legacy suites and relocated
+Windows packaging. The earlier focused result does not substitute for that gate.
 
-Python owns transport/schema validation, bounded workflows, target selection,
-observations, memory-only audit metadata, cancellation and the optional CDP client.
-C# owns Windows UIA, OCR, guarded input, app lifecycle and the pure compatibility
-kernels. Live authority is fixed at startup; failed or uncertain mutations are
-not automatically retried. Retained compatibility calls carry the caller's culture across their process boundary and restore native request-local culture afterward; this changes no OS locale setting. Read-only task/form/smart planning queries send JSON to a fixed bootstrap and binds a named string array, so control-like values remain data. Windows proved that native `-File` binding and a literal `--` do not provide this boundary. The bootstrap suppresses only its progress stream so first-use module loading cannot corrupt the JSON reply; genuine errors remain captured. Both boundaries have Windows fixtures. CDP requires one explicitly configured numeric-loopback
-endpoint and fresh target/document/element references.
+## What moved
 
-Required CI covers Linux contracts, Windows native/protocol contracts, relocated
-portable packaging, and seven real fresh-profile sandboxed Chrome fixture tests.
-It includes 56 OCR, 57 safety and 115 coordinate kernel cases plus actual retained
-adapters; 254 complete original-tokenizer-fed workflow plans; and eight actual
-native parsed-plan dispatch cases. Preset qualification includes 554 exact
-recipe/payload comparisons from 285 inputs, 28 argv/quoting cases, and a new actual
-adapter/formatting comparison. **The current commit's complete CI must pass**;
-an earlier green run is not a substitute. The Pester regression suite loads the actual compatibility bridge and needs `CUCP_NATIVE_HOST` set to the matching Release native DLL; CI builds and sets it explicitly. Its workflow safety assertions run against the real migrated kernel.
+Python owns MCP/JSONL transport, schema validation, core workflows, observations,
+cancellation, installer/packaging logic and optional browser control. C# owns
+Windows UIA/OCR/input/application primitives and the migrated compatibility logic.
 
-Two candidates remain deliberately unretired: strategy ranking (including
-cross-culture comparisons) and a net48 image-diff library with 55 generated-file
-and error cases across PNG/BMP/JPEG/GIF/TIFF. Explicit strategy culture currently
-controls its comparers. The next isolated candidate also scopes alias regex
-normalization to the requested culture; its new Unicode differential must pass
-before strategy retirement.
+Previously qualified replacements cover OCR matching with Windows NLS/UTF-16/tie
+semantics; compiled Win32 interop declarations; safety classification; coordinate
+math; workflow/task/form/preset/smart-plan assembly; app-profile assembly and its
+sole-use strategy score helper; and the user installer. Their retained adapters
+preserve acquisition, errors, formatting, explicit persistence and exit behavior.
 
-## Planning integration
+The current batch adds:
 
-Task/form plan assembly (22,380 bytes in the pinned baseline) and smart-plan
-composition (17,025 bytes) passed independent Windows qualification and now use C# builders with retained
-read-only PowerShell acquisition adapters. Local managed checks cover 105 task/form contracts and 23
-smart-plan contracts; Windows corpora contain 367 task/form cases and 201
-smart-plan cases, plus each captured-prefix query trace. Exact numeric errors,
-null binding, ordered queries, unsafe-child accumulation, and full outputs remain
-qualification gates. The pure operations are explicitly registered in the production host. Strengthened
-actual-adapter checks compare real Console output, exact query traces and the current
-workflow bridge, not reconstructed output from a test payload. At
-[aadbc58 / run 36957910828](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36957910828),
-all four CI jobs passed, including all 367 task/form and 201 SmartPlan actual
-adapter cases. The prior 70 SmartPlan raw JSON field-order mismatches were fixed
-by restoring the original property order; every oracle assertion remained intact.
+- Workflow/task/form execution, SmartClick routing, watch and recovery coordination
+  in C#, with closed typed effects and immutable startup authority
+- Coordinate-anchor/point/target planning, history scoring and fixed-path cache/
+  history storage in C#, including prevalidated persistence and exact legacy output
+- Legacy CDP transport, page selection, DOM algorithms and wrapper construction in
+  Python/JavaScript, with one retained PowerShell host bridge and typed live startup
 
-## What still prevents full completion
+Read-only browser evaluation keeps its side-effect guard; arbitrary evaluation
+and mutations need startup live permission. Control-looking text remains data.
+A failed read after possible mutation is terminal and cannot trigger retry or
+fallback. UTF-8 protocol decoding is independent of the Windows console code page.
+The large confirmation entry accepts only its existing pure confirmation operation;
+other pure operations retain their smaller request limit.
 
-Roughly 0.935 MB of PS remains. Major callable groups include smart-click and live
-fallback routing; app/profile/probe acquisition; task/form/workflow execution;
-persistent history/recording; legacy CDP/vision adapters; IME/clipboard/drag and
-multi-edit; helper lifecycle, UAC/autostart, and system/process/registry macros.
+## Remaining work and acceptance boundaries
 
-Hosted protocol and generated-data tests do **not** establish real interactive
-Windows acceptance. Outstanding checks include Korean IME composition, clipboard
+The tracked inventory still contains 821,540 PowerShell bytes. Major remaining
+work includes leaf UIA/OCR/window acquisition, IME/clipboard/drag/multi-edit,
+application/process/registry/system macros, recorder/audit/profile acquisition,
+helper lifecycle and IPC, optional vision/provider plumbing, the original workflow
+tokenizer, installer/elevation shims, Pester/reference tests and CI oracle calls.
+The image-diff candidate is separately qualified but not yet retired from its
+legacy caller. Shared normalization helpers still have retained callers.
+
+Compatibility parity is not a privacy or security proof. The CDP review found
+legacy form values and source-only subtree text entering search results and logs.
+The current integration intentionally removes those signals before matching,
+locator construction and output, while preserving ordinary labels and current
+visible button captions. Thirty-two original synthetic exposure cases and eleven additional textarea
+scenarios characterize that divergence; ordinary parity assertions and the read side-effect guard remain.
+Four new owned-browser privacy cases require the current full gate. This focused
+correction does not establish privacy safety for every remaining legacy surface.
+
+Hosted protocol and generated-data checks do not establish interactive Windows
+acceptance. Outstanding checks include Korean IME composition, clipboard
 restoration, focus/modal races, held-input cleanup, mixed-DPI/multi-monitor
-coordinates, cross-integrity/UAC behavior, helper restart/crash handling, and
-application-specific task success. No user desktop, account-connected model, or
-personal documents were used to claim these checks.
+coordinates, cross-integrity/UAC behavior, helper restart/crash handling and
+application-specific success. No user desktop, personal documents or account-
+connected model were used for these claims. An authorized isolated Windows fixture
+environment is required for those acceptance cases.
 
-The next isolated candidate is app-profile assembly and its strategy helpers,
-with 496 captured-reply cases and 344 Unicode/culture comparisons awaiting
-Windows qualification. Its original PowerShell body remains. These pure and
-noninteractive slices can continue in cloud CI. Full retirement of the remaining
-live input and lifecycle boundaries additionally needs an authorized, isolated
-interactive Windows fixture environment. Until those boundaries are proved,
-retiring them merely to change language percentages would drop behavior. This
-milestone is a reviewable foundation, not a completed rewrite or signed release.
+Before the final zero-execution gate, replace temporary PowerShell oracle calls
+with provenance-backed expected fixtures and independent Python/C# tests. Linking
+the PowerShell SDK, retaining encoded bootstraps, or deleting unported operations
+does not satisfy the target. See [the zero-PowerShell gates](zero-powershell-acceptance.md).

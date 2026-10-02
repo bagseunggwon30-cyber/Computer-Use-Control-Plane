@@ -1,4 +1,4 @@
-﻿# Candidate CDP host glue; not activated by production dispatch.
+﻿# Retained CDP host glue; business logic runs in Python.
 # New bridge/delegation code only. Business logic lives in pcucp_cli.legacy_cdp*.
 # Tests load exact functions with the PowerShell AST. No top-level execution.
 
