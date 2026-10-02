@@ -103,7 +103,7 @@ class LegacyCdpAssetParityTests(unittest.TestCase):
                            ('click',dict(selector='#small')),
                            ('deep_read',dict(needle='Save')),('deep_read',dict(needle='이름'))]:
             cases.append(dict(original=old_expression(source,asset,args),ported=_expression(asset,args),fixture=fixture))
-        p=subprocess.run(['node','-e',HARNESS],input=json.dumps(cases,ensure_ascii=True),text=True,capture_output=True,timeout=20)
+        p=subprocess.run(['node','-e',HARNESS],input=json.dumps(cases,ensure_ascii=True),text=True,encoding='utf-8',capture_output=True,timeout=20)
         self.assertEqual(p.returncode,0,p.stderr)
         actual=json.loads(p.stdout)
         self.assertEqual(len(actual),len(cases))

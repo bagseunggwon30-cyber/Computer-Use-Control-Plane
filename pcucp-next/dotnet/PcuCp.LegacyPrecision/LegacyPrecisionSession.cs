@@ -254,6 +254,9 @@ internal sealed class LegacyPrecisionSession(TextReader input, TextWriter output
     internal static JsonElement ReadStartup(TextReader reader)
     {
         string line = ReadBoundedLine(reader, 4194304) ?? throw new ArgumentException("Missing precision startup.");
+        // Framework process creation may flush the inherited stdin encoder's BOM
+        // before its StreamWriter can be replaced. Accept it once, only here.
+        if (line.Length > 0 && line[0] == '\uFEFF') line = line[1..];
         using var document = JsonDocument.Parse(line, new JsonDocumentOptions { MaxDepth = 128 }); return document.RootElement.Clone();
     }
     private static string? ReadBoundedLine(TextReader reader, int maximum)

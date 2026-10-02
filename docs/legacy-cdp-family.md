@@ -67,7 +67,7 @@ native queries, trajectory payloads and exits.
 ## Behavior preserved
 
 - Original page scores, reasons, first-eight evidence, page-match miss detection,
-  title ordering and tied enumeration order. Windows uses NLS `LCMapStringEx`
+  title ordering and Framework's unstable ordering for equal page keys. Windows uses NLS `LCMapStringEx`
   invariant lowercase and `CompareStringEx`, matching the Framework runtime;
   non-Windows mock execution uses a documented portable fallback. Windows remains
   the release oracle for culture-sensitive cases.
@@ -156,11 +156,15 @@ CUCP_LEGACY_CDP_BROWSER_TEST=1 CUCP_CHROME_TEST=1 python -m unittest discover -s
   `bf895d3120dd5e145f360cb1c41e1d79a061d048`, stub only external acquisition, and
   compare helper outputs/exits, ranking and plans. Wrapper cases compare native
   argv, trajectory effects, exit remapping, and both JSON/brief Console output.
-  Original deep/ProseMirror defects are asserted separately.
+  Original deep/ProseMirror defects and click's PS5 `(if ...)` command error on
+  the partial branch are asserted separately from their corrected behavior.
 - Five opt-in actual Chrome tests reuse the existing owned fresh-profile fixture:
   rendered smart/label ranking, shadow/frame traversal, getter/proxy side-effect
   rejection, live Unicode input/events, trusted editor insertion and failed focus.
   No account, remote page, existing browser profile or desktop is touched.
+  One additional bounded diagnostic test records each fixed read primitive's
+  guarded acceptance/rejection, including complete smart and deep algorithms;
+  it does not relax or replace any of the five behavior assertions.
 
 Local 2026-10-02: mock and Node fixture checks passed; Windows tests are explicitly
 skipped off Windows. All five enabled browser attempts failed at Chrome startup:
@@ -168,6 +172,15 @@ skipped off Windows. All five enabled browser attempts failed at Chrome startup:
 No browser assertions ran locally. No sandbox bypass was attempted. Passing
 ordinary guarded read tests in sandbox-capable CI is a retirement prerequisite;
 if V8 rejects ordinary operations, that remains a feature blocker to solve.
+
+Exact commit `120b64a605bece965da4637e6510afcbd46fe871`, Actions run
+`36997186053`, established that all three live-input/getter-protection browser
+cases pass, while the rendered and shadow/frame cases fail at guarded smart
+evaluation with `EvalError: Possible side-effect in debug-evaluate`. Deep was not
+reached by the latter case. Windows also exposed host framing/output defects,
+detect's ignored page-match option, unstable equal-page sorting, and the original
+click partial-branch command error. Repairs and primitive diagnostics require a
+new exact-commit qualification; none of these failures authorize retirement.
 
 Packaging must include `legacy_cdp_assets/*.js` both in setuptools package data
 and the PyInstaller bundle. The integrator owns these packaging/dispatcher edits.

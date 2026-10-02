@@ -62,8 +62,14 @@ foreach($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Conver
  'cdp-smart-find'{'_Action-CdpSmartFind'};'cdp-smart-type-find'{'_Action-CdpSmartTypeFind'};'cdp-smart-click'{'_Action-CdpSmartClick'}
  'cdp-smart-type'{'_Action-CdpSmartType'};'cdp-deep-find'{'_Action-CdpDeepFind'};'cdp-prosemirror-insert'{'_Action-CdpProseMirrorInsert'}
  }
- try {& $fn} catch {if($_.Exception.Message -ne '__CDP_EMITTED__'){throw}}
- [void]$all.Add(@{result=$script:emitted;calls=@($script:calls)})
+ $runtimeError=$null
+ try {& $fn} catch {
+   if($_.Exception.Message -ne '__CDP_EMITTED__'){
+     if(-not $case.capture_runtime_error){throw}
+     $runtimeError=@{id=$_.FullyQualifiedErrorId;command=$_.InvocationInfo.InvocationName}
+   }
+ }
+ [void]$all.Add(@{result=$script:emitted;calls=@($script:calls);runtime_error=$runtimeError})
 }
 [Console]::Out.WriteLine((ConvertTo-Json -InputObject @($all) -Depth 64 -Compress))
 '''
@@ -93,7 +99,9 @@ def compatible_cases():
         if action in ('cdp-type','cdp-smart-type'):args['text']='a'
         c=fixture(action,args);c['detect'].update(available=False,error='tcp_port_closed_or_timeout',pages=[]);cases.append(c)
         c=fixture(action,{**args,'page_match':'missing'});cases.append(c)
-    for action in ('cdp-type','cdp-click','cdp-smart-find','cdp-smart-type-find'):
+    # Click's partial branch has an original PS5 `(if ...)` command error.
+    # Its unchanged failure and corrected Python envelope have a separate gate.
+    for action in ('cdp-type','cdp-smart-find','cdp-smart-type-find'):
         args=dict(selector='#x',text='a') if action=='cdp-type' else dict(selector='#x') if action=='cdp-click' else dict(needle='Save')
         cases.append(fixture(action,args,dict(ok=False,reason='no_text_match',candidate_count=2,top_score=45,candidate_summaries=[{'score':45}])))
     # Null, empty, single, multi, nested and value/Count-shaped objects retain their real runtime type.
@@ -104,6 +112,7 @@ def compatible_cases():
 
 @unittest.skipUnless(os.name=='nt' and shutil.which('powershell.exe'),'Windows PowerShell 5 pinned-tree oracle')
 class LegacyCdpPinnedParityTests(unittest.TestCase):
+    maxDiff=None
     def oracle(self,cases):
         with tempfile.TemporaryDirectory(prefix='cucp-legacy-cdp-oracle-') as directory:
             root=Path(directory)
@@ -124,6 +133,9 @@ class LegacyCdpPinnedParityTests(unittest.TestCase):
             cases.append(dict(kind='score',args=dict(page_match=match),detect=dict(available=True,pages=pages)))
         for action in ('click','type','find'):
             cases.append(dict(kind='plan',dom_action=action,args=dict(needle="이름 O'Brien",text='한글😀',clear=True,enter=True,page_match='App')))
+        for count in (1,2,3,7,12,17,32):
+            pages=[dict(id=str(i),title='Same',url='https://x',type='page',ws_url='') for i in range(count)]
+            cases.append(dict(kind='score',args=dict(page_match=''),detect=dict(available=True,pages=pages)))
         expected=self.oracle(cases)
         for case,want in zip(cases,expected):
             if case['kind']=='score':
@@ -155,6 +167,25 @@ class LegacyCdpPinnedParityTests(unittest.TestCase):
         self.assertEqual(expected[1]['result']['payload']['reason'],'selector_not_found')
         self.assertEqual(expected[1]['result']['exit_code'],2)
         self.assertNotIn('Input.insertText',[c['method'] for c in expected[1]['calls']])
+
+    def test_original_click_partial_command_error_and_corrected_envelope(self):
+        cases=[]
+        for value in (None,dict(ok=False,reason='selector_not_found')):
+            case=fixture('cdp-click',dict(selector='#absent'),value)
+            case['capture_runtime_error']=True
+            cases.append(case)
+        expected=self.oracle(cases)
+        for case,want in zip(cases,expected):
+            self.assertIsNone(want['result'])
+            self.assertEqual(want['runtime_error'],dict(id='CommandNotFoundException',command='if'))
+            adapter=LegacyCdpAdapter('http://127.0.0.1:9222',allow_live_control=True)
+            with patch.object(adapter,'_discover',return_value=case['detect']),patch.object(adapter._transport,'call',return_value=case['responses'][0]['response']):
+                actual=adapter.execute(case['action'],case['args'])
+            payload=dict(actual.payload);payload['elapsed_ms']=0
+            value=case['responses'][0]['response']['result']['result']['value']
+            self.assertEqual(payload,dict(status='partial',reason=value['reason'] if value else 'no_result',
+                selector='#absent',action='cdp-click',elapsed_ms=0))
+            self.assertEqual(actual.exit_code,2)
 
 
 if __name__=='__main__':unittest.main()

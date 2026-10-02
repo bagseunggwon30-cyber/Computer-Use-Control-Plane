@@ -55,6 +55,19 @@ error, exit, query order, authority and uncertainty checks. Where formatting
 limits deep output, compare the original unformatted object separately from its
 exact public Console representation; do not discard either assertion.
 
+Each family command saves its complete stdout/stderr bytes as a CI artifact.
+Inline job output shows at most the final 64 KiB of each command so large exact
+comparison failures cannot make the entire job log unreadable. A failed command
+still fails the job; log capture does not alter or suppress test assertions.
+Artifacts are retained for seven days, including on failure.
+
+The first combined candidate, commit `120b64a605bece965da4637e6510afcbd46fe871`
+(tree `fe6d3c2e2d6dd65b5351072fa20586549a330302`), is preserved in
+[run 36997186053](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/36997186053).
+Fast contracts passed; all three Windows family jobs and the browser job failed.
+Those results are diagnostic evidence, not retirement approval. The candidate
+and adapter repairs are qualified together before any original family is removed.
+
 After the full gate passes, verify the published commit/tree and every blob,
 recompute actual PS bytes, and report only the accepted reduction. Interactive
 Windows checks remain separately identified; captured effects and headless
@@ -76,7 +89,7 @@ percentage. Main remains at `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`.
 
 The three exact adapter fixtures are executable PowerShell files, counted normally
 in the inventory. With original bodies retained, the candidate currently contains
-982,825 PS bytes, 61,211 more than the last accepted checkpoint. This temporary
+985,154 PS bytes, 63,540 more than the last accepted checkpoint. This temporary
 overlap is qualification code, not retirement. After the combined adapter/kernel
 Windows gate, promote the same glue, remove verified original bodies and duplicate
 fixtures, then measure the resulting blobs and run the full regression gate.

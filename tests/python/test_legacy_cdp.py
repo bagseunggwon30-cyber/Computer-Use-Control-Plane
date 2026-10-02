@@ -56,11 +56,14 @@ class PureContractTests(unittest.TestCase):
         self.assertEqual(evidence['candidates'][0]['id'],'a')
         with self.assertRaises(ValueError): score_pages(dict(pages={'value':pages,'Count':4}))
 
-    def test_stable_equal_titles_and_first_eight(self):
+    def test_framework_equal_title_swaps_and_first_eight(self):
         detected = dict(available=True,pages=[dict(id=str(i),title='Same',url='https://x',type='page') for i in range(12)])
         selected, evidence = find_page(detected)
-        self.assertEqual(selected['id'],'0')
-        self.assertEqual([p['id'] for p in evidence['candidates']],list(map(str,range(8))))
+        self.assertEqual(selected['id'],'8')
+        self.assertEqual([p['id'] for p in evidence['candidates']],list(map(str,[8,7,6,11,10,9,2,1])))
+        # This is intentionally distinct from stable DOM candidate ranking.
+        pages=[dict(id=str(i),title='same',url='https://x',type='page') for i in range(2)]
+        self.assertEqual([p['id'] for p in score_pages(dict(pages=pages))],['1','0'])
 
     def test_dom_bridge_helper_and_wrapper_difference(self):
         helper = dom_bridge_plan('type', '이름', 1234, "O'Brien", 'a\n😀', True, True)

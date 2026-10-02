@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import cmp_to_key
 import ctypes
 import json
 import os
@@ -77,6 +76,72 @@ def _ps_equal(left: str, right: str) -> bool:
     return _nls_compare(left, right, '') == 0
 
 
+def _framework_sort(items, compare):
+    """Framework pre-4.5 List.Sort ordering used by the Windows PS5 host.
+
+    Equal keys are deliberately unstable. In particular a seven-page captured
+    fixture reverses its leading equal pair; Python's stable sort did not.
+    Keep the depth-limited partition and heap fallback, including equal swaps.
+    Reference: microsoft/referencesource ArraySortHelper.DepthLimitedQuickSort.
+    """
+    def swap(a, b):
+        items[a], items[b] = items[b], items[a]
+
+    def heap(left, right):
+        size = right - left + 1
+        def down(index, count):
+            value = items[left + index - 1]
+            while index <= count // 2:
+                child = index * 2
+                if child < count and compare(items[left + child - 1], items[left + child]) < 0:
+                    child += 1
+                if compare(value, items[left + child - 1]) >= 0:
+                    break
+                items[left + index - 1] = items[left + child - 1]
+                index = child
+            items[left + index - 1] = value
+        for index in range(size // 2, 0, -1):
+            down(index, size)
+        for count in range(size, 1, -1):
+            swap(left, left + count - 1)
+            down(1, count - 1)
+
+    def partition(left, right, depth):
+        while left < right:
+            if depth == 0:
+                heap(left, right)
+                return
+            i, j = left, right
+            middle = i + ((j - i) >> 1)
+            for a, b in ((i, middle), (i, j), (middle, j)):
+                if a != b and compare(items[a], items[b]) > 0:
+                    swap(a, b)
+            pivot = items[middle]
+            while True:
+                while compare(items[i], pivot) < 0:
+                    i += 1
+                while compare(pivot, items[j]) < 0:
+                    j -= 1
+                if i > j:
+                    break
+                if i < j:
+                    swap(i, j)
+                i, j = i + 1, j - 1
+                if i > j:
+                    break
+            depth -= 1
+            if j - left <= right - i:
+                if left < j:
+                    partition(left, j, depth)
+                left = i
+            else:
+                if i < right:
+                    partition(i, right, depth)
+                right = j
+    partition(0, len(items) - 1, 32)
+    return items
+
+
 def score_pages(detect: dict, page_match: str | None = '') -> list[dict]:
     pages = detect.get('pages', [])
     if not isinstance(pages, list):
@@ -109,7 +174,7 @@ def score_pages(detect: dict, page_match: str | None = '') -> list[dict]:
                            score=score, reasons=reasons, page=page))
     def compare(a, b):
         return (b['score'] > a['score']) - (b['score'] < a['score']) or _title_compare(a['title'], b['title'])
-    return sorted(output, key=cmp_to_key(compare))
+    return _framework_sort(output, compare)
 
 
 def find_page(detect: dict, page_match: str | None = '') -> tuple[dict | None, dict | None]:
@@ -225,7 +290,7 @@ def native_arguments(macro: LegacyCdpMacro) -> list[str]:
         if action=='cdp-eval':
             result.extend(('-CdpExpr',a['expression']) if a.get('expression') else ('-CdpExprB64',a['expression_b64']))
         if action in ('cdp-type','cdp-smart-type') and a.get('text'): result.extend(('-Text',a['text']))
-    if a.get('page_match'): result.extend(('-CdpPageMatch',a['page_match']))
+    if action != 'cdp-detect' and a.get('page_match'): result.extend(('-CdpPageMatch',a['page_match']))
     if a.get('enter'): result.append('-PressEnter')
     if a.get('clear'): result.append('-ClearFirst')
     return result

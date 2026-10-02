@@ -46,9 +46,16 @@ internal sealed record LegacyExecutionStartup(string Operation, string[] Rest,
             if (flag is not ("--allow-live-control" or "--confirm-sensitive") || !flags.Add(flag))
                 throw CommandOptions.Invalid("Unsupported or duplicate execution startup switch.");
         using var buffer = new MemoryStream();
+        bool firstFrame = true;
         while (true)
         {
-            using var part = JsonDocument.Parse(ReadFrame(input), new JsonDocumentOptions { MaxDepth = 4 });
+            var line = ReadFrame(input);
+            // .NET Framework's redirected stdin writer may emit its UTF-8
+            // preamble before the caller replaces it with a no-BOM writer.
+            // Only the stream's first character can be an encoding marker.
+            if (firstFrame && line.Length > 0 && line[0] == '\uFEFF') line = line[1..];
+            firstFrame = false;
+            using var part = JsonDocument.Parse(line, new JsonDocumentOptions { MaxDepth = 4 });
             var frame = part.RootElement;
             if (frame.ValueKind != JsonValueKind.Object || !frame.TryGetProperty("kind", out var kind) || kind.ValueKind != JsonValueKind.String)
                 throw CommandOptions.Invalid("Missing execution startup frame kind.");

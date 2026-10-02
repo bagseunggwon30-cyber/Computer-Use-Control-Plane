@@ -89,7 +89,10 @@ def main(argv=None):
         data = sys.stdin.buffer.readline(MAX_FRAME + 1)
         if len(data) > MAX_FRAME:
             raise ValueError('bridge request exceeds 1 MiB')
-        request = _json(data)
+        # Framework Process starts its stdin StreamWriter with AutoFlush=true;
+        # Console.InputEncoding may therefore emit a UTF-8 preamble before the
+        # host writes the bounded bytes. Accept one prefix, never relaxed JSON.
+        request = _json(data.removeprefix(b'\xef\xbb\xbf'))
         result = handle(options.operation, request, allow_live_control=options.allow_live_control,
                         endpoint=options.endpoint, timeout_s=options.timeout_s)
         response, exit_code = dict(schema=SCHEMA, status='ok', data=result), 0

@@ -41,7 +41,13 @@ internal static partial class LegacyPrecisionKernel
             var lines = ctx.Query("history-lines", "path", ctx.HistoryFile);
             reuse = Score(record, ReadHistory(T(lines) ? A(lines).Select(S) : [], 500), tolerance, ctx.HistoryFile);
         }
-        if (recordHistory && !noHistory) ctx.Effects.Add(D("kind", "history-append", "args", D("path", ctx.HistoryFile, "record", record, "max", I(P(ctx.Args, "history_max"))), "bind", "reuse_history.recorded"));
+        if (recordHistory && !noHistory)
+        {
+            // Add-Member -Force replaces the legacy note property at the end.
+            var reordered = ((Dictionary<string, object?>)reuse!).Where(p => p.Key != "recorded").ToDictionary(p => p.Key, p => p.Value);
+            reordered.Add("recorded", false); reuse = reordered;
+            ctx.Effects.Add(D("kind", "history-append", "args", D("path", ctx.HistoryFile, "record", record, "max", I(P(ctx.Args, "history_max"))), "bind", "reuse_history.recorded"));
+        }
         return ctx.Complete(D("schema", "cucp.coord-anchor/v1", "status", "ok", "anchor_id", id, "anchor_type", "window_normalized_point", "source_point", D("x", x, "y", y),
             "safe_to_reuse", safe, "coordinate_risk", risk, "selected_window", selected,
             "anchor", D("target_match", target, "target_hwnd_current", L(P(selected, "hwnd")), "process", S(P(selected, "process")), "class", S(P(selected, "class")), "normalized_window_point", norm, "visible_normalized_point", visibleNorm, "coord_signature", S(P(profile, "coord_signature"))),

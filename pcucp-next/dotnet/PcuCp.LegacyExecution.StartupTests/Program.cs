@@ -14,6 +14,15 @@ string Wire(object payload) => Frames(JsonSerializer.SerializeToUtf8Bytes(payloa
 LegacyExecutionStartup Read(object payload, params string[] options) => LegacyExecutionStartup.Read(options,new StringReader(Wire(payload)));
 var ordinary = Read(Payload("--step","windows"));
 Check(!ordinary.Authority.AllowLiveControl && !ordinary.Authority.ConfirmSensitive,"Default authority changed");
+var framed = Wire(Payload("--label", "--confirm-sensitive"));
+var prefixed = LegacyExecutionStartup.Read(["--confirm-sensitive"], new StringReader("\uFEFF" + framed));
+Check(!prefixed.Authority.AllowLiveControl && !prefixed.Authority.ConfirmSensitive, "Encoding preamble granted authority");
+Check(prefixed.Rest.SequenceEqual(new[]{"--label", "--confirm-sensitive"}), "Encoding preamble changed argv");
+Reject(()=>LegacyExecutionStartup.Read([],new StringReader("\uFEFF\uFEFF"+framed)),"Repeated encoding preamble accepted");
+Reject(()=>LegacyExecutionStartup.Read([],new StringReader(" \uFEFF"+framed)),"Embedded encoding preamble accepted");
+Reject(()=>LegacyExecutionStartup.Read([],new StringReader(framed.Replace("{\"kind\":\"end\"", "\uFEFF{\"kind\":\"end\""))),"Later-frame encoding preamble accepted");
+var prefixedPayload = Frames(Encoding.UTF8.GetBytes("\uFEFF" + JsonSerializer.Serialize(Payload())));
+Reject(()=>LegacyExecutionStartup.Read([],new StringReader(prefixedPayload)),"Decoded payload encoding marker accepted");
 foreach(var option in new[]{"--label","--text","--type-text","--field","--step","--pre-shortcut","--window"}) {
     var value=Read(Payload(option,"--confirm-sensitive"),"--allow-live-control","--confirm-sensitive");
     Check(value.Authority.AllowLiveControl && !value.Authority.ConfirmSensitive,"Value granted confirmation: "+option);

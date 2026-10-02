@@ -56,7 +56,24 @@ def enabled_adapters(root: Path = ROOT) -> set[str]:
     return set(values)
 
 
-def run_family(family: str, browser: bool = False) -> None:
+def run_logged(argv: list[str], *, cwd: Path, env: dict[str, str], log_path: Path) -> None:
+    """Keep the complete command output while bounding its inline CI rendering."""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Running {argv!r}; complete output: {log_path}", flush=True)
+    with log_path.open("wb") as stream:
+        result = subprocess.run(argv, cwd=cwd, env=env, stdout=stream, stderr=subprocess.STDOUT)
+    with log_path.open("rb") as stream:
+        stream.seek(0, os.SEEK_END)
+        size = stream.tell()
+        stream.seek(max(0, size - 65536))
+        tail = stream.read()
+    if size > len(tail):
+        print(f"[Inline output limited to the last {len(tail)} bytes; full output is in the log artifact]", flush=True)
+    print(tail.decode("utf-8", errors="replace"), end="", flush=True)
+    result.check_returncode()
+
+
+def run_family(family: str, browser: bool = False, log_dir: Path | None = None) -> None:
     if family not in PROJECTS or browser and family != "cdp":
         raise ValueError("Unsupported qualification family/platform combination.")
     pattern = "test_legacy_cdp_browser*.py" if browser else PATTERNS[family]
@@ -68,8 +85,14 @@ def run_family(family: str, browser: bool = False) -> None:
     for name in (*ADAPTER_ENV.values(), "CUCP_EXECUTION_STARTUP_TEST_HOST", "CUCP_EXECUTION_ADAPTER_SOURCE",
                  "CUCP_PRECISION_ADAPTER_DRAFT", "CUCP_LEGACY_CDP_ADAPTER_MODE"):
         env.pop(name, None)
+    command_index = 0
     def run(argv: list[str]) -> None:
-        subprocess.run(argv, cwd=ROOT, env=env, check=True)
+        nonlocal command_index
+        command_index += 1
+        if log_dir is None:
+            subprocess.run(argv, cwd=ROOT, env=env, check=True)
+        else:
+            run_logged(argv, cwd=ROOT, env=env, log_path=log_dir / f"{command_index:02d}.log")
     if browser:
         env["CUCP_CHROME_TEST"] = "1"
         env["CUCP_LEGACY_CDP_BROWSER_TEST"] = "1"
@@ -124,6 +147,7 @@ def main() -> int:
     run = sub.add_parser("run")
     run.add_argument("--family", required=True, choices=tuple(PROJECTS))
     run.add_argument("--browser", action="store_true")
+    run.add_argument("--log-dir", type=Path, help="Save complete command logs and bound inline CI output.")
     args = parser.parse_args()
     if args.action == "available":
         output = f"families={json.dumps(available_families())}\n"
@@ -133,7 +157,7 @@ def main() -> int:
         print(output, end="")
         return 0
     if args.action == "run":
-        run_family(args.family, args.browser)
+        run_family(args.family, args.browser, args.log_dir)
         return 0
     families, full = select_scope(os.environ.get("MIGRATION_SCOPE", ""), os.environ.get("MIGRATION_COMMIT_MESSAGE", ""))
     outputs = f"families={json.dumps(families)}\nfull={str(full).lower()}\n"

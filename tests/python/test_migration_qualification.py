@@ -4,7 +4,10 @@ import contextlib
 import io
 from unittest.mock import patch
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -15,6 +18,29 @@ spec.loader.exec_module(qualification)
 
 
 class QualificationSelectionTests(unittest.TestCase):
+    def test_logged_failure_preserves_all_bytes_and_exit_status(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            log = root / "logs/01.log"
+            output = io.StringIO()
+            command = [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'x'*100000+b'\\xffFAILURE\\n'); sys.exit(7)"]
+            with contextlib.redirect_stdout(output), self.assertRaises(subprocess.CalledProcessError) as caught:
+                qualification.run_logged(command, cwd=root, env=dict(os.environ), log_path=log)
+            self.assertEqual(caught.exception.returncode, 7)
+            self.assertEqual(log.read_bytes(), b"x" * 100000 + b"\xffFAILURE\n")
+            self.assertIn("FAILURE", output.getvalue())
+            self.assertIn("full output is in the log artifact", output.getvalue())
+            self.assertLess(len(output.getvalue()), 67000)
+
+    def test_logged_success_combines_stdout_and_stderr_without_losing_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            log = root / "01.log"
+            command = [sys.executable, "-c", "import os; os.write(1,b'out\\n'); os.write(2,b'err\\n')"]
+            with contextlib.redirect_stdout(io.StringIO()):
+                qualification.run_logged(command, cwd=root, env=dict(os.environ), log_path=log)
+            self.assertEqual(log.read_bytes(), b"out\nerr\n")
+
     def test_default_runs_all_families_and_full_cannot_be_weakened_by_focus(self):
         families = list(qualification.FAMILIES)
         self.assertEqual(qualification.select_scope("", "Implement batch"), (families, False))

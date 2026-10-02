@@ -3,10 +3,11 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'pcucp-next/python'))
-from pcucp_cli.legacy_cdp import LegacyCdpAdapter
+from pcucp_cli.legacy_cdp import LegacyCdpAdapter, _expression
 from pcucp_cli.cdp import CdpAdapter
 import test_cdp_browser as fixtures
 
@@ -29,6 +30,58 @@ class LegacyCdpBrowserTests(unittest.TestCase):
         result=self.adapter(True).execute('cdp-eval',{'expression':expression,'page_match':self.fixture_url})
         self.assertEqual(result.payload['status'],'ok',result.payload)
         return result.payload['result_value']
+
+    def test_guarded_primitive_diagnostics(self):
+        # Fixed source against this owned fixture only. Every probe remains
+        # guarded and bounded; failures never trigger unrestricted evaluation.
+        self.evaluate("""(()=>{const host=document.createElement('div');host.id='probe-host';document.body.append(host);
+          host.attachShadow({mode:'open'}).innerHTML='<button>Probe</button>';
+          const frame=document.createElement('iframe');frame.id='probe-frame';document.body.append(frame);return true})()""")
+        primitives={
+            'literal_object':'({ok:true})',
+            'nfkc':"'Ｓａｖｅ'.normalize('NFKC').toLowerCase()",
+            'unicode_regex':"'Save!'.replace(/[^\\p{L}\\p{N}\\s]+/gu,' ')",
+            'local_array':'(()=>{const a=[];a.push(2,1);a.sort((x,y)=>x-y);return a.map(x=>x+1)})()',
+            'local_set':'(()=>{const a=new Set();a.add(1);return a.has(1)})()',
+            'query_all':"document.querySelectorAll('button').length",
+            'query_array_from':"Array.from(document.querySelectorAll('button')).length",
+            'connected':"document.getElementById('save').isConnected",
+            'rect':"document.getElementById('save').getBoundingClientRect().width",
+            'style_object':"!!window.getComputedStyle(document.getElementById('save'))",
+            'style_display':"window.getComputedStyle(document.getElementById('save')).display",
+            'style_visibility':"window.getComputedStyle(document.getElementById('save')).visibility",
+            'style_opacity':"window.getComputedStyle(document.getElementById('save')).opacity",
+            'tag':"document.getElementById('save').tagName",
+            'attribute':"document.getElementById('save').getAttribute('aria-label')",
+            'inner_text':"document.getElementById('save').innerText",
+            'text_content':"document.getElementById('save').textContent",
+            'labels':"document.getElementById('message').labels.length",
+            'label_array_from':"Array.from(document.getElementById('message').labels).length",
+            'control':"document.querySelector('label').control.id",
+            'disabled':"document.getElementById('save').disabled",
+            'onclick':"document.getElementById('save').onclick===null",
+            'content_editable':"document.getElementById('prosemirror').isContentEditable",
+            'value':"document.getElementById('message').value",
+            'placeholder':"document.getElementById('message').placeholder",
+            'title':"document.getElementById('message').title",
+            'shadow_root':"document.getElementById('save').shadowRoot===null",
+            'shadow_query':"document.getElementById('probe-host').shadowRoot.querySelectorAll('*').length",
+            'content_document':"document.getElementById('probe-frame').contentDocument.querySelectorAll('*').length",
+            'css_escape':"CSS.escape('save')",
+            'json_stringify':"JSON.stringify('Save')",
+            'complete_smart_click':_expression('smart_read',dict(action='click',needle='Save')),
+            'complete_smart_type':_expression('smart_read',dict(action='type',needle='Write a note')),
+            'complete_deep':_expression('deep_read',dict(needle='Save')),
+        }
+        adapter=self.adapter()
+        page=dict(id=self.target_id,type='page',ws_url=self.endpoint.replace('http:','ws:')+'/devtools/page/'+self.target_id)
+        report={}
+        for name,expression in primitives.items():
+            response=adapter._transport.call(page,'Runtime.evaluate',dict(expression=expression,returnByValue=True,
+                throwOnSideEffect=True,awaitPromise=False,timeout=250),time.monotonic()+1,audited_read=True)
+            error=response.get('error') or response.get('result',{}).get('exceptionDetails')
+            report[name]='ok' if error is None else json.dumps(error,ensure_ascii=True)[:260]
+        print('LEGACY_CDP_GUARDED_PRIMITIVES '+json.dumps(report,sort_keys=True),flush=True)
 
     def test_rendered_smart_find_and_label_match_with_guard(self):
         adapter=self.adapter()

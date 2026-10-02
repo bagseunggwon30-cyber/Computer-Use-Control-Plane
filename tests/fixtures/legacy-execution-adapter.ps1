@@ -107,6 +107,25 @@ function _Execution-WriteChunks($Writer,[long]$Id,[string]$Target,$Value) {
   $end=[ordered]@{kind='end';id=$Id};if($Target){$end['target']=$Target}
   $Writer.WriteLine((ConvertTo-Json -InputObject $end -Compress));$Writer.Flush()
 }
+function _Execution-WriteDiagnostic($State,$Process,$Stderr,[string]$ErrorText) {
+  # Qualification-only opt-in. Never modify the protocol or replace its error.
+  try {
+    if($env:CUCP_EXECUTION_DIAGNOSTICS -cne '1' -or $State.diagnostic_phase -ceq 'host-error'){return}
+    $counter=Get-Variable -Name ExecutionDiagnosticCount -Scope Script -ErrorAction SilentlyContinue
+    $count=if($null -eq $counter){0}else{[int]$counter.Value}
+    if($count -ge 4){return};$script:ExecutionDiagnosticCount=$count+1
+    $line=[string]$State.diagnostic_frame;$prefix=$line.Substring(0,[Math]::Min(256,$line.Length))
+    $points=@(foreach($character in $line.Substring(0,[Math]::Min(16,$line.Length)).ToCharArray()){'U+{0:X4}' -f [int]$character})
+    $exited=$null;$code=$null;$err=''
+    if($null -ne $Process){$exited=$Process.HasExited;if($exited){$code=$Process.ExitCode}}
+    if($null -ne $Stderr -and $Stderr.IsCompleted){$err=[string]$Stderr.GetAwaiter().GetResult()}
+    $record=[ordered]@{phase=[string]$State.diagnostic_phase;expected_id=$State.diagnostic_expected_id;
+      frame_characters=$line.Length;prefix_codepoints=$points;frame_prefix=$prefix;
+      host_exited=$exited;host_exit=$code;stderr_prefix=$err.Substring(0,[Math]::Min(1024,$err.Length));
+      error=$ErrorText.Substring(0,[Math]::Min(512,$ErrorText.Length))}
+    [Console]::Error.WriteLine('[execution-protocol] '+(ConvertTo-Json -InputObject $record -Depth 5 -Compress))
+  } catch {} # Diagnostic collection cannot mask the original failure.
+}
 function _Execution-ValidateEffect($Effect,$State) {
   _Execution-Fields $Effect @('kind','name','argv','data','live','quiet','brief','confirm_sensitive')
   _Execution-Require ($Effect.kind -is [string] -and $Effect.name -is [string] -and $Effect.argv -is [array] -and
@@ -208,8 +227,11 @@ function _Invoke-LegacyExecutionEffectLoop {
     $buffer=New-Object IO.MemoryStream;$target=$null;$id=$null
     try {
       while($true) {
+        $State.diagnostic_phase='read-frame';$State.diagnostic_expected_id=$sequence+1;$State.diagnostic_frame=$null
         $line=$HostProcess.StandardOutput.ReadLine();if($null -eq $line){if($State.live_effect_seen){throw 'mutation_may_have_occurred=true; automatic_retry=false; execution session disconnected.'};throw 'Execution session disconnected; automatic_retry=false.'}
+        $State.diagnostic_frame=$line;$State.diagnostic_phase='parse-frame'
         $frame=$line|ConvertFrom-Json -ErrorAction Stop
+        $State.diagnostic_phase='validate-frame'
         if($frame.kind -ceq 'part'){_Execution-Fields $frame @('kind','target','id','data')}
         elseif($frame.kind -ceq 'end'){_Execution-Fields $frame @('kind','target','id')}
         else {throw 'Unknown execution frame kind.'}
@@ -220,16 +242,19 @@ function _Invoke-LegacyExecutionEffectLoop {
         _Execution-Require ($frame.data -is [string]) 'Execution chunk data must be a base64 string.'
         $part=[Convert]::FromBase64String($frame.data);_Execution-Require ($part.Length -le 49152) 'Execution chunk exceeds 48 KiB.';$buffer.Write($part,0,$part.Length)
       }
+      $State.diagnostic_phase='parse-message'
       $message=$utf8.GetString($buffer.ToArray())|ConvertFrom-Json -ErrorAction Stop
     } finally {$buffer.Dispose()}
     $sequence=$id
     if($target -ceq 'error'){
+      $State.diagnostic_phase='host-error'
       _Execution-Fields $message @('message','mutation_may_have_occurred','automatic_retry')
       _Execution-Require ($message.message -is [string] -and $message.mutation_may_have_occurred -is [bool] -and $message.automatic_retry -is [bool] -and -not $message.automatic_retry) 'Invalid execution error envelope.'
       if($message.mutation_may_have_occurred){throw ('mutation_may_have_occurred=true; automatic_retry=false; '+$message.message)}
       throw $message.message
     }
     if($target -ceq 'complete') {
+      $State.diagnostic_phase='validate-completion'
       _Execution-Fields $message @('payload','exit','json_depth','brief','emit_json')
       _Execution-Require ($message.exit -is [int] -and $message.exit -ge 0 -and $message.exit -le 3 -and $message.json_depth -is [int] -and
         $message.json_depth -ge 0 -and $message.json_depth -le 100 -and $message.emit_json -is [bool] -and ($null -eq $message.brief -or $message.brief -is [string])) 'Invalid execution completion envelope.'
@@ -239,7 +264,9 @@ function _Invoke-LegacyExecutionEffectLoop {
       return [int]$message.exit
     }
     # Protocol/authority failures must terminate, never become fallback replies.
+    $State.diagnostic_phase='validate-effect'
     _Execution-ValidateEffect $message $State
+    $State.diagnostic_phase='dispatch-effect'
     if($message.live){$State.live_effect_seen=$true}
     try {$value=_Execution-Dispatch $message $State;$reply=@{state='ok';value=(_Execution-EncodeWire $value)}}
     catch {$reply=@{state='error';message=$_.Exception.Message;mutation_may_have_occurred=[bool]$message.live}}
@@ -278,7 +305,7 @@ function _Invoke-LegacyExecutionFamily {
   $startup=[ordered]@{schema='cucp.execution-start/v1';operation=$Operation;rest=@($Rest);brief=[bool]$Brief;
     cache_seconds=[int]$CacheSeconds;vision_available=[bool]$Script:CliPath;culture=[Globalization.CultureInfo]::CurrentCulture.Name}
   $state=@{live=$liveCeiling;sensitive=$sensitiveCeiling;script_path=$ScriptPath;cache_dir=$Script:CacheDir;paths=@{};clocks=@{};writer=$null;live_effect_seen=$false}
-  $process=New-Object Diagnostics.Process;$process.StartInfo=$psi;$started=$false;$writer=$null
+  $process=New-Object Diagnostics.Process;$process.StartInfo=$psi;$started=$false;$writer=$null;$stderr=$null
   try {
     $started=$process.Start();if(-not $started){throw 'Execution runtime did not start.'}
     $stderr=$process.StandardError.ReadToEndAsync()
@@ -293,6 +320,7 @@ function _Invoke-LegacyExecutionFamily {
     if($process.ExitCode -ne $exit){throw ('Execution runtime exit did not match its final report. '+$err)}
     return [int]$exit
   } catch {
+    _Execution-WriteDiagnostic -State $state -Process $process -Stderr $stderr -ErrorText $_.Exception.Message
     if($state.live_effect_seen -and $_.Exception.Message -notlike 'mutation_may_have_occurred=true;*'){
       throw ('mutation_may_have_occurred=true; automatic_retry=false; '+$_.Exception.Message)
     }

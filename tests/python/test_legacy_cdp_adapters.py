@@ -247,5 +247,34 @@ catch {[Console]::Out.WriteLine($_.Exception.Message);exit 0}
                 self.assertIn('no retry was attempted',p.stdout)
                 self.assertIn('timed out' if kind=='timeout' else kind,p.stdout)
 
+    def test_process_stdin_bytes_and_stdout_are_exact(self):
+        # Own fixed data only. Exposes a framing defect without logging request
+        # contents from a real native/browser operation or weakening JSON checks.
+        program='''import json,sys
+data=sys.stdin.buffer.readline(1048577)
+try:
+    value=json.loads(data.decode('utf-8-sig'))
+    result={'value':value,'preamble':data.startswith(bytes.fromhex('efbbbf'))}
+except Exception as exc:
+    result={'error':str(exc),'length':len(data),'prefix':data[:4].hex()}
+sys.stdout.write(json.dumps({'schema':'cucp.legacy-cdp-bridge/v1','status':'ok','data':result}))
+'''
+        runner=INVOKE_RUNNER[:INVOKE_RUNNER.index('$inputData=')]+r'''
+$inputData=Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json
+$result=_Invoke-LegacyCdpBridge -Operation 'macro-prepare' -Request @{action='cdp-detect';argv=@($inputData.argv)}
+[Console]::Out.WriteLine(($result|ConvertTo-Json -Depth 16 -Compress))
+'''
+        with tempfile.TemporaryDirectory(prefix='cucp-cdp-framing-fixture-') as directory:
+            root=Path(directory);package=root/'pcucp-next/python/pcucp_cli';package.mkdir(parents=True)
+            (package/'__init__.py').write_text('',encoding='utf-8')
+            (package/'legacy_cdp_bridge.py').write_text(program,encoding='utf-8')
+            expected=dict(action='cdp-detect',argv=['한글😀',"O'Brien",'-CdpAllowLiveControl'])
+            p=self.run_script(runner,dict(argv=expected['argv']),root=root,timeout=23)
+            self.assertEqual(p.returncode,0,p.stderr)
+            actual=json.loads(p.stdout)
+            self.assertNotIn('error',actual,actual)
+            self.assertEqual(actual['value'],expected)
+            self.assertIs(type(actual['preamble']),bool)
+
 
 if __name__=='__main__':unittest.main()

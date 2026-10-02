@@ -1,5 +1,18 @@
 # Legacy execution coordination candidate
 
+The first published combined gate (`120b64a605bece965da4637e6510afcbd46fe871`,
+Actions run `36997186053`) reached terminal failure in the execution Windows job.
+The job-log connector repeatedly returned `Transport closed`, and the run had no
+downloadable artifacts. This is not parity qualification. The next gate retains
+every comparison and includes bounded fixture diagnostics: the adapter can emit
+up to four protocol-failure records when `CUCP_EXECUTION_DIAGNOSTICS=1`, containing
+phase/expected ID, the first 16 codepoints and 256 characters of the last frame,
+process exit state, and at most 1,024 stderr characters. Normal execution leaves
+that diagnostic option unset. The harness reports a compact first difference and
+bounds only displayed unittest diffs; it does not remove cases or assertions.
+A separate inert Windows child characterizes the .NET Framework redirected-input
+writer's initial UTF-8 BOM, even when the subsequent explicit writer uses no BOM.
+
 The execution family migrates the coordination bodies of `workflow-run`,
 `task-run`, `form-run`, `smart-click`, `watch`, `recovery-plan`, and `recovery-run`
 as one qualification unit. The oracle is the original `scripts/cucp.ps1` blob in

@@ -38,7 +38,14 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - run: python pcucp-next/packaging/migration_qualification.py run --family "${{ matrix.family }}"
+      - run: python pcucp-next/packaging/migration_qualification.py run --family "${{ matrix.family }}" --log-dir ".migration-logs/${{ matrix.family }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qualification-${{ matrix.family }}
+          path: .migration-logs/${{ matrix.family }}
+          include-hidden-files: true
+          retention-days: 7
   legacy-cdp-browser:
     needs: migration-family-scope
     if: contains(fromJSON(needs.migration-family-scope.outputs.families), 'cdp')
@@ -50,11 +57,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python pcucp-next/packaging/migration_qualification.py run --family cdp --browser
+      - run: python pcucp-next/packaging/migration_qualification.py run --family cdp --browser --log-dir .migration-logs/cdp-browser
         env:
           PYTHONPATH: pcucp-next/python
           CUCP_CHROME_TEST: '1'
           CUCP_LEGACY_CDP_BROWSER_TEST: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qualification-cdp-browser
+          path: .migration-logs/cdp-browser
+          include-hidden-files: true
+          retention-days: 7
   core:
     runs-on: ubuntu-latest
     steps:

@@ -37,6 +37,9 @@ change that kernel's API. Casing and command-token rules use `LegacyTextKernel`.
 The production transport is `LegacyPrecisionSession`, exposed through the dedicated
 `legacy-precision-session` host command. `ReadStartup` reads a maximum of 4,194,304
 characters before parsing; the caller must not call an unbounded `ReadLine` first.
+One leading U+FEFF is accepted only at the beginning of this startup line for
+Framework's redirected-input encoder. Repeated/embedded BOMs and BOMs in later
+reply frames are rejected; the same character bound still applies.
 The startup schema is `cucp.precision-session/v1` with exactly `schema`, `operation`,
 `args` (tagged wire value), and `culture`. Planner arguments are exactly `rest`,
 `cache_seconds`, `brief`, `now`, `history_file`, `history_max`, `cache_dir`, and
@@ -101,6 +104,10 @@ not be added to the pure compatibility dispatcher.
   `--no-history`; disabled history does not query the file
 - All planners retain commands as data. None executes `recommended_command`, moves
   the pointer, clicks, types, opens an authenticated service, or changes permissions
+- PS5 no-output acquisition values remain false during planning and serialize as
+  empty objects when retained as evidence. Ordinary JSON nulls inside returned
+  objects remain null. Object-property array stringification uses `System.Object[]`,
+  and a replaced history `recorded` property moves to the end in raw Console JSON
 
 ## Qualification
 
@@ -139,3 +146,14 @@ The suite does not operate a live desktop. Real mixed-DPI/window-race and UIA
 provider behavior remain responsibilities of the acquisition layer and later
 Windows acceptance tests. The candidate's successful unit tests do not replace
 that evidence.
+
+The first combined Windows run at commit
+`120b64a605bece965da4637e6510afcbd46fe871` passed 494 isolated contracts, helper
+differentials, and all 11 transport tests. It exposed three candidate payload
+differences and twelve raw Console differences; the no-output, object-string,
+and property-order fixes above address those exact differences. Actual adapters
+rejected their first startup output, and the retained filesystem oracle exceeded
+its 90-second limit. The next gate keeps exact comparisons and adds a bounded
+initial-frame diagnostic, a Framework child-input byte characterization, and
+noninteractive storage-oracle stage diagnostics. These repairs remain unqualified
+until that Windows run passes.

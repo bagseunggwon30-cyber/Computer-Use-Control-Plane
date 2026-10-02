@@ -20,6 +20,25 @@ BASELINE_TREE = "bf895d3120dd5e145f360cb1c41e1d79a061d048"
 PROJECT = ROOT / "pcucp-next/dotnet/PcuCp.LegacyExecution.ContractTests"
 
 
+def first_difference(actual, expected, path="$"):
+    """Bounded failure context; equality assertions remain the qualification gate."""
+    if type(actual) is not type(expected):
+        return f"{path}: actual {type(actual).__name__}, expected {type(expected).__name__}"
+    if isinstance(actual, dict):
+        for key in expected:
+            if key not in actual:return f"{path}.{key}: missing actual key"
+            if actual[key] != expected[key]:return first_difference(actual[key], expected[key], f"{path}.{key}")
+        for key in actual:
+            if key not in expected:return f"{path}.{key}: unexpected actual key"
+    elif isinstance(actual, list):
+        if len(actual) != len(expected):return f"{path}: actual count {len(actual)}, expected {len(expected)}"
+        for index, (left, right) in enumerate(zip(actual, expected)):
+            if left != right:return first_difference(left, right, f"{path}[{index}]")
+    elif actual != expected:
+        return f"{path}: actual {repr(actual)[:256]}, expected {repr(expected)[:256]}"
+    return None
+
+
 def reply(value=None, exit=0, raw="captured 한글"):
     return dict(exit=exit, raw=raw, json=value)
 
@@ -183,6 +202,13 @@ def run_candidate(fixtures):
 
 
 class ExecutionPortableTests(unittest.TestCase):
+    def test_first_difference_reports_nested_path_without_dumping_large_payload(self):
+        self.assertIsNone(first_difference({"effects":[]},{"effects":[]}))
+        self.assertEqual(first_difference({"effects":[{"live":False}]},{"effects":[{"live":True}]}),
+                         "$.effects[0].live: actual False, expected True")
+        self.assertEqual(first_difference({},{"payload":{"secret":"not printed"}}),"$.payload: missing actual key")
+        self.assertLess(len(first_difference("a"*100000,"b"*100000)),600)
+
     def test_all_family_corpus_is_closed(self):
         cs=cases();self.assertGreaterEqual(len(cs),400)
         self.assertEqual({c["operation"] for c in cs},{"workflow-run","task-run","form-run","smart-click","watch","recovery-plan","recovery-run"})
@@ -242,7 +268,8 @@ def decode_wire(value):
 
 @unittest.skipUnless(sys.platform=="win32","Windows PowerShell 5.1 differential qualification")
 class ExecutionWindowsParityTests(unittest.TestCase):
-    maxDiff=None
+    # Keep all assertions/subtests; bound only unittest's textual diff output.
+    maxDiff=1200
     def test_original_payload_effect_order_errors_exits_and_console(self):
         fixtures=cases();actual=run_candidate(fixtures)
         with tempfile.TemporaryDirectory(prefix="CUCP execution 한글 ") as temp:
@@ -254,8 +281,8 @@ class ExecutionWindowsParityTests(unittest.TestCase):
             self.assertEqual(p.returncode,0,p.stderr.decode(errors="replace"));baseline=json.loads(p.stdout.decode("utf-8-sig"))
             self.assertEqual(len(baseline),len(fixtures))
             render=[]
-            for f,old,new in zip(fixtures,baseline,actual):
-                with self.subTest(operation=f["operation"],rest=f["rest"],brief=f.get("brief")):
+            for index,(f,old,new) in enumerate(zip(fixtures,baseline,actual)):
+                with self.subTest(case=index,operation=f["operation"],rest=f["rest"],brief=f.get("brief")):
                     self.assertEqual(new["state"],old["state"])
                     self.assertEqual(new["effects"],decode_wire(old["effects"]))
                     self.assertEqual(new["consumed"],old["consumed"])
@@ -281,16 +308,18 @@ class ExecutionWindowsParityTests(unittest.TestCase):
             original=subprocess.run(command,capture_output=True,timeout=240)
             self.assertEqual(original.returncode,0,original.stderr.decode(errors="replace"))
             adapted=subprocess.run(command+["-AdapterSource",os.environ.get("CUCP_EXECUTION_ADAPTER_SOURCE",str(ROOT/"scripts/cucp.ps1")),"-BridgeSource",str(ROOT/"scripts/cucp.ps1")],
-                env={**os.environ,"CUCP_NATIVE_HOST":os.environ["CUCP_EXECUTION_TEST_HOST"]},capture_output=True,timeout=600)
+                env={**os.environ,"CUCP_NATIVE_HOST":os.environ["CUCP_EXECUTION_TEST_HOST"],"CUCP_EXECUTION_DIAGNOSTICS":"1"},capture_output=True,timeout=600)
+            if adapted.stderr:
+                print("Execution adapter diagnostics (first 16 KiB):\n"+adapted.stderr.decode("utf-8-sig",errors="replace")[:16384],flush=True)
             self.assertEqual(adapted.returncode,0,adapted.stderr.decode(errors="replace"))
             old=json.loads(original.stdout.decode("utf-8-sig"));new=json.loads(adapted.stdout.decode("utf-8-sig"))
             self.assertEqual(len(old),len(fixtures));self.assertEqual(len(new),len(fixtures))
             def unbrief_key(fixture):
                 return json.dumps({k:v for k,v in fixture.items() if k!="brief"},sort_keys=True)
             unbrief_results={unbrief_key(f):r for f,r in zip(fixtures,new) if not f.get("brief")}
-            exact_failures=0;uncertain_failures=0
-            for fixture,before,after in zip(fixtures,old,new):
-                with self.subTest(operation=fixture["operation"],rest=fixture["rest"],brief=fixture.get("brief")):
+            exact_failures=0;uncertain_failures=0;diagnostic_shown=False
+            for index,(fixture,before,after) in enumerate(zip(fixtures,old,new)):
+                with self.subTest(case=index,operation=fixture["operation"],rest=fixture["rest"],brief=fixture.get("brief")):
                     original_effects=decode_wire(before["effects"])
                     failures=captured_failure_effects(fixture,original_effects)
                     # Any earlier live dispatch is relevant too: losing a later
@@ -300,6 +329,10 @@ class ExecutionWindowsParityTests(unittest.TestCase):
                     if uncertain is None:
                         # Includes every captured failure before a live dispatch,
                         # plus fixture throws that the original never reached.
+                        if after != before and not diagnostic_shown:
+                            diagnostic_shown=True
+                            print(f"First exact adapter mismatch, case {index}, {fixture['operation']}: "+str(first_difference(after,before))+
+                                  "; actual error="+str(after.get("error",""))[:1024],flush=True)
                         self.assertEqual(after,before)
                         exact_failures+=bool(failures)
                         continue

@@ -12,8 +12,74 @@ ROOT=Path(__file__).resolve().parents[2]
 BASELINE_TREE="bf895d3120dd5e145f360cb1c41e1d79a061d048"
 
 
+@unittest.skipUnless(sys.platform=="win32","Windows PowerShell diagnostic contract")
+class ExecutionAdapterDiagnosticTests(unittest.TestCase):
+    def test_adapter_diagnostic_is_opt_in_bounded_and_limited(self):
+        with tempfile.TemporaryDirectory(prefix="CUCP protocol diagnostic ") as temp:
+            runner=Path(temp)/"diagnostic.ps1"
+            runner.write_text(r'''
+param([string]$Source)
+$ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+$tokens=$null;$errors=$null;$ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[ref]$errors)
+$definition=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq '_Execution-WriteDiagnostic'},$true))
+if($errors.Count -or $definition.Count -ne 1){throw 'Expected one diagnostic helper'}
+. ([scriptblock]::Create($definition[0].Extent.Text))
+$state=@{diagnostic_phase='parse-frame';diagnostic_expected_id=1;diagnostic_frame=([string][char]0xFEFF+('x'*100000))}
+$env:CUCP_EXECUTION_DIAGNOSTICS='0';_Execution-WriteDiagnostic $state $null $null ('e'*3000)
+$env:CUCP_EXECUTION_DIAGNOSTICS='1'
+1..8|ForEach-Object {_Execution-WriteDiagnostic $state $null $null ('e'*3000)}
+''',encoding="utf-8-sig")
+            p=subprocess.run([shutil.which("powershell.exe"),"-NoProfile","-NonInteractive","-File",str(runner),"-Source",str(ROOT/"tests/fixtures/legacy-execution-adapter.ps1")],capture_output=True,timeout=30)
+            self.assertEqual(p.returncode,0,p.stderr.decode(errors="replace"))
+            lines=p.stderr.decode("utf-8-sig",errors="replace").splitlines()
+            self.assertEqual(len(lines),4)
+            self.assertLess(len(p.stderr),10000)
+            for line in lines:
+                self.assertTrue(line.startswith("[execution-protocol] "))
+                row=json.loads(line.removeprefix("[execution-protocol] "))
+                self.assertEqual(row["prefix_codepoints"][0],"U+FEFF")
+                self.assertEqual(row["frame_characters"],100001)
+                self.assertEqual(len(row["frame_prefix"]),256)
+                self.assertEqual(len(row["error"]),512)
+                self.assertEqual(row["expected_id"],1)
+
+
 @unittest.skipUnless(sys.platform=="win32","Windows PowerShell argument binding characterization")
 class ExecutionOriginalDefectTests(unittest.TestCase):
+    def test_framework_redirected_stdin_can_emit_bom_before_explicit_no_bom_writer(self):
+        """Characterize Framework Process.StandardInput with an inert byte echo."""
+        with tempfile.TemporaryDirectory(prefix="CUCP stdin bytes ") as temp:
+            runner=Path(temp)/"bytes.ps1"
+            runner.write_text(r'''
+$ErrorActionPreference='Stop'
+$previous=[Console]::InputEncoding;$process=$null;$writer=$null
+try {
+ [Console]::InputEncoding=New-Object Text.UTF8Encoding($true)
+ [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+ $echo='$buffer=New-Object IO.MemoryStream;[Console]::OpenStandardInput().CopyTo($buffer);[Console]::Out.Write([Convert]::ToBase64String($buffer.ToArray()))'
+ $psi=New-Object Diagnostics.ProcessStartInfo
+ $psi.FileName=(Get-Command powershell.exe -CommandType Application).Source
+ $psi.Arguments='-NoProfile -NonInteractive -EncodedCommand '+[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($echo))
+ $psi.UseShellExecute=$false;$psi.RedirectStandardInput=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true
+ $process=New-Object Diagnostics.Process;$process.StartInfo=$psi;[void]$process.Start()
+ $stdout=$process.StandardOutput.ReadToEndAsync();$stderr=$process.StandardError.ReadToEndAsync()
+ $utf8=New-Object Text.UTF8Encoding($false,$true)
+ $writer=New-Object IO.StreamWriter -ArgumentList @($process.StandardInput.BaseStream,$utf8,4096,$true)
+ $writer.WriteLine('{"kind":"end","id":0}');$writer.Flush();$writer.Dispose();$writer=$null
+ $process.StandardInput.Close();$process.WaitForExit()
+ if($process.ExitCode -ne 0){throw $stderr.GetAwaiter().GetResult()}
+ [Console]::Out.WriteLine($stdout.GetAwaiter().GetResult())
+} finally {
+ if($null -ne $writer){$writer.Dispose()}
+ if($null -ne $process){try {if(-not $process.HasExited){$process.Kill()}}catch {};$process.Dispose()}
+ [Console]::InputEncoding=$previous
+}
+''',encoding="utf-8-sig")
+            p=subprocess.run([shutil.which("powershell.exe"),"-NoProfile","-NonInteractive","-File",str(runner)],capture_output=True,timeout=30)
+            self.assertEqual(p.returncode,0,p.stderr.decode(errors="replace"))
+            import base64
+            self.assertEqual(base64.b64decode(p.stdout.strip()),b'\xef\xbb\xbf{"kind":"end","id":0}\r\n')
+
     def test_original_literal_value_is_misclassified_as_consent(self):
         with tempfile.TemporaryDirectory(prefix="CUCP consent fixture ") as temp:
             d=Path(temp);source=d/"source.ps1";runner=d/"check.ps1"

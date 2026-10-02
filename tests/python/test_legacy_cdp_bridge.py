@@ -96,5 +96,15 @@ class LegacyCdpBridgeTests(unittest.TestCase):
         p=self.invoke('macro-prepare',dict(action='cdp-eval',argv=['--expr','1']))
         self.assertEqual(json.loads(p.stdout)['error']['message'],'macro cdp-eval requires -AllowLiveControl')
 
+    def test_framework_utf8_preamble_is_transport_only(self):
+        frame=json.dumps(dict(action='cdp-detect',argv=['--page-match','한글😀']))+'\n'
+        p=self.invoke('macro-prepare',None,raw='\ufeff'+frame)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertEqual(json.loads(p.stdout)['data']['native_argv'],['-Action','cdp-detect','-CdpPort','9222'])
+        for raw in ('\ufeff\ufeff'+frame,' \ufeff'+frame,'\ufeff{"action":"cdp-detect","action":"cdp-eval","argv":[]}\n'):
+            with self.subTest(raw=raw):
+                p=self.invoke('macro-prepare',None,raw=raw)
+                self.assertEqual(p.returncode,1)
+
 
 if __name__=='__main__':unittest.main()

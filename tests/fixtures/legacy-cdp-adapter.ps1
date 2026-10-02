@@ -47,31 +47,37 @@ function _Invoke-LegacyCdpBridge {
     $watch = [Diagnostics.Stopwatch]::StartNew()
     $out = New-Object Text.StringBuilder
     $err = New-Object Text.StringBuilder
-    $outBuffer = New-Object char[] 4096
-    $errBuffer = New-Object char[] 4096
+    $outBuffer = New-Object char[] 16384
+    $errBuffer = New-Object char[] 16384
     $outRead = $process.StandardOutput.ReadAsync($outBuffer, 0, $outBuffer.Length)
     $errRead = $process.StandardError.ReadAsync($errBuffer, 0, $errBuffer.Length)
     $write = $process.StandardInput.BaseStream.WriteAsync($bytes, 0, $bytes.Length)
     $inputClosed = $false
     while (-not ($process.HasExited -and $null -eq $outRead -and $null -eq $errRead)) {
+      $progressed = $false
       if ($watch.ElapsedMilliseconds -ge 15000) { throw 'CDP bridge timed out; no retry was attempted.' }
       if (-not $inputClosed -and $write.IsCompleted) {
-        $write.GetAwaiter().GetResult(); $process.StandardInput.Close(); $inputClosed = $true
+        [void]$write.GetAwaiter().GetResult(); $process.StandardInput.Close(); $inputClosed = $true
+        $progressed = $true
       }
       if ($null -ne $outRead -and $outRead.IsCompleted) {
+        $progressed = $true
         $n = $outRead.GetAwaiter().GetResult()
         if ($out.Length + $n -gt 4194304) { throw 'CDP bridge stdout exceeds 4 MiB; no retry was attempted.' }
         if ($n -gt 0) { [void]$out.Append($outBuffer, 0, $n); $outRead = $process.StandardOutput.ReadAsync($outBuffer, 0, $outBuffer.Length) }
         else { $outRead = $null }
       }
       if ($null -ne $errRead -and $errRead.IsCompleted) {
+        $progressed = $true
         $n = $errRead.GetAwaiter().GetResult()
         if ($err.Length + $n -gt 65536) { throw 'CDP bridge stderr exceeds 64 KiB; no retry was attempted.' }
         if ($n -gt 0) { [void]$err.Append($errBuffer, 0, $n); $errRead = $process.StandardError.ReadAsync($errBuffer, 0, $errBuffer.Length) }
         else { $errRead = $null }
       }
-      if (-not $process.HasExited) { [void]$process.WaitForExit(5) }
-      else { [Threading.Thread]::Sleep(1) }
+      if (-not $progressed) {
+        if (-not $process.HasExited) { [void]$process.WaitForExit(1) }
+        else { [Threading.Thread]::Sleep(1) }
+      }
     }
     $response = $out.ToString() | ConvertFrom-Json -ErrorAction Stop
     if ($response.schema -ne 'cucp.legacy-cdp-bridge/v1') { throw 'Invalid CDP bridge schema; no retry was attempted.' }

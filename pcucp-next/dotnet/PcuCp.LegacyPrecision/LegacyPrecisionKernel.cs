@@ -8,6 +8,11 @@ using System.Text.Json;
 // caller writes history/cache, and no growing replay frame follows a write.
 internal static partial class LegacyPrecisionKernel
 {
+    // A command that writes no pipeline object assigns AutomationNull in PS5.
+    // It is false in conditions, but a retained object property serializes as {}.
+    private sealed class EmptyPipelineOutput;
+    private static readonly object EmptyOutput = new EmptyPipelineOutput();
+    private static object? Acquisition(object? value) => value is null or JsonElement { ValueKind: JsonValueKind.Null or JsonValueKind.Undefined } ? EmptyOutput : value;
     internal static Dictionary<string, object?> D(params object?[] pairs)
     {
         var d = new Dictionary<string, object?>();
@@ -25,11 +30,11 @@ internal static partial class LegacyPrecisionKernel
     internal static object?[] A(object? value) => value switch
     {
         JsonElement { ValueKind: JsonValueKind.Array } j => j.EnumerateArray().Select(v => (object?)v.Clone()).ToArray(),
-        object?[] a => a, IEnumerable<object?> e => e.ToArray(), null => [null], _ => [value]
+        object?[] a => a, IEnumerable<object?> e => e.ToArray(), EmptyPipelineOutput => [], null => [null], _ => [value]
     };
     internal static bool T(object? value) => value switch
     {
-        null => false, bool b => b, string s => s.Length != 0,
+        null or EmptyPipelineOutput => false, bool b => b, string s => s.Length != 0,
         JsonElement j => j.ValueKind switch
         {
             JsonValueKind.Null or JsonValueKind.Undefined or JsonValueKind.False => false,
@@ -42,13 +47,13 @@ internal static partial class LegacyPrecisionKernel
     };
     internal static string S(object? value) => value switch
     {
-        null => "", string s => s, bool b => b ? "True" : "False",
+        null or EmptyPipelineOutput => "", string s => s, bool b => b ? "True" : "False",
         JsonElement j => j.ValueKind switch
         {
             JsonValueKind.Null or JsonValueKind.Undefined => "", JsonValueKind.String => j.GetString()!,
             JsonValueKind.True => "True", JsonValueKind.False => "False",
             JsonValueKind.Array => string.Join(" ", j.EnumerateArray().Select(v => S(v))),
-            JsonValueKind.Object => "@{" + string.Join("; ", j.EnumerateObject().Select(p => p.Name + "=" + S(p.Value))) + "}", _ => j.ToString()
+            JsonValueKind.Object => "@{" + string.Join("; ", j.EnumerateObject().Select(p => p.Name + "=" + (p.Value.ValueKind == JsonValueKind.Array ? "System.Object[]" : S(p.Value)))) + "}", _ => j.ToString()
         }, _ => Convert.ToString(value, CultureInfo.InvariantCulture) ?? ""
     };
     internal static int I(object? value)
@@ -207,7 +212,7 @@ internal static partial class LegacyPrecisionKernel
                     return new(p, I(Get("click-inset", "ClickInset")), I(Get("radius", "ScanRadius")), I(Get("step", "ScanStep")));
                 }
                 string[] argv = parameters.TryGetValue("argv", out var av) ? A(av).Select(S).ToArray() : [];
-                return kind switch
+                return Acquisition(kind switch
                 {
                     "coord-map" => reader.CoordinateMap(Point()), "hit-test" => reader.HitTest(Point()), "coord-profile" => reader.CoordinateProfile(Point()),
                     "hit-scan" => reader.HitScan(Scan(argv, false)),
@@ -215,7 +220,7 @@ internal static partial class LegacyPrecisionKernel
                     "history-lines" => reader.HistoryLines(HistoryFile),
                     "cache-read" => reader.ReadCache(CacheDir, S(P(parameters, "key")), I(P(parameters, "max_age_seconds"))),
                     _ => throw new ArgumentException("Unknown precision effect.")
-                };
+                });
             }
             var replies = P(Args, "captured_replies"); var all = replies == null ? [] : A(replies);
             if (Cursor >= all.Length) throw new NeedReply(query);
@@ -227,7 +232,7 @@ internal static partial class LegacyPrecisionKernel
             if (keys.Count != 3 || hasResult == hasError || !EqExact(P(reply, "kind"), kind) || !reply.TryGetProperty("args", out var actual) || !JsonEqual(actual, JsonSerializer.SerializeToElement(parameters)))
                 throw new ArgumentException("Captured reply descriptor does not match exact query order/arguments.");
             if (hasError) { if (error.ValueKind != JsonValueKind.String) throw new ArgumentException("Captured error must be a string."); throw new InvalidOperationException(error.GetString()); }
-            return result.Clone();
+            return Acquisition(result.Clone());
         }
         internal int Elapsed => I(P(Args, "elapsed_ms"));
         internal string HistoryFile => S(P(Args, "history_file"));

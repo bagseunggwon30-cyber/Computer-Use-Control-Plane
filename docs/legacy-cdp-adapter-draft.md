@@ -91,9 +91,9 @@ Executable source: `tests/fixtures/legacy-cdp-adapter.ps1`, region `cdp-native-d
 Current old CDP-named function bodies occupy 64,988 UTF-8 bytes (function extents
 only, excluding surrounding comments). Retaining the shared 1,307-byte
 `Test-CdpPortQuick` and counting every draft block as future PowerShell, including
-one shared 4,659-byte process bridge, gives 11,379 executable code bytes. Counting
-the complete 11,778-byte `.ps1` fixture, including headers/regions/BOM, gives a
-candidate reduction of **51,903 bytes** when one shared bridge source is used. The staged fixture
+one shared 4,820-byte process bridge, gives 11,540 executable code bytes. Counting
+the complete 11,939-byte `.ps1` fixture, including headers/regions/BOM, gives a
+candidate reduction of **51,742 bytes** when one shared bridge source is used. The staged fixture
 adds real `.ps1` bytes temporarily; no executable code is hidden in Markdown and
 this is not a language-percentage claim.
 Initializer/dispatch glue is additional and must be included in the final staged
@@ -116,3 +116,12 @@ standalone typed delegation, process output/deadline bounds, and large successfu
 live replies or failed logging after dispatch. The production mode also tests
 `Invoke-NativeHelper` interception before the old runtime lookup. These are draft
 adapter checks, not a claim that the central host is already switched.
+
+The first exact Windows gate (`120b64a`, run `36997186053`) failed. Its repair
+candidate suppresses Framework's `VoidTaskResult` pipeline value, drains ready
+stdout/stderr without a per-buffer wait, and accepts a single UTF-8 prefix BOM
+from Framework's automatically initialized stdin writer. The same strict JSON
+field/duplicate/size checks remain in force. A fixed-data raw-byte round-trip
+fixture independently diagnoses the actual host framing. Source/frozen launch,
+the original Console differential, authority-looking values, and post-dispatch
+uncertainty still require a successful Windows gate before promotion.

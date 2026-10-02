@@ -80,7 +80,7 @@ function _Precision-ReadMessage($Reader,[long]$ExpectedId){
       $line=$Reader.ReadLine();if($null -eq $line){throw 'Precision session closed; terminal outcome may be uncertain. No write is retried.'}
       if($line.Length -gt 70000){throw 'Precision output frame exceeds its bound.'}
       $frame=$line|ConvertFrom-Json -ErrorAction Stop
-      if($frame.kind -ceq 'part'){_Precision-Fields $frame @('kind','target','id','data')}elseif($frame.kind -ceq 'end'){_Precision-Fields $frame @('kind','target','id')}else{throw 'Invalid precision output frame.'}
+      if($frame.kind -ceq 'part'){_Precision-Fields $frame @('kind','target','id','data')}elseif($frame.kind -ceq 'end'){_Precision-Fields $frame @('kind','target','id')}else{throw ('Invalid precision output frame: '+$line.Substring(0,[Math]::Min(2048,$line.Length)))}
       _Precision-Require ($frame.id -is [int] -or $frame.id -is [long]) 'Invalid precision frame id.'
       _Precision-Require ([long]$frame.id -eq $ExpectedId -and $frame.target -is [string]) 'Precision message does not match outstanding sequence.'
       if($null -eq $target){$target=$frame.target}else{_Precision-Require ($target -ceq $frame.target) 'Interleaved precision messages.'}

@@ -25,6 +25,13 @@ internal static class SelfTests
         Check(stopped.GetProperty("queries").GetArrayLength() == 2, "Mismatched guard must not scan/cache");
         Check(stopped.GetProperty("effects").GetArrayLength() == 0, "Mismatched guard must not write cache");
         Check(!stopped.GetProperty("payload").GetProperty("mouse_moved").GetBoolean(), "Planning must not move mouse");
+        var noGuard = Complete("point-plan", new { rest, captured_replies = new object[] { new { kind = "hit-test", args = guardArgs, result = (object?)null }, profile }, cache_seconds = 10 });
+        Check(noGuard.GetProperty("precheck").ValueKind == JsonValueKind.Object && !noGuard.GetProperty("precheck").EnumerateObject().Any(), "PS5 no-output guard must render an empty object");
+        Check(noGuard.GetProperty("checks")[0].GetProperty("evidence").GetRawText() == "{}", "No-output evidence shape changed");
+        Check(noGuard.GetProperty("reason").GetString() == "fast_guard_mismatch", "No-output guard must remain false");
+        var noMap = Complete("coord-anchor", new { rest, captured_replies = new[] { new { kind = "coord-map", args = new { from = "screen", x = 100, y = 100, norm_x = 0, norm_y = 0, has_norm = false, target_hwnd = 0, target_match = "Fixture" }, result = (object?)null } } });
+        Check(noMap.GetProperty("coord_map").GetRawText() == "{}", "PS5 no-output map must render an empty object");
+        Check(LegacyPrecisionKernel.S(JsonSerializer.SerializeToElement(new { value = new[] { "macro", "click-point" }, Count = 2 })) == "@{value=System.Object[]; Count=2}", "PS5 object member array stringification changed");
         foreach (var replies in new object[][] { [new { kind = "hit-scan", args = guardArgs, result = (object?)null }], [guard, profile, guard], [new { kind = "hit-test", args = guardArgs, result = (object?)null, error = "ambiguous" }] })
             Check(Run("point-plan", new { rest, captured_replies = replies }).GetProperty("state").GetString() == "error", "Malformed/unused capture accepted");
         foreach (var value in new[] { ("high", 3), ("HIGH", 3), ("medium", 2), ("low", 1), ("unknown", 0), ("", 0) })
@@ -69,6 +76,7 @@ internal static class SelfTests
         Check(reader.Maps == 1 && reader.Histories == 1, "In-process observations must be acquired only once");
         Check(inProcess.GetProperty("effects").GetArrayLength() == 1, "Requested history write must be a terminal effect");
         Check(!inProcess.GetProperty("payload").GetProperty("reuse_history").GetProperty("recorded").GetBoolean(), "Unexecuted history effect must not claim success");
+        Check(inProcess.GetProperty("payload").GetProperty("reuse_history").EnumerateObject().Last().Name == "recorded", "Legacy Add-Member -Force must put recorded last before rendering");
         Check(JsonSerializer.Serialize(inProcess).Length < 10000, "Terminal result must not echo near-cap history lines");
         var childEnvelope = Complete("child-plan-envelope", new { raw_lines = new[] { "{", "  \"status\":\"ok\"", "}" }, exit_code = 2 });
         Check(childEnvelope.GetProperty("exit").GetInt32() == 2 && childEnvelope.GetProperty("json").GetProperty("status").GetString() == "ok", "Child output parsing/exit changed");
@@ -76,6 +84,12 @@ internal static class SelfTests
         Check(Complete("child-plan-envelope", new { raw_lines = new[] { "not JSON" }, exit_code = 1 }).GetProperty("json").ValueKind == JsonValueKind.Null, "Unparseable child output must stay null");
         try { LegacyPrecisionSession.ReadStartup(new StringReader(new string('x', 4194305))); throw new Exception("Startup bound ignored"); }
         catch (LegacyExecutionProtocolException) { Check(true, "Startup is bounded before complete line allocation"); }
+        Check(LegacyPrecisionSession.ReadStartup(new StringReader("\uFEFF{\"test\":true}\r\n")).GetProperty("test").GetBoolean(), "Single Framework startup BOM was rejected");
+        foreach (string invalid in new[] { "\uFEFF\uFEFF{}\n", "{\uFEFF}\n", "{}\uFEFF\n", " \uFEFF{}\n" })
+        {
+            try { LegacyPrecisionSession.ReadStartup(new StringReader(invalid)); throw new Exception("Invalid startup BOM accepted"); }
+            catch (JsonException) { Check(true, "Repeated or embedded startup BOM rejected"); }
+        }
         Storage(Check);
         Console.WriteLine($"PASS: {checks} isolated precision contracts; no desktop probes or input executed.");
     }

@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from test_legacy_precision_parity import fixtures, runner_command
@@ -110,6 +111,38 @@ class PrecisionTransportTests(unittest.TestCase):
             proc=self.spawn(fixture,Path(tmp));_,i,_=receive(proc)
             proc.stdin.write(json.dumps(dict(kind='end',id=i+1))+'\n');proc.stdin.flush()
             target,_,state=receive(proc);self.assertEqual(target,'error');self.assertIn('outstanding',state['error']);self.assertEqual(self.finish(proc)[0],1)
+    def test_later_reply_bom_is_rejected_without_acquisition_or_write(self):
+        fixture=next(f for f in fixtures() if f['operation']=='coord-anchor' and '--record-history' in f['rest'])
+        with tempfile.TemporaryDirectory(prefix='CUCP precision later BOM ') as tmp:
+            root=Path(tmp);proc=self.spawn(fixture,root);_,i,_=receive(proc)
+            reply=frames(dict(state='ok',value=fixture['mapping']),i)
+            proc.stdin.write('\ufeff'+reply[0]);proc.stdin.flush()
+            target,_,state=receive(proc);self.assertEqual(target,'error');self.assertEqual(state['queries'][0]['kind'],'coord-map')
+            self.assertEqual(len(state['queries']),1);self.assertEqual(self.finish(proc)[0],1);self.assertFalse((root/'history.jsonl').exists())
+    @unittest.skipUnless(sys.platform=='win32','Requires .NET Framework Process stdin characterization')
+    def test_framework_emits_input_bom_before_replacement_writer(self):
+        with tempfile.TemporaryDirectory(prefix='CUCP precision Framework BOM ') as tmp:
+            root=Path(tmp);config=root/'command.json'
+            config.write_text(json.dumps(dict(exe=self.command[0],dll=self.command[1])),encoding='utf-8-sig')
+            script=root/'bom.ps1';script.write_text(r'''param([string]$Config)
+$ErrorActionPreference='Stop'
+[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+$c=Get-Content -LiteralPath $Config -Raw -Encoding UTF8|ConvertFrom-Json
+$previous=[Console]::InputEncoding;$process=New-Object Diagnostics.Process;$writer=$null
+try{
+ [Console]::InputEncoding=New-Object Text.UTF8Encoding($true)
+ $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName=$c.exe;$psi.Arguments='"'+$c.dll+'" --stdin-prefix-fixture'
+ $psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.RedirectStandardInput=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true
+ $process.StartInfo=$psi;[void]$process.Start()
+ $writer=New-Object IO.StreamWriter -ArgumentList @($process.StandardInput.BaseStream,(New-Object Text.UTF8Encoding($false)))
+ $writer.Write('abc');$writer.Flush();$writer.Close()
+ $output=$process.StandardOutput.ReadToEnd();$errorText=$process.StandardError.ReadToEnd();$process.WaitForExit()
+ if($process.ExitCode -ne 0){throw $errorText}
+ [Console]::Out.Write($output)
+}finally{if($writer){$writer.Dispose()};$process.Dispose();[Console]::InputEncoding=$previous}
+''',encoding='utf-8-sig')
+            result=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(script),'-Config',str(config)],capture_output=True,timeout=30)
+            self.assertEqual(result.returncode,0,result.stderr.decode(errors='replace'));self.assertEqual(json.loads(result.stdout.decode('utf-8-sig')),[239,187,191])
     def test_history_write_failure_is_bounded_false_commit(self):
         fixture=next(f for f in fixtures() if f['operation']=='coord-anchor' and '--record-history' in f['rest'])
         with tempfile.TemporaryDirectory(prefix='CUCP precision failed ') as tmp:

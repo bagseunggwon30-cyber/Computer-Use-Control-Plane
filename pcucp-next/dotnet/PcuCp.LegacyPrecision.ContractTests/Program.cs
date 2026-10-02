@@ -1,4 +1,9 @@
 using System.Text.Json;
+if (args.SequenceEqual(new[] { "--stdin-prefix-fixture" }))
+{
+    using var stream = Console.OpenStandardInput();
+    Console.WriteLine(JsonSerializer.Serialize(new[] { stream.ReadByte(), stream.ReadByte(), stream.ReadByte() })); return;
+}
 if (args.SequenceEqual(new[] { "--session-fixture" }) || args.SequenceEqual(new[] { "--storage-session-fixture" }))
 {
     var startup = LegacyPrecisionSession.ReadStartup(Console.In);

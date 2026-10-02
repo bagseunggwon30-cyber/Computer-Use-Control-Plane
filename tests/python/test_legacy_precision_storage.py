@@ -19,6 +19,7 @@ foreach($name in @('_AnchorHistory-Append','_PointPlan-CachePath','_PointPlan-Re
 $clock=New-Object DateTime(2026,10,2,1,2,3);function Get-Date {$clock}
 $all=New-Object Collections.ArrayList
 foreach($fixture in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json)){
+ [Console]::Error.WriteLine(('storage fixture maximum={0} records={1} create_cache={2} begin' -f $fixture.maximum,@($fixture.records).Count,$fixture.create_cache))
  $root=$fixture.root;[void][IO.Directory]::CreateDirectory($root)
  $Script:AnchorHistoryFile=Join-Path $root 'history.jsonl';$Script:AnchorHistoryMax=[int]$fixture.maximum;$Script:CacheDir=Join-Path $root 'cache'
  if($fixture.create_cache){[void][IO.Directory]::CreateDirectory($Script:CacheDir)}
@@ -28,10 +29,12 @@ foreach($fixture in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Con
   [void]$serialized.Add(($record|ConvertTo-Json -Compress -Depth 10))
   [void]$appended.Add((_AnchorHistory-Append -Record $record))
  }
+ [Console]::Error.WriteLine('storage history appended')
  $serializedCache=$null;$key='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';$cacheFile=_PointPlan-CachePath -Key $key
  if($null -ne $fixture.cache_payload){$serializedCache=$fixture.cache_payload|ConvertTo-Json -Depth 14;_PointPlan-WriteCache -Key $key -Payload $fixture.cache_payload}
  if(Test-Path -LiteralPath $cacheFile){[IO.File]::SetLastWriteTime($cacheFile,$clock.AddMilliseconds(-[double]$fixture.age_ms))}
  $hit=_PointPlan-ReadCache -Key $key -MaxAgeSeconds ([int]$fixture.ttl)
+ [Console]::Error.WriteLine('storage cache read')
  $lines=@();$historyBytes=$null;$cacheBytes=$null
  if(Test-Path -LiteralPath $Script:AnchorHistoryFile){$lines=@(Get-Content -LiteralPath $Script:AnchorHistoryFile -Encoding UTF8);$historyBytes=[Convert]::ToBase64String([IO.File]::ReadAllBytes($Script:AnchorHistoryFile))}
  if(Test-Path -LiteralPath $cacheFile){$cacheBytes=[Convert]::ToBase64String([IO.File]::ReadAllBytes($cacheFile))}
@@ -53,7 +56,10 @@ class PrecisionStorageWindowsTests(unittest.TestCase):
                     path=Path(tempfile.mkdtemp(prefix='CUCP-precision-storage-'));paths.append(path)
                     cases.append(dict(root=str(path),maximum=maximum,initial_lines=[],records=[dict(n=n,text='한글 <x> 😀',nested={'array':[1,None,True]}) for n in range(count)],cache_payload=dict(status='ok',items=[1,None,'한글']),age_ms=age,ttl=ttl,create_cache=create))
                 data=root/'fixtures.json';data.write_text(json.dumps(cases,ensure_ascii=True),encoding='utf-8-sig');runner=root/'storage.ps1';runner.write_text(STORAGE_RUNNER,encoding='utf-8-sig')
-                old=subprocess.run(['powershell.exe','-NoProfile','-File',str(runner),'-Source',str(source),'-InputPath',str(data)],capture_output=True,timeout=90)
+                try:
+                    old=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(runner),'-Source',str(source),'-InputPath',str(data)],capture_output=True,timeout=90)
+                except subprocess.TimeoutExpired as failure:
+                    self.fail('Storage oracle exceeded 90s: '+(failure.stderr or b'').decode('utf-8-sig',errors='replace')+'\nstdout: '+(failure.stdout or b'').decode('utf-8-sig',errors='replace'))
                 self.assertEqual(old.returncode,0,old.stderr.decode(errors='replace'));captured=json.loads(old.stdout.decode('utf-8-sig'))
                 for path in paths:shutil.rmtree(path)
                 actual=run_batch(runner_command(root),[c['request'] for c in captured])
