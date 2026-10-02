@@ -367,6 +367,10 @@ class InteractionDecodedDescriptorTests(unittest.TestCase):
                 self.assertEqual(result['exit'],7)
                 self.assertEqual(result['state_type'],result['expected_state_type'])
                 self.assertIs(result['aliases_caller'],False)
+                for snapshot in ('raw_before', 'raw_after', 'caller_before', 'caller_after',
+                                 'state_before', 'state_after', 'startup_before', 'startup_after',
+                                 'expected_state', 'expected_startup'):
+                    self.assertIsInstance(result[snapshot], str, snapshot)
                 self.assertEqual(json.loads(result['raw_before']),fixture['rest'])
                 self.assertEqual(result['raw_after'],result['raw_before'])
                 self.assertEqual(result['caller_after'],result['caller_before'])

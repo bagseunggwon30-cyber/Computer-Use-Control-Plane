@@ -139,3 +139,9 @@ state has no mutable storage and needs no array type or element mutation claim.
 Non-null state still requires the exact original array CLR type, independently
 owned storage, every element mutated by the inert host, and unchanged startup.
 All 18 ownership cases and eight public-delegate checks remain in the gate.
+
+Null snapshots use the explicit JSON text `null`; every snapshot field must be
+a string before Python decodes it. This avoids PS5's observed non-string null
+snapshot representation without changing caller data, production conversion or
+non-null array semantics. Both raw/bound before/after and expected/actual state
+comparisons remain exact.

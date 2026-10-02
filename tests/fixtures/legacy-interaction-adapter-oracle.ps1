@@ -90,6 +90,11 @@ if($ValidateDescriptors -or $ValidateStartupClone){
   # A separate typed-parameter function preserves the pre-copy expression as
   # the expected shape/type. Returning a hashtable prevents array unrolling.
   function Get-OriginalCloneShape {param([string[]]$Rest) return @{rest=@($Rest)}}
+  function Get-CloneJsonSnapshot($Value){
+   # Always return explicit JSON text for null as well as non-null snapshots.
+   if($null -eq $Value){return 'null'}
+   return Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $Value -Compress
+  }
   # This disposable process checks argv ownership, not confirmation parsing.
   # Exercise the real gate's immutable false ceiling before any subprocess.
   New-Variable -Name 'CUCP_EXECUTION_SENSITIVE_CEILING' -Scope Global -Option Constant -Value $false
@@ -108,22 +113,22 @@ if($ValidateDescriptors -or $ValidateStartupClone){
    $script:cloneLive=$State.live;$script:cloneSensitive=$State.sensitive
    $script:cloneStateType=if($null -eq $State.rest){$null}else{$State.rest.GetType().FullName}
    $script:cloneAliasesCaller=($null -ne $State.rest -and [object]::ReferenceEquals($State.rest,$script:cloneCaller))
-   $script:cloneStateBefore=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $State.rest -Compress
-   $script:cloneStartupBefore=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $Startup.rest -Compress
+   $script:cloneStateBefore=Get-CloneJsonSnapshot $State.rest
+   $script:cloneStartupBefore=Get-CloneJsonSnapshot $Startup.rest
    for($i=0;$i -lt $State.rest.Count;$i++){$State.rest[$i]="host-mutated-$i"}
-   $script:cloneStateAfter=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $State.rest -Compress
-   $script:cloneStartupAfter=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $Startup.rest -Compress
+   $script:cloneStateAfter=Get-CloneJsonSnapshot $State.rest
+   $script:cloneStartupAfter=Get-CloneJsonSnapshot $Startup.rest
    return 7
   }
   $AllowLiveControl=$false;$Brief=$false;$CacheSeconds=5;$Script:CliPath=$null
   $rows=New-Object Collections.ArrayList
   foreach($row in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json)){
    try {
-   $rawBefore=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $row.rest -Compress
+   $rawBefore=Get-CloneJsonSnapshot $row.rest
    $script:cloneCaller=[string[]]$row.rest;$script:cloneHostCalls=0;$script:cloneCompatibilityCalls=0
-   $before=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $script:cloneCaller -Compress
+   $before=Get-CloneJsonSnapshot $script:cloneCaller
    $originalShape=Get-OriginalCloneShape -Rest $script:cloneCaller
-   $expectedState=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $originalShape.rest -Compress
+   $expectedState=Get-CloneJsonSnapshot $originalShape.rest
    $expectedStateType=if($null -eq $originalShape.rest){$null}else{$originalShape.rest.GetType().FullName}
    $expectedStartup=$expectedState
    if($row.public){
@@ -139,8 +144,8 @@ if($ValidateDescriptors -or $ValidateStartupClone){
     $state=_Diagnostic-NewState -Operation 'perf' -Rest $script:cloneCaller -Context $context
     $exit=_Invoke-LegacyExecutionHost -EntryPoint 'legacy-diagnostic-session' -Startup @{operation='perf';rest=$originalShape.rest} -State $state
    }else{throw 'Unknown startup clone fixture family'}
-   $after=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $script:cloneCaller -Compress
-   $rawAfter=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $row.rest -Compress
+   $after=Get-CloneJsonSnapshot $script:cloneCaller
+   $rawAfter=Get-CloneJsonSnapshot $row.rest
    [void]$rows.Add(@{case=$row.case;family=$row.family;raw_before=$rawBefore;raw_after=$rawAfter;caller_before=$before;caller_after=$after;expected_state=$expectedState;expected_state_type=$expectedStateType;expected_startup=$expectedStartup;
     state_before=$script:cloneStateBefore;state_after=$script:cloneStateAfter;startup_before=$script:cloneStartupBefore;startup_after=$script:cloneStartupAfter;
     script_path=$script:cloneScriptPath;operation=$script:cloneOperation;state_type=$script:cloneStateType;aliases_caller=$script:cloneAliasesCaller;host_calls=$script:cloneHostCalls;compatibility_calls=$script:cloneCompatibilityCalls;

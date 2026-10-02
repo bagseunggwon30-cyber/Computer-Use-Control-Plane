@@ -50,6 +50,11 @@ def completion_cases():
         if row['family'] == 'execution' and not row['accepted']:
             rows.append(dict(row, case=row['case'] + ':after-write', after_write=True))
     add('execution', 'valid-after-write', after_write=True)
+    add('execution', 'zero-depth-after-write', after_write=True, json_depth=0)
+    # Real interaction Silent completions use depth zero without JSON output.
+    for label, brief in (('silent', None), ('brief', 'completion fixture')):
+        add('interaction', 'zero-depth-' + label, payload=wire(None), json_depth=0,
+            emit_json=False, brief=brief)
     return rows
 
 
@@ -151,6 +156,13 @@ class CompletionParserHostTests(unittest.TestCase):
             self.assertEqual(process.returncode, 0, process.stderr.decode(errors='replace'))
             result = json.loads(process.stdout.decode('utf-8-sig'))
             self.assertEqual(result['major'], major)
+            if major == 5:
+                self.assertIsNone(result['zero_depth_output'])
+                self.assertIsInstance(result['zero_depth_error'], str)
+                self.assertTrue(result['zero_depth_error'])
+            else:
+                self.assertIsNone(result['zero_depth_error'])
+                self.assertEqual(json.loads(result['zero_depth_output']), 'fixture')
             self.assertEqual(len(result['rows']), len(cases))
             for index, (case, actual) in enumerate(zip(cases, result['rows'])):
                 with self.subTest(runtime=executable, case=case['case']):
@@ -162,17 +174,29 @@ class CompletionParserHostTests(unittest.TestCase):
                     self.assertEqual((root / f'{index}.log').read_text().splitlines(),
                                      ['start', 'startup'] + (['write-acknowledged'] if case['after_write'] else []))
                     if case['accepted']:
+                        completion = json.loads(case['completion'])
+                        self.assertEqual(actual['exit_type'], 'System.Int32' if major == 5 else 'System.Int64')
+                        self.assertEqual(actual['depth_type'], 'System.Int32' if major == 5 else 'System.Int64')
+                        if major == 5 and completion['emit_json'] and completion['json_depth'] == 0:
+                            # The envelope passes, then the unchanged native
+                            # PS5 renderer rejects its unsupported depth. This
+                            # must match the independent cmdlet probe exactly.
+                            prefix = 'mutation_may_have_occurred=true; automatic_retry=false; ' if case['after_write'] else ''
+                            self.assertEqual(actual['error'], prefix + result['zero_depth_error'])
+                            self.assertEqual(actual['pipeline'], [])
+                            self.assertEqual(actual['pipeline_types'], [])
+                            self.assertEqual(actual['console'], '')
+                            continue
                         self.assertIsNone(actual['error'])
                         buffered = ['buffered pipeline fixture'] if case['family'] == 'interaction' else []
                         self.assertEqual(actual['pipeline'], buffered + [case['process_exit']])
                         self.assertEqual(actual['pipeline_types'],
                                          (['System.String'] if buffered else []) + ['System.Int32'])
-                        self.assertEqual(actual['exit_type'], 'System.Int32' if major == 5 else 'System.Int64')
-                        self.assertEqual(actual['depth_type'], 'System.Int32' if major == 5 else 'System.Int64')
-                        if json.loads(case['completion'])['emit_json']:
+                        if completion['emit_json']:
                             self.assertEqual(json.loads(actual['console']), 'fixture')
                         else:
-                            self.assertEqual(actual['console'], 'completion fixture\r\n')
+                            self.assertEqual(actual['console'],
+                                             '' if completion['brief'] is None else completion['brief'] + '\r\n')
                     else:
                         prefix = 'mutation_may_have_occurred=true; automatic_retry=false; ' if case['after_write'] else ''
                         self.assertEqual(actual['error'], prefix + 'Invalid execution completion envelope.')

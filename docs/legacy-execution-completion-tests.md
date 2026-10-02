@@ -24,18 +24,19 @@ These sources explain the failure; the tests below require both actual parsers.
 
 ## Test boundaries
 
-`test_legacy_execution_completion.py` runs 118 cases under each of Windows
+`test_legacy_execution_completion.py` runs 121 cases under each of Windows
 PowerShell 5.1 and PowerShell 7. Each runtime must be present on Windows; neither
 is silently skipped there. The accepted cases explicitly assert the parsed CLR
 types, exact host return/pipeline output, and JSON or brief Console output.
 
-- Twenty accepted cases cover both depth boundaries, all existing 0 through 3
-  exits, signed Int32 interaction endpoints, and brief output
+- Twenty-three envelope-valid cases cover both depth boundaries, all existing
+  0 through 3 exits, signed Int32 interaction endpoints, silent and brief output;
+  native formatter refusal is distinguished from envelope rejection
 - Seventy-three malformed cases cover null, both Boolean values, strings,
   integral and fractional floats, arrays, objects, Int32 overflow, Int64 endpoints,
   invalid depth and the narrower family exit bounds
 - The same 25 malformed execution cases run again after one acknowledged inert
-  possible-write dispatch; the twentieth accepted case also follows that dispatch
+  possible-write dispatch; two envelope-valid cases also follow that dispatch
 
 The visible `legacy-execution-completion.ps1` fixture loads exact unique AST
 definitions of the production shared host, loop, codecs, validation, dispatch and
@@ -116,5 +117,23 @@ wrapped a buffered string in a collection. The host now emits the already
 validated string through named `-InputObject`, matching original scalar output.
 The fixture inspects every collected pipeline element's actual CLR type before
 JSON serialization, preserving exact order, terminal Int32 exit, and no output
-on invalid completion. The 118 completion cases and 259 integer cases per shell
-remain required; these repairs do not weaken validation or uncertainty handling.
+on invalid completion. The original 118 completion cases remain, with three depth-zero cases added;
+all 121 completion and 259 integer cases per shell remain required; these repairs do not weaken validation or uncertainty handling.
+
+## Depth-zero envelope versus native renderer
+
+Run 37069006385 passed the integer matrices and PS7 completion cases but exposed
+three PS5 expectation errors: its native ConvertTo-Json accepts Depth only from
+1 upward, while PS7 also accepts 0. The pre-repair host already admitted envelope
+depths 0 through 100 and delegated JSON formatting directly to that cmdlet.
+Clamping would silently change output semantics; rejecting depth-zero envelopes
+would break the real interaction coordinator's Silent completion, which disables
+JSON. Neither production behavior nor validation range is changed.
+
+An independent native formatter probe now supplies the exact expected PS5 error.
+The affected cases still prove integer representation, one child/startup and
+acknowledgment as applicable, no output and no retry. Two added interaction cases
+cover depth-zero silent and brief success on both shells. One added execution
+case verifies that depth-zero formatter failure after a possible write retains
+the existing mutation/automatic_retry prefix. PS7 must still format that same
+case successfully. The original 118 cases are retained; the total is now 121.

@@ -3,6 +3,11 @@ $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 if($PSVersionTable.PSVersion.Major -ne $ExpectedMajor){throw 'Unexpected PowerShell parser version'}
 if($ExpectedMajor -eq 5 -and $PSVersionTable.PSVersion.Minor -ne 1){throw 'Expected Windows PowerShell 5.1'}
+# Independent renderer characterization: the existing envelope admits depth 0,
+# but the PS5 cmdlet's own parameter contract requires depth at least 1.
+$zeroDepthOutput=$null;$zeroDepthError=$null
+try{$zeroDepthOutput=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject 'fixture' -Depth 0}
+catch{$zeroDepthError=$_.Exception.Message}
 $names=@('_Execution-Require','_Execution-Fields','_Execution-EncodeWire','_Execution-DecodeWire',
  '_Execution-ValidateEffect','_Execution-Dispatch','_Execution-EffectMayChangeState',
  '_Execution-WriteChunks','_Execution-WriteDiagnostic','_Invoke-LegacyExecutionEffectLoop','_Invoke-LegacyExecutionHost')
@@ -49,4 +54,4 @@ foreach($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Conver
   phase=$state.diagnostic_phase;exit_type=$exitType;depth_type=$depthType})
  $capture.Dispose()
 }
-[Console]::Out.WriteLine((ConvertTo-Json -InputObject @{major=$PSVersionTable.PSVersion.Major;rows=@($rows)} -Depth 20 -Compress))
+[Console]::Out.WriteLine((ConvertTo-Json -InputObject @{major=$PSVersionTable.PSVersion.Major;zero_depth_output=$zeroDepthOutput;zero_depth_error=$zeroDepthError;rows=@($rows)} -Depth 20 -Compress))

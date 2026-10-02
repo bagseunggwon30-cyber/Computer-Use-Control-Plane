@@ -233,3 +233,10 @@ and wire-readiness checks. Their exact Windows gate is still pending.
 This follow-up index contains **866,913 tracked PS bytes**, with the same runtime
 source footprint as the first repair and 2,540 extra temporary test-fixture
 bytes. No additional source retirement or zero-PowerShell completion is claimed.
+
+The subsequent depth-zero fixture correction preserves the native PS5/PS7
+renderer difference and actual non-JSON Silent completions. It retains the
+original 118 cases and adds three, including post-write formatter refusal. This
+and the explicit-null snapshot fix add 249 net temporary driver bytes, bringing
+tracked PS to **867,162 bytes**; runtime
+PS remains **612,709 bytes**. Exact Windows qualification is still pending.
