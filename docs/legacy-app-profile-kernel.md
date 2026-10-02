@@ -22,6 +22,14 @@ an independent explicit-record/history/score-threshold/one-Append gate. Its hist
 destination is the script-owned value captured at entry. Generated commands
 remain output data.
 
+At the acquisition-to-JSON boundary, the port reply is explicitly cast to bool,
+matching its sole original use as an `if` condition. History is retained as its
+actual value; only a runtime `Array` is shallow-cloned to remove PowerShell
+`Write-Output -NoEnumerate` wrapper metadata. Literal objects with `value`/`Count`
+properties are not unwrapped. A Windows wire characterization covers empty,
+singleton, nested and multi-element arrays plus similarly shaped ordinary
+objects, null, booleans and strings.
+
 The facade is the same closed `app-profile-advance` operation, now mapped to
 `LegacyAppProfileController.Advance`. Original kernel inputs/outputs and direct
 oracle remain intact. The facade adds `facade: "cucp.app-profile-controller/v1"`
@@ -140,6 +148,10 @@ retain raw geometry, browser metadata and history fields.
 baseline tree `bf895d3120dd5e145f360cb1c41e1d79a061d048`. It substitutes only the
 external acquisition functions. Four checked elapsed-expression seams become
 zero in the original; no other field, error, or Console output is normalized.
+Two checked observation-only assignments also capture the original local payload
+immediately before its Console branches. Full unrendered kernel objects compare
+to this untruncated original object, while candidate rendered payloads and exact
+Console compare separately to the original public depth-limited serialization.
 The full payload, query sequence/argv, error, exit and actual original Console
 text are compared. Candidate output is rendered through the same legacy
 PowerShell JSON/Brief formatting boundary. Every captured prefix must request
@@ -193,6 +205,15 @@ pure replay-only tests also cover the historical nine-evaluation receipt path. M
 remains a separate approval.
 
 ## Historical qualification findings
+
+The first actual-bridge run, `af9e05e7` / `36970053682`, passed the managed and
+culture/text gates but exposed three array-wrapper transport differences (empty
+or singleton-false port replies and empty history). Two direct deep-history
+comparisons also used inconsistent serialization depths, although their exact
+actual-bridge/Console comparisons passed. The typed capture adjustment and
+separate raw/public payload observations preserve every existing fixture,
+error/exit/query comparison, Console assertion and no-post-Append call check.
+Their corrected Windows qualification is still pending.
 
 Early candidate runs exposed a PowerShell case-insensitive `$Brief` capture-name
 collision, first-seen UIA group-order ties, legacy versus modern regex casing,

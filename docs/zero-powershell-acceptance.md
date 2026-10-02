@@ -8,13 +8,13 @@ feature branch; merging into main needs separate approval.
 At the qualified planner checkpoint `aadbc58aa9dcc2254a3361cf8963429197859f22`,
 78,544 of the original 1,013,478 tracked PowerShell bytes were actually retired.
 That checkpoint left 934,934 bytes. The current app-profile source replacement
-removes another 13,662 bytes, bringing the total reduction to 92,206 bytes and
-remaining source to 921,272 bytes. Its exact-commit actual-adapter CI gate is
+removes another 13,320 bytes, bringing the total reduction to 91,864 bytes and
+remaining source to 921,614 bytes. Its exact-commit actual-adapter CI gate is
 required before claiming that replacement qualified. Current source groups are:
 
 | Remaining source group | Bytes |
 | --- | ---: |
-| Main legacy wrapper and macros, `scripts/cucp.ps1` | 577,143 |
+| Main legacy wrapper and macros, `scripts/cucp.ps1` | 577,485 |
 | Native helper, `scripts/cucp-native-helper.ps1` | 165,893 |
 | Resident helper server | 27,427 |
 | Four PowerShell test files | 135,171 |

@@ -9621,7 +9621,8 @@ function Invoke-MacroAppProfile {
         }
         'cdp_port' {
           $cdpWatch=[Diagnostics.Stopwatch]::StartNew()
-          $capture.result=Test-CdpPortQuick -Port ([int]$query.argv[0]) -TimeoutMs 120
+          # The original consumes this reply only as an if-condition.
+          $capture.result=[bool](Test-CdpPortQuick -Port ([int]$query.argv[0]) -TimeoutMs 120)
           if (-not $capture.result) { $cdpWatch.Stop() }
         }
         'native' { $capture.result=Invoke-NativeHelper -ArgList @('-Action','cdp-detect','-CdpPort',$query.argv[3]);$cdpWatch.Stop() }
@@ -9630,7 +9631,12 @@ function Invoke-MacroAppProfile {
           $capture.result=@(_Get-UIAffordances -FocusedWindow $query.argv[1] -MaxElements ([int]$query.argv[3]) -MinSize 6 -Hwnd ([int64]$query.argv[7]))
           $uiaWatch.Stop();$arguments.uia_elapsed_ms=[int]$uiaWatch.Elapsed.TotalMilliseconds
         }
-        'history' { $capture.result=_AppStrategy-LastGood -AppKey $query.argv[0] }
+        'history' {
+          $capture.result=_AppStrategy-LastGood -AppKey $query.argv[0]
+          # Remove only runtime Array wrapper metadata before JSON transport.
+          # Literal objects with value/Count properties remain ordinary objects.
+          if ($capture.result -is [array]) { $capture.result=$capture.result.Clone() }
+        }
         'record' {
           $recordAttempted=$true
           $capture.result=_AppStrategy-Append -AppKey $query.argv[0] -AppType $query.argv[1] -Strategy $query.argv[2] -Confidence $query.argv[3] -Score ([int]$query.argv[4]) -Process $query.argv[5] -Class $query.argv[6] -Title $query.argv[7]

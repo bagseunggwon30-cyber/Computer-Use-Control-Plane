@@ -19,12 +19,12 @@ The baseline is published commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tre
 
 | Canonical tracked PS source | Baseline | This milestone |
 | --- | ---: | ---: |
-| All `.ps1` source and tests | 1,013,478 bytes | 921,272 bytes |
-| Three legacy runtime scripts | 858,937 bytes | 770,463 bytes |
-| Actual all-source reduction | — | **92,206 bytes (9.10%)** |
+| All `.ps1` source and tests | 1,013,478 bytes | 921,614 bytes |
+| Three legacy runtime scripts | 858,937 bytes | 770,805 bytes |
+| Actual all-source reduction | — | **91,864 bytes (9.06%)** |
 
 The earlier 78,544-byte planner reduction is qualified at aadbc58 / run
-36957910828. The additional 13,662-byte app-profile replacement in this source
+36957910828. The additional 13,320-byte app-profile replacement in this source
 is release-gated by its exact-commit 523-case actual-bridge suite. Physical source
 retirement and verified behavior are separate evidence.
 

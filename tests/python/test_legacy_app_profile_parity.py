@@ -200,6 +200,13 @@ foreach($name in $names){
     if([regex]::Matches($body,$pattern).Count -ne 4){throw 'Expected four app-profile elapsed seams'}
    }
    $body=[regex]::Replace($body,$pattern,'0')
+   if(-not $CurrentBridge){
+    # Observe the original local object before its retained depth-limited
+    # serialization. This assignment changes no payload, output or acquisition.
+    $formatSeam='(?m)^[ \t]+if \(\$Brief -and -not \$jsonOnly\)'
+    if([regex]::Matches($body,$formatSeam).Count -ne 2){throw 'Expected two original app-profile Console branches'}
+    $body=[regex]::Replace($body,$formatSeam,'  $script:OriginalProfileRawPayload=$payload' + "`n" + '$0')
+   }
  }
  . ([scriptblock]::Create($body))
 }
@@ -244,7 +251,7 @@ $candidateResults=if($CandidatePath){@(Get-Content -LiteralPath $CandidatePath -
 $all=New-Object Collections.ArrayList;$caseIndex=0
 foreach($fixture in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json)){
  $script:fixture=$fixture;$script:queries=New-Object Collections.ArrayList;$script:replies=New-Object Collections.ArrayList
- $script:bridgeCalls=0;$script:kernelEvaluations=0;$script:appendObserved=$false;$script:bridgeCallsAtAppend=$null;$script:maxBridgeRequestBytes=0
+ $script:bridgeCalls=0;$script:kernelEvaluations=0;$script:appendObserved=$false;$script:bridgeCallsAtAppend=$null;$script:maxBridgeRequestBytes=0;$script:OriginalProfileRawPayload=$null
  [Threading.Thread]::CurrentThread.CurrentCulture=[Globalization.CultureInfo]::GetCultureInfo([string]$fixture.culture)
  $Brief=[bool]$fixture.brief;$Script:AppStrategyFile=$fixture.history_file
  $writer=New-Object IO.StringWriter;$previous=[Console]::Out;[Console]::SetOut($writer)
@@ -257,6 +264,7 @@ foreach($fixture in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Con
  }catch{$expected=@{state='error';error=$_.Exception.Message;queries=@($script:queries)}}
  finally{[Console]::SetOut($previous);$expected['console']=$writer.ToString();$writer.Dispose()}
  $entry=@{expected=$expected;args=@{rest=@($fixture.rest);brief=[bool]$fixture.brief;culture=[string]$fixture.culture;history_file=$fixture.history_file;elapsed_ms=0;cdp_elapsed_ms=0;uia_elapsed_ms=0;captured_replies=@($script:replies)}}
+ if(-not $CurrentBridge){$entry['raw_payload']=$script:OriginalProfileRawPayload}
  if($CurrentBridge){
   $entry['bridge_calls']=$script:bridgeCalls;$entry['kernel_evaluations']=$script:kernelEvaluations
   $entry['bridge_calls_at_append']=$script:bridgeCallsAtAppend
@@ -275,7 +283,11 @@ foreach($fixture in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Con
     if($null -ne $state.brief){[Console]::Out.WriteLine([string]$state.brief)}
     else{[Console]::Out.WriteLine(($state.payload|ConvertTo-Json -Depth ([int]$state.json_depth)))}
    }
-  }finally{[Console]::SetOut($previous);$entry['candidate_console']=$writer.ToString();$writer.Dispose()}
+  }finally{
+   [Console]::SetOut($previous);$entry['candidate_console']=$writer.ToString()
+   $entry['candidate_payload']=if($state.state -eq 'complete' -and $null -eq $state.brief){$writer.ToString()|ConvertFrom-Json}else{$null}
+   $writer.Dispose()
+  }
  }
  [void]$all.Add($entry);$caseIndex++
 }
@@ -294,6 +306,8 @@ class AppProfileSourceTests(unittest.TestCase):
         # The pure candidate may be centrally registered only with its source link.
         self.assertEqual('LegacyAppProfile' in host, '"app-profile-advance" => LegacyAppProfileController.Advance(args)' in dispatcher)
         self.assertIn("if([regex]::Matches($body,$pattern).Count -ne 4)", CAPTURE_RUNNER)
+        self.assertIn('Expected two original app-profile Console branches', CAPTURE_RUNNER)
+        self.assertIn('$script:OriginalProfileRawPayload=$payload', CAPTURE_RUNNER)
         self.assertIn("'_AppProfile-StrategyScore'", CAPTURE_RUNNER)
         self.assertIn('brief=[bool]$fixture.brief;', CAPTURE_RUNNER)
         self.assertNotIn('$brief=$', CAPTURE_RUNNER.lower())
@@ -302,6 +316,42 @@ class AppProfileSourceTests(unittest.TestCase):
 @unittest.skipUnless(sys.platform == 'win32', 'Requires Windows PowerShell 5.1 app-profile oracle')
 class AppProfileWindowsTests(unittest.TestCase):
     maxDiff = None
+
+    def test_runtime_array_capture_wire_and_boolean_condition(self):
+        values = [[], [False], [False, False], ['single'], ['first', 'second'],
+                  [[False]], [[], []], {'value': [], 'Count': 0},
+                  {'value': [False], 'Count': 1}, None, False, 'false']
+        script = r'''
+param([string]$InputPath)
+$ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+function Emit-Reply {param($Value) Write-Output -NoEnumerate $Value}
+$results=New-Object Collections.ArrayList
+foreach($fixture in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json)){
+ $received=Emit-Reply -Value $fixture.value
+ $originalCondition=if(Emit-Reply -Value $fixture.value){$true}else{$false}
+ $capture=@{result=$received}
+ $runtimeArray=$capture.result -is [array]
+ if($runtimeArray){$capture.result=$capture.result.Clone()}
+ $wire=$capture|ConvertTo-Json -Depth 24 -Compress
+ [void]$results.Add(@{runtime_array=$runtimeArray;wire=$wire;condition=$originalCondition;boolean_capture=[bool](Emit-Reply -Value $fixture.value)})
+}
+[Console]::Out.WriteLine((ConvertTo-Json -InputObject @($results) -Depth 32 -Compress))
+'''
+        with tempfile.TemporaryDirectory(prefix='CUCP array wire ') as temp:
+            root = Path(temp)
+            source = root / 'wire.ps1'; source.write_text(script, encoding='utf-8-sig')
+            inputs = root / 'inputs.json'; inputs.write_text(json.dumps([{'value': value} for value in values]), encoding='utf-8-sig')
+            result = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(source), '-InputPath', str(inputs)], capture_output=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8', errors='replace'))
+            rows = json.loads(result.stdout.decode('utf-8-sig'))
+            self.assertEqual(len(rows), len(values))
+            for value, row in zip(values, rows):
+                with self.subTest(value=value):
+                    self.assertEqual(row['runtime_array'], isinstance(value, list))
+                    self.assertEqual(json.loads(row['wire'])['result'], value)
+                    self.assertEqual(row['boolean_capture'], row['condition'])
+            self.assertEqual([row['condition'] for row in rows[:3]], [False, False, True])
+            self.assertTrue(rows[7]['condition'])
 
     def test_a_characterize_fresh_and_mixed_culture_regex_cache(self):
         # The public wrapper dispatches once and exits. This deliberately mixed
@@ -376,9 +426,11 @@ class AppProfileWindowsTests(unittest.TestCase):
             for fixture, old, new, console in zip(cases, captured, results, formatted):
                 with self.subTest(fixture=fixture):
                     expected = {k: v for k, v in old['expected'].items() if k != 'console'}
-                    if expected.get('brief') is not None:
-                        new = {**new, 'payload': None}
+                    if expected['state'] == 'complete':
+                        expected = {**expected, 'payload': old['raw_payload']}
                     self.assertEqual(new, expected)
+                    if old['expected']['state'] == 'complete':
+                        self.assertEqual(console['candidate_payload'], old['expected']['payload'])
                     self.assertEqual(console['candidate_console'], old['expected']['console'])
                     self.assertEqual(console['expected'], old['expected'])
             prefixes, traces = [], []
