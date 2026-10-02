@@ -1,6 +1,7 @@
 """Characterize PS5 regex alias folding independently from NLS route collation."""
 import copy
 import itertools
+import json
 from pathlib import Path
 import shutil
 import subprocess
