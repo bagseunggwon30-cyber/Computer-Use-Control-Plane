@@ -61,7 +61,8 @@ class SharedQuoteAndCasingWindowsTests(unittest.TestCase):
     def test_direct_quote_and_nls_casing_against_framework(self):
         values = ['', 'plain', "O'Brien", 'a b', '$name; data', '가😀', 'I', 'i', 'İ', 'ı', 'ſ', 'K',
                   'É', 'e\u0301', 'Σ', 'σ', 'ς', 'ΟΣ', 'İıſK', 'i\u0307', 'K\u0301', '𐐀𐐨', '𞤀𞤢',
-                  'appİ', 'Chrome_WidgetWİn_1', 'C:\\Users\\Fixture', 'literal\n', 'a\nb']
+                  'appİ', 'Chrome_WidgetWİn_1', 'C:\\Users\\Fixture', 'literal\n', 'a\nb',
+                  '\n', 'x\n\n', 'x\r\n', '\r', '\nX', '\x00', '\x7f', 'AZ09_-.\\/:=@']
         project = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyAppProfile.ContractTests'
         with tempfile.TemporaryDirectory(prefix='CUCP quote casing ') as temp:
             root = Path(temp)

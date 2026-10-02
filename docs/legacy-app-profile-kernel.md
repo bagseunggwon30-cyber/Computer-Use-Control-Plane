@@ -147,3 +147,28 @@ quoter now preserves original case-insensitive, current-culture `-match`; a
 separate exact original QuoteToken/StepString comparison covers the same corpus.
 The existing task/preset/form/SmartPlan assertions are unchanged. All shared
 changes still require their next exact-commit Windows qualification.
+
+The direct oracle at `7961bf50` / run `36962431015` established that invariant
+NLS casing already matched every supplied value. Sixteen named-culture casing
+triples differed because plain `LCMAP_LOWERCASE` uses filesystem casing.
+`LegacyTextKernel` now uses `LCMAP_LINGUISTIC_CASING` for named cultures while
+retaining the proven invariant flag, and queries the required output length
+before allocating the destination. The same run matched 109/112 quoting pairs;
+the exceptions were Turkish `I`/dotless-i and invariant Kelvin sign.
+
+The shared text helper implements only the two fixed ASCII character-class
+predicates, using NLS character lowercase followed by the original allowed set.
+It preserves replacement-run collapsing, raw valid character spelling and the
+historical regex end-anchor allowance for a terminal LF. This follows the
+[Framework character-class algorithm](https://raw.githubusercontent.com/microsoft/referencesource/main/System/regex/system/text/regularexpressions/RegexCharClass.cs),
+whose range mapping differs from modern Regex equivalence classes. It is not a
+generic regex replacement or a per-character exception table. Buffer sizing and
+linguistic flags follow the [LCMapStringEx contract](https://learn.microsoft.com/en-us/windows/win32/api/winnls/nf-winnls-lcmapstringex).
+
+All earlier assertions remain. Direct coverage expands to 36 values in four
+cultures: 144 exact quote/step pairs and 144 casing triples, including LF/CRLF,
+control characters and all bare-token punctuation. The app-profile matrix
+remains 496 complete cases, plus every acquisition prefix and explicit regex
+cache characterization. Shared strategy coverage remains 344 complete scores.
+The new managed harness passes 34 checks; the final NLS/predicate repair still
+requires its own exact-commit Windows run.

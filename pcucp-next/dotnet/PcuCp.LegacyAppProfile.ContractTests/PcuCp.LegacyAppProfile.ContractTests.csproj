@@ -7,6 +7,7 @@
     <Compile Include="../PcuCp.LegacyAppProfile/LegacyAppProfileKernel.cs" Link="LegacyAppProfileKernel.cs" />
     <Compile Include="../PcuCp.NativeHost/Contracts.cs" Link="Contracts.cs" />
     <Compile Include="../PcuCp.NativeHost/LegacyStrategyKernel.cs" Link="LegacyStrategyKernel.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyTextKernel.cs" Link="LegacyTextKernel.cs" />
     <Compile Include="../PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs" Link="LegacyTaskPresetKernel.cs" />
   </ItemGroup>
 </Project>

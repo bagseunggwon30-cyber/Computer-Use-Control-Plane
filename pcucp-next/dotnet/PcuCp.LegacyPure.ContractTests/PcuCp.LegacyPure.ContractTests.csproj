@@ -8,5 +8,6 @@
     <Compile Include="../PcuCp.NativeHost/LegacySafetyKernel.cs" Link="LegacySafetyKernel.cs" />
     <Compile Include="../PcuCp.NativeHost/LegacyCoordinateKernel.cs" Link="LegacyCoordinateKernel.cs" />
     <Compile Include="../PcuCp.NativeHost/LegacyStrategyKernel.cs" Link="LegacyStrategyKernel.cs" />
+  <Compile Include="../PcuCp.NativeHost/LegacyTextKernel.cs" Link="LegacyTextKernel.cs" />
   </ItemGroup>
 </Project>

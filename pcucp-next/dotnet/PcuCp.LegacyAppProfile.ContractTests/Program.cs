@@ -63,6 +63,11 @@ if (args.SequenceEqual(new[] { "--self-test" }))
         Check(CultureInfo.CurrentCulture.Name == "en-US", "Early alias return leaked culture");
     }
     finally { CultureInfo.CurrentCulture = previous; }
+    Check(LegacyTaskPresetKernel.QuoteToken("I", CultureInfo.GetCultureInfo("tr-TR")) == "'I'", "Framework Turkish ASCII range must quote I");
+    Check(LegacyTaskPresetKernel.QuoteToken("ı", CultureInfo.GetCultureInfo("tr-TR")) == "'ı'", "Framework Turkish ASCII range must quote dotless i");
+    Check(LegacyTaskPresetKernel.QuoteToken("literal\n", CultureInfo.GetCultureInfo("en-US")) == "literal\n", "Original terminal-LF anchor behavior changed");
+    Check(LegacyTaskPresetKernel.QuoteToken("\n", CultureInfo.GetCultureInfo("en-US")) == "'\n'", "Bare token still requires at least one allowed character");
+    Check(LegacyTaskPresetKernel.QuoteToken("x\r\n", CultureInfo.GetCultureInfo("en-US")) == "'x\r\n'", "CRLF must not be accepted by terminal-LF rule");
     Console.WriteLine($"PASS: {checks} isolated app-profile contracts; no probes or history writes executed.");
     return;
 }

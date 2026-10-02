@@ -322,13 +322,7 @@ internal static class LegacyAppProfileKernel
         {
             // PowerShell -replace remains case-insensitive after ToLowerInvariant.
             // Non-ASCII case equivalents can therefore survive the ASCII range.
-            var previous = CultureInfo.CurrentCulture;
-            try
-            {
-                CultureInfo.CurrentCulture = culture;
-                return Regex.Replace(Lower(value.Trim()), "[^a-z0-9_.-]+", "-", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
-            }
-            finally { CultureInfo.CurrentCulture = previous; }
+            return LegacyTextKernel.SanitizeAppKeyPart(Lower(value.Trim()), culture);
         }
         string appKey = string.Join("|", new[] { process, @class, appType }.Select(KeyPart).Where(s => s.Length > 0));
         if (appKey.Length == 0) appKey = "unknown-app";

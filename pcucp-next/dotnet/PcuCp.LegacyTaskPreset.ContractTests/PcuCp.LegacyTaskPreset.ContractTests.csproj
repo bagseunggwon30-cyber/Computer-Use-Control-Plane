@@ -6,5 +6,6 @@
   <ItemGroup>
     <Compile Include="../PcuCp.NativeHost/Contracts.cs" Link="Contracts.cs" />
     <Compile Include="../PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs" Link="LegacyTaskPresetKernel.cs" />
+  <Compile Include="../PcuCp.NativeHost/LegacyTextKernel.cs" Link="LegacyTextKernel.cs" />
   </ItemGroup>
 </Project>
