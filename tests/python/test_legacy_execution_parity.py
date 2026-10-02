@@ -290,6 +290,8 @@ class ExecutionWindowsParityTests(unittest.TestCase):
             render=[]
             for index,(f,old,new) in enumerate(zip(fixtures,baseline,actual)):
                 with self.subTest(case=index,operation=f["operation"],rest=f["rest"],brief=f.get("brief")):
+                    if old["state"]=="complete" and not f.get("brief") and f["operation"] in ("recovery-plan","recovery-run"):
+                        self.assertIsNotNone(old["payload"],"The original ordered recovery report must be captured before Console serialization")
                     self.assertEqual(new["state"],old["state"])
                     self.assertEqual(new["effects"],decode_wire(old["effects"]))
                     self.assertEqual(new["consumed"],old["consumed"])
@@ -327,6 +329,8 @@ class ExecutionWindowsParityTests(unittest.TestCase):
             exact_failures=0;uncertain_failures=0;diagnostic_shown=False
             for index,(fixture,before,after) in enumerate(zip(fixtures,old,new)):
                 with self.subTest(case=index,operation=fixture["operation"],rest=fixture["rest"],brief=fixture.get("brief")):
+                    if before["state"]=="complete" and not fixture.get("brief") and fixture["operation"] in ("recovery-plan","recovery-run"):
+                        self.assertIsNotNone(before["payload"],"The original ordered recovery report must be captured before Console serialization")
                     original_effects=decode_wire(before["effects"])
                     failures=captured_failure_effects(fixture,original_effects)
                     # Any earlier live dispatch is relevant too: losing a later
@@ -437,7 +441,13 @@ function Invoke-MacroClickPoint {param([string[]]$Rest) $r=Capture-Effect 'Local
 function Invoke-MacroIconFind {param([string[]]$Rest) $r=Capture-Effect 'LocalMacro' -Name 'icon-find' -Argv $Rest;[Console]::Out.WriteLine((Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $r.json -Depth 64));return [int]$r.exit}
 function ConvertTo-Json {
  [CmdletBinding()]param([Parameter(ValueFromPipeline=$true)]$InputObject,[int]$Depth=2,[switch]$Compress)
- process{if($InputObject -and $InputObject.PSObject.Properties['schema'] -and $InputObject.schema -in @('cucp.workflow-run/v1','cucp.task-run/v1','cucp.form-run/v1','cucp.smart-click/v1','cucp.watch/v1','cucp.recovery-plan/v1','cucp.recovery-run/v1')){$script:payload=Encode-Wire $InputObject};Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $InputObject -Depth $Depth -Compress:$Compress}
+ process{
+  # Original recovery reports are ordered dictionaries; their keys are not
+  # PSObject properties. Capture either representation before formatting.
+  $schema=if($InputObject -is [Collections.IDictionary]){$InputObject['schema']}elseif($null -ne $InputObject -and $InputObject.PSObject.Properties['schema']){$InputObject.schema}else{$null}
+  if($schema -in @('cucp.workflow-run/v1','cucp.task-run/v1','cucp.form-run/v1','cucp.smart-click/v1','cucp.watch/v1','cucp.recovery-plan/v1','cucp.recovery-run/v1')){$script:payload=Encode-Wire $InputObject}
+  Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $InputObject -Depth $Depth -Compress:$Compress
+ }
 }
 $names=@('_Read-OptValue','_Read-Switch','_Safety-Truncate','_Classify-SafetyFromText','Invoke-MacroWorkflowRun','Invoke-MacroTaskRun','Invoke-MacroFormRun','Invoke-MacroSmartClick','Invoke-MacroWatch','Invoke-MacroRecoveryPlan','Invoke-MacroRecoveryRun')
 foreach($name in $names){

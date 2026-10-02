@@ -41,6 +41,15 @@ shape-based normalization. Portable coordinator and disposable-session tests
 verify that the failed read emits no second fallback effect and retains the
 uncertain, no-retry terminal outcome. Exact original comparisons are unchanged.
 
+At `ad8790be0301b5e77ca87d841718bf0fac8fb1e9` (run `37005163979`), the
+actual codec roundtrips, large confirmation preflight, typed children and all
+uncertainty checks passed. The 54 remaining actual-adapter mismatches were
+recovery reports whose original ordered dictionaries were omitted by the capture
+observer's PSObject-only schema lookup. The observer now recognizes dictionary
+keys too, and both differentials require a full original recovery payload before
+comparing it. This strengthens capture without changing the original functions,
+candidate runtime or expected Console/effect/error/exit equality.
+
 The execution family migrates the coordination bodies of `workflow-run`,
 `task-run`, `form-run`, `smart-click`, `watch`, `recovery-plan`, and `recovery-run`
 as one qualification unit. The oracle is the original `scripts/cucp.ps1` blob in

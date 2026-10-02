@@ -153,7 +153,9 @@ function _Precision-ReadEffect($Effect,$State){
         _Precision-Require ($State.reads -eq 2 -and $p.directory -is [string] -and $p.directory -ceq $State.cache_dir -and $p.key -is [string] -and $p.max_age_seconds -is [int] -and $p.max_age_seconds -eq $ttl) 'Invalid cache read.'
         $key=_PointPlan-CacheKey -X $x -Y $y -Radius $radius -Step $step -ClickInset $inset -TargetHwnd $th -TargetMatch $tm -Precheck $State.precheck -CoordSignature ([string]$State.profile.coord_signature)
         _Precision-Require ($p.key -ceq $key) 'Cache key changed.'
-        return _PointPlan-ReadCache -Key $key -MaxAgeSeconds $ttl
+        $reply=_PointPlan-ReadCache -Key $key -MaxAgeSeconds $ttl
+        $State.cache_key=$key;$State.cache_hit=[bool]($reply -and $reply.Json)
+        return ,$reply
       }
       $argv=@('-Action','hit-scan','-X',"$x",'-Y',"$y",'-ClickInset',"$inset",'-ScanRadius',"$radius",'-ScanStep',"$step")
       if($tm){$argv+=@('-TargetMatch',$tm)};if($th -gt 0){$argv+=@('-TargetHwnd',"$th")}
@@ -166,7 +168,7 @@ function _Precision-ReadEffect($Effect,$State){
 function _Invoke-LegacyPrecisionSession {
   param([string]$Operation,[hashtable]$Arguments,[switch]$Storage)
   $planner=$Operation -in @('coord-anchor','point-plan','target-validate') -and -not $Storage
-  $state=@{operation=$Operation;rest=@($Arguments.rest);cache_seconds=[int]$Arguments.cache_seconds;history_file=[string]$Arguments.history_file;history_max=[int]$Arguments.history_max;cache_dir=[string]$Arguments.cache_dir;reads=0;precheck=$null;profile=$null;planner=$planner}
+  $state=@{operation=$Operation;rest=@($Arguments.rest);cache_seconds=[int]$Arguments.cache_seconds;history_file=[string]$Arguments.history_file;history_max=[int]$Arguments.history_max;cache_dir=[string]$Arguments.cache_dir;reads=0;precheck=$null;profile=$null;planner=$planner;cache_hit=$false;cache_key=$null}
   $startupArgs=$Arguments
   $schema=if($Storage){'cucp.precision-storage/v1'}else{'cucp.precision-session/v1'}
   $startup=@{schema=$schema;operation=$Operation;args=(_Precision-EncodeWire $startupArgs);culture=[Globalization.CultureInfo]::CurrentCulture.Name}
@@ -189,7 +191,10 @@ function _Invoke-LegacyPrecisionSession {
       if($message.target -cin @('complete','prepare')){
         $prepared=$message.value
         _Precision-Fields $prepared @('state','payload','exit','brief','json_depth','queries','effects')
-        _Precision-Require ($prepared.state -ceq 'complete' -and (-not $planner -or $prepared.payload.schema -ceq "cucp.$Operation/v1") -and $prepared.exit -in @(0,1,2) -and $prepared.json_depth -in @(2,4,8,12,14,18,32,64,100) -and $prepared.effects -is [array] -and $prepared.effects.Count -le 1) 'Invalid precision completion.'
+        # Legacy cache hits keep the stored object's schema, including no schema.
+        # Accept that only after the matching observed read and with no writes.
+        $cacheCompletion=$Operation -ceq 'point-plan' -and $message.target -ceq 'complete' -and $state.reads -eq 3 -and $state.cache_hit -and $prepared.payload.from_cache -is [bool] -and $prepared.payload.from_cache -and $prepared.payload.cache_key -ceq $state.cache_key -and $prepared.effects -is [array] -and $prepared.effects.Count -eq 0
+        _Precision-Require ($prepared.state -ceq 'complete' -and (-not $planner -or $prepared.payload.schema -ceq "cucp.$Operation/v1" -or $cacheCompletion) -and $prepared.exit -in @(0,1,2) -and $prepared.json_depth -in @(2,4,8,12,14,18,32,64,100) -and $prepared.effects -is [array] -and $prepared.effects.Count -le 1) 'Invalid precision completion.'
         $rendered=if(-not $planner){$null}elseif($null -ne $prepared.brief){[string]$prepared.brief}else{$prepared.payload|ConvertTo-Json -Depth ([int]$prepared.json_depth)}
         if($message.target -ceq 'complete'){_Precision-Require ($prepared.effects.Count -eq 0) 'Uncommitted precision effect.';break}
         _Precision-Require ($planner -and $prepared.effects.Count -eq 1) 'Missing precision terminal effect.'

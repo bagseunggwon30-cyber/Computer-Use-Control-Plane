@@ -182,3 +182,13 @@ Unicode, scalars, and genuine objects named `value`/`Count`. No object-shaped
 wrapper inference is used. The remaining filesystem fix drops out-of-range
 negative multi-index selections for a configured maximum of one, preserving the
 legacy repeated valid indices. These repairs await the next actual Windows gate.
+
+At `ad8790be0301b5e77ca87d841718bf0fac8fb1e9`, all 509 contracts, candidate and
+helper comparisons, codec cases, native ingress, persistence tests, and all eight
+filesystem fixtures pass on Windows. Four actual-adapter cases remain: original
+point-plan cache hits retain cached objects without requiring a planner schema.
+The adapter now accepts that completion only after the observed matching cache
+read, with the same cache key, true `from_cache`, and zero terminal effects.
+All four original full comparisons are retained for the next gate. The qualified
+source-map artifact from this run includes normalized hashes and UTF-16 function
+extents; promotion must use a map matching the final qualified adapter revision.

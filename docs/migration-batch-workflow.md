@@ -104,8 +104,8 @@ percentage. Main remains at `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`.
 ## Current candidate source accounting
 
 The three exact adapter fixtures are executable PowerShell files, counted normally
-in the inventory. With original bodies retained, the candidate currently contains
-987,754 PS bytes, 66,140 more than the last accepted checkpoint. This temporary
-overlap is qualification code, not retirement. After the combined adapter/kernel
+in the [tracked source inventory](legacy-function-inventory.json), which records
+the current exact totals. With original bodies retained, the temporary overlap
+is qualification code, not retirement. After the combined adapter/kernel
 Windows gate, promote the same glue, remove verified original bodies and duplicate
 fixtures, then measure the resulting blobs and run the full regression gate.
