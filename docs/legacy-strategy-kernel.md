@@ -56,8 +56,26 @@ When omitted, current process culture remains the default. Forty additional
 checks deliberately run the managed harness in en-US while supplying the PS
 caller's culture in JSON; original inherited-culture comparisons remain intact.
 
-Retirement limit: explicit `culture` currently controls key/sort/label comparisons,
-but `NormalizeValue` still builds case-insensitive alias regexes under the ambient
-process culture. A caller with a changed thread culture can differ on Unicode
-aliases such as `UİA_PATTERN`. Original PS strategy bodies remain until this
-normalization boundary and the actual transport are separately qualified.
+The Unicode alias normalization boundary is now qualified by 296 complete
+app-profile score comparisons on commit 96f1f2a4, run 36959747063. The current
+kernel scopes regex culture to the requested culture and restores it afterward.
+This closes the earlier ambient-culture limitation; it does not establish parity
+for every unconstrained private PowerShell helper input.
+
+
+## Private helper retirement boundary
+
+Repository-wide production call-site audit finds exactly one caller of
+`_AppProfile-StrategyScore`: `Invoke-MacroAppProfile`. Once that complete public
+macro is migrated and qualified, the unused private Score body can be removed.
+`_AppStrategy-NormalizeRoute` also remains called by `_AppStrategy-Append` when
+constructing recorded history, so it must remain while that adapter uses it.
+Pinned-original test references are not production callers.
+
+Standalone private coercion is not qualified: original PowerShell accepts
+coercible probe fields and truthy non-string persisted strategy values while
+preserving the full original history object; the native helper currently imposes
+stricter JSON types and bounds. The selected boundary is complete public
+app-profile behavior, which constructs typed summaries and preserves raw history
+evidence. No private-helper wrapper or removal follows from the existing pure
+score/culture tests alone.

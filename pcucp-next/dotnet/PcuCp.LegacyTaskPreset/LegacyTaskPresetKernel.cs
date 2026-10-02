@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 internal static class LegacyTaskPresetKernel
 {
     private static readonly StringComparer Comparer = StringComparer.InvariantCultureIgnoreCase;
-    private static readonly Regex BareToken = new(@"^[A-Za-z0-9_\-\.\/\\:=@]+$", RegexOptions.CultureInvariant);
+    private const string BareTokenPattern = @"^[A-Za-z0-9_\-\.\/\\:=@]+$";
     private static readonly string[] TaskValues = ["--name", "--verify-label", "--verify-timeout-ms", "--settle-ms", "--observe-match", "--verify-match", "--verify-label-after-step", "--verify-label-window", "--verify-label-timeout-ms", "--verify-label-interval-ms", "--retry-failed-step", "--retry-delay-ms", "--precision-radius", "--precision-step", "--point-cache-ttl"];
     private static readonly string[] TaskSwitches = ["--allow-cdp", "--no-cdp", "--precision-points", "--include-ocr", "--verify-after-step", "--observe-after-step", "--retry-live-steps", "--clear-first", "--enter", "--press-enter"];
     private static readonly string[] WorkflowValues = ["--settle-ms", "--observe-match", "--verify-match", "--verify-label-after-step", "--verify-label-window", "--verify-label-timeout-ms", "--verify-label-interval-ms", "--retry-failed-step", "--retry-delay-ms"];
@@ -217,8 +217,20 @@ internal static class LegacyTaskPresetKernel
         return new(kind, mode, task.ToArray(), steps.ToArray(), extras.ToArray(), notes.ToArray(), workflowRest.ToArray(), run.ToArray(), dry.ToArray());
     }
 
-    internal static string QuoteToken(string? value) => value is not null && BareToken.IsMatch(value) ? value : "'" + (value ?? "").Replace("'", "''", StringComparison.Ordinal) + "'";
-    internal static string StepString(IEnumerable<string> command) => string.Join(" ", command.Select(QuoteToken));
+    internal static string QuoteToken(string? value, CultureInfo? culture = null)
+    {
+        var previous = CultureInfo.CurrentCulture;
+        try
+        {
+            if (culture is not null) CultureInfo.CurrentCulture = culture;
+            // Original -match is case-insensitive, including culture-specific
+            // Unicode equivalents inside its nominally ASCII bare-token range.
+            return value is not null && Regex.IsMatch(value, BareTokenPattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1))
+                ? value : "'" + (value ?? "").Replace("'", "''", StringComparison.Ordinal) + "'";
+        }
+        finally { CultureInfo.CurrentCulture = previous; }
+    }
+    internal static string StepString(IEnumerable<string> command, CultureInfo? culture = null) => string.Join(" ", command.Select(value => QuoteToken(value, culture)));
 
     // JSON-only compatibility probes for the legacy one-level argv helpers. The
     // recipes themselves always construct string argv; objects are not argv.

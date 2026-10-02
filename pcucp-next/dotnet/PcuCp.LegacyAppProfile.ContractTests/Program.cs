@@ -70,4 +70,31 @@ var input = Console.In.ReadToEnd();
 if (input.Length > 16777216) throw new ArgumentException("Fixture batch exceeds 16MiB.");
 using var document = JsonDocument.Parse(input);
 if (document.RootElement.ValueKind != JsonValueKind.Array) throw new ArgumentException("Expected fixture batch array.");
+if (args.SequenceEqual(new[] { "--quote-fixtures" }))
+{
+    CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+    Console.WriteLine(JsonSerializer.Serialize(document.RootElement.EnumerateArray().Select(fixture =>
+    {
+        string? value = fixture.GetProperty("value").GetString();
+        var culture = CultureInfo.GetCultureInfo(fixture.GetProperty("culture").GetString()!);
+        return new { value = LegacyTaskPresetKernel.QuoteToken(value, culture), step = LegacyTaskPresetKernel.StepString(new[] { "macro", value ?? "" }, culture) };
+    })));
+    if (CultureInfo.CurrentCulture.Name != "en-US") throw new InvalidOperationException("Quote fixture leaked culture.");
+    return;
+}
+if (args.SequenceEqual(new[] { "--casing-fixtures" }))
+{
+    Console.WriteLine(JsonSerializer.Serialize(document.RootElement.EnumerateArray().Select(fixture =>
+    {
+        string value = fixture.GetProperty("value").GetString()!;
+        var culture = CultureInfo.GetCultureInfo(fixture.GetProperty("culture").GetString()!);
+        return new
+        {
+            invariant = LegacyStrategyKernel.LowerValue(value, CultureInfo.InvariantCulture),
+            current = LegacyStrategyKernel.LowerValue(value, culture),
+            characters = string.Concat(value.Select(c => LegacyStrategyKernel.LowerValue(c.ToString(), culture)))
+        };
+    })));
+    return;
+}
 Console.WriteLine(JsonSerializer.Serialize(document.RootElement.EnumerateArray().Select(LegacyAppProfileKernel.Advance)));

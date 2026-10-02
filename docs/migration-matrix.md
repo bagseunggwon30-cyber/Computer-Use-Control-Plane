@@ -143,6 +143,6 @@ passed all 367 task/form and 201 SmartPlan actual-adapter comparisons: real
 Console text, exact child/workflow/native query traces and current native bridge
 execution. A prior pure-kernel pass alone was not the adapter release gate.
 
-App-profile remains an isolated candidate with 496 captured-reply cases and 296
+App-profile remains an isolated candidate with 496 captured-reply cases and 344
 Unicode/culture strategy comparisons awaiting Windows qualification. Its current
 PowerShell acquisition, decisions and optional history persistence remain intact.

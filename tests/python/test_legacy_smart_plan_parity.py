@@ -64,6 +64,12 @@ def fixtures():
             result.append(f)
     for option,value in itertools.product(('--precision-radius','--precision-step','--point-cache-ttl','--cdp-port'),('1.5','2.5','bad','2147483648','-2147483649')):
         f=copy.deepcopy(base);f['rest'] += [option,value];result.append(f)
+    # Exercise the shared command quoting boundary through complete precision plans.
+    for text in ('İ', 'ı', 'ſ', 'K', 'K', 'Σ', 'ς', '가', 'A\u030A'):
+        f = copy.deepcopy(base)
+        f['rest'] = ['--label', text, '--precision-points', '--match', text]
+        f['uia']['Json']['top']['invoke_pattern'] = ''
+        result.append(f)
     # Both render modes must retain the same exit and acquisition sequence.
     for f in copy.deepcopy(result[:6]): f['brief']=True;result.append(f)
     return result
@@ -112,12 +118,12 @@ foreach($fixture in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Con
   $exitCode=Invoke-MacroSmartPlan -Rest $fixture.rest
   $console=$writer.ToString()
   $raw=$console.TrimEnd([char[]]"`r`n")
-  if($Brief -and -not ($fixture.rest -contains '--json-only')) {$payload=$null;$brief=$raw -replace 'elapsed_ms=\d+','elapsed_ms=0'}
-  else {$payload=$raw|ConvertFrom-Json;$payload.elapsed_ms=0;$brief=$null}
-  $expected=@{state='complete';payload=$payload;exit=[int]$exitCode;brief=$brief;queries=@($script:queries)}
+  if($Brief -and -not ($fixture.rest -contains '--json-only')) {$payload=$null;$capturedBriefText=$raw -replace 'elapsed_ms=\d+','elapsed_ms=0'}
+  else {$payload=$raw|ConvertFrom-Json;$payload.elapsed_ms=0;$capturedBriefText=$null}
+  $expected=@{state='complete';payload=$payload;exit=[int]$exitCode;brief=$capturedBriefText;queries=@($script:queries)}
  }catch{$expected=@{state='error';error=$_.Exception.Message;queries=@($script:queries)}}
  finally{[Console]::SetOut($previous);if($ExactConsole){$expected['console']=$writer.ToString()};$writer.Dispose()}
- [void]$all.Add(@{expected=$expected;args=@{rest=@($fixture.rest);cache_seconds=$CacheSeconds;brief=$Brief;elapsed_ms=0;captured_replies=@($script:replies)}})
+ [void]$all.Add(@{expected=$expected;args=@{rest=@($fixture.rest);cache_seconds=$CacheSeconds;brief=[bool]$fixture.brief;elapsed_ms=0;captured_replies=@($script:replies)}})
 }
 [Console]::Out.WriteLine((ConvertTo-Json -InputObject @($all) -Depth 64 -Compress))
 '''
@@ -129,6 +135,8 @@ class SmartPlanSourceTests(unittest.TestCase):
         for forbidden in ('Process.Start','System.Management.Automation','HttpClient','File.Read','SendInput'):
             self.assertNotIn(forbidden,source)
         self.assertGreaterEqual(len(fixtures()),100)
+        self.assertIn('brief=[bool]$fixture.brief;', CAPTURE_RUNNER)
+        self.assertNotIn('$brief=$', CAPTURE_RUNNER.lower())
         self.assertTrue((PROJECT/'PcuCp.LegacySmartPlan.ContractTests.csproj').is_file())
         self.assertNotEqual((ROOT/'pcucp-next/dotnet/PcuCp.LegacySmartPlan').parent.name,'PcuCp.NativeHost')
 

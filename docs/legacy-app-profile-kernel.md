@@ -119,3 +119,31 @@ candidate arguments were serialized. The harness now uses a distinct text
 variable and records the original fixture's explicitly cast boolean. All payload,
 error, Console and query assertions remain unchanged. Full app-profile parity
 still awaits the corrected Windows run; the original implementation is retained.
+
+
+At `015de0e2` / run `36960182124`, 454 of 496 complete cases matched; the 42
+remaining cases exposed first-seen UIA group order, NLS versus ICU invariant
+casing, wildcard casing, case-insensitive bare-token quoting, and an oracle
+batching issue. The captured-prefix assertion also stopped at the first culture
+mismatch. The assertions remain exact.
+
+The original public script dispatches one top-level macro and exits; it never
+changes `CurrentCulture`. The initial fixture alone mixed cultures in one
+PowerShell process. The inherited [PowerShell regex cache implementation](https://raw.githubusercontent.com/PowerShell/PowerShell/v6.0.0/src/System.Management.Automation/engine/lang/parserutils.cs)
+keys case-insensitive patterns without culture. A new explicit fresh/warmed
+characterization runs before the complete comparison and asserts the observed
+cache difference. The complete suite then retains all cases, grouped into fresh
+per-culture oracle processes, matching the public call boundary. No failing case
+or assertion is removed. Original output is still captured twice to verify
+Console determinism.
+
+The candidate now retains first-seen role-group order before Count sorting.
+Its invariant casing is shared with strategy normalization through Windows NLS
+`LCMapStringEx`; a direct .NET Framework comparison covers Kelvin sign, long s,
+dotted/dotless I, sigma, combining sequences and supplementary letters under
+four cultures, for whole strings and individual UTF-16 characters. That direct
+comparison must pass before claiming casing parity. The shared TaskPreset
+quoter now preserves original case-insensitive, current-culture `-match`; a
+separate exact original QuoteToken/StepString comparison covers the same corpus.
+The existing task/preset/form/SmartPlan assertions are unchanged. All shared
+changes still require their next exact-commit Windows qualification.

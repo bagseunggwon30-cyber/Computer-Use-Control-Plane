@@ -116,7 +116,7 @@ application-specific task success. No user desktop, account-connected model, or
 personal documents were used to claim these checks.
 
 The next isolated candidate is app-profile assembly and its strategy helpers,
-with 496 captured-reply cases and 296 Unicode/culture comparisons awaiting
+with 496 captured-reply cases and 344 Unicode/culture comparisons awaiting
 Windows qualification. Its original PowerShell body remains. These pure and
 noninteractive slices can continue in cloud CI. Full retirement of the remaining
 live input and lifecycle boundaries additionally needs an authorized, isolated

@@ -118,3 +118,10 @@ SmartPlan step completed at 03:08:58 UTC. Assertions and original oracle output
 were retained through the field-order correction. Only elapsed time was zeroed
 at the documented pre-format seam. This qualifies captured-reply planning and
 adapter behavior; it does not constitute interactive Windows GUI validation.
+
+The next shared-quoting qualification retains those 201 cases and adds nine
+Unicode precision-plan cases (210 total). SmartPlan now calls the shared
+TaskPreset StepString helper, preventing divergent culture-sensitive quoting.
+The fixture also records its Brief input directly from the original boolean,
+separately from captured output text. All prior comparisons remain unchanged;
+these dependent changes require the next complete Windows pass.

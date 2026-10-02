@@ -232,7 +232,8 @@ internal static class LegacyAppProfileKernel
             return Complete(payload, 2, 12, $"partial app-profile reason={reason} windows={visible.Length}");
         }
         string title = T(P(target, "title")) ? S(P(target, "title")) : "", process = T(P(target, "process")) ? S(P(target, "process")) : "", @class = T(P(target, "class")) ? S(P(target, "class")) : "";
-        string titleLower = title.ToLowerInvariant(), processLower = process.ToLowerInvariant(), classLower = @class.ToLowerInvariant();
+        string Lower(string value) => LegacyStrategyKernel.LowerValue(value, CultureInfo.InvariantCulture);
+        string titleLower = Lower(title), processLower = Lower(process), classLower = Lower(@class);
         string identity = (titleLower + " " + processLower + " " + classLower).Trim();
         string targetMatch = T(match) ? match! : T(title) ? title : T(process) ? process : S(P(target, "hwnd"));
         bool Match(string value, string pattern)
@@ -241,7 +242,11 @@ internal static class LegacyAppProfileKernel
             try { CultureInfo.CurrentCulture = culture; return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)); }
             finally { CultureInfo.CurrentCulture = previous; }
         }
-        bool browser = Match(processLower, "^(chrome|msedge|brave|firefox|electron|cursor|code|windsurf)$") || classLower.Contains("chrome_widgetwin", StringComparison.OrdinalIgnoreCase);
+        string Step(IEnumerable<string> command) => LegacyTaskPresetKernel.StepString(command, culture);
+        // The source wildcard has only leading/trailing stars. Its literal
+        // characters are lowercased with the current culture before matching.
+        bool browser = Match(processLower, "^(chrome|msedge|brave|firefox|electron|cursor|code|windsurf)$") ||
+            LegacyStrategyKernel.LowerValue(classLower, culture).Contains(LegacyStrategyKernel.LowerValue("chrome_widgetwin", culture), StringComparison.Ordinal);
         bool office = Match(identity, "winword|excel|powerpnt|outlook|onenote|hwp|wordpad|notepad");
         object? cdp = null, uia = null;
         if (!noProbe && (auto || B("--probe-cdp") || browser))
@@ -271,16 +276,18 @@ internal static class LegacyAppProfileKernel
                 var group = groups.FirstOrDefault(g => CompareText(S(g["role"]), role, true, culture) == 0);
                 if (group is null) groups.Add(D("role", role, "count", 1)); else group["count"] = I(group["count"]) + 1;
             }
-            var roles = groups.ToArray(); LegacySort(roles, (a, b) => CompareText(S(a["role"]), S(b["role"]), true, culture));
+            // PS5 Group-Object keeps first-seen group order; sorting names here
+            // changes the subsequent unstable Count tie order and first eight.
+            var roles = groups.ToArray();
             LegacySort(roles, (a, b) => I(b["count"]).CompareTo(I(a["count"])));
             var hits = uniqueLabels.Select(label =>
             {
-                string needle = label.ToLowerInvariant(); bool found = false;
+                string needle = Lower(label); bool found = false;
                 foreach (var item in items)
                 {
                     var hay = new List<string>(); if (T(P(item, "text"))) hay.Add(S(P(item, "text")));
                     if (T(P(item, "synonyms"))) foreach (var synonym in A(P(item, "synonyms"))) if (T(synonym)) hay.Add(S(synonym));
-                    if (hay.Any(s => { string lower = s.ToLowerInvariant(); return Eq(lower, needle) || lower.Contains(needle, StringComparison.Ordinal) || needle.Contains(lower, StringComparison.Ordinal); })) { found = true; break; }
+                    if (hay.Any(s => { string lower = Lower(s); return Eq(lower, needle) || lower.Contains(needle, StringComparison.Ordinal) || needle.Contains(lower, StringComparison.Ordinal); })) { found = true; break; }
                 }
                 return D("label", label, "found", found);
             }).ToArray();
@@ -319,7 +326,7 @@ internal static class LegacyAppProfileKernel
             try
             {
                 CultureInfo.CurrentCulture = culture;
-                return Regex.Replace(value.Trim().ToLowerInvariant(), "[^a-z0-9_.-]+", "-", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+                return Regex.Replace(Lower(value.Trim()), "[^a-z0-9_.-]+", "-", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
             }
             finally { CultureInfo.CurrentCulture = previous; }
         }
@@ -347,13 +354,13 @@ internal static class LegacyAppProfileKernel
         {
             var command = new List<string> { "macro", "smart-plan", "--label", label, "--match", targetMatch, "--precision-points" };
             if (useCdp) { command.Add("--allow-cdp"); if (port != 9222) command.AddRange(["--cdp-port", S(port)]); } command.Add("--json-only");
-            return D("label", label, "command", command.ToArray(), "command_line", LegacyTaskPresetKernel.StepString(command), "purpose", "Read-only route probe for this label before any live control.");
+            return D("label", label, "command", command.ToArray(), "command_line", Step(command), "purpose", "Read-only route probe for this label before any live control.");
         }).ToArray();
         object? affordance = null;
         if (B("--include-affordances"))
         {
             string[] command = ["macro", "list-affordances", "--window", targetMatch, "--limit", "40", "--json-only"];
-            affordance = D("command", command, "command_line", LegacyTaskPresetKernel.StepString(command), "purpose", "Optional read-only UIA affordance inventory for label discovery.");
+            affordance = D("command", command, "command_line", Step(command), "purpose", "Optional read-only UIA affordance inventory for label discovery.");
         }
         string[] prefix = new[] { "macro", "task-plan" }.Concat(options).ToArray();
         var final = D("schema", "cucp.app-profile/v1", "status", "ok", "match", match,
@@ -362,7 +369,7 @@ internal static class LegacyAppProfileKernel
             "strategy_persistence", D("enabled", !noHistory, "app_key", appKey, "history_file", historyFile, "last_good_strategy", EvidenceCapture(history), "record_requested", recordRequested,
                 "recorded", T(record) && !T(P(record, "error")), "record", EvidenceCapture(record), "skipped_reason", skipped),
             "capability_probes", D("cdp", cdp, "uia", uia), "recommended_task_options", options.ToArray(), "suggested_task_plan_prefix", prefix,
-            "suggested_task_plan_prefix_line", LegacyTaskPresetKernel.StepString(prefix), "probe_commands", commands, "affordance_probe", affordance,
+            "suggested_task_plan_prefix_line", Step(prefix), "probe_commands", commands, "affordance_probe", affordance,
             "windows_sample", sample, "notes", notes.ToArray(), "elapsed_ms", elapsed,
             "next_action", "Append the task-specific fields/click labels/text to suggested_task_plan_prefix, run the returned plan or probe commands as read-only, then use task-run --dry-run before live control.");
         return Complete(final, 0, 14, $"ok app-profile type={appType} strategy={recommended} labels={commands.Length} elapsed_ms={elapsed}");

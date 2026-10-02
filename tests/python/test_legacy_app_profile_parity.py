@@ -210,8 +210,48 @@ class AppProfileSourceTests(unittest.TestCase):
 class AppProfileWindowsTests(unittest.TestCase):
     maxDiff = None
 
+    def test_a_characterize_fresh_and_mixed_culture_regex_cache(self):
+        # The public wrapper dispatches once and exits. This deliberately mixed
+        # test documents why changing culture in one oracle process is unsafe.
+        baseline = subprocess.check_output(['git', 'show', f'{BASELINE_TREE}:scripts/cucp.ps1'], cwd=ROOT)
+        text = baseline.decode('utf-8-sig')
+        dispatch = text[text.index('# Macro path'):]
+        self.assertIn('$code = Invoke-Macro -ArgList $CucpArgs', dispatch)
+        self.assertLess(dispatch.index('exit $code'), dispatch.index('# Direct CLI passthrough'))
+        self.assertNotIn('CurrentCulture=', text)
+        self.assertNotIn('CurrentCulture =', text)
+        base = copy.deepcopy(fixtures()[0])
+        base.update(rest=['--no-probe'], culture='en-US')
+        base['windows'][0].update(process='fİrefox', title='Fixture')
+        fresh = copy.deepcopy(base); fresh['culture'] = ''
+        with tempfile.TemporaryDirectory(prefix='CUCP culture boundary ') as temp:
+            root = Path(temp)
+            source = root/'original.ps1'; source.write_bytes(baseline)
+            runner = root/'capture.ps1'; runner.write_text(CAPTURE_RUNNER, encoding='utf-8-sig')
+            def capture(items, name):
+                inputs=root/(name+'.json'); inputs.write_text(json.dumps(items, ensure_ascii=True), encoding='utf-8-sig')
+                result=subprocess.run(['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',str(runner),'-Source',str(source),'-InputPath',str(inputs)],capture_output=True,timeout=30)
+                self.assertEqual(result.returncode,0,result.stderr.decode('utf-8',errors='replace'))
+                return json.loads(result.stdout.decode('utf-8-sig'))
+            fresh_result=capture([fresh],'fresh')[0]['expected']
+            mixed_result=capture([base,fresh],'mixed')[1]['expected']
+            self.assertEqual(fresh_result['payload']['app_type'],'win32_desktop')
+            self.assertEqual(fresh_result['payload']['strategy_persistence']['app_key'],'f-refox|mainwindow|win32_desktop')
+            self.assertEqual(mixed_result['payload']['app_type'],'browser_or_electron')
+            self.assertEqual(mixed_result['payload']['strategy_persistence']['app_key'],'fİrefox|mainwindow|browser_or_electron')
+            self.assertEqual(fresh_result['exit'],0)
+            self.assertEqual(mixed_result['exit'],0)
+
     def test_complete_payload_errors_order_argv_exit_and_console(self):
         cases = fixtures()
+        # Keep every original case and every assertion. Fresh processes retain
+        # each public invocation's ambient culture, without an earlier culture's
+        # cached PowerShell -match/-replace regexes contaminating later cases.
+        for culture in dict.fromkeys(case['culture'] for case in cases):
+            with self.subTest(culture=culture):
+                self.compare_cases([case for case in cases if case['culture']==culture])
+
+    def compare_cases(self, cases):
         with tempfile.TemporaryDirectory(prefix='CUCP app-profile 한글 ') as temp:
             root = Path(temp)
             source = root / 'original.ps1'

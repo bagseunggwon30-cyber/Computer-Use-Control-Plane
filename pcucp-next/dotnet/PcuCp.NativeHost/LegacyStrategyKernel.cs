@@ -66,7 +66,7 @@ internal static class LegacyStrategyKernel
     {
         if (string.IsNullOrEmpty(strategy)) return string.Empty;
         if (strategy.Length > 4096) throw CommandOptions.Invalid("Strategy name exceeds 4096 UTF-16 units.");
-        var value = Regex.Replace(strategy, @"\+.*$", "", RegexOptions.None, TimeSpan.FromSeconds(1)).ToLowerInvariant();
+        var value = LowerValue(Regex.Replace(strategy, @"\+.*$", "", RegexOptions.None, TimeSpan.FromSeconds(1)), CultureInfo.InvariantCulture);
         // PowerShell switch -Regex uses current-culture regex case folding, which
         // is not interchangeable with NLS linguistic comparison. Regex has no
         // public CultureInfo argument. Scope only this synchronous match so an
@@ -85,6 +85,20 @@ internal static class LegacyStrategyKernel
     {
         Fields(args, "strategy");
         return new { value = NormalizeValue(Text(args, "strategy")) };
+    }
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern int LCMapStringEx(string locale, uint flags, string source, int sourceLength,
+        [Out] char[] destination, int destinationLength, IntPtr version, IntPtr reserved, IntPtr parameter);
+    internal static string LowerValue(string value, CultureInfo culture)
+    {
+        if (value.Length == 0) return value;
+        if (!OperatingSystem.IsWindows()) return culture.TextInfo.ToLower(value);
+        // .NET Framework uses Windows NLS casing, including the historical
+        // invariant Kelvin-sign behavior. Modern .NET's ICU casing differs.
+        var buffer = new char[value.Length];
+        int written = LCMapStringEx(culture.Name, 0x100, value, value.Length, buffer, buffer.Length, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+        if (written == 0) throw new NativeFailure("legacy_casing_failed", "Windows NLS case conversion failed.");
+        return new string(buffer, 0, written);
     }
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern int CompareStringEx(string locale, uint flags, string left, int leftLength,

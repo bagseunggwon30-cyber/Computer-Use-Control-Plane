@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 // Captured replies only: no subprocess, filesystem, network, GUI or input API.
 internal static class LegacySmartPlanKernel
@@ -54,7 +53,7 @@ internal static class LegacySmartPlanKernel
         { throw new InvalidOperationException($"Cannot convert value \"{s}\" to type \"System.Int32\". Error: \"{(ex is FormatException ? "Input string was not in a correct format." : ex.Message)}\""); }
     }
     private static bool Eq(object? a, string b) => string.Equals(S(a), b, StringComparison.InvariantCultureIgnoreCase);
-    private static string Step(IEnumerable<string> command) => string.Join(" ", command.Select(s => Regex.IsMatch(s, @"^[A-Za-z0-9_\-\.\/\\:=@]+$") ? s : "'" + s.Replace("'", "''") + "'"));
+    private static string Step(IEnumerable<string> command) => LegacyTaskPresetKernel.StepString(command);
     internal static object Advance(JsonElement args)
     {
         if (args.ValueKind != JsonValueKind.Object || args.GetRawText().Length > 4194304) throw new ArgumentException("Expected bounded smart-plan object.");
