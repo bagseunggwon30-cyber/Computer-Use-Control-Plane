@@ -240,7 +240,7 @@
     },
     {
       "path": "scripts/cucp.ps1",
-      "lines": 8570,
+      "lines": 8575,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -980,203 +980,203 @@
         },
         {
           "name": "_Invoke-LegacyExecutionFamily",
-          "line": 6432
+          "line": 6437
         },
         {
           "name": "_Invoke-LegacyExecutionHost",
-          "line": 6447
+          "line": 6452
         },
         {
           "name": "Invoke-MacroWorkflowRun",
-          "line": 6502
+          "line": 6507
         },
         {
           "name": "_TaskPlan-QuoteToken",
-          "line": 6504
+          "line": 6509
         },
         {
           "name": "_TaskPlan-StepString",
-          "line": 6512
+          "line": 6517
         },
         {
           "name": "_TaskPlan-UnwrapCommand",
-          "line": 6528
+          "line": 6533
         },
         {
           "name": "_AppStrategy-NormalizeRoute",
-          "line": 6536
+          "line": 6541
         },
         {
           "name": "_AppStrategy-Key",
-          "line": 6555
+          "line": 6560
         },
         {
           "name": "_AppStrategy-Read",
-          "line": 6564
+          "line": 6569
         },
         {
           "name": "_AppStrategy-LastGood",
-          "line": 6577
+          "line": 6582
         },
         {
           "name": "_AppStrategy-Append",
-          "line": 6587
+          "line": 6592
         },
         {
           "name": "Invoke-MacroAppProfile",
-          "line": 6630
+          "line": 6635
         },
         {
           "name": "_Invoke-LegacyReadOnlyQuery",
-          "line": 6731
+          "line": 6736
         },
         {
           "name": "Invoke-MacroTaskPreset",
-          "line": 6784
+          "line": 6789
         },
         {
           "name": "Invoke-MacroTaskPlan",
-          "line": 6834
+          "line": 6839
         },
         {
           "name": "Invoke-MacroTaskRun",
-          "line": 6867
+          "line": 6872
         },
         {
           "name": "Invoke-MacroFormPlan",
-          "line": 6869
+          "line": 6874
         },
         {
           "name": "Invoke-MacroFormRun",
-          "line": 6898
+          "line": 6903
         },
         {
           "name": "Invoke-MacroSmartClick",
-          "line": 6900
+          "line": 6905
         },
         {
           "name": "Invoke-MacroWatch",
-          "line": 6915
+          "line": 6920
         },
         {
           "name": "Invoke-MacroOcrScreen",
-          "line": 6929
+          "line": 6934
         },
         {
           "name": "Invoke-MacroOcrImage",
-          "line": 6958
+          "line": 6963
         },
         {
           "name": "Invoke-MacroOcrFindText",
-          "line": 6982
+          "line": 6987
         },
         {
           "name": "Invoke-MacroOcrClick",
-          "line": 7025
+          "line": 7030
         },
         {
           "name": "Invoke-MacroOcrUiaFuse",
-          "line": 7039
+          "line": 7044
         },
         {
           "name": "Invoke-MacroOcrUiaInvoke",
-          "line": 7082
+          "line": 7087
         },
         {
           "name": "Invoke-MacroScreenshotDiff",
-          "line": 7124
+          "line": 7129
         },
         {
           "name": "Invoke-MacroClickAndVerifyScreen",
-          "line": 7163
+          "line": 7168
         },
         {
           "name": "Invoke-MacroAutoDo",
-          "line": 7260
+          "line": 7265
         },
         {
           "name": "_Trajectory-Append",
-          "line": 7369
+          "line": 7374
         },
         {
           "name": "_Trajectory-Read",
-          "line": 7393
+          "line": 7398
         },
         {
           "name": "_Trajectory-Clear",
-          "line": 7407
+          "line": 7412
         },
         {
           "name": "_History-Append",
-          "line": 7431
+          "line": 7436
         },
         {
           "name": "_History-PickBestStrategy",
-          "line": 7470
+          "line": 7475
         },
         {
           "name": "_History-Stats",
-          "line": 7517
+          "line": 7522
         },
         {
           "name": "_Helper-IsUp",
-          "line": 7554
-        },
-        {
-          "name": "_Helper-Ensure",
           "line": 7559
         },
         {
+          "name": "_Helper-Ensure",
+          "line": 7564
+        },
+        {
           "name": "Invoke-MacroSession",
-          "line": 7580
+          "line": 7585
         },
         {
           "name": "_Cucp-RedactSecrets",
-          "line": 7798
+          "line": 7803
         },
         {
           "name": "Invoke-MacroImePaste",
-          "line": 7830
+          "line": 7835
         },
         {
           "name": "Invoke-MacroSafeTypeIme",
-          "line": 7882
+          "line": 7887
         },
         {
           "name": "Invoke-MacroModalDetect",
-          "line": 7962
+          "line": 7967
         },
         {
           "name": "Invoke-MacroRecoveryPlan",
-          "line": 7995
+          "line": 8000
         },
         {
           "name": "Invoke-MacroRecoveryRun",
-          "line": 8003
+          "line": 8008
         },
         {
           "name": "Invoke-MacroPrecisionValidate",
-          "line": 8010
+          "line": 8015
         },
         {
           "name": "Invoke-MacroBenchmark",
-          "line": 8018
+          "line": 8023
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 8159
+          "line": 8164
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 8191
+          "line": 8196
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 8306
+          "line": 8311
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 8402
+          "line": 8407
         }
       ]
     },
@@ -1563,8 +1563,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 849829,
-    "removed": 163649,
+    "current": 864373,
+    "removed": 149105,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",

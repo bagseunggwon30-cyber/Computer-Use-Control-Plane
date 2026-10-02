@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -82,6 +83,7 @@ def run_adapter(fixtures, *, descriptors=False, startup_clone=False, portable=Fa
                    '-Source', str(accepted), '-BaselineSource', str(baseline),
                    '-SharedSource', str(SHARED), '-AdapterSource', str(ADAPTER),
                    '-PublicSource', str(adapter_public_source()),
+                   '-DiagnosticSource', str(ROOT/'scripts/cucp-legacy-diagnostic-adapter.ps1'),
                    '-OracleSource', str(ORACLE), '-InputPath', str(inputs)]
         if descriptors:
             command.append('-ValidateDescriptors')
@@ -336,11 +338,21 @@ class InteractionDecodedDescriptorTests(unittest.TestCase):
                 self.assertEqual(result['exit'],7)
 
     def test_wrapper_host_state_rest_cannot_mutate_caller_or_startup(self):
-        fixtures=[dict(case=name,rest=rest,family=family) for family in ('interaction','execution') for name,rest in (
+        self.assert_wrapper_host_state_clone(portable=False)
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Requires Windows PowerShell 7')
+    def test_powershell7_wrapper_host_state_rest_cannot_mutate_caller_or_startup(self):
+        shell = shutil.which('pwsh')
+        self.assertIsNotNone(shell, 'PowerShell 7 is required for argv ownership qualification')
+        with mock.patch.dict(os.environ, {'CUCP_INTERACTION_POWERSHELL': shell}):
+            self.assert_wrapper_host_state_clone(portable=True)
+
+    def assert_wrapper_host_state_clone(self, *, portable):
+        fixtures=[dict(case=name,rest=rest,family=family) for family in ('interaction','execution','diagnostics') for name,rest in (
             ('null-argv',None),('empty-argv',[]),('null-element',[None]),
             ('empty-element',['']),('singleton',['--label']),
             ('literal-tokens',['--label','한글','--text','-AllowLiveControl','']))]
-        results=run_adapter(fixtures,startup_clone=True)
+        results=run_adapter(fixtures,startup_clone=True,portable=portable)
         self.assertEqual(len(results),len(fixtures))
         for fixture,result in zip(fixtures,results):
             with self.subTest(case=fixture['case'],family=fixture['family']):
@@ -350,9 +362,11 @@ class InteractionDecodedDescriptorTests(unittest.TestCase):
                 self.assertEqual(result['compatibility_calls'],0)
                 self.assertIs(result['live'],False)
                 self.assertIs(result['sensitive'],False)
-                self.assertEqual(result['entry'],f"legacy-{fixture['family']}-session")
+                entry_family='diagnostic' if fixture['family']=='diagnostics' else fixture['family']
+                self.assertEqual(result['entry'],f'legacy-{entry_family}-session')
                 self.assertEqual(result['exit'],7)
-                self.assertEqual(result['state_type'],'System.String[]')
+                self.assertEqual(result['state_type'],result['expected_state_type'])
+                self.assertTrue(result['state_type'].endswith('[]'))
                 self.assertIs(result['aliases_caller'],False)
                 self.assertEqual(result['caller_after'],result['caller_before'])
                 self.assertEqual(json.loads(result['caller_before']),fixture['rest'])

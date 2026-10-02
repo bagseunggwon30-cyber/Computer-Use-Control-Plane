@@ -3142,7 +3142,7 @@ function _Precision-ReadEffect($Effect,$State){
   if($Effect.kind -cin @('coord-map','hit-test','coord-profile')){
     $fields=@('x','y','target_hwnd','target_match');if($Effect.kind -eq 'coord-map'){$fields+=@('from','norm_x','norm_y','has_norm')};if($Effect.kind -eq 'coord-profile'){$fields+='has_point'}
     _Precision-Fields $p $fields
-    _Precision-Require (($p.x -is [int]) -and ($p.y -is [int]) -and ($p.target_hwnd -is [int] -or $p.target_hwnd -is [long]) -and $p.target_match -is [string]) 'Invalid precision target types.'
+    _Precision-Require (($p.x -is [int] -or $p.x -is [long]) -and $p.x -ge [int]::MinValue -and $p.x -le [int]::MaxValue -and ($p.y -is [int] -or $p.y -is [long]) -and $p.y -ge [int]::MinValue -and $p.y -le [int]::MaxValue -and ($p.target_hwnd -is [int] -or $p.target_hwnd -is [long]) -and $p.target_match -is [string]) 'Invalid precision target types.'
     _Precision-Require ($p.x -eq $x -and $p.y -eq $y -and [int64]$p.target_hwnd -eq $th -and $p.target_match -ceq [string]$tm) 'Precision target changed.'
   }
   switch -CaseSensitive ($Effect.kind){
@@ -3178,7 +3178,7 @@ function _Precision-ReadEffect($Effect,$State){
       _Precision-Require ($State.operation -eq 'point-plan' -and $State.reads -in @(2,3) -and ((-not $tm -and $th -le 0) -or [bool]$State.precheck.matched)) 'Target guard forbids this read.'
       if($Effect.kind -ceq 'cache-read'){
         _Precision-Fields $p @('directory','key','max_age_seconds')
-        _Precision-Require ($State.reads -eq 2 -and $p.directory -is [string] -and $p.directory -ceq $State.cache_dir -and $p.key -is [string] -and $p.max_age_seconds -is [int] -and $p.max_age_seconds -eq $ttl) 'Invalid cache read.'
+        _Precision-Require ($State.reads -eq 2 -and $p.directory -is [string] -and $p.directory -ceq $State.cache_dir -and $p.key -is [string] -and ($p.max_age_seconds -is [int] -or $p.max_age_seconds -is [long]) -and $p.max_age_seconds -ge [int]::MinValue -and $p.max_age_seconds -le [int]::MaxValue -and $p.max_age_seconds -eq $ttl) 'Invalid cache read.'
         $key=_PointPlan-CacheKey -X $x -Y $y -Radius $radius -Step $step -ClickInset $inset -TargetHwnd $th -TargetMatch $tm -Precheck $State.precheck -CoordSignature ([string]$State.profile.coord_signature)
         _Precision-Require ($p.key -ceq $key) 'Cache key changed.'
         $reply=_PointPlan-ReadCache -Key $key -MaxAgeSeconds $ttl
@@ -6295,14 +6295,14 @@ function _Execution-ValidateEffect($Effect,$State) {
     'HistoryRead' {_Execution-Require ($n -eq '' -and $null -eq $d -and $a.Count -eq 3 -and $a[2] -ceq '5') 'Invalid history query.'}
     'HistoryAppend' {
       _Execution-Require ($n -eq '' -and $a.Count -eq 3) 'Invalid history append descriptor.'
-      _Execution-Fields $d @('success','elapsed_ms');_Execution-Require ($d.success -is [bool] -and $d.elapsed_ms -is [int]) 'Invalid history append payload.'
+      _Execution-Fields $d @('success','elapsed_ms');_Execution-Require ($d.success -is [bool] -and ($d.elapsed_ms -is [int] -or $d.elapsed_ms -is [long]) -and $d.elapsed_ms -ge [int]::MinValue -and $d.elapsed_ms -le [int]::MaxValue) 'Invalid history append payload.'
     }
     'TrajectoryAppend' {
       _Execution-Require ($n -cin @('workflow-run','task-run','form-run') -and $a.Count -eq 0) 'Invalid trajectory append kind.'
       if($n -eq 'task-run'){_Execution-Fields $d @('status','dry_run','workflow_exit','elapsed_ms')}
       else {_Execution-Fields $d @('status','executed_count','failed_count','total_steps','elapsed_ms')}
     }
-    'Sleep' {_Execution-Require ($n -eq '' -and $a.Count -eq 0 -and $d -is [int] -and $d -ge 0) 'Invalid execution sleep.'}
+    'Sleep' {_Execution-Require ($n -eq '' -and $a.Count -eq 0 -and ($d -is [int] -or $d -is [long]) -and $d -ge 0 -and $d -le [int]::MaxValue) 'Invalid execution sleep.'}
     'Clock' {_Execution-Require ($n -cin @('start','stop','elapsed') -and $a.Count -eq 0 -and $d -is [string] -and $d -cin @('total','step','attempt','run')) 'Invalid execution clock.'}
     'Timestamp' {_Execution-Require ($n -cin @('o','HHmmss-fff') -and $a.Count -eq 0 -and $null -eq $d) 'Invalid execution timestamp.'}
     'CachePath' {_Execution-Require ($n -cin @('smartclick-before','smartclick-after','smartclick-retry-before','smartclick-retry-after') -and $a.Count -eq 0 -and $d -is [string] -and $d -match '^\d{6}-\d{3}$') 'Invalid execution capture path.'}
@@ -6408,7 +6408,12 @@ function _Invoke-LegacyExecutionEffectLoop {
     if($target -ceq 'complete') {
       $State.diagnostic_phase='validate-completion'
       _Execution-Fields $message @('payload','exit','json_depth','brief','emit_json')
-      _Execution-Require ($message.exit -is [int] -and ($State.family -ceq 'interaction' -or ($message.exit -ge 0 -and $message.exit -le 3)) -and $message.json_depth -is [int] -and
+      # PS5 parses JSON integers as Int32; PS7 uses Int64. Accept both parser
+      # representations while preserving the exact integer/range contract.
+      _Execution-Require (($message.exit -is [int] -or $message.exit -is [long]) -and
+        $message.exit -ge [int]::MinValue -and $message.exit -le [int]::MaxValue -and
+        ($State.family -ceq 'interaction' -or ($message.exit -ge 0 -and $message.exit -le 3)) -and
+        ($message.json_depth -is [int] -or $message.json_depth -is [long]) -and
         $message.json_depth -ge 0 -and $message.json_depth -le 100 -and $message.emit_json -is [bool] -and ($null -eq $message.brief -or $message.brief -is [string])) 'Invalid execution completion envelope.'
       $payload=_Execution-DecodeWire $message.payload
       if($State.family -ceq 'diagnostics'){$payload=_Diagnostic-PreparePayload $payload $State}
@@ -6439,7 +6444,7 @@ function _Invoke-LegacyExecutionFamily {
       -not ($inherited.Options -band [Management.Automation.ScopedItemOptions]::Constant))){$sensitiveCeiling=$false}
   $startup=[ordered]@{schema='cucp.execution-start/v1';operation=$Operation;rest=@($Rest);brief=[bool]$Brief;
     cache_seconds=[int]$CacheSeconds;vision_available=[bool]$Script:CliPath;culture=[Globalization.CultureInfo]::CurrentCulture.Name}
-  $restCopy=[string[]]@($Rest);$restCopy=[string[]]$restCopy.Clone()
+  $restCopy=@($Rest);if($null -ne $restCopy){$restCopy=$restCopy.Clone()}
   $state=@{family='execution';operation=$Operation;rest=$restCopy;state_effect_seen=$false;live=$liveCeiling;sensitive=$sensitiveCeiling;script_path=$ScriptPath;cache_dir=$Script:CacheDir;paths=@{};clocks=@{};writer=$null;live_effect_seen=$false}
   return _Invoke-LegacyExecutionHost -EntryPoint 'legacy-execution-session' -Startup $startup -State $state
 }
@@ -6673,7 +6678,7 @@ function Invoke-MacroAppProfile {
           $state.record_completion.payload.schema -cne 'cucp.app-profile/v1' -or
           $state.record_completion.queries.Count -ne ($captures.Count+1) -or
           -not [object]::Equals($authorization.history_file,$historyFile) -or
-          $score.total_score -isnot [int] -or $score.total_score -lt 50 -or $score.total_score -gt 100 -or
+          ($score.total_score -isnot [int] -and $score.total_score -isnot [long]) -or $score.total_score -lt 50 -or $score.total_score -gt 100 -or
           $score.confidence -cne $expectedConfidence -or $query.argv.Count -ne 8 -or
           -not [string]::Equals((ConvertTo-Json -InputObject @($authorization.query.argv) -Compress),
             (ConvertTo-Json -InputObject @($query.argv) -Compress),[StringComparison]::Ordinal)) {

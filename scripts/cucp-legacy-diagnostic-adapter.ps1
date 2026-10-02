@@ -29,7 +29,7 @@ function _Diagnostic-NewState {
   foreach($key in @('audit_directory','cache_directory','wrapper_log','cli_path','changelog_path','temp_root','benchmark_schema','release_schema')) {
     $owned|Add-Member NoteProperty $key $Context.$key
   }
-  $restCopy=[string[]]@($Rest);$restCopy=[string[]]$restCopy.Clone()
+  $restCopy=@($Rest);if($null -ne $restCopy){$restCopy=$restCopy.Clone()}
   return @{family='diagnostics';operation=$Operation;rest=$restCopy;context=$owned;
     live=$false;sensitive=$false;paths=@{};clocks=@{};writer=$null;live_effect_seen=$false;
     diagnostic_counts=@{};diagnostic_audit_files=@{};diagnostic_cache_path=$null;diagnostic_changelog=$null;
@@ -122,7 +122,7 @@ function _Diagnostic-ValidateEffect($Effect,$State) {
     'ReadText' {_Diagnostic-Require ($op -ceq 'benchmark' -and $value -is [string] -and $value -ceq (_Diagnostic-Value $rest '--baseline')) 'Baseline read changed its requested path.'}
     'ResolvePath' {_Diagnostic-Require ($op -ceq 'release-notes' -and $value -is [string] -and $value -ceq $c.changelog_path) 'Changelog resolution changed its configured path.';_Diagnostic-Limit $State 'resolve' 1}
     'TailBytes' {
-      _Diagnostic-Fields $value @('path','max_bytes');_Diagnostic-Require ($value.path -is [string] -and $value.max_bytes -is [int] -and $value.max_bytes -gt 0) 'Invalid diagnostic tail types.'
+      _Diagnostic-Fields $value @('path','max_bytes');_Diagnostic-Require ($value.path -is [string] -and ($value.max_bytes -is [int] -or $value.max_bytes -is [long]) -and $value.max_bytes -gt 0 -and $value.max_bytes -le [int]::MaxValue) 'Invalid diagnostic tail types.'
       $path=$c.wrapper_log;$maximum=65536
       if($op -ceq 'log-tail'){$path=_Diagnostic-Value $rest '--path';if(-not $path){$path=$c.wrapper_log};$maximum=_Diagnostic-IntOption $State '--max-bytes' 262144}
       _Diagnostic-Require ($op -cin @('log-tail','health-quick','diagnose-lag') -and $value.path -ceq $path -and $value.max_bytes -eq $maximum) 'Tail window differs from requested diagnostic.'
@@ -148,7 +148,7 @@ function _Diagnostic-ValidateEffect($Effect,$State) {
     }
     'ProcessMetrics' {
       _Diagnostic-Fields $value @('current_ordinal','previous_ordinal')
-      _Diagnostic-Require ($op -ceq 'diagnose-lag' -and $State.diagnostic_process_lists.Count -eq 2 -and $State.diagnostic_counts['processor-count'] -eq 1 -and $value.current_ordinal -is [int] -and ($null -eq $value.previous_ordinal -or $value.previous_ordinal -is [int])) 'Invalid retained process ordinal types.'
+      _Diagnostic-Require ($op -ceq 'diagnose-lag' -and $State.diagnostic_process_lists.Count -eq 2 -and $State.diagnostic_counts['processor-count'] -eq 1 -and ($value.current_ordinal -is [int] -or $value.current_ordinal -is [long]) -and $value.current_ordinal -ge [int]::MinValue -and $value.current_ordinal -le [int]::MaxValue -and ($null -eq $value.previous_ordinal -or (($value.previous_ordinal -is [int] -or $value.previous_ordinal -is [long]) -and $value.previous_ordinal -ge [int]::MinValue -and $value.previous_ordinal -le [int]::MaxValue))) 'Invalid retained process ordinal types.'
       $cursor=[int]$State.diagnostic_metric_cursor
       _Diagnostic-Require ($cursor -lt $State.diagnostic_metric_order.Count -and $value.current_ordinal -eq $State.diagnostic_metric_order[$cursor]) 'Process metrics changed original grouped order.'
       $current=$State.diagnostic_process_rows[1][$value.current_ordinal];$expected=$null
@@ -160,7 +160,7 @@ function _Diagnostic-ValidateEffect($Effect,$State) {
     'Windows' {_Diagnostic-Require ($op -ceq 'diagnose-lag' -and $null -eq $value) 'Invalid foreground query.';_Diagnostic-Limit $State 'windows' 1}
     'Sleep' {
       $sample=[Math]::Min(8000,(_Diagnostic-IntOption $State '--sample-ms' 3000))
-      _Diagnostic-Require ($op -ceq 'diagnose-lag' -and $value -is [int] -and $value -eq $sample -and $State.diagnostic_process_lists.Count -eq 1) 'Diagnostic sampling delay changed.';_Diagnostic-Limit $State 'sleep' 1
+      _Diagnostic-Require ($op -ceq 'diagnose-lag' -and ($value -is [int] -or $value -is [long]) -and $value -ge [int]::MinValue -and $value -le [int]::MaxValue -and $value -eq $sample -and $State.diagnostic_process_lists.Count -eq 1) 'Diagnostic sampling delay changed.';_Diagnostic-Limit $State 'sleep' 1
     }
     'AssertAuthorized' {
       $allowed=(_Diagnostic-ArgvEquals $a @('act','click','--x','0','--y','0','--after','fake')) -or (_Diagnostic-ArgvEquals $a @('act','click','--x','100','--y','100'))
@@ -171,7 +171,7 @@ function _Diagnostic-ValidateEffect($Effect,$State) {
       _Diagnostic-Fields $value @('match','semantic','no_cache','cache_max_seconds')
       _Diagnostic-Require ($op -ceq 'self-test' -and $value.match -is [string] -and $value.semantic -is [bool] -and $value.no_cache -is [bool]) 'Invalid self-test appshot types.'
       $cold=$value.match -ceq 'selftest-cache' -and -not $value.semantic -and $value.no_cache -and $null -eq $value.cache_max_seconds
-      $warm=$value.match -ceq 'selftest-cache' -and -not $value.semantic -and -not $value.no_cache -and $value.cache_max_seconds -is [int] -and $value.cache_max_seconds -eq 600
+      $warm=$value.match -ceq 'selftest-cache' -and -not $value.semantic -and -not $value.no_cache -and ($value.cache_max_seconds -is [int] -or $value.cache_max_seconds -is [long]) -and $value.cache_max_seconds -eq 600
       $full=$rest -contains '--deep' -and $value.match -ceq '' -and $value.semantic -and $value.no_cache -and $null -eq $value.cache_max_seconds
       _Diagnostic-Require ($cold -or $warm -or $full) 'Appshot exceeds fixed self-test scope.'
       _Diagnostic-Limit $State ('appshot:'+$cold+':'+$warm+':'+$full) 1
@@ -179,7 +179,7 @@ function _Diagnostic-ValidateEffect($Effect,$State) {
     'CacheKey' {_Diagnostic-Require ($op -ceq 'self-test' -and $value -is [string] -and $value -ceq 'selftest-cache') 'Invalid self-test cache key.';_Diagnostic-Limit $State 'cache-key' 1}
     'Uia' {
       _Diagnostic-Fields $value @('focused_window','max_elements')
-      _Diagnostic-Require ($op -ceq 'self-test' -and $rest -contains '--deep' -and $value.focused_window -is [string] -and $value.focused_window -ceq '' -and $value.max_elements -is [int] -and $value.max_elements -eq 50) 'UIA check exceeds fixed self-test scope.'
+      _Diagnostic-Require ($op -ceq 'self-test' -and $rest -contains '--deep' -and $value.focused_window -is [string] -and $value.focused_window -ceq '' -and ($value.max_elements -is [int] -or $value.max_elements -is [long]) -and $value.max_elements -eq 50) 'UIA check exceeds fixed self-test scope.'
       _Diagnostic-Limit $State 'uia' 1
     }
     'Notice' {

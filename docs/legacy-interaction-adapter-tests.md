@@ -86,20 +86,29 @@ and scored anchor records are rejected before leaf dispatch too.
 
 ## Caller argv isolation
 
-The same inert runner AST-loads `_Invoke-LegacyInteractionFamily` and
-`_Invoke-LegacyExecutionFamily` for a bounded wrapper check. One inert host seam
+The same inert runner AST-loads `_Invoke-LegacyInteractionFamily`,
+`_Invoke-LegacyExecutionFamily` and `_Diagnostic-NewState` for a bounded check. One inert host seam
 mutates every element of `State.rest` after startup construction, then returns a
-fixed exit. Twelve cases cover both wrappers with null argv, empty arrays,
+fixed exit. Eighteen cases cover the three constructors with null argv, empty arrays,
 null/empty elements, singleton arrays and ordinary/control-looking tokens.
-The assertions require a distinct `System.String[]`, actual state mutation,
-unchanged caller argv and unchanged serialized startup, preserving the existing
-PowerShell conversion of null and empty values. This check executes no process
+The assertions require a distinct array, actual state mutation, unchanged caller
+argv and unchanged serialized startup. Expected shape and runtime array type
+come independently from a typed-parameter helper containing the original
+`rest=@($Rest)` expression. This preserves null/empty elements without requiring
+a new string-array conversion. This check executes no process
 or acquisition and does not claim that malformed startup argv is accepted by
 NativeHost. It leaves the 870 source cases and 12 uncertainty cases intact.
 The clone-only disposable PowerShell process fixes the global sensitive ceiling
 to Constant=false and places a throwing guard at the compatibility subprocess
 boundary. It requires zero compatibility calls and false live/sensitive state;
 the existing confirmation gate itself is retained.
+
+Run `37058066571` at remote `031bff14` passed all 870 actual-adapter comparisons
+and 12 uncertainty cases, but the first null-argv clone fixture failed at the
+added string-array cast/Clone expression. The repair materializes the original
+array-subexpression result, then clones existing storage without a string-array
+cast or null normalization. The same one-line correction applies to all three
+constructors; the next Windows gate must verify the expanded boundary check.
 
 
 ## Manifest-selected public delegates
@@ -117,3 +126,7 @@ using the Windows PowerShell 5.1 `Parser.ParseInput` filename overload, preservi
 after promotion the path must be the main `scripts/cucp.ps1` wrapper. The source
 entry points are never executed. Draft support, all 870 ordinary comparisons,
 all 12 uncertainty cases, exact Console comparisons and descriptor guards remain.
+
+The 18-case null/empty/literal argv ownership matrix is required under both
+Windows PowerShell 5.1 and PowerShell 7 in the Windows lane. The supplemental PS7
+case explicitly resolves `pwsh`; it cannot silently substitute PS5.1.

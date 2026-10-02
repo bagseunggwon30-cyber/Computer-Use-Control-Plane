@@ -61,6 +61,29 @@ original 21 Pester assertions remain unchanged. The integrated checkpoint needs
 the complete Windows, browser, portable and regression gate; none of this is
 interactive desktop, clipboard or IME acceptance.
 
+## Integrated boundary repair awaiting qualification
+
+The initial integration tree (`031bff14` remotely, `2cc712d` locally) failed the
+full run [37058066571](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37058066571):
+12 active jobs passed and two failed. Seven Pester boundary assertions rejected
+valid PS7 completion integers, and the interaction argv-ownership fixture found
+that casting a null argument array before cloning could produce a null receiver.
+All 21 original Pester assertions remain unchanged.
+
+The repair retains array ownership without that cast and accepts only Int32 or
+Int64 protocol integers within the original Int32/domain bounds. It adds actual
+PS5.1/PS7 completion and integer-guard matrices, including 25 malformed completion
+cases after one acknowledged inert possible-write dispatch. These require the
+same uncertainty marker, no automatic retry, and no premature output. Real
+Windows results for this repaired tree remain pending until its full gate passes.
+
+The repaired index contains 26 tracked PowerShell files totaling **864,373 bytes**,
+including **612,709 runtime bytes** and **251,664 other source/test bytes**. That
+is 14,544 more than the initial integration, and 41,295 more than the last accepted
+`56be343c` checkpoint. These temporary regression fixtures are fully counted;
+they do not earn new accepted migration credit and must also be removed only
+after equivalent zero-PowerShell coverage exists.
+
 ## Qualification and integration
 
 All focused jobs passed at `e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe` in

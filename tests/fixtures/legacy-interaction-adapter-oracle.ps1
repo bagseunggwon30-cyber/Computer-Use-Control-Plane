@@ -1,6 +1,6 @@
 param(
  [string]$Source,[string]$BaselineSource,[string]$InputPath,
- [string]$SharedSource,[string]$AdapterSource,[string]$PublicSource,[string]$OracleSource,
+ [string]$SharedSource,[string]$AdapterSource,[string]$PublicSource,[string]$OracleSource,[string]$DiagnosticSource,
  [switch]$ValidateDescriptors,[switch]$ValidateStartupClone,[switch]$AllowPortableHost
 )
 $ErrorActionPreference='Stop'
@@ -79,6 +79,17 @@ if($ValidateDescriptors -or $ValidateStartupClone){
  }
  . ([scriptblock]::Create($install))
  if($ValidateStartupClone){
+  $diagnosticTokens=$null;$diagnosticErrors=$null
+  $diagnosticAst=[Management.Automation.Language.Parser]::ParseFile($DiagnosticSource,[ref]$diagnosticTokens,[ref]$diagnosticErrors)
+  if($diagnosticErrors.Count){throw 'Diagnostic state source did not parse'}
+  foreach($name in @('_Diagnostic-Require','_Diagnostic-Fields','_Diagnostic-NewState')){
+   $definition=@($diagnosticAst.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name},$true))
+   if($definition.Count -ne 1){throw "Missing diagnostic state constructor dependency: $name"}
+   . ([scriptblock]::Create($definition[0].Extent.Text))
+  }
+  # A separate typed-parameter function preserves the pre-copy expression as
+  # the expected shape/type. Returning a hashtable prevents array unrolling.
+  function Get-OriginalCloneShape {param([string[]]$Rest) return @{rest=@($Rest)}}
   # This disposable process checks argv ownership, not confirmation parsing.
   # Exercise the real gate's immutable false ceiling before any subprocess.
   New-Variable -Name 'CUCP_EXECUTION_SENSITIVE_CEILING' -Scope Global -Option Constant -Value $false
@@ -107,10 +118,13 @@ if($ValidateDescriptors -or $ValidateStartupClone){
   $AllowLiveControl=$false;$Brief=$false;$CacheSeconds=5;$Script:CliPath=$null
   $rows=New-Object Collections.ArrayList
   foreach($row in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json)){
+   try {
    $script:cloneCaller=[string[]]$row.rest;$script:cloneHostCalls=0;$script:cloneCompatibilityCalls=0
    $before=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $script:cloneCaller -Compress
-   $expectedState=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject ([string[]]@($script:cloneCaller)) -Compress
-   $expectedStartup=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject @($script:cloneCaller) -Compress
+   $originalShape=Get-OriginalCloneShape -Rest $script:cloneCaller
+   $expectedState=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $originalShape.rest -Compress
+   $expectedStateType=$originalShape.rest.GetType().FullName
+   $expectedStartup=$expectedState
    if($row.public){
     if($row.family -cne 'interaction' -or $row.public -cnotin $publicNames){throw 'Unknown public delegate fixture'}
     $exit=& ([string]$row.public) -Rest $script:cloneCaller
@@ -118,12 +132,18 @@ if($ValidateDescriptors -or $ValidateStartupClone){
     $exit=_Invoke-LegacyExecutionFamily -Operation 'workflow-run' -Rest $script:cloneCaller -ScriptPath 'C:\fixture\cucp.ps1'
    }elseif($row.family -ceq 'interaction'){
     $exit=_Invoke-LegacyInteractionFamily -Operation 'click-label' -Rest $script:cloneCaller -ScriptPath 'C:\fixture\cucp.ps1'
+   }elseif($row.family -ceq 'diagnostics'){
+    $context=[pscustomobject]@{audit_directory='C:\fixture';cache_directory='C:\fixture';wrapper_log='C:\fixture\wrapper.log';cli_path=$null;
+     changelog_path='C:\fixture\CHANGELOG.md';temp_root='C:\fixture';benchmark_schema='cucp.benchmark/v1';release_schema='cucp.release-notes/v1'}
+    $state=_Diagnostic-NewState -Operation 'perf' -Rest $script:cloneCaller -Context $context
+    $exit=_Invoke-LegacyExecutionHost -EntryPoint 'legacy-diagnostic-session' -Startup @{operation='perf';rest=$originalShape.rest} -State $state
    }else{throw 'Unknown startup clone fixture family'}
    $after=Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $script:cloneCaller -Compress
-   [void]$rows.Add(@{case=$row.case;family=$row.family;caller_before=$before;caller_after=$after;expected_state=$expectedState;expected_startup=$expectedStartup;
+   [void]$rows.Add(@{case=$row.case;family=$row.family;caller_before=$before;caller_after=$after;expected_state=$expectedState;expected_state_type=$expectedStateType;expected_startup=$expectedStartup;
     state_before=$script:cloneStateBefore;state_after=$script:cloneStateAfter;startup_before=$script:cloneStartupBefore;startup_after=$script:cloneStartupAfter;
     script_path=$script:cloneScriptPath;operation=$script:cloneOperation;state_type=$script:cloneStateType;aliases_caller=$script:cloneAliasesCaller;host_calls=$script:cloneHostCalls;compatibility_calls=$script:cloneCompatibilityCalls;
     live=$script:cloneLive;sensitive=$script:cloneSensitive;entry=$script:cloneEntry;exit=$exit})
+   }catch{throw ("Startup clone fixture $($row.family)/$($row.case): "+$_.Exception.Message+"`n"+$_.InvocationInfo.PositionMessage)}
   }
   [Console]::Out.WriteLine((Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject @($rows) -Depth 100 -Compress))
   return

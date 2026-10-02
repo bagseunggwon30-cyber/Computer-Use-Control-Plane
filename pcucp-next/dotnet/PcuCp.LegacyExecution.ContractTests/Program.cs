@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+if (CompletionTransportFixture.TryRun(args)) return;
+
 if (args.SequenceEqual(new[] { "--session-fixture" }))
 {
     // Disposable test process only. This mode supplies no effect implementation.
