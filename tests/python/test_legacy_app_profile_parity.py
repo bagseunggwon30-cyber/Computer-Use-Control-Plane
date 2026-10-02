@@ -171,12 +171,12 @@ foreach($fixture in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Con
  try{
   $exitCode=Invoke-MacroAppProfile -Rest $fixture.rest
   $console=$writer.ToString();$raw=$console.TrimEnd([char[]]"`r`n")
-  if($Brief -and -not ($fixture.rest -contains '--json-only')){$payload=$null;$brief=$raw;$depth=if($exitCode -eq 2){12}else{14}}
-  else{$payload=$raw|ConvertFrom-Json;$brief=$null;$depth=if($payload.status -eq 'partial'){12}else{14}}
-  $expected=@{state='complete';payload=$payload;exit=[int]$exitCode;brief=$brief;json_depth=$depth;queries=@($script:queries)}
+  if($Brief -and -not ($fixture.rest -contains '--json-only')){$payload=$null;$capturedBriefText=$raw;$depth=if($exitCode -eq 2){12}else{14}}
+  else{$payload=$raw|ConvertFrom-Json;$capturedBriefText=$null;$depth=if($payload.status -eq 'partial'){12}else{14}}
+  $expected=@{state='complete';payload=$payload;exit=[int]$exitCode;brief=$capturedBriefText;json_depth=$depth;queries=@($script:queries)}
  }catch{$expected=@{state='error';error=$_.Exception.Message;queries=@($script:queries)}}
  finally{[Console]::SetOut($previous);$expected['console']=$writer.ToString();$writer.Dispose()}
- $entry=@{expected=$expected;args=@{rest=@($fixture.rest);brief=$Brief;culture=[string]$fixture.culture;history_file=$fixture.history_file;elapsed_ms=0;cdp_elapsed_ms=0;uia_elapsed_ms=0;captured_replies=@($script:replies)}}
+ $entry=@{expected=$expected;args=@{rest=@($fixture.rest);brief=[bool]$fixture.brief;culture=[string]$fixture.culture;history_file=$fixture.history_file;elapsed_ms=0;cdp_elapsed_ms=0;uia_elapsed_ms=0;captured_replies=@($script:replies)}}
  if($CandidatePath){
   $state=$candidateResults[$caseIndex];$writer=New-Object IO.StringWriter;$previous=[Console]::Out;[Console]::SetOut($writer)
   try{
@@ -202,6 +202,8 @@ class AppProfileSourceTests(unittest.TestCase):
         self.assertNotIn('app-profile-advance', (ROOT / 'pcucp-next/dotnet/PcuCp.NativeHost/LegacyCompatibilityDispatcher.cs').read_text())
         self.assertIn("if([regex]::Matches($body,$pattern).Count -ne 4)", CAPTURE_RUNNER)
         self.assertIn("'_AppProfile-StrategyScore'", CAPTURE_RUNNER)
+        self.assertIn('brief=[bool]$fixture.brief;', CAPTURE_RUNNER)
+        self.assertNotIn('$brief=$', CAPTURE_RUNNER.lower())
 
 
 @unittest.skipUnless(sys.platform == 'win32', 'Requires Windows PowerShell 5.1 app-profile oracle')

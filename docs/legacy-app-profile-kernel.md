@@ -110,3 +110,12 @@ is included. After strict Windows proof, central integration would require the
 NativeHost compile link/closed registry operation, a bounded acquisition adapter,
 its independent validation, an actual-adapter differential, and the inventory
 and migration-matrix update. Main-branch merge remains a separate approval.
+
+At `96f1f2a4` / run `36959747063`, the independent Windows job passed all 296
+Unicode alias score comparisons and 29 managed app-profile contracts. The first
+app-profile oracle exposed a capture-harness variable collision: PowerShell
+`$brief` output text overwrote the case-insensitive `$Brief` boolean before the
+candidate arguments were serialized. The harness now uses a distinct text
+variable and records the original fixture's explicitly cast boolean. All payload,
+error, Console and query assertions remain unchanged. Full app-profile parity
+still awaits the corrected Windows run; the original implementation is retained.
