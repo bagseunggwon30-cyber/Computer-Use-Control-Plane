@@ -204,3 +204,55 @@ unchanged. Known exact diagnostic and normalized gaps remain documented in the
 parser-parity flags still opt-in. No production parser, native candidate
 exclusion, workflow/job condition, source-accounting rule or retirement claim
 changes here.
+
+
+## Explicit history reducer candidate gate
+
+`history-candidate` is a separate, opt-in scope. Select it through workflow
+dispatch or a first-line `[focus history-candidate]` marker. The existing six
+production families, default `all`, `next-batch`, `full` and full-foundation
+coverage are unchanged. The adapter manifest rejects history as promoted;
+passing this scope cannot retire helpers or authorize production cutover.
+
+Exact local/CI command on an owned Windows host:
+
+```text
+python pcucp-next/packaging/migration_qualification.py run --family history-candidate --log-dir .migration-logs/history-candidate
+```
+
+The dedicated Windows job checks out full Git history and installs .NET 8.
+Its runner requires every candidate source/fixture file, resolves actual
+`powershell.exe`, `pwsh.exe` and `dotnet.exe` files, then verifies PS5.1/PS7 by
+running the pinned original-functions oracle under each actual executable.
+It builds and runs the managed self-test, executes the entire Windows Python
+contract suite with no skipped tests accepted (including the isolated
+CP 949/1252 Unicode probe), and runs all six fresh-process differential batches:
+a singleton plus two independent full 465-case batches per PowerShell runtime.
+
+All original source comes from published qualified Git tree
+`d4c9660d40c7e909f18afb166a8e846798f63b1d`. The manifest contains metadata only;
+the complete source and four selected AST definitions retain exact byte hashes.
+The oracle/manifest have byte-preserving Git attributes for Windows checkouts.
+Static current-helper checks use canonical tracked Git bytes, matching the source
+inventory; no accepted oracle input/output is normalized. Four production
+history helpers and their callers remain untouched.
+
+Bounded stdout/stderr, process exit/timeout/truncation metadata, source/input
+hashes, exact ordered/type-tagged values, raw JSON and Console comparisons are
+retained even on failure. Each Windows contract child (including owned-console
+and nested managed children) retains its own bounded evidence before assertion
+or JSON parsing; incomplete pipe drains preserve the available byte prefix and
+fail closed. Expected rejections require a completed, nonzero process rather
+than treating launch failures or timeouts as valid rejection. The runner
+validates all six identities, all 465 case
+IDs/counts, every required input/raw/process/mismatch artifact and its hashes.
+Missing hosts/files, skipped contracts, blocked runs, any exact mismatch or any
+incomplete artifact set are nonzero failures. The workflow uploads evidence with
+`if: always()` and treats missing upload files as an error. Reports explicitly
+say `candidate_only: true` and `production_cutover: false`.
+
+This integration adds 10,672 openly tracked oracle PowerShell bytes and no
+embedded/renamed source. Canonical tracked PowerShell is 880,873 bytes against
+the 1,013,478-byte baseline (132,605 bytes removed). This accounting is not a new
+Windows parity claim. The four original helper extents total 3,651 bytes and
+remain in production until separately authorized qualification and promotion.

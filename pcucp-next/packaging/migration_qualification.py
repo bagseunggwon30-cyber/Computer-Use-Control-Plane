@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -14,7 +15,8 @@ FAMILIES = ("execution", "precision", "cdp", "interaction", "diagnostics", "file
 NEXT_BATCH = ("interaction", "diagnostics", "file-images")
 # Keep explicit staging support: a kernel-only gate cannot imply adapter parity.
 # Both new families now require their actual shared-session draft suites.
-CANDIDATE_ONLY: frozenset[str] = frozenset()
+CANDIDATE_SCOPES = ("history-candidate",)
+CANDIDATE_ONLY: frozenset[str] = frozenset(CANDIDATE_SCOPES)
 DRAFT_ADAPTERS = {
     "interaction": "scripts/cucp-legacy-interaction-adapter.ps1",
     "diagnostics": "scripts/cucp-legacy-diagnostic-adapter.ps1",
@@ -35,6 +37,7 @@ PROJECTS = {
     "interaction": ("PcuCp.LegacyInteraction.ContractTests", "PcuCp.LegacyExecution.StartupTests", "PcuCp.LegacyExecution.ContractTests"),
     "diagnostics": ("PcuCp.LegacyDiagnostics.ContractTests", "PcuCp.LegacyExecution.StartupTests", "PcuCp.LegacyExecution.ContractTests"),
     "file-images": ("PcuCp.LegacyFileOcr.ContractTests",),
+    "history-candidate": ("PcuCp.LegacyHistory.Qualification",),
     "foundation": ("PcuCp.LegacyPure.ContractTests", "PcuCp.LegacyTaskForm.ContractTests", "PcuCp.LegacyWorkflow.ContractTests"),
 }
 PATTERNS = {
@@ -44,6 +47,7 @@ PATTERNS = {
     "interaction": "test_legacy_interaction*.py",
     "diagnostics": "test_legacy_diagnostics*.py",
     "file-images": ("test_legacy_images.py", "test_legacy_file_ocr.py"),
+    "history-candidate": "test_legacy_history_reducers.py",
     "foundation": ("test_migration_inventory.py", "test_legacy_workflow*.py"),
 }
 ADAPTER_ENV = {
@@ -67,7 +71,7 @@ def select_scope(explicit: str, message: str) -> tuple[list[str], bool]:
             if len(tags) > 1:
                 raise ValueError("Use one focused scope or the full regression marker.")
             scope = tags[0] if tags else "all"
-    if scope not in (*FAMILIES, "foundation", "next-batch", "all", "full"):
+    if scope not in (*FAMILIES, *CANDIDATE_SCOPES, "foundation", "next-batch", "all", "full"):
         raise ValueError(f"Unknown migration qualification scope: {scope}")
     if scope == "next-batch":
         return list(NEXT_BATCH), False
@@ -79,7 +83,7 @@ def enabled_adapters(root: Path = ROOT) -> set[str]:
     if not isinstance(data, dict) or set(data) != {"test_adapters"}:
         raise ValueError("Expected the exact migration adapter manifest schema.")
     values = data["test_adapters"]
-    if not isinstance(values, list) or any(type(v) is not str or v not in FAMILIES for v in values) or len(values) != len(set(values)):
+    if not isinstance(values, list) or any(type(v) is not str or v not in (*FAMILIES, *CANDIDATE_SCOPES) for v in values) or len(values) != len(set(values)):
         raise ValueError("Adapter families must be unique known names.")
     if CANDIDATE_ONLY.intersection(values):
         raise ValueError("Candidate-only kernels cannot be marked as promoted adapters.")
@@ -117,6 +121,15 @@ def run_logged(argv: list[str], *, cwd: Path, env: dict[str, str], log_path: Pat
 def run_family(family: str, browser: bool = False, log_dir: Path | None = None) -> None:
     if family not in PROJECTS or browser and family != "cdp":
         raise ValueError("Unsupported qualification family/platform combination.")
+    if family == "history-candidate":
+        path = ROOT / "pcucp-next/packaging/history_candidate_qualification.py"
+        if not path.is_file():
+            raise ValueError("Missing explicit history candidate runner")
+        spec = importlib.util.spec_from_file_location("history_candidate_qualification", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.run(ROOT, log_dir, check_adapters=enabled_adapters)
+        return
     selected = "test_legacy_cdp_browser*.py" if browser else PATTERNS[family]
     patterns = (selected,) if isinstance(selected, str) else selected
     if family == "foundation":

@@ -82,10 +82,31 @@ assertion failure.
 - All tracked PowerShell remains 870,201 bytes: 610,258 runtime and 259,943
   other source/test bytes, with 143,277 bytes removed from the original baseline.
 
-This local batch has not been freshly qualified on Windows or published.
-The 24 new expectations remain inferred until the actual PS5.1 run supplies
-fresh results. Historical replay does not establish full grammar or localized
-parse-error wording parity.
+At the local freeze, this batch had not been freshly qualified on Windows or
+published and the 24 new expectations were inferred. Historical replay alone
+does not establish full grammar or localized parse-error wording parity.
+
+## Subsequent Windows qualification
+
+Published commit `3e892ab02395bdc916a5814e39d4154efd1f6249` passed all three
+active jobs in
+[run 37091346155](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37091346155).
+The foundation lane passed 49 Windows workflow tests without skips and three
+inventory tests. Its complete 152-row raw capture was preserved:
+
+- Artifact ZIP SHA256:
+  `777cf43a5eeec2ff8faaa933b67b19958d45919eb782d8871c804cee5e5c199e`
+- Raw capture SHA256:
+  `eef0c88385aa7debfa3262421946dc3407aeac2975ba8bfe03d6409f3dbaecab`
+- Original 128 rows: 86 exact differences, including the same eight normalized
+  differences and 78 text-only differences.
+- New 24 rows: eight text-only differences in the syntax-precedence guard group;
+  all sixteen exact unsupported-token probes passed.
+- Full 152 rows: 94 exact differences, eight normalized and 86 text-only.
+
+No newly accepted syntax was introduced. This establishes the targeted repair
+and rejection-safety checks; it does not establish full parser parity or retire
+the production PowerShell parser.
 
 ## Next separate bounded candidate
 

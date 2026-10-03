@@ -29,9 +29,11 @@ production routing and portable packaging. Source groups at that checkpoint are:
 | Audit and verification references | 10,586 |
 | Installer, launchers and publisher shims | 5,052 |
 
-These are canonical Git blob bytes, including comments and tests. They are not
-GitHub Linguist percentages or a functional completion percentage. No source is
-excluded, renamed, embedded elsewhere or padded to change the metric.
+These are canonical Git blob bytes for tracked `.ps1`, `.psm1` and `.psd1`
+files, including comments and tests. They are not GitHub Linguist percentages,
+a functional completion percentage, or an exhaustive all-language source count.
+Moving script text into another extension, a string or an encoded payload does
+not retire it and cannot earn credit toward the final goal.
 
 ## Latest automated checkpoint
 
@@ -50,6 +52,18 @@ known conservative syntax and exact diagnostic differences still block its
 promotion. It remains excluded from NativeHost. The required interactive Windows
 matrix and all zero-dependency final gates below remain open. New benchmark/audit
 and history candidates do not earn retirement credit before their exact gates.
+
+The explicit history-candidate gate subsequently adds one 10,672-byte, openly
+tracked PowerShell oracle. The integrated candidate tree therefore has 880,873
+extension-counted bytes in 28 files, including the unchanged 610,258 runtime
+bytes. This is a temporary qualification cost, not new retirement credit or a
+new full-green checkpoint. Its four retained production function bodies remain.
+
+The extension count has a concrete known limitation: `test_legacy_interop.py`
+still contains two inline PowerShell test drivers executed with
+`-EncodedCommand`. Those scripts remain dependencies even though they are not
+included in the extension-based byte figure. This finding is not an exhaustive
+audit of all embedded drivers; the final checks below cover every source form.
 
 ## Ordered implementation families
 
@@ -100,12 +114,25 @@ solution. Its accepted syntax and error behavior remain a separate release gate.
 ## Final evidence required
 
 - Git-tracked `.ps1`, `.psm1` and `.psd1` runtime/test source count is zero
+- A repository-wide source audit finds no inline, encoded, concatenated or
+  dynamically materialized PowerShell programs in Python, C#, JavaScript,
+  templates, resources, fixtures or other renamed containers. Script snippets
+  still required to execute tests count as dependencies; inert captured input
+  and expected-output data must be distinguished explicitly
 - Runtime, install, launcher, packaging and CI paths contain no required
   PowerShell executable, PowerShell SDK, encoded bootstrap or hidden fallback
+- CI commands, installers, launchers, subprocess builders and test-driver
+  generation paths are reviewed together. `-Command`, `-EncodedCommand`,
+  temporary `.ps1` materialization and reflective engine loading cannot conceal
+  a remaining execution path behind an extension-only scan
 - Every retained public capability has a tested Python/C# implementation or an
   explicitly resolved compatibility decision; no unported operation was dropped
 - Supported fresh and upgraded Windows installations work without PowerShell on
   the execution path, and process-level evidence shows no implicit shell fallback
+- Current automated tests and packaged execution run with PowerShell unavailable;
+  process-level evidence includes child processes and generated temporary
+  drivers. Historical originals may remain reachable in normal Git history for
+  recovery, without becoming a dependency of final shipping code or its tests
 - All current-commit automated checks and the required interactive Windows matrix
   pass, with unperformed checks reported explicitly
 - Published blobs match the reviewed tree, and release/merge claims refer to that

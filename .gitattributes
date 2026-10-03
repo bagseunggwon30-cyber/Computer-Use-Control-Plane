@@ -1,2 +1,5 @@
 tests/fixtures/legacy-workflow-ps51-raw-diagnostics-37082726512.json -text whitespace=cr-at-eol
 tests/fixtures/legacy-workflow-ps51-raw-diagnostics-37086299736.json -text whitespace=cr-at-eol
+# Exact history oracle and manifest provenance must survive Windows checkouts.
+tests/fixtures/history-reducers/oracle.ps1 -text
+tests/fixtures/history-reducers/original-functions.json -text

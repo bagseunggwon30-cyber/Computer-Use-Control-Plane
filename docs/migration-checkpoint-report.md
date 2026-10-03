@@ -23,7 +23,10 @@ Exact runtime deletion is 2,451 bytes; 151 fixture-guard bytes make the net tota
 reduction 2,300 bytes from its parent. All 27 tracked PS files total **870,201
 bytes**: **610,258 runtime** and **259,943 other source/test bytes**. Reduction
 from the original 1,013,478-byte baseline is **143,277 bytes**. All temporary
-PowerShell oracle source remains counted.
+`.ps1`/`.psm1`/`.psd1` oracle files remain counted. Inline PowerShell test drivers
+in other source files are not part of this extension-based byte figure; the
+[final acceptance checklist](zero-powershell-acceptance.md) separately requires
+their removal and process-level proof of zero execution.
 
 The unchanged parser candidate separately passed all three active jobs in
 [focused run 37086299736](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37086299736)
@@ -54,9 +57,44 @@ The existing mandatory diagnostic gate appends 24 inferred rejection probes
 without reordering its 128 prior rows; its explicit cap is now 152. Sixteen probes
 require exact detail/full-plan agreement and eight preserve syntax-error
 precedence. The strict raw parity flags, all historical fixtures, production
-PSParser route and NativeHost parser exclusion remain. All-source/runtime
+PSParser route and NativeHost parser exclusion remain. Extension-counted/runtime
 PowerShell counts are unchanged. This is local historical replay, not a new
 Windows pass or publication. See the [evidence and remaining scope](../plans/evidence/workflow-token-kind-diagnostics-37086299736.md).
+
+### Subsequent exact-commit Windows result
+
+The rejection-only batch was published as
+`3e892ab02395bdc916a5814e39d4154efd1f6249`, with all 375 blobs/modes verified.
+All three active jobs passed in
+[focused run 37091346155](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37091346155):
+49 Windows workflow tests without skips, three inventory tests and 1,755 managed
+workflow checks. The verified raw capture contains all 152 inputs. The original
+128 retain 86 exact differences; the added 24 contribute eight text-only
+differences. The total is 94 exact differences: eight normalized and 86 text-only.
+Those categories overlap the separate literal/boundary corpus and are not
+additive capability totals. Production still uses the original parser.
+
+The first retained diagnostic candidate run instead failed on 12 of 332 inputs;
+its exact input/route/assertion counts and evidence limitation are recorded in
+the [Windows result](../plans/evidence/retained-diagnostics-ci-37090071710.md).
+This parser pass does not qualify those unrelated report candidates.
+
+### Integrated history candidate gate
+
+The four retained history reducers now have an explicit, candidate-only Windows
+gate with actual PS5.1/PS7 verification and six fresh differential runs. The
+integration preserves the six production family scopes, full foundation gate,
+all current original bodies and the new parser batch. Its only conflict was
+combining byte-preserving Git attributes for both independent fixture sets.
+Local integrated validation ran 609 Python tests: 484 passed and 125 environment
+skips. Independent review found no remaining blocker to collecting Windows
+candidate evidence; no actual Windows history parity is claimed yet.
+
+The openly tracked history oracle adds 10,672 PowerShell bytes. The candidate
+tree has 880,873 extension-counted bytes in 28 files (610,258 runtime and 270,615
+other bytes), 132,605 below the original extension-counted baseline. This is
+temporary qualification source, not hidden source or new retirement credit.
+Inline/encoded test drivers remain a separate final-zero audit requirement.
 
 ## Earlier qualified checkpoint (c414)
 

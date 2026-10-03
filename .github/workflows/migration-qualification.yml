@@ -9,7 +9,7 @@ on:
         description: Qualification scope (full includes the complete regression suite)
         type: choice
         default: all
-        options: [all, next-batch, foundation, execution, precision, cdp, interaction, diagnostics, file-images, full]
+        options: [all, next-batch, foundation, execution, precision, cdp, interaction, diagnostics, file-images, history-candidate, full]
 permissions:
   contents: read
 jobs:
@@ -50,7 +50,7 @@ jobs:
           PYTHONPATH: pcucp-next/python
   windows-family:
     needs: scope
-    if: needs.scope.outputs.full != 'true'
+    if: needs.scope.outputs.full != 'true' && !contains(fromJSON(needs.scope.outputs.families), 'history-candidate')
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -73,6 +73,34 @@ jobs:
         with:
           name: qualification-${{ matrix.family }}
           path: .migration-logs/${{ matrix.family }}
+          include-hidden-files: true
+          retention-days: 7
+  windows-history-candidate:
+    needs: scope
+    if: needs.scope.outputs.full != 'true' && contains(fromJSON(needs.scope.outputs.families), 'history-candidate')
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Qualify history candidate only with actual Windows PS5.1 and PS7
+        run: python pcucp-next/packaging/migration_qualification.py run --family history-candidate --log-dir .migration-logs/history-candidate
+        env:
+          PYTHONIOENCODING: utf-8
+      - name: Retain history candidate evidence including failures
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qualification-history-candidate
+          path: .migration-logs/history-candidate
+          if-no-files-found: error
           include-hidden-files: true
           retention-days: 7
   cdp-browser:
