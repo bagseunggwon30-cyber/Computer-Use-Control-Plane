@@ -38,7 +38,7 @@ namespace PcuCp.LegacyHelper
                     return 0;
                 }
                 if (args[0] != "serve") throw new ArgumentException("unknown candidate mode");
-                Only(options, "lock-file", "idle-timeout-ms", "allow-readonly-desktop", "fixture", "diagnostic-phases");
+                Only(options, "lock-file", "idle-timeout-ms", "allow-readonly-desktop", "fixture", "diagnostic-phases", "diagnostic-acl");
                 string lockFile = Path.GetFullPath(Required(options, "lock-file"));
                 if (!Directory.Exists(Path.GetDirectoryName(lockFile))) throw new DirectoryNotFoundException("candidate lock directory must exist");
                 int pid = Process.GetCurrentProcess().Id;
@@ -56,8 +56,14 @@ namespace PcuCp.LegacyHelper
                 }
                 Func<DateTime> clock = () => DateTime.UtcNow;
                 var actions = new LegacyHelperActions(provider, pid, pipe, clock);
+                int aclRecords = 0;
+                Action<Dictionary<string, object>> aclEvidence = null;
+                if (options.ContainsKey("diagnostic-acl")) aclEvidence = value => {
+                    if (++aclRecords <= 16) Console.Error.WriteLine("helper_acl_evidence=" + LegacyHelperService.NewJson().Serialize(value));
+                    else if (aclRecords == 17) Console.Error.WriteLine("helper_acl_evidence_limit=16");
+                };
                 var service = new LegacyHelperService(actions, pid, pipe, lockFile,
-                    Integer(options, "idle-timeout-ms", 60000), clock, message => Console.Error.WriteLine(message), phase);
+                    Integer(options, "idle-timeout-ms", 60000), clock, message => Console.Error.WriteLine(message), phase, aclEvidence);
                 service.Run();
                 if (scripted != null) scripted.AssertExhausted();
                 return 0;
@@ -75,7 +81,7 @@ namespace PcuCp.LegacyHelper
             {
                 if (!args[i].StartsWith("--", StringComparison.Ordinal)) throw new ArgumentException("named candidate options required");
                 string key = args[i].Substring(2);
-                string value = key == "allow-readonly-desktop" || key == "diagnostic-phases" ? "true" : ++i < args.Length ? args[i] : null;
+                string value = key == "allow-readonly-desktop" || key == "diagnostic-phases" || key == "diagnostic-acl" ? "true" : ++i < args.Length ? args[i] : null;
                 if (value == null || result.ContainsKey(key)) throw new ArgumentException("missing or repeated candidate option");
                 result.Add(key, value);
             }

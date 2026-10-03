@@ -35,7 +35,15 @@ internal static class LegacyDiagnosticCulture
                 LocaleValue(culture, Am), LocaleValue(culture, Pm));
             if (format is not null) return value.ToString("G", format);
         }
-        return value.ToString(culture);
+        try { return value.ToString(culture); }
+        catch (ArgumentOutOfRangeException)
+        {
+            // This is diagnostic prose for an already-invalid Int32 cast. A
+            // calendar's narrower date range must not turn the contained
+            // baseline failure into a terminal operation failure. Preserve a
+            // useful bounded value without changing culture or cast semantics.
+            return value.ToString("O", CultureInfo.InvariantCulture);
+        }
     }
 
     internal static DateTimeFormatInfo? NumericGregorianFormat(string date, string time, string am, string pm)

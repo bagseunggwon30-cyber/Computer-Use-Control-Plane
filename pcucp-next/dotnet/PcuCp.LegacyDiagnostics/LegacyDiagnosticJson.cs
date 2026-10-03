@@ -67,6 +67,18 @@ internal static class LegacyDiagnosticJson
             ? list.Select(item => new Value(item)) : value is null ? [] : [this];
         internal int Int32()
         {
+            if (value is decimal exact)
+            {
+                // Framework JSON without an exponent can produce Decimal.
+                // PowerShell ConvertNumeric calls Convert.ChangeType on that
+                // typed value. Passing it through JsonElement.GetDouble first
+                // changes near-midpoint rounding and Int32 acceptance.
+                try { return Convert.ToInt32(exact); }
+                catch (OverflowException)
+                {
+                    throw CommandOptions.Invalid($"Cannot convert value \"{Json.GetRawText()}\" to type \"System.Int32\". Error: \"Value was either too large or too small for an Int32.\"");
+                }
+            }
             if (value is DateTime date)
                 throw CommandOptions.Invalid($"Cannot convert value \"{LegacyDiagnosticCulture.DateTimeErrorText(date, CultureInfo.CurrentCulture)}\" to type \"System.Int32\". Error: \"Invalid cast from 'DateTime' to 'Int32'.\"");
             if (value is double number && !double.IsFinite(number))

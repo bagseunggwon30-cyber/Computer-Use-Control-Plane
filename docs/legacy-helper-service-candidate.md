@@ -111,6 +111,7 @@ reviewed before production cutover.
 | Candidate launch surface | Original script accepts custom `PipeName`, optional default lock path, debug-log switch and signed integer idle timeout | Candidate requires explicit isolated lock path, fixes pipe name to its PID, rejects negative timeouts, logs failures to stderr, and requires explicit desktop-provider opt-in; these launcher options are not a drop-in replacement | closed CLI parsing and owned fixture setup; production launcher remains untouched |
 | Framework connection wait | Original creates a synchronous pipe, then invokes `BeginWaitForConnection`; Framework requires an async handle for that API | Candidate uses `PipeOptions.Asynchronous` and task-owned `WaitForConnectionAsync` cancellation, observes cancellation without closing its completion event, and does not retry unexpected setup/logic exceptions | owned service health/idle tests; unmodified original startup remains a separate mandatory observation |
 | First response timing | Original and initial candidate enable `StreamWriter.AutoFlush` before reading any request, which synchronously writes a UTF-8 BOM | Candidate reads a complete nonblank request before writing the same BOM plus response and CRLF; blank/disconnected clients receive no unsolicited BOM. Response bytes and request counting stay unchanged. This is an explicit timing/blank-connection correction, pending Windows qualification | portable no-write-before-request and exact two-response byte checks; owned eager/deferred handshake controls and actual service phases |
+| Pipe access policy | Original intends current-user-only access but creates a default-DACL pipe and attempts a setter without WRITE_DAC; setter errors continue fail-soft | Isolated ACL candidate supplies a protected current-user-only DACL at creation and verifies Framework-normalized readback before waiting for clients; any failure closes the owned pipe and terminates. Other principals lose accidental default read grants; unsupported security setups lose persistent service availability | owned descriptor/readback and same-user service tests; see [ACL candidate contract](legacy-helper-pipe-acl-candidate.md) for unqualified cross-user/session/elevation/SMB limits |
 | Server startup lock | `Set-Content` overwrites the path, with write errors logged fail-soft | `CreateNew` requires an absent explicit candidate lock; existing or unwritable locks stop startup | `test_existing_lock_is_never_overwritten` |
 | Server cleanup | Read matching PID, then delete pathname; a replacement can race | Check original file identity, exact bounded byte length and all originally written bytes (including UTF-8 BOM) under a write/delete-exclusive native handle, then delete that handle; replacement, BOM removal and encoding rewrites remain | `test_replacement_lock_survives_cleanup_even_if_pid_reused_in_content` and same-file BOM/encoding rewrite tests |
 | Client pipe contact | `Invoke-HelperPipe` re-reads only lock existence/name, relying on callers | Revalidate owner/PID/time/name/version and expected lock identity before contact; a changed lock rejects the request | client framing/replacement and foreign-owner tests |
@@ -139,8 +140,10 @@ failure branches are currently independent C# contracts; only the documented
 loader-failure branches have original-function differential cases.
 
 The original owner username, PID and pipe-name checks are not cryptographic
-identity. The original ACL attempt is fail-soft; this candidate preserves that
-scope/behavior and logs failure. Neither implementation is claimed to be
+identity. The original ACL attempt is fail-soft, and that path was observed on
+the first Windows run. The separate [ACL candidate](legacy-helper-pipe-acl-candidate.md)
+now stages creation-time owner-only security with fail-closed readback. Neither
+implementation is claimed to be
 fully authenticated or safe against all same-user impersonation/PID reuse, nor
 is the ACL attempt claimed to reject every possible remote SMB pipe access. A
 broader authenticated-IPC redesign is a separate reviewed change.

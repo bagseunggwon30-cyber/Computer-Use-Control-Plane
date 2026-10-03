@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
-using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
@@ -20,6 +19,7 @@ namespace PcuCp.LegacyHelper
         private readonly Func<DateTime> clock;
         private readonly Action<string> log;
         private readonly Action<string> phase;
+        private readonly Action<Dictionary<string, object>> aclEvidence;
         private readonly string pipeName;
         private readonly string lockPath;
         private readonly int pid;
@@ -27,11 +27,13 @@ namespace PcuCp.LegacyHelper
         private readonly JavaScriptSerializer json = NewJson();
 
         public LegacyHelperService(LegacyHelperActions actions, int pid, string pipeName, string lockPath,
-            int idleMs, Func<DateTime> clock, Action<string> log, Action<string> phase = null)
+            int idleMs, Func<DateTime> clock, Action<string> log, Action<string> phase = null,
+            Action<Dictionary<string, object>> aclEvidence = null)
         {
             this.actions = actions; this.pid = pid; this.pipeName = pipeName;
             this.lockPath = lockPath; this.idleMs = idleMs; this.clock = clock; this.log = log;
             this.phase = phase ?? (_ => { });
+            this.aclEvidence = aclEvidence;
         }
         public static JavaScriptSerializer NewJson()
         {
@@ -112,18 +114,10 @@ namespace PcuCp.LegacyHelper
                 {
                     try
                     {
-                        using (var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1,
-                            PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
+                        using (var pipe = LegacyHelperPipeSecurity.Create(pipeName, ownerSid, aclEvidence))
                         {
                             phase("pipe.created");
-                            try
-                            {
-                                var security = new PipeSecurity();
-                                security.AddAccessRule(new PipeAccessRule(ownerSid, PipeAccessRights.FullControl, AccessControlType.Allow));
-                                pipe.SetAccessControl(security);
-                            }
-                            catch (Exception e) { log("PipeSecurity ACL failed (continuing): " + e.Message); }
-                            phase("pipe.acl.complete");
+                            phase("pipe.acl.verified");
                             using (var cancellation = new System.Threading.CancellationTokenSource())
                             {
                                 // Task owns the overlapped completion; never close an

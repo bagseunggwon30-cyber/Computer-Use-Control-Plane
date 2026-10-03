@@ -41,7 +41,7 @@ class HelperTransportTests(unittest.TestCase):
             argv = [shutil.which('powershell.exe'), '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
                     '-File', str(source), '-LockFile', str(lock), '-IdleTimeoutMs', str(idle_ms)]
         else:
-            argv = [HOST, 'serve', '--lock-file', str(lock), '--idle-timeout-ms', str(idle_ms), '--diagnostic-phases']
+            argv = [HOST, 'serve', '--lock-file', str(lock), '--idle-timeout-ms', str(idle_ms), '--diagnostic-phases', '--diagnostic-acl']
             if fixture is not None:
                 path = self.root / 'server-fixture.json'
                 path.write_text(json.dumps(fixture), encoding='utf-8')
@@ -326,6 +326,41 @@ class HelperTransportTests(unittest.TestCase):
         phases = service['stderr']
         self.assertLess(phases.index(b'helper_phase=request.read.complete'), phases.index(b'helper_phase=response.write.start'))
         self.assertIn(b'helper_phase=lock.cleanup.complete', phases)
+        self.assertNotIn(b'ACL failed (continuing)', phases)
+        descriptors = [json.loads(line.split('=',1)[1]) for line in phases.decode('utf-8').splitlines()
+                       if line.startswith('helper_acl_evidence=')]
+        self.assertGreaterEqual(len(descriptors), 1)
+        for descriptor in descriptors:
+            self.assert_owner_only_descriptor(descriptor, data['owner_sid'])
+
+    def assert_owner_only_descriptor(self, value, owner):
+        self.assertEqual(value['evidence_kind'], 'framework-normalized-descriptor')
+        self.assertEqual(value['owner_sid'], owner)
+        self.assertEqual(value['expected_user_sid'], owner)
+        self.assertTrue(value['dacl_present'])
+        self.assertFalse(value['dacl_null'])
+        self.assertTrue(value['protected'])
+        self.assertTrue(value['canonical'])
+        self.assertEqual(len(value['aces']), 1)
+        ace = value['aces'][0]
+        self.assertEqual((ace['sid'], ace['type'], ace['flags']), (owner, 'AccessAllowed', 'None'))
+        self.assertFalse(ace['callback'])
+        self.assertEqual(ace['opaque_bytes'], 0)
+
+    def test_owned_pipe_effective_acl_and_negative_descriptor_contracts(self):
+        result = run_evidence([PROBE, 'acl-contracts'], directory=self.logs, label='owned-acl-contracts',
+                              cwd=self.root, timeout=8)
+        require_success(result)
+        value = json.loads(result['stdout'].decode('utf-8-sig'))
+        self.assertEqual(value['status'], 'ok')
+        self.assertEqual(value['checks'], 27)
+        self.assertEqual([x['kind'] for x in value['observations']],
+                         ['legacy_default_read_only', 'candidate_creation_time_verified'])
+        candidate = value['observations'][1]
+        self.assert_owner_only_descriptor(candidate, value['current_user_sid'])
+        self.assertEqual(candidate['aces'][0]['mask'], value['full_control_mask'])
+        self.assertEqual(value['normalization_controls'],
+                         ['ineffective leaf inheritance flags removed', 'compatible owner ACEs merged'])
 
     def handshake_pair(self, server_mode, client_mode, buffer_size):
         label = f'handshake-{server_mode}-{client_mode}-{buffer_size}'
