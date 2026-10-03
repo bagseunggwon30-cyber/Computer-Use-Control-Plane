@@ -78,15 +78,18 @@ class WorkflowObservedDiagnosticTests(unittest.TestCase):
     def test_future_raw_capture_appends_neighbors_without_rewriting_original_cases(self):
         manifest, raw = evidence()
         live = diagnostics.diagnostic_cases()
-        self.assertEqual(len(live), 124)
+        self.assertEqual(len(live), 128)
         self.assertEqual(live[:101], [{key: case[key] for key in ("id", "step")} for case in raw["cases"]])
-        self.assertEqual(live[101:], [{key: case[key] for key in ("id", "step")} for case in manifest["inferred_neighbors"]])
+        position = diagnostics.command_position_fixtures()
+        prior = {case["id"]: case for case in manifest["inferred_neighbors"] + position["observed_positive_targets"]}
+        self.assertEqual(live[101:124], [{key: prior[id][key] for key in ("id", "step")} for id in manifest["captured_neighbor_order"]])
+        self.assertEqual(live[124:], [{key: case[key] for key in ("id", "step")} for case in position["inferred_live_neighbors"]])
 
     def test_adversarial_neighbors_stay_inferred_rejections(self):
         manifest, raw = evidence()
         neighbors = manifest["inferred_neighbors"]
-        self.assertEqual(len(neighbors), 23)
-        self.assertEqual(len({case["id"] for case in neighbors}), 23)
+        self.assertEqual(len(neighbors), 22)
+        self.assertEqual(len({case["id"] for case in neighbors}), 22)
         self.assertFalse({case["step"] for case in neighbors} & {case["step"] for case in raw["cases"]})
         for case in neighbors:
             self.assertEqual(case["evidence"], "inferred-unqualified")
@@ -94,6 +97,33 @@ class WorkflowObservedDiagnosticTests(unittest.TestCase):
             self.assertEqual(case["candidate"]["tokens"], [])
             self.assertIn(case["candidate"]["error"], {"parse_error", "unsupported_token"})
             self.assertLessEqual(len(case["step"]), 65536)
+
+    def test_observed_positive_row_is_separate_from_22_rejection_contracts(self):
+        position = diagnostics.command_position_fixtures()
+        provenance = position["provenance"]
+        self.assertEqual(provenance["run_id"], "37084621275")
+        self.assertEqual(provenance["tested_commit"], "fe3963929cebefd23b318f129a236d8ff7b5acb3")
+        self.assertEqual(provenance["raw_capture_sha256"], "7e12bab3a28adf209bc1a7d1437260cc9b53af2e84a006d1be94639d8ddcade0")
+        self.assertEqual(provenance["artifact_zip_sha256"], "351a8145d09804fd3dfd8a8ddc08f465ff7fdd3f9c985fb6611e8927df5e94a0")
+        self.assertEqual([provenance[name] for name in ("historical_raw_case_count", "historical_exact_gap_count", "historical_normalized_gap_count", "historical_text_only_gap_count")], [124, 107, 9, 98])
+        self.assertEqual(position["oracle_provenance"]["candidate_commit"], provenance["tested_commit"])
+        self.assertEqual(len(position["observed_positive_targets"]), 1)
+        row_hash = hashlib.sha256(json.dumps(position["observed_positive_targets"], sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+        self.assertEqual(row_hash, "a674092da4b3662c85a4a4ac5997b72b752a0b10797f01123bb62d2f7f5f7f86")
+        self.assertEqual(provenance["observed_positive_rows_sha256"], row_hash)
+        positive = position["observed_positive_targets"][0]
+        self.assertEqual(positive["id"], "diagnostic_context_named_block_after_newline")
+        self.assertEqual(positive["step"], "macro windows\nprocess")
+        self.assertEqual(positive["parsed"], {"ok": True, "error": "", "detail": "", "tokens": ["macro", "windows", "process"]})
+        self.assertEqual(positive["parse_errors"], [])
+        self.assertFalse(positive["candidate"]["parsed"]["ok"])
+        self.assertTrue(positive["plan"]["safe_to_run"])
+        manifest, _ = evidence()
+        self.assertNotIn(positive["id"], {case["id"] for case in manifest["inferred_neighbors"]})
+        self.assertEqual(len(position["inferred_live_neighbors"]), 4)
+        self.assertEqual(len(position["inferred_managed_neighbors"]), 10)
+        for case in position["inferred_live_neighbors"] + position["inferred_managed_neighbors"]:
+            self.assertEqual(case["evidence"], "inferred-unqualified")
 
 
 @unittest.skipUnless(sys.platform == "win32", "Fresh Windows PowerShell 5.1 diagnostic context qualification")
@@ -113,6 +143,17 @@ class WorkflowDiagnosticSemanticsWindowsTests(unittest.TestCase):
                 self.assertEqual(workflow.normalized(original), workflow.normalized(case["parsed"]))
                 self.assertEqual(workflow.normalized(actual), workflow.normalized(original))
                 self.assertFalse(actual["ok"])
+
+    def test_recorded_positive_command_position_and_four_live_neighbors(self):
+        position = diagnostics.command_position_fixtures()
+        cases = position["observed_positive_targets"] + position["inferred_live_neighbors"]
+        inputs = [{"kind": "parse", "step": case["step"]} for case in cases]
+        for case, (_, original, actual) in zip(cases, self.differential(inputs)):
+            with self.subTest(case=case["id"]):
+                expected = case["parsed"] if "parsed" in case else case["candidate"]
+                self.assertEqual(workflow.normalized(actual), workflow.normalized(expected))
+                self.assertEqual(workflow.normalized(actual), workflow.normalized(original))
+                self.assertTrue(actual["ok"])
 
     def test_inferred_neighbors_preserve_ps51_rejection_classification(self):
         manifest, _ = evidence()

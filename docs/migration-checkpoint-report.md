@@ -139,6 +139,25 @@ Local verification passed 1,372 managed checks and ran 550 Python tests (428
 passed, 122 platform skips). The next Windows capture adds 23 labelled inferred
 rejection neighbors, for 124 bounded cases; a fresh result is still required.
 
+[Run 37084621275](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37084621275)
+on `fe3963929cebefd23b318f129a236d8ff7b5acb3` verified all three diagnostic
+corrections and 22 of the 23 new neighbors. Its 46-test Windows suite had one
+failure: the original accepts `macro windows` followed by a newline and `process`
+as three literal tokens, while the candidate conservatively rejected it. Its
+complete 124-record raw capture contains 107 exact differences: nine normalized
+and 98 text-only. These overlap earlier corpora and are not additive totals.
+
+The bounded follow-up at local `5cb9727` permits that named-block keyword family
+only in a later command position after an ordinary command. An explicit observed
+positive token/full-plan comparison replaces only the mistaken inferred-negative
+expectation; all other 22 rejection checks remain. Among 1,020 existing local
+fixtures, exactly that one result changes. Four live probes and ten managed-only
+inferred neighbors were added, reaching the unchanged 128-case live-capture cap.
+Local checks passed 1,402 managed assertions and 552 Python tests (429 passed,
+123 platform skips). Historical 124-case replay now has 106 exact differences,
+eight normalized and 98 text-only. Production still uses the retained parser;
+this requires a fresh Windows result and does not establish complete parity.
+
 ## Actual source replacement
 
 The baseline is commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tree

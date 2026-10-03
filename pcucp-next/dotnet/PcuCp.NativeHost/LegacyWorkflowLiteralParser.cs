@@ -41,6 +41,7 @@ internal static partial class LegacyWorkflowKernel
         var items = new List<string>();
         var index = 0;
         var commandStart = true;
+        var hasOrdinaryCommand = false;
         while (index < step.Length)
         {
             if (char.IsWhiteSpace(step[index]))
@@ -154,7 +155,12 @@ internal static partial class LegacyWorkflowKernel
             {
                 if (signedNumber && !IsSignedDecimalLiteral(step.AsSpan(tokenStart, index - tokenStart)))
                     return Reject("unsupported_token", "This signed numeric expression is not yet qualified.");
-                if (ReservedStarts.Contains(content)) return Reject("unsupported_token", "Reserved statement keywords are not literal commands.");
+                // Named blocks are special only at the qualified script head.
+                // Following an ordinary command, a new physical line can use
+                // that bounded keyword family as command names. Keep other
+                // statement keywords and expression-led scripts fail closed.
+                if (ReservedStarts.Contains(content) && !(hasOrdinaryCommand && IsLaterNamedBlockCommand(content)))
+                    return Reject("unsupported_token", "Reserved statement keywords are not literal commands.");
                 if (startsQuoted || content.Length > 0 && (char.IsDigit(content[0]) || content[0] is '+' or '-'))
                 {
                     // A leading quoted/number expression cannot silently be
@@ -165,6 +171,8 @@ internal static partial class LegacyWorkflowKernel
                     if (remainder.Length > 0 && remainder[0] is not ('\r' or '\n'))
                         return Reject("parse_error", "Expression-form command prefixes are not supported.");
                 }
+                if (!startsQuoted && !signedNumber && content.Length > 0 && !char.IsDigit(content[0]) && content[0] != '\0')
+                    hasOrdinaryCommand = true;
                 commandStart = false;
             }
             // PS5.1 omits a generic token consisting only of a physical NUL
@@ -198,6 +206,10 @@ internal static partial class LegacyWorkflowKernel
         }
         return new(items.Count > 0, items.Count > 0 ? "" : "empty_step", "", items.ToArray());
     }
+
+    private static bool IsLaterNamedBlockCommand(string value) =>
+        value.Equals("begin", StringComparison.OrdinalIgnoreCase) || value.Equals("process", StringComparison.OrdinalIgnoreCase) ||
+        value.Equals("end", StringComparison.OrdinalIgnoreCase) || value.Equals("dynamicparam", StringComparison.OrdinalIgnoreCase);
 
     // A bounded numeric grammar, not a conversion or expression evaluator.
     // Type suffixes, multipliers, hex and out-of-range values remain gaps.

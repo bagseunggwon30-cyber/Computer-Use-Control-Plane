@@ -16,11 +16,16 @@ import sys
 import tempfile
 import unittest
 
-from test_legacy_workflow_parity import BASELINE_TREE, ROOT, PROJECT, original_source, inferred_literal_fixtures
+from test_legacy_workflow_parity import BASELINE_TREE, ROOT, PROJECT, original_source, inferred_literal_fixtures, normalized
 
 FIXTURES = ROOT / "tests/fixtures/legacy-workflow-diagnostic-candidate.json"
 PREFLIGHT = PROJECT / "LegacyWorkflowParseErrorPreflight.cs"
 CONTEXT_FIXTURES = ROOT / "tests/fixtures/legacy-workflow-diagnostic-repair-37082726512.json"
+COMMAND_POSITION_FIXTURES = ROOT / "tests/fixtures/legacy-workflow-command-position-observed-37084621275.json"
+
+
+def command_position_fixtures():
+    return json.loads(COMMAND_POSITION_FIXTURES.read_text(encoding="utf-8"))
 
 
 def validate_diagnostic_inputs(cases):
@@ -80,8 +85,13 @@ def diagnostic_cases():
         {"id": "diagnostic_first_unsupported_pipeline", "step": "macro windows | other -Name value"},
         {"id": "diagnostic_two_errors", "step": "macro windows -Name ( {"},
     ])
-    cases.extend({"id": case["id"], "step": case["step"]}
-                 for case in json.loads(CONTEXT_FIXTURES.read_text(encoding="utf-8"))["inferred_neighbors"])
+    context = json.loads(CONTEXT_FIXTURES.read_text(encoding="utf-8"))
+    position = command_position_fixtures()
+    prior_neighbors = {case["id"]: case for case in context["inferred_neighbors"] + position["observed_positive_targets"]}
+    # Keep all existing 124 input rows in their captured order; append only four.
+    cases.extend({"id": prior_neighbors[id]["id"], "step": prior_neighbors[id]["step"]}
+                 for id in context["captured_neighbor_order"])
+    cases.extend({"id": case["id"], "step": case["step"]} for case in position["inferred_live_neighbors"])
     return validate_diagnostic_inputs(cases)
 
 
@@ -106,7 +116,7 @@ class WorkflowDiagnosticFixtureTests(unittest.TestCase):
         for cases in (one, many):
             self.assertIs(validate_diagnostic_inputs(cases), cases)
             self.assertEqual(validate_diagnostic_inputs(json.loads(json.dumps(cases))), cases)
-        self.assertEqual(len(diagnostic_cases()), 124)
+        self.assertEqual(len(diagnostic_cases()), 128)
 
     def test_input_validation_rejects_invalid_shapes_and_duplicate_ids(self):
         for name, cases in invalid_diagnostic_inputs():
@@ -306,13 +316,20 @@ class WorkflowWindowsDiagnosticTests(unittest.TestCase):
             contracts = {case["id"]: case for case in json.loads(FIXTURES.read_text(encoding="utf-8"))["cases"]}
             for case in json.loads(CONTEXT_FIXTURES.read_text(encoding="utf-8"))["inferred_neighbors"]:
                 contracts[case["id"]] = {**case, "candidate_error": case["candidate"]["error"]}
+            position = command_position_fixtures()
+            positives = {case["id"]: case for case in position["observed_positive_targets"]}
+            live_neighbors = {case["id"]: case for case in position["inferred_live_neighbors"]}
+            normalized_gaps = []
             capture["exact_diagnostic_gap_ids"] = gaps
+            capture["normalized_diagnostic_gap_ids"] = normalized_gaps
             for i, (requested, observed) in enumerate(zip(cases, capture["cases"])):
                 original = observed["parsed"]
                 candidate = {"parsed": actual[i * 2], "plan": actual[i * 2 + 1]}
                 observed["candidate"] = candidate
                 if candidate["parsed"] != original or candidate["plan"] != observed["plan"]:
                     gaps.append(observed["id"])
+                if normalized(candidate) != normalized({"parsed": original, "plan": observed["plan"]}):
+                    normalized_gaps.append(observed["id"])
                 with self.subTest(case=requested["id"]):
                     self.assertEqual(observed["id"], requested["id"])
                     self.assertEqual(observed["step"], requested["step"])
@@ -323,6 +340,12 @@ class WorkflowWindowsDiagnosticTests(unittest.TestCase):
                     elif observed["first_unsupported_token_type"]:
                         self.assertEqual(original["error"], "unsupported_token")
                         self.assertEqual(original["detail"], "unsupported token type '" + observed["first_unsupported_token_type"] + "'")
+                    if positive := positives.get(requested["id"]):
+                        self.assertEqual(original, positive["parsed"], "Observed positive oracle changed")
+                        self.assertEqual(actual[i * 2], original, "Observed positive token contract")
+                        self.assertEqual(actual[i * 2 + 1], positive["plan"], "Observed positive full plan contract")
+                    if neighbor := live_neighbors.get(requested["id"]):
+                        self.assertEqual(normalized(actual[i * 2]), neighbor["candidate"], "Inferred command-position contract")
                     if contract := contracts.get(requested["id"]):
                         if contract.get("oracle_expectation") == "capture-only":
                             # Unknown PS5 boundaries stay rejected by the
@@ -338,6 +361,7 @@ class WorkflowWindowsDiagnosticTests(unittest.TestCase):
                         self.assertTrue(original["ok"], "Candidate accepted a rejected sequence")
                         self.assertEqual(actual[i * 2]["tokens"], original["tokens"], "Candidate reinterpreted accepted tokens")
             capture["comparison_completed"] = True
+            print(f"WORKFLOW DIAGNOSTIC GAP COUNTS: {len(gaps)} exact, {len(normalized_gaps)} normalized, {len(set(gaps) - set(normalized_gaps))} text-only; counts overlap and do not establish full grammar parity")
             # Cleanup retains the raw original/candidate capture even when a
             # non-relaxation or exact-diagnostic assertion fails.
             if gaps:
