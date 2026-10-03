@@ -5,6 +5,10 @@ on:
     branches: [migration/python-csharp-runtime]
     paths:
       - 'pcucp-next/python/legacy_helper_bridge.py'
+      - 'pcucp-next/python/legacy_helper_autostart_entry.py'
+      - 'pcucp-next/python/pcucp_cli/legacy_helper_autostart.py'
+      - 'tests/python/test_legacy_helper_autostart*.py'
+      - 'tests/fixtures/legacy-helper-autostart*'
       - 'pcucp-next/python/pcucp_cli/legacy_helper_runtime.py'
       - 'pcucp-next/python/pcucp_cli/legacy_helper_client.py'
       - 'pcucp-next/dotnet/PcuCp.LegacyHelper/**'
@@ -41,10 +45,10 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Portable staged contracts
         if: runner.os != 'Windows'
-        run: python pcucp-next/packaging/qualify_staged_legacy_helper.py
+        run: python pcucp-next/packaging/qualify_staged_legacy_helper.py --autostart
       - name: Owned Windows adapters and production wrapper (desktop disabled)
         if: runner.os == 'Windows'
-        run: python pcucp-next/packaging/qualify_staged_legacy_helper.py --windows
+        run: python pcucp-next/packaging/qualify_staged_legacy_helper.py --windows --autostart
       - uses: actions/upload-artifact@v4
         if: always()
         with:

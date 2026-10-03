@@ -17,10 +17,12 @@ import uuid
 
 
 class OwnedProcess:
-    def __init__(self, argv, *, cwd=None, env=None, limit=262144, input_bytes=None, creationflags=0):
-        allowed_flags = 0x00000008 | 0x00000200 | 0x08000000  # detached, new group, no window only
+    def __init__(self, argv, *, cwd=None, env=None, limit=262144, input_bytes=None, creationflags=0, hide_window=False):
+        allowed_flags = 0x00000008 | 0x00000010 | 0x00000200 | 0x08000000  # detached, owned console, group, no window
         if type(creationflags) is not int or creationflags < 0 or creationflags & ~allowed_flags:
             raise ValueError('Fixture creation flags are outside the owned startup modes')
+        if type(hide_window) is not bool: raise ValueError('hide_window must be boolean')
+        self.hide_window = hide_window
         self.creationflags = creationflags
         self.argv = [str(x) for x in argv]
         self.started = time.monotonic()
@@ -34,8 +36,14 @@ class OwnedProcess:
         self.readers = []
         self.stdin_error = None
         try:
+            startup = None
+            if hide_window:
+                if os.name != 'nt': raise ValueError('Hidden fixture console requires Windows')
+                startup = subprocess.STARTUPINFO()
+                startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startup.wShowWindow = 0
             self.process = subprocess.Popen(self.argv, cwd=cwd, env=env, stdin=subprocess.PIPE if input_bytes is not None else subprocess.DEVNULL,
-                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0, shell=False, creationflags=self.creationflags)
+                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0, shell=False, creationflags=self.creationflags, startupinfo=startup)
         except (OSError, ValueError) as exc:
             self.launch_error = f"{type(exc).__name__}: {exc}"
             return
@@ -98,7 +106,7 @@ class OwnedProcess:
         """Persist currently available prefixes without waiting or killing."""
         with self.guard:
             raw = {name: bytes(value) for name, value in self.buffers.items()}
-            result = dict(argv=self.argv, creationflags=self.creationflags, exit_code=self.process.poll() if self.process else None,
+            result = dict(argv=self.argv, creationflags=self.creationflags, hide_window=self.hide_window, exit_code=self.process.poll() if self.process else None,
                           timed_out=timed_out, running=self.process is not None and self.process.poll() is None, launch_error=self.launch_error, kill_error=kill_error,
                           drain_incomplete=any(x.is_alive() for x in self.readers),
                           elapsed_ms=round((time.monotonic() - self.started) * 1000),
@@ -117,8 +125,8 @@ class OwnedProcess:
         return result
 
 
-def run_evidence(argv, *, directory, label, cwd=None, env=None, input_bytes=None, timeout=30, limit=262144, creationflags=0):
-    return OwnedProcess(argv, cwd=cwd, env=env, input_bytes=input_bytes, limit=limit, creationflags=creationflags).finish(directory, label, timeout=timeout)
+def run_evidence(argv, *, directory, label, cwd=None, env=None, input_bytes=None, timeout=30, limit=262144, creationflags=0, hide_window=False):
+    return OwnedProcess(argv, cwd=cwd, env=env, input_bytes=input_bytes, limit=limit, creationflags=creationflags, hide_window=hide_window).finish(directory, label, timeout=timeout)
 
 
 def require_success(result, expected_exit=0):

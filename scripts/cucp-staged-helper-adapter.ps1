@@ -12,6 +12,13 @@ if ($env:CUCP_STAGED_HELPER_READONLY_DESKTOP -and -not $Script:StagedHelperDeskt
   throw 'CUCP_STAGED_HELPER_READONLY_DESKTOP accepts only 1 or an unset value.'
 }
 
+# Separate immutable authority for persistent-launcher mutations.
+$Script:StagedAutostartLive = [bool]$AllowLiveControl
+
+function _Get-StagedAutostartMetadataDirectory {
+  return [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+}
+
 function _Invoke-StagedHelper {
   param([string]$Operation, [hashtable]$Arguments = @{})
   if (-not $Script:StagedCompiledHelper) { throw 'Staged helper was not selected at startup.' }
@@ -28,7 +35,15 @@ function _Invoke-StagedHelper {
       -not (Test-Path -LiteralPath $python.Source -PathType Leaf)) {
     throw 'Staged helper Python application is invalid or missing; no fallback.'
   }
-  foreach ($path in @($bridge, $Script:HelperLockPath)) {
+  $startup = $null; $metadataDirectory = $null
+  if ($Operation -cin @('autostart-install','autostart-uninstall','autostart-status')) {
+    $startup = Split-Path -Parent (_Get-AutostartShimPath)
+    $metadataDirectory = _Get-StagedAutostartMetadataDirectory
+    if (-not $metadataDirectory) { throw 'LocalApplicationData is unavailable; no fallback.' }
+  }
+  $paths = @($bridge, $Script:HelperLockPath)
+  if ($startup) { $paths += $startup; $paths += $metadataDirectory }
+  foreach ($path in $paths) {
     if ($path.Contains('"') -or $path.Contains("`r") -or $path.Contains("`n") -or $path.EndsWith('\')) {
       throw 'Invalid staged helper bootstrap path.'
     }
@@ -43,6 +58,10 @@ function _Invoke-StagedHelper {
   # unavailable under -I, so -E -s give source-mode imports with env isolation.
   $psi.Arguments = '-E -s "' + $bridge + '" --staged-unqualified --lock-file "' + $Script:HelperLockPath + '"'
   if ($Script:StagedHelperDesktop) { $psi.Arguments += ' --allow-readonly-desktop' }
+  if ($startup) {
+    $psi.Arguments += ' --startup-directory "' + $startup + '" --metadata-directory "' + $metadataDirectory + '"'
+    if ($Script:StagedAutostartLive) { $psi.Arguments += ' --allow-autostart-change' }
+  }
   $psi.UseShellExecute=$false; $psi.CreateNoWindow=$true
   $psi.RedirectStandardInput=$true; $psi.RedirectStandardOutput=$true; $psi.RedirectStandardError=$true
   $psi.StandardOutputEncoding=$utf8; $psi.StandardErrorEncoding=$utf8

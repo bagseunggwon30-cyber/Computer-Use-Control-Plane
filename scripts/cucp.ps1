@@ -520,7 +520,7 @@ function _Get-AutostartShimPath {
 function Install-HelperAutostart {
   # Startup 폴더에 helper-server 를 hidden 으로 기동하는 .cmd shim 생성 (idempotent).
   param([int]$IdleTimeoutMs = 28800000)  # 기본 8시간
-  if ($Script:StagedCompiledHelper) { return [pscustomobject]@{status='error'; reason='staged_helper_autostart_unqualified'} }
+  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'autostart-install' -Arguments @{idle_timeout_ms=$IdleTimeoutMs}) }
   if (-not $Script:HelperServerScript -or -not (Test-Path -LiteralPath $Script:HelperServerScript)) {
     return [pscustomobject]@{ status = "error"; reason = "helper_server_script_missing"; path = $Script:HelperServerScript }
   }
@@ -551,6 +551,7 @@ function Install-HelperAutostart {
 }
 
 function Uninstall-HelperAutostart {
+  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'autostart-uninstall') }
   # Startup shim 제거. shim 없어도 graceful (status ok, removed=false).
   $shimPath = _Get-AutostartShimPath
   $removed = $false
@@ -567,6 +568,7 @@ function Uninstall-HelperAutostart {
 }
 
 function Get-HelperAutostartStatus {
+  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'autostart-status') }
   # shim 설치 여부 + 경로 반환.
   $shimPath = _Get-AutostartShimPath
   return [pscustomobject]@{
@@ -706,7 +708,8 @@ function Get-CucpVersionReport {
   }
   $hs = _Read-HelperServerVersion
   if ($hs.error) {
-    [void]$errs.Add((_Make-RecoverableError -Code $hs.error -Layer "helper_server" -RecommendedAction "Verify scripts/cucp-helper-server.ps1 헤더의 helper_version 표기"))
+    $helperRecommendation = if ($Script:StagedCompiledHelper) { 'Build and verify pcucp-next/bin/legacy-helper with packaging/publish_legacy_helper.py' } else { 'Verify scripts/cucp-helper-server.ps1 헤더의 helper_version 표기' }
+    [void]$errs.Add((_Make-RecoverableError -Code $hs.error -Layer "helper_server" -RecommendedAction $helperRecommendation))
   }
   $lock = _Read-LockSafely
   $helperMode = "child_only"

@@ -1,7 +1,8 @@
 """Explicit production-route staging gate. Not action or promotion qualification.
 
 Windows mode builds the fixed package, then executes only owned denied-desktop
-runtime and real-wrapper lifecycle fixtures. It never installs/registers anything.
+runtime and real-wrapper lifecycle fixtures. Optional autostart fixtures write
+only owned temporary directories, never real Startup/LocalAppData registrations.
 Use the separate legacy helper action/oracle gate and full regression as well.
 """
 from __future__ import annotations
@@ -18,11 +19,13 @@ from helper_process_evidence import run_evidence, require_success
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--windows',action='store_true')
+    parser.add_argument('--autostart',action='store_true',help='include owned temporary autostart/launcher fixtures, never real registration')
     parser.add_argument('--log-dir',type=Path,default=ROOT/'.migration-logs/staged-helper')
     args=parser.parse_args(argv)
     if args.windows and sys.platform!='win32': parser.error('--windows requires actual Windows')
     env=dict(os.environ,PYTHONPATH=str(ROOT/'pcucp-next/python'),PYTHONIOENCODING='utf-8',CUCP_HELPER_EVIDENCE_DIR=str(args.log_dir.resolve()))
     if args.windows: env['CUCP_REQUIRE_STAGED_HELPER']='1'
+    if args.windows and args.autostart: env['CUCP_REQUIRE_STAGED_AUTOSTART']='1'
     def run(argv,label):
         evidence=run_evidence([str(a) for a in argv],directory=args.log_dir,label=label,cwd=ROOT,env=env,timeout=300,limit=2*1024*1024)
         print(evidence['evidence_path'],flush=True)
@@ -37,7 +40,9 @@ def main(argv=None):
         run(['dotnet','build',project,'-c','Release','-warnaserror','-m:1','-p:UseSharedCompilation=false'],'startup-probe-build')
         run([sys.executable,ROOT/'pcucp-next/packaging/collect_staged_helper_startup.py','--probe',
              project.parent/'bin/Release/net48/LegacyHelperStartupProbe.exe','--log-dir',args.log_dir], 'startup-observations')
-    for pattern in ('test_legacy_helper_package.py','test_legacy_helper_runtime.py','test_legacy_helper_client.py'):
+    patterns=['test_legacy_helper_package.py','test_legacy_helper_runtime.py','test_legacy_helper_client.py']
+    if args.autostart: patterns.append('test_legacy_helper_autostart*.py')
+    for pattern in patterns:
         run([sys.executable,'-m','unittest','discover','-s','tests/python','-p',pattern,'-v'],pattern)
     return 0
 

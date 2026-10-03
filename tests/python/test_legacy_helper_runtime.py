@@ -185,10 +185,16 @@ class StagedWrapperStructureTests(unittest.TestCase):
         self.assertIn('-not $ForceChild -and -not $env:CUCP_FORCE_CHILD',native)
         self.assertIn('_Try-Delete-Lock -ExpectedLock $lock',native)
 
-    def test_staged_autostart_explicitly_blocked_no_ps_fallback(self):
+    def test_staged_autostart_preserves_live_guards_and_has_no_legacy_fallback(self):
         text=(ROOT/'scripts/cucp.ps1').read_text(encoding='utf-8-sig')
-        body=text.split('function Install-HelperAutostart {',1)[1].split('\nfunction ',1)[0]
-        self.assertLess(body.index('staged_helper_autostart_unqualified'),body.index('WriteAllText'))
+        for name,operation in (('Install-HelperAutostart','autostart-install'),('Uninstall-HelperAutostart','autostart-uninstall'),('Get-HelperAutostartStatus','autostart-status')):
+            body=text.split('function '+name+' {',1)[1].split('\nfunction ',1)[0]
+            self.assertIn("return (_Invoke-StagedHelper -Operation '"+operation+"'",body)
+        self.assertIn('session install-autostart requires -AllowLiveControl',text)
+        self.assertIn('session uninstall-autostart requires -AllowLiveControl',text)
+        adapter=(ROOT/'scripts/cucp-staged-helper-adapter.ps1').read_text()
+        self.assertIn('$Script:StagedAutostartLive = [bool]$AllowLiveControl',adapter)
+        self.assertIn('if ($Script:StagedAutostartLive)',adapter)
 
     def test_observed_startup_failures_remain_hash_pinned(self):
         fixtures=ROOT/'tests/fixtures/legacy-helper'

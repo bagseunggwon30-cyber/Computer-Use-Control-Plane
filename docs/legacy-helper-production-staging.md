@@ -122,11 +122,12 @@ not changed here.
 - Version reporting: staged path reads verified compiled-package metadata,
   reports that manifest as its source, and retains partial/recoverable failure
   behavior. Default mode still uses the original PS header.
-- `install-autostart`: deliberately returns `staged_helper_autostart_unqualified`
-  in staged mode before any write. No old PS shim is silently installed when the
-  compiled service was selected. Existing status/uninstall behavior remains and
-  existing installed shims are not modified. Proper compiled autostart packaging,
-  path/quoting and owned registration tests remain a promotion blocker.
+- `install-autostart`, `uninstall-autostart`, `autostart-status`: now delegate in
+  explicit staging to the separately unqualified compiled-bootstrap candidate.
+  See [autostart candidate](legacy-helper-autostart-candidate.md) for preserved
+  public paths/schemas/live guards, approved compatibility corrections, owned-temp
+  proof plan and remaining real-registration/update gates. Existing live or legacy
+  shims are never automatically overwritten or removed.
 - `install.ps1`, default portable distribution and direct script launchers are
   unchanged. Source-mode staging packaging is not a complete user installation.
 
@@ -236,3 +237,16 @@ state acquisition or launch; the added Windows direct-CLI fixture retains all
 three vectors (0, -1, Int32 minimum) with the original admission boundaries.
 Fresh Windows execution is still required, rather than inferred from the local
 compile or skipped methods.
+
+## Verified lifecycle checkpoint and subsequent autostart stage
+
+The earlier local-only/unrun statements above describe the original freeze.
+The owned Windows lifecycle checkpoint subsequently passed at public
+`b9dff5ddd9daad44cb5a5ba0ef58d7a088ebe81b`, tree
+`af4eb1af502a37a187eac6d3c19f0d09ed28f5b4`, CI `37114285871`: 27 package passes,
+36 runtime passes plus one Linux-only skip, and 43 client passes. Real wrapper
+start/status/version success+partial/stop and concrete detached lifecycle pass.
+Raw prior failures and corrected-intent action evidence remain separate. This is
+bounded lifecycle qualification, not default activation or source retirement.
+The new [autostart candidate](legacy-helper-autostart-candidate.md) is a subsequent
+unqualified change requiring fresh owned Windows and real-transition proof.
