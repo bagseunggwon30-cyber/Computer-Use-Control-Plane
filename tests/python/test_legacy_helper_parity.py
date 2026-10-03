@@ -139,7 +139,7 @@ class HelperParityCorpusTests(unittest.TestCase):
 class HelperActionsWindowsParityTests(unittest.TestCase):
     maxDiff=None
 
-    def oracle(self, root, logs, label, *, source, stubs=None, wrong_binding=False):
+    def oracle(self, root, logs, label, *, source, stubs=None, wrong_binding=False, extent_fault=None):
         command = [shutil.which('powershell.exe'), '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
                    '-File', str(FIXTURES / 'oracle.ps1'), '-Source', str(source),
                    '-Manifest', str(FIXTURES / 'source-manifest.json'), '-CasePath', str(root / 'case.json')]
@@ -147,7 +147,46 @@ class HelperActionsWindowsParityTests(unittest.TestCase):
             command += ['-Stubs', str(stubs or FIXTURES / 'OracleAcquisition.cs')]
         if wrong_binding:
             command += ['-TestWrongBinding']
+        if extent_fault is not None:
+            command += ['-TestTypeExtentFault', extent_fault]
         return run_evidence(command, directory=logs, label=label, cwd=root, timeout=40, limit=2 * 1024 * 1024)
+
+    def test_oracle_type_edit_order_and_refusals(self):
+        with tempfile.TemporaryDirectory(prefix='CUCP extent oracle ') as directory:
+            root = Path(directory)
+            logs = Path(os.environ.get('CUCP_HELPER_EVIDENCE_DIR', root / 'evidence'))
+            raw = published_source('scripts/cucp-helper-server.ps1', logs)
+            source = root / 'published.ps1'
+            source.write_bytes(raw)
+            (root / 'case.json').write_text(json.dumps(dict(requests=[])), encoding='utf-8')
+            success = self.oracle(root, logs, 'oracle-type-edit-order', source=source)
+            require_success(success)
+            before = json.loads(success['stdout'].decode('utf-8-sig'))
+            seam = before['oracle_seam']
+            seam['guarded_types'].sort()
+            seam['type_substitutions'].sort(key=lambda s: s['start_utf16'])
+            self.assertEqual(seam, expected_type_seam(raw))
+            self.assertEqual(before['responses'], [])
+            self.assertEqual(before['calls'], [])
+            self.assertEqual(success['stderr'], b'')
+            first = next(s for s in seam['type_substitutions'] if s['function'] == '_Action-Windows')
+            for fault, reason, planned, applied in [('duplicate', 'overlap_or_order', 12, 11),
+                                                     ('changed', 'text_mismatch', 11, 10)]:
+                with self.subTest(fault=fault):
+                    result = self.oracle(root, logs, 'oracle-type-edit-' + fault, source=source, extent_fault=fault)
+                    require_success(result, expected_exit=1)
+                    lines = result['stderr'].decode('utf-8-sig', errors='strict').splitlines()
+                    diagnostic = json.loads(lines[0])
+                    self.assertEqual(diagnostic['schema'], 'cucp.oracle-type-extent-refusal/v1')
+                    self.assertEqual(diagnostic['function'], '_Action-Windows')
+                    self.assertEqual(diagnostic['reason'], reason)
+                    self.assertEqual(diagnostic['start_utf16'], first['start_utf16'])
+                    self.assertEqual(diagnostic['end_utf16'], first['end_utf16'])
+                    self.assertEqual(diagnostic['planned'], planned)
+                    self.assertEqual(diagnostic['applied'], applied)
+                    self.assertLessEqual(len(diagnostic['actual_prefix'].encode('utf-16-le')), 256)
+                    self.assertIn('Overlapping or changed oracle type extent', '\n'.join(lines[1:]))
+                    self.assertEqual(result['stdout'], b'')
 
     def test_oracle_rejects_source_facade_and_type_binding_changes_before_dispatch(self):
         with tempfile.TemporaryDirectory(prefix='CUCP guarded oracle ') as directory:

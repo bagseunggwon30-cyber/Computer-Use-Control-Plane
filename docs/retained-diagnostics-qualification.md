@@ -1,5 +1,9 @@
 # Retained benchmark and audit-summary qualification
 
+Current staged tree: [audit-only cutover candidate](audit-summary-staged-cutover.md).
+The original-body statements below describe the preceding candidate checkpoint;
+new Windows and full-regression acceptance remains pending.
+
 This is a candidate-only continuation. `Invoke-MacroBenchmark` (5,389 UTF-8
 AST bytes) and `Invoke-MacroAuditSummary` (2,728 bytes) remain byte-for-byte
 unchanged in `scripts/cucp.ps1`. `RETAINED_DIAGNOSTICS` still contains both

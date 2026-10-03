@@ -101,14 +101,15 @@ function Replace-ExactSeam {
 $names=@('_Read-OptValue','_Read-Switch','_Emit-Envelope','_New-ObservationEnvelope','_Cucp-RedactSecrets',
  'Invoke-MacroAuditSummary','Invoke-MacroLogTail','Invoke-MacroReleaseNotes')
 if($ProductionEntry){$names=@($names|Where-Object {$_ -ne '_Cucp-RedactSecrets'})}
+$productionDelegates=@{'Invoke-MacroAuditSummary'='audit-summary';'Invoke-MacroLogTail'='log-tail';'Invoke-MacroReleaseNotes'='release-notes'}
 foreach($name in $names){
  $found=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
  if($found.Count -ne 1){throw "Expected one original diagnostic function: $name"}
  $text=$found[0].Extent.Text
- # Keep current audit-summary on its original body. The migrated two file
- # reports load current public delegates without replacing their statements.
- if($ProductionEntry -and $name -cin @('Invoke-MacroLogTail','Invoke-MacroReleaseNotes')){
-  $operation=if($name -ceq 'Invoke-MacroLogTail'){'log-tail'}else{'release-notes'}
+ # All file-report production entries must be exact current delegates.
+ # Pinned original imports below remain available only without ProductionEntry.
+ if($ProductionEntry -and $productionDelegates.ContainsKey($name)){
+  $operation=$productionDelegates[$name]
   Fixture-ValidatePublicDelegate $found[0] $operation
   . ([scriptblock]::Create($text));continue
  }

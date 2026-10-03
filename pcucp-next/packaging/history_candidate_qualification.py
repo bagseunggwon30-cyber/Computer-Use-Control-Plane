@@ -12,6 +12,7 @@ import tempfile
 SCOPE = "history-candidate"
 REQUIRED_FILES = (
     "tests/python/test_legacy_history_reducers.py",
+    "pcucp-next/packaging/history_functional_comparison.py",
     "tests/fixtures/history-reducers/oracle.ps1",
     "tests/fixtures/history-reducers/original-functions.json",
     "tests/fixtures/history-reducers/windows-ps51-host-37092069983.raw.json",

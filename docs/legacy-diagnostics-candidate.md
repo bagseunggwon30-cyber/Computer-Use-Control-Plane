@@ -1,5 +1,9 @@
 # Diagnostic and reporting assembly candidate
 
+The current [audit-only staged cutover](audit-summary-staged-cutover.md) adds an
+eighth delegate pending qualification. The seven-delegate summary below records
+the preceding checkpoint; benchmark remains original.
+
 The C# implementation covers nine report/orchestration bodies in
 `PcuCp.LegacyDiagnostics/LegacyDiagnosticCoordinator`. Seven qualified bodies now
 use public delegates in the main wrapper and the closed diagnostic support

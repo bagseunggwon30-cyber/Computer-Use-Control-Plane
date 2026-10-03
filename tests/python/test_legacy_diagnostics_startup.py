@@ -1,4 +1,4 @@
-"""Only the seven qualified diagnostic production routes are checked here."""
+"""Real startup checks for eight diagnostic delegates, including staged audit."""
 import unittest
 from legacy_production_startup import ProductionStartupChecks
 

@@ -25,14 +25,17 @@ FAMILIES = {
             'safe-type': 'SafeType', 'icon-find': 'IconFind', 'icon-click': 'IconClick',
             'ocr-click': 'OcrClick', 'precision-validate': 'PrecisionValidate',
         },
+        'failure_operations': ('find-label',),
     },
     'diagnostics': {
         'entry': '_Invoke-LegacyDiagnosticFamily',
         'operations': {
             'perf': 'Perf', 'diagnose-lag': 'DiagnoseLag', 'health-quick': 'HealthQuick',
             'health-detail': 'HealthDetail', 'log-tail': 'LogTail', 'self-test': 'SelfTest',
-            'release-notes': 'ReleaseNotes',
+            'release-notes': 'ReleaseNotes', 'audit-summary': 'AuditSummary',
         },
+        # Keep the original control and qualify the newly promoted audit route.
+        'failure_operations': ('perf', 'audit-summary'),
     },
 }
 # Values intentionally resemble outer switches and consent flags. They travel
@@ -120,23 +123,29 @@ class ProductionStartupChecks:
                     self.assertEqual(record['cache_dir'], str(audit / 'wrapper-cache'))
 
     def test_missing_support_file_never_reaches_family(self):
-        case = fixture_case(self.family, next(iter(FAMILIES[self.family]['operations'])))
-        process, records, _ = run_startup(self.powershell, case, 'missing-support')
-        self.assertNotEqual(process.returncode, 0)
-        self.assertNotEqual(process.returncode, 37)
-        self.assertEqual(records, [])
+        for operation in FAMILIES[self.family]['failure_operations']:
+            with self.subTest(operation=operation):
+                case = fixture_case(self.family, operation)
+                process, records, _ = run_startup(self.powershell, case, 'missing-support')
+                self.assertNotEqual(process.returncode, 0)
+                self.assertNotEqual(process.returncode, 37)
+                self.assertEqual(records, [])
 
     def test_duplicate_production_support_load_fails(self):
-        case = fixture_case(self.family, next(iter(FAMILIES[self.family]['operations'])))
-        process, records, _ = run_startup(self.powershell, case, 'duplicate-load')
-        self.assertNotEqual(process.returncode, 0)
-        self.assertNotEqual(process.returncode, 37)
-        self.assertEqual(records, [])
-        self.assertIn('Duplicate production support load', process.stderr.decode(errors='replace'))
+        for operation in FAMILIES[self.family]['failure_operations']:
+            with self.subTest(operation=operation):
+                case = fixture_case(self.family, operation)
+                process, records, _ = run_startup(self.powershell, case, 'duplicate-load')
+                self.assertNotEqual(process.returncode, 0)
+                self.assertNotEqual(process.returncode, 37)
+                self.assertEqual(records, [])
+                self.assertIn('Duplicate production support load', process.stderr.decode(errors='replace'))
 
     def test_native_leaf_is_stopped_before_its_body(self):
-        case = fixture_case(self.family, next(iter(FAMILIES[self.family]['operations'])))
-        process, records, _ = run_startup(self.powershell, case, 'blocked-provider')
-        self.assertEqual(process.returncode, 97, process.stderr.decode(errors='replace'))
-        self.assertIn('startup_provider_guard', process.stderr.decode(errors='replace'))
-        self.assertEqual(records, [])
+        for operation in FAMILIES[self.family]['failure_operations']:
+            with self.subTest(operation=operation):
+                case = fixture_case(self.family, operation)
+                process, records, _ = run_startup(self.powershell, case, 'blocked-provider')
+                self.assertEqual(process.returncode, 97, process.stderr.decode(errors='replace'))
+                self.assertIn('startup_provider_guard', process.stderr.decode(errors='replace'))
+                self.assertEqual(records, [])

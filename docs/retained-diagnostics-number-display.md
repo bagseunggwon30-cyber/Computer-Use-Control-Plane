@@ -1,5 +1,9 @@
 # Finite-Double diagnostic display candidate
 
+Current staged tree: [audit-only cutover candidate](audit-summary-staged-cutover.md).
+The original-body statements below describe the preceding candidate checkpoint;
+new Windows and full-regression acceptance remains pending.
+
 ## Decision: keep both original production bodies
 
 The audit-only retirement preflight found a material numeric display gap that

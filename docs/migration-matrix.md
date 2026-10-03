@@ -24,7 +24,7 @@ passed all 870 candidate and 870 adapter comparisons and its uncertainty/descrip
 checks; one added clone-test setup failed before assertions. Its inert setup is
 repaired in the current integration and remains a required gate.
 
-The current integration replaces 21 bodies: six image/OCR helpers, eight
+That qualified integration replaces 21 bodies: six image/OCR helpers, eight
 interaction macros and seven diagnostic macros. Benchmark and audit-summary
 retain their original bodies because unusual JSON conversion semantics remain
 unqualified. Exact source hashes and parser ranges protect the byte splices.
@@ -36,6 +36,14 @@ open; the latest report records the fully counted temporary-fixture growth. See
 the [file-image evidence](legacy-file-images-qualification.md),
 [interaction evidence](legacy-interaction-family.md) and
 [diagnostic limits](legacy-diagnostics-candidate.md).
+
+## Staged audit-only continuation
+
+The [audit cutover candidate](audit-summary-staged-cutover.md) adds one fixed
+135-byte public delegate while retaining benchmark. This isolated source change
+has no accepted retirement credit yet: fresh finite-Double Windows evidence,
+exact production-entry/startup tests and full regression must all pass.
+The historical corpus and all final zero-PowerShell requirements remain intact.
 
 ## Initial core foundation (historical)
 

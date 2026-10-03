@@ -154,3 +154,17 @@ class HelperSourceTests(unittest.TestCase):
                         raw + b'\n# altered source'):
             with self.assertRaisesRegex(AssertionError, 'Published server source hash mismatch'):
                 expected_type_seam(mutated)
+
+    def test_type_edits_sort_numeric_dictionary_keys_and_fail_closed(self):
+        driver = (FIXTURES / 'oracle.ps1').read_text(encoding='utf-8')
+        self.assertIn("Sort-Object -Property {[int]$_['start']} -Descending", driver)
+        self.assertNotIn('Sort-Object -Property start -Descending', driver)
+        self.assertIn("if($overlap -or $actual -cne $edit.name)", driver)
+        self.assertIn("[Math]::Min(128,$actual.Length)", driver)
+        diagnostic = driver.index("schema='cucp.oracle-type-extent-refusal/v1'")
+        refusal = driver.index("throw 'Overlapping or changed oracle type extent'")
+        self.assertLess(diagnostic, refusal)
+        self.assertLess(refusal, driver.index('Microsoft.PowerShell.Utility\\Add-Type'))
+        self.assertIn("[ValidateSet('none','duplicate','changed')][string]$TestTypeExtentFault='none'", driver)
+        self.assertIn("if($TestTypeExtentFault -eq 'duplicate')", driver)
+        self.assertIn("else{$first.name='FixtureChangedType'}", driver)

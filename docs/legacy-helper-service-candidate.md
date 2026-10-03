@@ -366,3 +366,56 @@ Net48 service/transport and inert C#5 facade builds passed with zero warnings.
 Canonical inventory and diff checks passed. These results do not substitute for
 a new Windows run; neither the repaired oracle execution nor the IPC diagnosis
 has been observed on Windows yet.
+
+## Second Windows observation and PowerShell 5.1 extent ordering
+
+Windows run
+[37099034933](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37099034933)
+at public commit `049eb924bd3ec1323c52e857f5c9a0c80a12b48d`
+(tree `240c09fbb416bf13d016bde93bdc5cf027c0c041`) ran 73 helper test
+methods. All 18 transport methods passed, including the separately classified
+unmodified original startup defect. Nineteen assertions remained failed: the
+wrong-type-binding refusal check and all 18 synthetic action cases stopped
+before dispatch at `Overlapping or changed oracle type extent`. The retained
+748-file archive has SHA-256
+`5cedae15744e7dfc00929b2b0f63e19442999931aae83e34ca148987d27b8947`.
+These failures do not qualify any original action behavior or the type-binding
+guard's later refusal path. They also do not waive the separate real-provider,
+ACL/security or production-cutover limits.
+
+The edit plan consists of hashtables. Its named-property sort incorrectly
+assumed that `Sort-Object -Property start` could sort hashtable keys on Windows
+PowerShell 5.1. That support begins in PowerShell 6. The
+[PowerShell 5.1 Sort-Object documentation](https://learn.microsoft.com/en-gb/powershell/module/Microsoft.PowerShell.Utility/Sort-Object?view=powershell-5.1)
+specifies calculated properties for this input. The repair uses an explicit
+integer dictionary lookup, sorted descending, so insertions at higher UTF-16
+offsets cannot shift any remaining lower-offset extent. The original overlap
+and exact-text checks remain mandatory; duplicate edits are never discarded.
+The old evidence did not retain the failed site's order or establish duplicate
+AST nodes, so neither is asserted as an observed runtime detail.
+
+The counted driver now emits one bounded JSON site diagnostic before any
+extent refusal. It identifies the function, source offsets, preceding edit
+boundary, expected type, at most 128 UTF-16 code units of observed text, and
+applied/planned counts. New opt-in negative paths introduce a duplicate extent
+or a changed expected type inside the explicit `.ps1` driver. Both must fail
+before facade compilation or action import. Python passes only data and option
+arguments; it constructs no executable PowerShell command. A Windows regression
+method first checks the complete valid 52-site/eight-function reconstruction
+without dispatch, then verifies both precise failures and their raw evidence.
+All original source pins, facade hash and 23-type assembly/identity guards remain
+unchanged. Successful synthetic action execution still requires a fresh Windows
+run after this repair.
+
+This repair adds 1,479 fully counted temporary PowerShell driver bytes. The
+action oracle is 13,822 bytes; both helper drivers total 21,803 bytes. Canonical
+tracked PowerShell is 904,469 bytes in 30 files, comprising 610,258 runtime and
+294,211 other bytes. Runtime retirement credit remains zero.
+
+Local verification for this extent repair passed 117 action and 45 wire
+contracts, five raw-evidence tests, and 53 helper Python checks with 22 explicit
+Windows-only skips. Full Python discovery passed 711 tests: 563 executed and
+148 platform/opt-in skips. The net48 inert facade compiled with zero warnings
+or errors. The Linux SDK/runtime and Major roll-forward limitation above still
+apply. The new PowerShell 5.1 ordering and refusal paths have not yet executed
+locally; their mandatory Windows tests remain a qualification boundary.

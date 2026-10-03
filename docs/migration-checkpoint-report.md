@@ -39,9 +39,11 @@ job used its established 11-test workflow selection; the same parser's expanded
 routes future full jobs through the complete shared foundation gate and retains
 its raw evidence, rather than retroactively claiming those tests ran in f09.
 
-The following diagnostic candidate changes are not a new production cutover.
-Benchmark/audit-summary bodies and the history reducers remain retained. Full
-zero-PowerShell and interactive Windows acceptance remain open; main is unchanged.
+The earlier diagnostic candidates below did not change production routing.
+The current [audit-only staged cutover](audit-summary-staged-cutover.md) replaces
+its body in an isolated candidate tree, with acceptance still pending. Benchmark
+and history originals remain. Full zero-PowerShell and interactive Windows
+acceptance remain open; main is unchanged.
 
 ## Local rejected-token diagnostic candidate (after 7b4f163)
 

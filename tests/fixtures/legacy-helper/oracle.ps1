@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Source,[Parameter(Mandatory=$true)][string]$Manifest,[Parameter(Mandatory=$true)][string]$CasePath,[string]$Stubs,[switch]$TestWrongBinding)
+param([Parameter(Mandatory=$true)][string]$Source,[Parameter(Mandatory=$true)][string]$Manifest,[Parameter(Mandatory=$true)][string]$CasePath,[string]$Stubs,[switch]$TestWrongBinding,[ValidateSet('none','duplicate','changed')][string]$TestTypeExtentFault='none')
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 function Hash-Text([string]$Text) {
@@ -58,7 +58,7 @@ $typeCounts=[ordered]@{
   'Windows.Media.Ocr.OcrResult'=1
   'System.Windows.Automation.Condition'=2
 }
-$seen=@{};$functions=New-Object Collections.ArrayList;$sites=New-Object Collections.ArrayList
+$seen=@{};$functions=New-Object Collections.ArrayList;$sites=New-Object Collections.ArrayList;$faultInjected=$false
 foreach($item in $verified){
   $record=$item.record;$node=$item.node
   if($record.parent_function -or $loaderNames -ccontains $record.name){continue}
@@ -84,11 +84,29 @@ foreach($item in $verified){
     [void]$sites.Add(@{function=$record.name;kind=$kind;start_utf16=$extent.StartOffset;end_utf16=$extent.EndOffset;original=$name;replacement=$fixturePrefix+$name})
     $seen[$name]=1+[int]$seen[$name]
   }
-  $body=$node.Extent.Text;$previous=$body.Length
-  foreach($edit in @($edits|Sort-Object -Property start -Descending)){
-    if($edit.end -gt $previous -or $body.Substring($edit.start,$edit.end-$edit.start) -cne $edit.name){throw 'Overlapping or changed oracle type extent'}
+  # Negative qualification changes only the in-memory edit plan. Neither fault
+  # can reach compilation/import: the original overlap/text guard must refuse.
+  if($TestTypeExtentFault -ne 'none' -and -not $faultInjected -and $edits.Count){
+    $first=$edits[0]
+    if($TestTypeExtentFault -eq 'duplicate'){[void]$edits.Add(@{start=$first.start;end=$first.end;name=$first.name})}
+    else{$first.name='FixtureChangedType'}
+    $faultInjected=$true
+  }
+  $body=$node.Extent.Text;$previous=$body.Length;$applied=0
+  # Windows PowerShell 5.1 does not sort hashtable keys by -Property start.
+  # A calculated numeric dictionary lookup works there as well as on PS6+.
+  foreach($edit in @($edits|Sort-Object -Property {[int]$_['start']} -Descending)){
+    $overlap=$edit.end -gt $previous
+    $actual=$body.Substring($edit.start,$edit.end-$edit.start)
+    if($overlap -or $actual -cne $edit.name){
+      # Bounded, non-executable per-site evidence precedes the refusal. No body
+      # or request data is emitted; the prefix is at most 128 UTF-16 code units.
+      $diagnostic=@{schema='cucp.oracle-type-extent-refusal/v1';function=$record.name;reason=$(if($overlap){'overlap_or_order'}else{'text_mismatch'});start_utf16=$node.Extent.StartOffset+$edit.start;end_utf16=$node.Extent.StartOffset+$edit.end;previous_start_utf16=$node.Extent.StartOffset+$previous;expected_type=$edit.name;actual_prefix=$actual.Substring(0,[Math]::Min(128,$actual.Length));applied=$applied;planned=$edits.Count}
+      [Console]::Error.WriteLine((ConvertTo-Json -InputObject $diagnostic -Depth 4 -Compress))
+      throw 'Overlapping or changed oracle type extent'
+    }
     $body=$body.Substring(0,$edit.start)+$fixturePrefix+$edit.name+$body.Substring($edit.end)
-    $previous=$edit.start
+    $previous=$edit.start;$applied++
   }
   # A second AST parse proves the mechanically produced body is still a single
   # definition with the same name; only this pinned function becomes executable.

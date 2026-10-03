@@ -123,6 +123,7 @@ function Replace-Pattern([string]$Text,[string]$Pattern,[string]$New){
 }
 $names=@('_Read-OptValue','_Read-Switch','_Iif','Invoke-MacroPerf','Invoke-MacroDiagnoseLag','Invoke-MacroHealthQuick','Invoke-MacroHealthDetail','Invoke-MacroSelfTest','Invoke-MacroBenchmark')
 if($ProductionEntry){$names=@($names|Where-Object {$_ -ne '_Iif'})}
+$productionDelegates=@{'Invoke-MacroPerf'='perf';'Invoke-MacroDiagnoseLag'='diagnose-lag';'Invoke-MacroHealthQuick'='health-quick';'Invoke-MacroHealthDetail'='health-detail';'Invoke-MacroSelfTest'='self-test'}
 $definitions=@{}
 foreach($name in $names){
  $nodes=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
@@ -130,8 +131,8 @@ foreach($name in $names){
  $body=$nodes[0].Extent.Text
  # Production loads current public delegates byte-for-byte. Benchmark remains
  # the current original body and still receives the exact acquisition seams.
- if($ProductionEntry -and $name -cin @('Invoke-MacroPerf','Invoke-MacroDiagnoseLag','Invoke-MacroHealthQuick','Invoke-MacroHealthDetail','Invoke-MacroSelfTest')){
-  $operation=switch($name){'Invoke-MacroPerf'{'perf'};'Invoke-MacroDiagnoseLag'{'diagnose-lag'};'Invoke-MacroHealthQuick'{'health-quick'};'Invoke-MacroHealthDetail'{'health-detail'};'Invoke-MacroSelfTest'{'self-test'}}
+ if($ProductionEntry -and $productionDelegates.ContainsKey($name)){
+  $operation=$productionDelegates[$name]
   Fixture-ValidatePublicDelegate $nodes[0] $operation
   $definitions[$name]=$body;continue
  }

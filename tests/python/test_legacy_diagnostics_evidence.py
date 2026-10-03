@@ -121,7 +121,7 @@ class DiagnosticEvidenceTests(unittest.TestCase):
             self.assertEqual(manifest['comparisons'][0]['status'], 'failed')
             self.assertEqual(manifest['comparisons'][0]['error']['type'], 'AssertionError')
 
-    def run_real_method(self, root, *, failure=None, mismatch=False):
+    def run_real_method(self, root, *, failure=None, mismatch=False, production_mismatch=False):
         host = root / 'inert-host.dll'
         host.write_bytes(b'inert host identity')
         fixtures = [dict(case_id='inert/audit', operation='audit-summary', rest=[], replies=[]),
@@ -151,16 +151,22 @@ class DiagnosticEvidenceTests(unittest.TestCase):
                 file_group = 'file-oracle.ps1' in argv[argv.index('-File') + 1]
                 name = 'production' if '-ProductionEntry' in argv else 'candidate' if '-AdapterSource' in argv else 'original'
                 route = name + ('-file' if file_group else '-runtime')
-                stdout = json.dumps([original[0] if file_group else uncertain if name == 'candidate' else original[1]]).encode()
+                value = original[0] if file_group else uncertain if name == 'candidate' else original[1]
+                if production_mismatch and file_group and name == 'production':
+                    value = dict(value, console='wrong production audit output\r\n')
+                stdout = json.dumps([value]).encode()
             calls.append(route)
             if failure == route:
                 raise FileNotFoundError('inert requested launch failure')
             return subprocess.CompletedProcess(argv, 0, stdout, (route + ' stderr\r\n').encode())
         class Probe(unittest.TestCase):
             def runTest(self):
-                retained.RetainedDiagnosticWindowsTests.test_pinned_original_current_original_pure_candidate_and_actual_candidate(self)
+                retained.RetainedDiagnosticWindowsTests.test_pinned_original_production_entry_pure_candidate_and_actual_candidate(self)
         result = unittest.TestResult()
         with patch.object(retained, 'retained_candidate_cases', return_value=fixtures), \
+             patch.object(retained, 'EXPECTED_CANDIDATE_PARTITION', dict(exact=1, owned_failure=1, terminal_failure=0)), \
+             patch.object(retained, 'EXPECTED_PRODUCTION_PARTITION', dict(exact=2, owned_failure=0, terminal_failure=0)), \
+             patch.object(retained, 'EXPECTED_AUDIT_PRODUCTION_CASES', 1), \
              patch.object(retained.shutil, 'which', side_effect=lambda name: 'inert-' + name), \
              patch.object(evidence.subprocess, 'run', side_effect=run), \
              patch.dict(os.environ, {evidence.CAPTURE_ENV: str(root / 'artifacts'), 'CUCP_DIAGNOSTICS_TEST_HOST': str(host)}, clear=False), \
@@ -196,6 +202,15 @@ class DiagnosticEvidenceTests(unittest.TestCase):
             self.assertEqual(manifest['provenance']['pinned_source']['sha256'], hashlib.sha256(b'inert pinned source\r\n').hexdigest())
             self.assertEqual(manifest['provenance']['git_head'], 'a' * 40)
             self.assertIn('python_version', manifest['provenance'])
+
+    def test_audit_production_output_mismatch_is_never_normalized(self):
+        with tempfile.TemporaryDirectory() as temp:
+            result, directory, manifest, calls = self.run_real_method(Path(temp), production_mismatch=True)
+            self.assertEqual(result.errors, [])
+            self.assertEqual([row['route'] for row in manifest['comparisons'] if row['status'] == 'failed'],
+                ['production-entry', 'production-v-candidate', 'partition-counts'])
+            self.assertFalse(manifest['qualification_passed'])
+            self.assertIn(b'wrong production audit output', (directory / 'production-file.stdout').read_bytes())
 
     def test_real_method_preserves_build_pure_and_grouped_launch_failures(self):
         for route in ('pure-build', 'pure', 'pinned-source', 'production-file', 'candidate-runtime'):

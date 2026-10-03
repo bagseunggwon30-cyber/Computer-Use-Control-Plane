@@ -10,6 +10,7 @@ import argparse
 import ast
 import copy
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -351,6 +352,15 @@ def run_bounded(command, data=None, *, timeout=120, stdout_limit=64*1024*1024, s
 
 
 
+def additional_functional_report(report_dir):
+    # Separate report only: the exact comparison, artifacts and status stay intact.
+    path = ROOT/'pcucp-next/packaging/history_functional_comparison.py'
+    spec = importlib.util.spec_from_file_location('history_additional_functional', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.write_report(report_dir, report_dir/'functional-report.json', sys.modules[__name__])
+
+
 def differential(args):
     report_dir = Path(args.report_dir).resolve()
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -402,8 +412,9 @@ def differential(args):
     except (ValueError, RuntimeError, OSError, subprocess.SubprocessError) as error:
         report['errors'].append(str(error))
     (report_dir / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-    print(json.dumps(dict(status=report['status'], fixture_count=len(cases), runs=len(report['runs']), report=str(report_dir / 'report.json'))))
-    return 0 if report['status'] == 'passed-candidate-parity' else 1
+    functional = additional_functional_report(report_dir)
+    print(json.dumps(dict(status=report['status'], functional_status=functional['status'], fixture_count=len(cases), runs=len(report['runs']), report=str(report_dir / 'report.json'))))
+    return 0 if report['status'] == 'passed-candidate-parity' and functional['status'] == 'passed-functional-candidate-only' else 1
 
 
 def unicode_transport_cases():

@@ -27,9 +27,9 @@ MIGRATED_DIAGNOSTICS = {
     'perf':'Invoke-MacroPerf', 'diagnose-lag':'Invoke-MacroDiagnoseLag',
     'health-quick':'Invoke-MacroHealthQuick', 'health-detail':'Invoke-MacroHealthDetail',
     'log-tail':'Invoke-MacroLogTail', 'self-test':'Invoke-MacroSelfTest',
-    'release-notes':'Invoke-MacroReleaseNotes',
+    'release-notes':'Invoke-MacroReleaseNotes', 'audit-summary':'Invoke-MacroAuditSummary',
 }
-RETAINED_DIAGNOSTICS = {'benchmark','audit-summary'}
+RETAINED_DIAGNOSTICS = {'benchmark'}
 KNOWN_ADAPTER_FAMILIES = ('execution','precision','cdp','interaction','diagnostics','file-images')
 
 
@@ -594,7 +594,9 @@ class DiagnosticAdapterPortableTests(unittest.TestCase):
             self.assertEqual('-ProductionEntry' in arguments,mode=='production')
             for operation in MIGRATED_DIAGNOSTICS:self.assertTrue(diagnostic_uses_session(operation,mode))
             for operation in RETAINED_DIAGNOSTICS:self.assertEqual(diagnostic_uses_session(operation,mode),mode=='draft')
-        self.assertEqual(len(MIGRATED_DIAGNOSTICS),7)
+        self.assertEqual(len(MIGRATED_DIAGNOSTICS),8)
+        self.assertEqual(RETAINED_DIAGNOSTICS, {'benchmark'})
+        self.assertEqual(diagnostic_adapter_mode(), 'production')
         for name in ('file','runtime'):
             source=(ROOT/f'tests/fixtures/legacy-diagnostics-{name}-oracle.ps1').read_text(encoding='utf-8-sig')
             self.assertIn('[switch]$ProductionEntry',source)
@@ -602,6 +604,44 @@ class DiagnosticAdapterPortableTests(unittest.TestCase):
             self.assertIn('if($ProductionEntry){& $',source)
             self.assertIn('Fixture-ValidatePublicDelegate $',source)
             self.assertIn('elseif($AdapterSource){_Invoke-LegacyDiagnosticFamily',source)
+
+    def test_both_oracle_delegate_selectors_exactly_partition_current_production(self):
+        selected = {}
+        for group in ('file', 'runtime'):
+            source = (ROOT / f'tests/fixtures/legacy-diagnostics-{group}-oracle.ps1').read_text(encoding='utf-8-sig')
+            mappings = re.findall(r"^\$productionDelegates=@\{([^\n]+)\}$", source, re.M)
+            self.assertEqual(len(mappings), 1)
+            mapping = dict((operation, name) for name, operation in re.findall(r"'([^']+)'='([^']+)'", mappings[0]))
+            expected = {op: name for op, name in MIGRATED_DIAGNOSTICS.items() if (op in FILE_OPERATIONS) == (group == 'file')}
+            self.assertEqual(mapping, expected)
+            self.assertIn('if($ProductionEntry -and $productionDelegates.ContainsKey($name))', source)
+            self.assertIn('$operation=$productionDelegates[$name]', source)
+            selected.update(mapping)
+        self.assertEqual(selected, MIGRATED_DIAGNOSTICS)
+        self.assertNotIn('benchmark', selected)
+        guard = GUARDS.read_text(encoding='utf-8-sig')
+        block = guard[guard.index('function Fixture-PublicDelegate'):guard.index('$cases=Microsoft.PowerShell.Utility')]
+        self.assertEqual(dict(re.findall(r"'([^']+)'='(Invoke-Macro[^']+)'", block)), MIGRATED_DIAGNOSTICS)
+
+    def test_audit_has_one_fixed_current_body_and_no_original_runtime_copy(self):
+        source = BRIDGE.read_text(encoding='utf-8-sig')
+        expected = "function Invoke-MacroAuditSummary {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'audit-summary' -Rest $Rest}"
+        self.assertEqual(re.findall(r'^function Invoke-MacroAuditSummary[^\n]*', source, re.M), [expected])
+        pinned = subprocess.check_output(['git', 'show', f'{ACCEPTED_TREE}:scripts/cucp.ps1'], cwd=ROOT).decode('utf-8-sig')
+        start = pinned.index('function Invoke-MacroAuditSummary {')
+        original = pinned[start:pinned.index('\n}', start) + 2]
+        runtime_files = subprocess.check_output(['git', 'ls-files', '--', 'scripts/*.ps1'], cwd=ROOT).decode().splitlines()
+        for path in runtime_files:
+            current = (ROOT / path).read_text(encoding='utf-8-sig')
+            self.assertNotIn(original, current, path)
+            if path != 'scripts/cucp.ps1':
+                self.assertNotRegex(current, re.compile(r'^function Invoke-MacroAuditSummary\b', re.M), path)
+        adapter = ADAPTER.read_text(encoding='utf-8-sig')
+        start = adapter.index('function _Invoke-LegacyDiagnosticFamily {')
+        body = adapter[start:adapter.index('\n}', start) + 2]
+        self.assertEqual(body.count("_Invoke-LegacyExecutionHost -EntryPoint 'legacy-diagnostic-session'"), 1)
+        self.assertNotIn('catch', body)
+        self.assertNotIn('Invoke-MacroAuditSummary', body)
 
     def test_guard_inventory_preserves_all_196_original_checks(self):
         from collections import Counter
@@ -689,13 +729,48 @@ class DiagnosticActualAdapterTests(unittest.TestCase):
         rest=['--fixture','한국어','literal; $(inert)']
         requests=[dict(id=f'{operation}/{brief}',mode='public-delegate',operation=operation,rest=rest if brief else [],brief=brief) for operation in MIGRATED_DIAGNOSTICS for brief in (False,True)]
         observations=run_guard_driver(self,requests)
-        self.assertEqual(len(observations),14)
+        self.assertEqual(len(observations),16)
         for request,observed in zip(requests,observations):
             with self.subTest(operation=request['operation'],brief=request['brief']):
                 self.assertEqual(observed['state'],'ok',observed)
                 self.assertIsNone(observed['error'])
                 self.assertEqual(observed['events'],[])
                 self.assertEqual(observed['value'],dict(exit=31,calls=[dict(operation=request['operation'],rest=request['rest'],brief=request['brief'])]))
+    def test_audit_requires_native_runtime_and_never_falls_back_to_original(self):
+        self.assertEqual(diagnostic_adapter_mode(), 'production')
+        with tempfile.TemporaryDirectory(prefix='CUCP audit no fallback ') as temporary:
+            temp = Path(temporary)
+            missing = temp / 'missing-native-host.exe'
+            inputs = temp / 'cases.json'
+            rows = [
+                ('file', dict(operation='audit-summary', rest=[], replies=[False])),
+                ('runtime', dict(operation='benchmark', rest=['--iters', '1'],
+                    replies=[dict(exit=0, json=dict(status='ok'))] * 4)),
+            ]
+            for group, fixture in rows:
+                with self.subTest(operation=fixture['operation']):
+                    inputs.write_text(json.dumps([fixture]), encoding='utf-8-sig')
+                    runner = ROOT / f'tests/fixtures/legacy-diagnostics-{group}-oracle.ps1'
+                    process = subprocess.run([shutil.which('powershell.exe'), '-NoProfile', '-NonInteractive',
+                        '-File', str(runner), '-InputPath', str(inputs)] + actual_adapter_arguments(BRIDGE, 'production'),
+                        env={**os.environ, 'CUCP_NATIVE_HOST': str(missing)}, capture_output=True, timeout=90)
+                    self.assertEqual(process.returncode, 0, process.stderr.decode(errors='replace'))
+                    observed = json.loads(process.stdout.decode('utf-8-sig'))
+                    self.assertEqual(len(observed), 1)
+                    actual = observed[0]
+                    if group == 'file':
+                        self.assertEqual(actual['state'], 'error')
+                        self.assertEqual(actual['error'], 'Matching execution runtime missing. Publish the native runtime or set CUCP_NATIVE_HOST to its executable/DLL.')
+                        self.assertEqual(actual['console'], '')
+                        self.assertEqual(decode_wire(actual['effects']), [])
+                        self.assertEqual(actual['consumed'], 0)
+                    else:
+                        self.assertEqual(actual['state'], 'complete')
+                        self.assertEqual(actual['exit'], 0)
+                        self.assertEqual(actual['consumed'], 4)
+                        self.assertEqual(sum(e['kind'] == 'Native' for e in decode_wire(actual['effects'])), 4)
+                    self.assertFalse(missing.exists())
+
     def test_exact_retained_adapter_all_cases(self):
         host=os.environ.get("CUCP_DIAGNOSTICS_TEST_HOST")
         self.assertTrue(host,"Qualification must supply CUCP_DIAGNOSTICS_TEST_HOST; actual adapter gate cannot silently skip")
@@ -724,7 +799,7 @@ class DiagnosticActualAdapterTests(unittest.TestCase):
             with self.subTest(index=index,operation=fixture["operation"],rest=fixture["rest"],brief=fixture.get("brief")):
                 old_effects=decode_wire(before["effects"]);new_effects=decode_wire(after["effects"])
                 failures=captured_failures(fixture,old_effects)
-                # The two retained production bodies do not enter the shared
+                # The retained benchmark production body does not enter the shared
                 # session: preserve their ordinary errors through full equality.
                 uses_session=diagnostic_uses_session(fixture['operation'],mode)
                 # The assertion leaf converts its original catch-any rejection

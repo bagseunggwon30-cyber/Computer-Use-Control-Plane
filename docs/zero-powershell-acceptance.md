@@ -168,3 +168,15 @@ bytes). The temporary diagnostic guard was reduced by 31,109 PS bytes through a
 real Python case/assertion/fixture-I/O port, not an embedded or renamed PS
 program. Remaining fixed PS boundary drivers are explicit temporary dependencies
 and are subject to the same final zero-execution requirement.
+
+## Isolated audit-only staged source measurement
+
+The [audit-summary cutover candidate](audit-summary-staged-cutover.md) replaces
+its 2,728-byte original body with a 135-byte delegate, a 2,593-byte runtime
+reduction. Oracle selector/map changes add 58 net bytes, giving a 2,535-byte
+total reduction: 893,908 extension-counted bytes, including 607,665 runtime
+bytes, in the same 30 files. These are staged physical measurements with no
+accepted retirement credit yet. Fresh finite-Double, production-entry/startup,
+and full regression qualification remain required. Benchmark, helper/history
+originals, complete foundation coverage and all inline/encoded-source zero
+requirements above remain unchanged.

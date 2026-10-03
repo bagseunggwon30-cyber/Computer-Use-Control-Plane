@@ -1,6 +1,6 @@
 ﻿# Diagnostic acquisition adapter. Shared _Execution-* functions own
 # framing, process lifetime, immutable authority and mutation uncertainty.
-# Main routes seven public delegates here; benchmark/audit bodies remain there.
+# Main routes eight public delegates here; benchmark retains its original body.
 function _Diagnostic-Require($Condition,[string]$Message) { _Execution-Require $Condition $Message }
 function _Diagnostic-Fields($Value,[string[]]$Names) { _Execution-Fields $Value $Names }
 function _Diagnostic-ArgvEquals($Actual,[string[]]$Expected) {

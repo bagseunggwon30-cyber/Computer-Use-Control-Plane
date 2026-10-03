@@ -7,18 +7,48 @@ import legacy_production_startup as harness
 
 
 class ProductionStartupHarnessTests(unittest.TestCase):
-    def test_exact_closed_operation_sets_exclude_retained_measurement_routes(self):
+    def test_exact_closed_operation_sets_include_audit_and_exclude_retained_benchmark(self):
         self.assertEqual(set(harness.FAMILIES['interaction']['operations']), {
             'find-label', 'click-point', 'click-label', 'safe-type', 'icon-find',
             'icon-click', 'ocr-click', 'precision-validate'})
         self.assertEqual(set(harness.FAMILIES['diagnostics']['operations']), {
-            'perf', 'diagnose-lag', 'health-quick', 'health-detail', 'log-tail', 'self-test', 'release-notes'})
+            'perf', 'diagnose-lag', 'health-quick', 'health-detail', 'log-tail', 'self-test',
+            'release-notes', 'audit-summary'})
         for family in harness.FAMILIES:
             for operation in harness.FAMILIES[family]['operations']:
                 case = harness.fixture_case(family, operation)
                 self.assertEqual(json.loads(json.dumps(case)), case)
                 self.assertEqual(case['rest'], harness.LITERAL_REST)
-                self.assertNotIn(operation, ('benchmark', 'audit-summary'))
+                self.assertNotEqual(operation, 'benchmark')
+        audit = harness.fixture_case('diagnostics', 'audit-summary')
+        self.assertEqual(audit['wrapper'], 'Invoke-MacroAuditSummary')
+        self.assertEqual(audit['entry'], '_Invoke-LegacyDiagnosticFamily')
+
+    def test_failure_controls_keep_original_routes_and_explicitly_exercise_audit(self):
+        class Checks(harness.ProductionStartupChecks, unittest.TestCase):
+            powershell = 'unused-powershell.exe'
+
+        controls = {
+            'missing-support': ('test_missing_support_file_never_reaches_family', 1, b''),
+            'duplicate-load': ('test_duplicate_production_support_load_fails', 1,
+                               b'Duplicate production support load'),
+            'blocked-provider': ('test_native_leaf_is_stopped_before_its_body', 97,
+                                 b'startup_provider_guard:Invoke-NativeHelper'),
+        }
+        for family, operations in (('interaction', ('find-label',)),
+                                   ('diagnostics', ('perf', 'audit-summary'))):
+            self.assertEqual(harness.FAMILIES[family]['failure_operations'], operations)
+            for mode, (method, exit_code, stderr) in controls.items():
+                with self.subTest(family=family, mode=mode):
+                    check = Checks(method)
+                    check.family = family
+                    process = harness.subprocess.CompletedProcess([], exit_code, b'', stderr)
+                    with patch.object(harness, 'run_startup', return_value=(process, [], 'unused-root')) as run:
+                        getattr(check, method)()
+                    self.assertEqual(run.call_count, len(operations))
+                    self.assertEqual([call.args for call in run.call_args_list], [
+                        (check.powershell, harness.fixture_case(family, operation), mode)
+                        for operation in operations])
 
     def test_typed_bootstrap_is_visible_and_does_not_ast_install_public_delegates(self):
         bootstrap = (harness.FIXTURES / 'legacy-family-production-startup.ps1').read_text(encoding='utf-8-sig')

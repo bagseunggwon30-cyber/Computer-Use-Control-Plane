@@ -950,76 +950,7 @@ function Invoke-MacroRecorder {
 # allow / deny / require_confirm 세 결과 중 하나를 반환.
 # ============================================================================
 
-function Invoke-MacroAuditSummary {
-  param([string[]]$Rest)
-  $sinceMin = _Read-OptValue -Rest $Rest -Name "--since-minutes"
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $cutoff = $null
-  if ($sinceMin) {
-    try { $cutoff = (Get-Date).AddMinutes(-1 * [int]$sinceMin) } catch { $cutoff = $null }
-  }
-  $files = @()
-  if (Test-Path -LiteralPath $Script:AuditDir) {
-    $files = @(Get-ChildItem -LiteralPath $Script:AuditDir -Filter 'trajectory*.ndjson' -ErrorAction SilentlyContinue -Recurse | Sort-Object LastWriteTime -Descending | Select-Object -First 20)
-  }
-  $totalEvents = 0
-  $byMacro = @{}
-  $byExit = @{}
-  $sensitiveCount = 0
-  $blockedCount = 0
-  $earliest = $null
-  $latest = $null
-  foreach ($f in $files) {
-    try {
-      $lines = Get-Content -LiteralPath $f.FullName -Encoding UTF8 -ErrorAction SilentlyContinue
-      foreach ($line in @($lines)) {
-        if ([string]::IsNullOrWhiteSpace($line)) { continue }
-        try {
-          $ev = $line | ConvertFrom-Json -ErrorAction Stop
-        } catch { continue }
-        if ($cutoff -and $ev.ts) {
-          try { $evTs = [datetime]$ev.ts } catch { $evTs = $null }
-          if ($evTs -and $evTs -lt $cutoff) { continue }
-        }
-        $totalEvents++
-        $m = "$($ev.macro)"
-        if (-not $m) { $m = "$($ev.action)" }
-        if ($m) {
-          if (-not $byMacro.ContainsKey($m)) { $byMacro[$m] = 0 }
-          $byMacro[$m] = $byMacro[$m] + 1
-        }
-        $ec = "$($ev.exit_code)"
-        if ($ec) {
-          if (-not $byExit.ContainsKey($ec)) { $byExit[$ec] = 0 }
-          $byExit[$ec] = $byExit[$ec] + 1
-        }
-        if ($ev.sensitive -or "$($ev.reason)" -match 'sensitive') { $sensitiveCount++ }
-        if ($ev.status -eq "blocked" -or $ec -eq "3") { $blockedCount++ }
-        if ($ev.ts) {
-          if (-not $earliest -or "$($ev.ts)" -lt $earliest) { $earliest = "$($ev.ts)" }
-          if (-not $latest   -or "$($ev.ts)" -gt $latest)   { $latest   = "$($ev.ts)" }
-        }
-      }
-    } catch { }
-  }
-  $status = if ($totalEvents -eq 0) { "empty" } else { "ok" }
-  $out = [pscustomobject]@{
-    schema = "cucp.audit-summary/v1"
-    status = $status
-    file_count = @($files).Count
-    event_count = $totalEvents
-    earliest_ts = $earliest
-    latest_ts = $latest
-    by_macro = $byMacro
-    by_exit_code = $byExit
-    sensitive_count = $sensitiveCount
-    blocked_count = $blockedCount
-    since_cutoff = if ($cutoff) { $cutoff.ToString("yyyy-MM-ddTHH:mm:ss.fffK") } else { $null }
-  }
-  $briefLine = "$status audit-summary files=$($files.Count) events=$totalEvents sensitive=$sensitiveCount blocked=$blockedCount"
-  _Emit-Envelope -Envelope $out -BriefLine $briefLine -Depth 8 -ForceJson:$jsonOnly
-  return 0
-}
+function Invoke-MacroAuditSummary {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'audit-summary' -Rest $Rest}
 
 function Invoke-MacroPolicyCheck {
   param([string[]]$Rest)
