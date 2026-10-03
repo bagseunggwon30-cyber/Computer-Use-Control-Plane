@@ -151,9 +151,10 @@ class DiagnosticEvidenceTests(unittest.TestCase):
                 file_group = 'file-oracle.ps1' in argv[argv.index('-File') + 1]
                 name = 'production' if '-ProductionEntry' in argv else 'candidate' if '-AdapterSource' in argv else 'original'
                 route = name + ('-file' if file_group else '-runtime')
-                value = original[0] if file_group else uncertain if name == 'candidate' else original[1]
-                if production_mismatch and file_group and name == 'production':
-                    value = dict(value, console='wrong production audit output\r\n')
+                value = original[0] if file_group else uncertain if name in ('candidate', 'production') else original[1]
+                if production_mismatch and name == 'production' and file_group == (production_mismatch != 'benchmark'):
+                    operation = 'audit' if file_group else 'benchmark'
+                    value = dict(value, console='wrong production ' + operation + ' output\r\n')
                 stdout = json.dumps([value]).encode()
             calls.append(route)
             if failure == route:
@@ -165,8 +166,10 @@ class DiagnosticEvidenceTests(unittest.TestCase):
         result = unittest.TestResult()
         with patch.object(retained, 'retained_candidate_cases', return_value=fixtures), \
              patch.object(retained, 'EXPECTED_CANDIDATE_PARTITION', dict(exact=1, owned_failure=1, terminal_failure=0)), \
-             patch.object(retained, 'EXPECTED_PRODUCTION_PARTITION', dict(exact=2, owned_failure=0, terminal_failure=0)), \
+             patch.object(retained, 'EXPECTED_PRODUCTION_PARTITION', dict(exact=1, owned_failure=1, terminal_failure=0)), \
              patch.object(retained, 'EXPECTED_AUDIT_PRODUCTION_CASES', 1), \
+             patch.object(retained, 'EXPECTED_BENCHMARK_PRODUCTION_CASES', 1), \
+             patch.object(retained, 'EXPECTED_BENCHMARK_OWNED_FAILURE_IDS', {'inert/benchmark'}), \
              patch.object(retained.shutil, 'which', side_effect=lambda name: 'inert-' + name), \
              patch.object(evidence.subprocess, 'run', side_effect=run), \
              patch.dict(os.environ, {evidence.CAPTURE_ENV: str(root / 'artifacts'), 'CUCP_DIAGNOSTICS_TEST_HOST': str(host)}, clear=False), \
@@ -211,6 +214,15 @@ class DiagnosticEvidenceTests(unittest.TestCase):
                 ['production-entry', 'production-v-candidate', 'partition-counts'])
             self.assertFalse(manifest['qualification_passed'])
             self.assertIn(b'wrong production audit output', (directory / 'production-file.stdout').read_bytes())
+
+    def test_benchmark_production_output_mismatch_is_never_normalized(self):
+        with tempfile.TemporaryDirectory() as temp:
+            result, directory, manifest, calls = self.run_real_method(Path(temp), production_mismatch='benchmark')
+            self.assertEqual(result.errors, [])
+            self.assertEqual([row['route'] for row in manifest['comparisons'] if row['status'] == 'failed'],
+                ['production-entry', 'production-v-candidate', 'partition-counts'])
+            self.assertFalse(manifest['qualification_passed'])
+            self.assertIn(b'wrong production benchmark output', (directory / 'production-runtime.stdout').read_bytes())
 
     def test_real_method_preserves_build_pure_and_grouped_launch_failures(self):
         for route in ('pure-build', 'pure', 'pinned-source', 'production-file', 'candidate-runtime'):

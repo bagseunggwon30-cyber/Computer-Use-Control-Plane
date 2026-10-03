@@ -1,5 +1,11 @@
 # Bounded benchmark functional qualification
 
+Current staged source routes benchmark through its managed candidate; fresh
+Windows production-entry and full-regression acceptance remain pending. Audit
+body retirement is separately qualified at `3cbbaaad` / run `37103102449`
+attempt 2. See [benchmark staging](benchmark-staged-cutover.md). The original-body
+statements below describe preceding checkpoints.
+
 This work retains the original benchmark and audit public bodies, the complete
 668-input exact gate, and all previous raw assertions. It implements the scoped
 prose criterion in `functional-migration-release-criteria.md`; it does not grant
@@ -118,4 +124,44 @@ calendar checks and 18 typed-numeric checks). Execution family checks pass 994 a
 110 checks. The existing exact corpus remains 668, with 16 calendar and 72
 numeric cases added only in the separately named functional gates. Tracked
 PowerShell remains 902,990 bytes on this base: zero source-byte change and no
-retirement credit. All new original Windows outcomes remain pending.
+retirement credit. At that checkpoint, the new original Windows outcomes were pending.
+
+## Saved Windows evidence and Brief harness repair
+
+Run `37103413852` at `fa1c830e` captured all routes, but both new tests failed
+during summary construction because `original_contract` tried to decode
+`payload=null`. This is the actual Brief rendering contract: the original and
+actual adapter print only their brief line, so the oracle's `ConvertTo-Json`
+capture hook is never called. The pure coordinator still retains its internal
+payload. All 668 historical exact cases, including 258 production audit pairs,
+passed that run. The new gates' original manifests remain failed/incomplete.
+
+The verified archive SHA-256 is
+`1e54a7c91cf93bdd5c0267e22f53b95e8b98fcdf86eb896d3c3cfdd8891498c2`.
+Reassessment with the corrected comparator finds all 72 Decimal public pairs
+exact, and all 16 calendar cases functionally equal: 12 public pairs are exact
+and four full-JSON pairs differ only in permitted detail prose. All 44 Brief
+public pairs preserve `payload=null` and exact Console/state/exit/effects.
+The source-inferred Decimal p50 outcomes are now observed in the original:
+the three reported values produce 1, 1 and 2147483647, with deltas 36, 36 and
+-2147483610 and percentages 7200, 2400 and -100 respectively.
+
+The repair preserves absent payload in raw summaries. Functional comparison
+permits that absence only for complete Brief records; non-Brief requires an
+intact tagged report. A Brief case must have an adjacent non-Brief observation
+whose fixture differs only in rendering mode and case ID. That complete
+original/pure/actual comparison is rerun, and the pure Brief data must exactly
+match the pure control's full contract. No original Brief payload is invented
+or replaced. State, terminal errors, exact effects/consumption, numeric fields,
+schema, render flags and public Console remain checked. Missing/null non-Brief
+payload, terminal failure, unmatched controls and extra pure errors are negative
+regressions, not accepted representations.
+
+`plans/evidence/benchmark-functional-reassessment-37103413852.json` records the
+offline assessment, validator source hashes and original artifact route hashes.
+Three complete observed pairs, including conversion success and rejection, are
+retained in `tests/fixtures/legacy-benchmark-brief-observed-37103413852.json`.
+This offline assessment does not turn the failed CI run into a green gate or
+qualify a production cutover. Fresh production-entry Windows and full regression
+remain required. The 668 historical corpus and runtime implementation are
+unchanged by this harness repair.

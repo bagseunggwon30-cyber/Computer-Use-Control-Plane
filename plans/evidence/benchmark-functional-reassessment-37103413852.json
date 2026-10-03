@@ -1,0 +1,574 @@
+{
+  "assessment_kind": "offline-saved-observation-functional-assessment",
+  "run_id": 37103413852,
+  "archive_sha256": "1e54a7c91cf93bdd5c0267e22f53b95e8b98fcdf86eb896d3c3cfdd8891498c2",
+  "original_ci_result": "failed: two Brief payload harness errors",
+  "original_manifests_modified": false,
+  "fresh_production_entry_windows_required": true,
+  "validator_sources": {
+    "tests/python/test_legacy_diagnostics_benchmark_functional.py": "7ec4b0b8199138b7249634ebf6e608ee7968293ad50dc261dcc6b5ef2ade16a3",
+    "tests/python/test_legacy_diagnostics_benchmark_decimal.py": "befa63ecc4b3d1dd1fae7b7ae8f23cdf0f21a7584a9d9cf586a848d73cec11d9"
+  },
+  "families": {
+    "calendar": {
+      "fixture_count": 16,
+      "source_commit": "fa1c830e1142b89388551b9577f89dd46138d27f",
+      "manifest_sha256": "cf038c0b44ced2572bb66b5465d4e3cee7d7ee48e35cb97d44cb9b535e5f0126",
+      "original_manifest_qualification_passed": false,
+      "route_sha256": {
+        "original": "fcb791e219765f905c64290bd616324228935ac1a9cb4e5c2945cc5ea33ea459",
+        "candidate": "2110088682553419aeb10d4a24ee4a34aadc1b1a968e1300f4dc12df423d15fc",
+        "pure": "215c532bdb936fa48b2210403f3ffc99dc3f3b9bcbe2d834739223e379415a60"
+      },
+      "functional_pass_count": 16,
+      "actual_adapter_exact_count": 12,
+      "brief_exact_count": 8,
+      "raw_comparisons": [
+        {
+          "case_id": "calendar/day-1/p50_ms/member-False/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "calendar/day-1/p50_ms/member-False/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "calendar/day-1/p50_ms/member-True/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "calendar/day-1/p50_ms/member-True/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "calendar/day-1/p95_ms/member-False/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "calendar/day-1/p95_ms/member-False/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "calendar/day-1/p95_ms/member-True/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "calendar/day-1/p95_ms/member-True/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "calendar/day-2/p50_ms/member-False/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": false
+        },
+        {
+          "case_id": "calendar/day-2/p50_ms/member-False/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "calendar/day-2/p50_ms/member-True/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": false
+        },
+        {
+          "case_id": "calendar/day-2/p50_ms/member-True/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "calendar/day-2/p95_ms/member-False/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": false
+        },
+        {
+          "case_id": "calendar/day-2/p95_ms/member-False/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "calendar/day-2/p95_ms/member-True/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": false
+        },
+        {
+          "case_id": "calendar/day-2/p95_ms/member-True/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        }
+      ]
+    },
+    "decimal": {
+      "fixture_count": 72,
+      "source_commit": "fa1c830e1142b89388551b9577f89dd46138d27f",
+      "manifest_sha256": "8cbea07ca9bd08dbb7fa0165ceeb5f90a7d7f0d53f15267ee6d1a5b6b49a74c8",
+      "original_manifest_qualification_passed": false,
+      "route_sha256": {
+        "original": "2a1b857143d7fb30459d80b109203773501876b3c595db46e4b8fa1ec4f98012",
+        "candidate": "2a1b857143d7fb30459d80b109203773501876b3c595db46e4b8fa1ec4f98012",
+        "pure": "82d123bd17b45625b640cc2b8ad210f03c5fba012cef85124997466f853f44b3"
+      },
+      "functional_pass_count": 72,
+      "actual_adapter_exact_count": 72,
+      "brief_exact_count": 36,
+      "raw_comparisons": [
+        {
+          "case_id": "typed-number/decimal/-0.5000000000000000000000000001/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-0.5000000000000000000000000001/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-0.5000000000000000000000000001/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-0.5000000000000000000000000001/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/0.5/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/0.5/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/0.5/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/0.5/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/0.5000000000000000000000000001/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/0.5000000000000000000000000001/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/0.5000000000000000000000000001/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/0.5000000000000000000000000001/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/1.4999999999999999999999999999/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/1.4999999999999999999999999999/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/1.4999999999999999999999999999/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/1.4999999999999999999999999999/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/1.5/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/1.5/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/1.5/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/1.5/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/2.5/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/2.5/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/2.5/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/2.5/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-1.5/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-1.5/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-1.5/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-1.5/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-2.5/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-2.5/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-2.5/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-2.5/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/2147483647.4999999999999999999/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/2147483647.4999999999999999999/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/2147483647.4999999999999999999/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/2147483647.4999999999999999999/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/2147483647.5/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/2147483647.5/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/2147483647.5/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/2147483647.5/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-2147483648.5/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-2147483648.5/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-2147483648.5/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-2147483648.5/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-2147483648.5000000000000000001/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-2147483648.5000000000000000001/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-2147483648.5000000000000000001/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/decimal/-2147483648.5000000000000000001/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/double/0.5000000000000000000000000001/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/double/0.5000000000000000000000000001/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/double/0.5000000000000000000000000001/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/double/0.5000000000000000000000000001/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/double/1.4999999999999999999999999999/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/double/1.4999999999999999999999999999/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/double/1.4999999999999999999999999999/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/double/1.4999999999999999999999999999/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/double/2147483647.4999999999999999999/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/double/2147483647.4999999999999999999/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/double/2147483647.4999999999999999999/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/double/2147483647.4999999999999999999/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/string/0.5000000000000000000000000001/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/string/0.5000000000000000000000000001/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/string/0.5000000000000000000000000001/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/string/0.5000000000000000000000000001/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/string/1.4999999999999999999999999999/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/string/1.4999999999999999999999999999/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/string/1.4999999999999999999999999999/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/string/1.4999999999999999999999999999/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/string/2147483647.4999999999999999999/p50_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/string/2147483647.4999999999999999999/p50_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/string/2147483647.4999999999999999999/p95_ms/brief-False",
+          "public_payload_observed": true,
+          "pure_kernel_contract_exact": true,
+          "actual_adapter_record_exact": true
+        },
+        {
+          "case_id": "typed-number/string/2147483647.4999999999999999999/p95_ms/brief-True",
+          "public_payload_observed": false,
+          "pure_kernel_contract_exact": false,
+          "actual_adapter_record_exact": true
+        }
+      ]
+    }
+  }
+}

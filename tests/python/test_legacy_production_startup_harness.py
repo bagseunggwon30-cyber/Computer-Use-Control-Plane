@@ -7,19 +7,18 @@ import legacy_production_startup as harness
 
 
 class ProductionStartupHarnessTests(unittest.TestCase):
-    def test_exact_closed_operation_sets_include_audit_and_exclude_retained_benchmark(self):
+    def test_exact_closed_operation_sets_include_all_nine_diagnostics(self):
         self.assertEqual(set(harness.FAMILIES['interaction']['operations']), {
             'find-label', 'click-point', 'click-label', 'safe-type', 'icon-find',
             'icon-click', 'ocr-click', 'precision-validate'})
         self.assertEqual(set(harness.FAMILIES['diagnostics']['operations']), {
             'perf', 'diagnose-lag', 'health-quick', 'health-detail', 'log-tail', 'self-test',
-            'release-notes', 'audit-summary'})
+            'release-notes', 'audit-summary', 'benchmark'})
         for family in harness.FAMILIES:
             for operation in harness.FAMILIES[family]['operations']:
                 case = harness.fixture_case(family, operation)
                 self.assertEqual(json.loads(json.dumps(case)), case)
                 self.assertEqual(case['rest'], harness.LITERAL_REST)
-                self.assertNotEqual(operation, 'benchmark')
         audit = harness.fixture_case('diagnostics', 'audit-summary')
         self.assertEqual(audit['wrapper'], 'Invoke-MacroAuditSummary')
         self.assertEqual(audit['entry'], '_Invoke-LegacyDiagnosticFamily')
@@ -36,7 +35,7 @@ class ProductionStartupHarnessTests(unittest.TestCase):
                                  b'startup_provider_guard:Invoke-NativeHelper'),
         }
         for family, operations in (('interaction', ('find-label',)),
-                                   ('diagnostics', ('perf', 'audit-summary'))):
+                                   ('diagnostics', ('perf', 'audit-summary', 'benchmark'))):
             self.assertEqual(harness.FAMILIES[family]['failure_operations'], operations)
             for mode, (method, exit_code, stderr) in controls.items():
                 with self.subTest(family=family, mode=mode):

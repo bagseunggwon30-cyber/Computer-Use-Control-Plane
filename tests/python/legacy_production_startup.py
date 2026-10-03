@@ -32,10 +32,10 @@ FAMILIES = {
         'operations': {
             'perf': 'Perf', 'diagnose-lag': 'DiagnoseLag', 'health-quick': 'HealthQuick',
             'health-detail': 'HealthDetail', 'log-tail': 'LogTail', 'self-test': 'SelfTest',
-            'release-notes': 'ReleaseNotes', 'audit-summary': 'AuditSummary',
+            'release-notes': 'ReleaseNotes', 'audit-summary': 'AuditSummary', 'benchmark': 'Benchmark',
         },
-        # Keep the original control and qualify the newly promoted audit route.
-        'failure_operations': ('perf', 'audit-summary'),
+        # Retain controls and prove both report routes fail closed during startup.
+        'failure_operations': ('perf', 'audit-summary', 'benchmark'),
     },
 }
 # Values intentionally resemble outer switches and consent flags. They travel

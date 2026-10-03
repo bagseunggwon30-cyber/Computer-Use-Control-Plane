@@ -1,0 +1,30 @@
+{
+  "schema": "cucp.helper-observed-binding-pin/v1",
+  "published_commit": "f5797783c71b4d2e70ac3649d59ad838ef10cd02",
+  "run_id": 37104552075,
+  "artifact_archive_sha256": "4381099fc3eae4ca191c1042520fc441d2b6cf53fb1b4c23691bf53c8ea180c0",
+  "artifact_stem": "original-dispatch-binding-probe-a1e43d4de4d9",
+  "stdout_bytes": 34021,
+  "stdout_sha256": "4d7cfb0b5de6c4d76e0685c6d5ff84d7e0c2d29f90590f79646cb444ad99521f",
+  "stderr_bytes": 0,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "probe_normalized_sha256": "624ae0d920be21d9a47dcaf0ff4d35529bc7cab872b744cdea8a8f2361bb0b86",
+  "process_record": {
+    "exit_code": 0,
+    "timed_out": false,
+    "running": false,
+    "launch_error": null,
+    "kill_error": null,
+    "drain_incomplete": false,
+    "stdin_error": null,
+    "read_errors": {},
+    "bytes_observed": {
+      "stdout": 34021,
+      "stderr": 0
+    },
+    "truncated": {
+      "stdout": false,
+      "stderr": false
+    }
+  }
+}

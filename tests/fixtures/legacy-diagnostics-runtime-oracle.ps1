@@ -123,14 +123,14 @@ function Replace-Pattern([string]$Text,[string]$Pattern,[string]$New){
 }
 $names=@('_Read-OptValue','_Read-Switch','_Iif','Invoke-MacroPerf','Invoke-MacroDiagnoseLag','Invoke-MacroHealthQuick','Invoke-MacroHealthDetail','Invoke-MacroSelfTest','Invoke-MacroBenchmark')
 if($ProductionEntry){$names=@($names|Where-Object {$_ -ne '_Iif'})}
-$productionDelegates=@{'Invoke-MacroPerf'='perf';'Invoke-MacroDiagnoseLag'='diagnose-lag';'Invoke-MacroHealthQuick'='health-quick';'Invoke-MacroHealthDetail'='health-detail';'Invoke-MacroSelfTest'='self-test'}
+$productionDelegates=@{'Invoke-MacroPerf'='perf';'Invoke-MacroDiagnoseLag'='diagnose-lag';'Invoke-MacroHealthQuick'='health-quick';'Invoke-MacroHealthDetail'='health-detail';'Invoke-MacroSelfTest'='self-test';'Invoke-MacroBenchmark'='benchmark'}
 $definitions=@{}
 foreach($name in $names){
  $nodes=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
  if($nodes.Count -ne 1){throw "Expected unique original definition $name"}
  $body=$nodes[0].Extent.Text
- # Production loads current public delegates byte-for-byte. Benchmark remains
- # the current original body and still receives the exact acquisition seams.
+ # Every runtime production entry loads its exact current delegate; only the
+ # pinned historical original route receives acquisition seam replacements.
  if($ProductionEntry -and $productionDelegates.ContainsKey($name)){
   $operation=$productionDelegates[$name]
   Fixture-ValidatePublicDelegate $nodes[0] $operation

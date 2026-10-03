@@ -1,19 +1,23 @@
-"""Pinned PS5 action bodies with an explicit, verified type-name-only seam.
+"""Exact-original binding evidence and separately labelled corrected intent.
 
 Provider results are synthesized only from case data, never candidate output.
-Query order comes from the original executed function and is checked by the
-candidate's exhaustible provider. Owned transport is a separate suite.
+The corrected body changes only verified Args names and acquisition type names.
+Its outputs/order face independent contracts and the candidate's exhaustible
+provider. This is not exact-original action parity. Transport is separate.
 """
 import copy
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sys
 import tempfile
 import unittest
 from helper_process_evidence import run_evidence, require_success
-from test_legacy_helper_source import ROOT, FIXTURES, MANIFEST, published_source, expected_type_seam
+from test_legacy_helper_source import ROOT, FIXTURES, MANIFEST, published_source, expected_type_seam, expected_args_seam
+from helper_binding_observation import classify_original_actions, classify_binding_probe
+from helper_baseline_observation import save_classification
 
 HOST = os.environ.get('CUCP_LEGACY_HELPER_TEST_HOST', '')
 ENABLED = sys.platform == 'win32' and HOST
@@ -70,6 +74,17 @@ def utf16_cut(text, maximum):
     return text.encode('utf-16-le')[:maximum * 2].decode('utf-16-le', errors='surrogatepass')
 
 
+def same_json_types(left, right):
+    """Fixture contracts distinguish booleans, integer fields and collections."""
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(same_json_types(left[key], right[key]) for key in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(same_json_types(a, b) for a, b in zip(left, right))
+    return left == right
+
+
 def validate_oracle_execution(case, before):
     """Reject absent dispatch/invalid JSON collections before candidate replay."""
     if not isinstance(before, dict) or not isinstance(before.get('calls'), list):
@@ -82,6 +97,171 @@ def validate_oracle_execution(case, before):
     for response in before['responses']:
         if not isinstance(response, dict) or set(response) != {'id', 'exit_code', 'result', 'error'}:
             raise AssertionError('Oracle response must preserve its complete result/error record')
+
+
+def corrected_intent_contract(case, *, temp_paths=()):
+    """Reviewed outputs and acquisition order for the closed fixture corpus.
+
+    Expectations come from fixture data and declared action semantics, never
+    candidate results or captured provider return sequences. Only generated OCR
+    filenames are supplied by the oracle; their format/count is checked below.
+    Tied-result order remains checked by the exact oracle/candidate differential.
+    """
+    responses, calls = [], []
+    def call(op, *args):
+        calls.append(dict(op=op, args=list(args)))
+    def response(result):
+        request = case['requests'][len(responses)]
+        responses.append(dict(id=request.get('id'), exit_code={'error': 1, 'partial': 2, 'fallback_required': 99}.get(result['status'], 0),
+                              result=result, error=None))
+    def health(count, loaded):
+        return dict(status='ok', schema='cucp.health/v1', helper_mode='persistent_server', pid=123,
+                    pipe_name='fixture', uptime_s=0, request_count=count, win32_loaded=loaded)
+    def failed(reason, **extra):
+        return dict(status='error', reason=reason, **extra)
+    def uia_candidate(element, score):
+        return dict(name=element['name'], score=score, rect=element['rect'],
+                    click_point=dict(x=50, y=50), control_type=element.get('control_type', ''))
+    def uia_result(elements, scores, match=None):
+        candidates = [uia_candidate(element, score) for element, score in zip(elements, scores)]
+        return dict(status='ok', schema='cucp.uia-find/v1', label='Save', match=match,
+                    score=scores[0], best=candidates[0], candidates=candidates,
+                    candidate_count=len(candidates), uia_warm=True)
+    def uia_scan(elements):
+        for element in elements:
+            call('uia.name', element['id']); call('uia.rect', element['id']); call('uia.controlType', element['id'])
+    identity = case['id']
+    if identity == 'denied-six':
+        call('win32.ensure'); response(failed('win32_unavailable'))
+        response(health(2, False))
+        call('win32.ensure'); response(failed('win32_unavailable'))
+        call('uia.loadModal'); call('win32.ensure'); response(failed('win32_unavailable'))
+        call('win32.ensure'); response(failed('win32_unavailable'))
+        call('uia.load'); response(failed('uia_load_failed'))
+        response(dict(status='ok', shutting_down=True))
+        response(dict(status='fallback_required', reason='action_not_supported_in_server', action='UNKNOWN',
+                      recommended_action='wrapper should fall back to child process for this action'))
+    elif identity.startswith('windows-'):
+        call('win32.ensure')
+        foreground = dict(hwnd=126, title='İstanbul')
+        for index in range(2):
+            # The literal I fixture intentionally distinguishes Turkish casing.
+            matches = [126] if index == 0 and case['culture'] != 'tr-TR' else []
+            call('win32.enumerate')
+            for window in case['windows']:
+                handle = window['hwnd']; call('win32.visible', handle)
+                if handle == 124: continue
+                call('win32.titleLength', handle)
+                if handle == 125: continue
+                call('win32.title', handle, len(window['title'].encode('utf-16-le')) // 2 + 1)
+                call('win32.class', handle, 256); call('win32.pid', handle)
+                if handle in matches: call('win32.rect', handle)
+            call('win32.foreground'); call('win32.titleLength', 126); call('win32.title', 126, 9)
+            response(dict(status='ok', schema='cucp.observation/v1', kind='windows', sources=['win32_helper_server'],
+                          foreground=foreground, windows=[{k: v for k, v in w.items() if k != 'visible'}
+                                                        for w in case['windows'] if w['hwnd'] in matches], count=len(matches)))
+        call('win32.foreground'); call('win32.title', 126, 512); call('win32.class', 126, 256)
+        call('win32.pid', 126); call('win32.rect', 126)
+        response(dict(status='ok', schema='cucp.focused/v1', **case['windows'][3]))
+        response(health(4, True))
+    elif identity.startswith('modal-'):
+        call('uia.loadModal'); call('win32.ensure'); call('win32.foreground')
+        foreground = None
+        if identity != 'modal-large-ties':
+            call('win32.title', 123, 512); call('win32.class', 123, 256)
+            foreground = dict(hwnd=123, title='한글 😀 Save', **{'class': 'Dialog'})
+        call('uia.root'); call('uia.children', 'root', 'window-or-pane')
+        candidates = []
+        for element in case['uia_children']:
+            for op in ('name', 'class', 'rect', 'isModal', 'handle'): call('uia.' + op, element['id'])
+            score, reason = {'modal': (120, 'uia_window_is_modal'), 'dialog': (80, 'dialog_class_name')}.get(element['id'], (20, 'small_window_size'))
+            candidates.append(dict(hwnd=0, title=element['name'], score=score, reason=reason,
+                                   is_modal=element.get('is_modal', False), **{'class': element.get('class', '')}))
+        candidates.sort(key=lambda value: -value['score'])
+        response(dict(status='ok', schema='cucp.modal-detect/v1', foreground=foreground,
+                      modal_candidates=candidates, candidate_count=len(candidates),
+                      recommended_action='wait' if identity == 'modal-large-ties' else 'dismiss_or_confirm'))
+    elif identity in ('ocr-success-truthiness-cache', 'ocr-max-dimension', 'ocr-init-retry'):
+        call('win32.ensure')
+        if identity == 'ocr-init-retry':
+            for _ in range(2):
+                call('ocr.initialize'); response(failed('ocr_init_failed', detail='owned fixture init failure'))
+        else:
+            call('ocr.initialize'); call('ocr.createProfile')
+            for index in range(len(case['requests'])):
+                for op in ('loadDrawing', 'primaryScreenWidth', 'loadFormsAndVirtualWidth', 'maxDimension'): call('ocr.' + op)
+                if identity == 'ocr-max-dimension':
+                    response(failed('region_exceeds_max_image_dimension', max_dim=100)); continue
+                region = rect(0, 0, 800, 600) if index == 0 else rect(0, -2, 800, 300)
+                path = temp_paths[index]
+                call('ocr.tempPath'); calls[-1]['value'] = path
+                call('ocr.capture', region['x'], region['y'], region['w'], region['h'], path)
+                call('ocr.prepareAsync'); call('ocr.loadFile', path); call('ocr.openRead', 'file')
+                call('ocr.createDecoder', 'stream'); call('ocr.getBitmap', 'decoder'); call('ocr.recognize', 'engine', 'bitmap')
+                call('ocr.removeTemp', path)
+                response(dict(status='ok', schema='cucp.ocr-screen/v1', region=region, text='한글 OWNED 123',
+                              line_count=1, lines=[dict(text='한글 OWNED 123', word_count=3)], engine_warm=True))
+    elif identity in ('uia-en-US', 'uia-tr-TR', 'uia-ko-KR'):
+        call('uia.load'); call('win32.ensure')
+        call('uia.root'); call('uia.children', 'root', 'all'); call('uia.name', 'first'); call('uia.subtree', 'first')
+        first = case['uia_children'][0]['subtree']; uia_scan(first)
+        response(uia_result(first, [100, 80, 50], 'Application'))
+        call('uia.root'); call('uia.children', 'root', 'all'); call('uia.name', 'first'); call('uia.name', 'second')
+        call('uia.subtree', 'root'); uia_scan(case['uia_subtree'])
+        response(uia_result(case['uia_subtree'], [50], 'missing'))
+        response(failed('missing_label'))
+        call('uia.root'); call('uia.subtree', 'root'); uia_scan(case['uia_subtree'])
+        response(uia_result(case['uia_subtree'], [50]))
+    elif identity == 'uia-caps-ties':
+        call('uia.load'); call('win32.ensure'); call('uia.root'); call('uia.subtree', 'root')
+        selected = case['uia_subtree'][:16]; uia_scan(selected); response(uia_result(selected, [80] * 16))
+    elif identity in ('uia-scan-cap', 'uia-no-match'):
+        call('uia.load'); call('win32.ensure'); call('uia.root'); call('uia.subtree', 'root')
+        for element in case['uia_subtree'][:800]: call('uia.name', element['id'])
+        response(dict(status='partial', reason='no_match', label='Save' if identity == 'uia-scan-cap' else 'missing', match=None, candidate_count=0))
+    elif identity == 'focused-partial':
+        call('win32.ensure'); call('win32.foreground'); response(dict(status='partial', reason='no_foreground'))
+    else:
+        raise AssertionError('Corrected-intent case needs an independent behavior contract: ' + identity)
+    return dict(responses=responses, calls=calls, request_count=len(responses),
+                effects=[{'win32.ensure': 'ensure_win32', 'uia.load': 'ensure_uia', 'ocr.initialize': 'ensure_ocr'}[c['op']]
+                         for c in calls if c['op'] in ('win32.ensure', 'uia.load', 'ocr.initialize')])
+
+
+def validate_corrected_intent_behavior(case, before):
+    validate_oracle_execution(case, before)
+    if before.get('oracle_mode') != 'corrected-intent':
+        raise AssertionError('Positive action checks require explicit corrected-intent mode')
+    paths = [call.get('value') for call in before['calls'] if call.get('op') == 'ocr.tempPath']
+    expected_count = 2 if case['id'] == 'ocr-success-truthiness-cache' else 0
+    if (len(paths) != expected_count
+            or any(not isinstance(path, str) or not re.fullmatch(r'.*[\\/]cucp-srv-ocr-[0-9a-f]{32}\.png', path) for path in paths)
+            or len(set(paths)) != len(paths)):
+        raise AssertionError('Corrected-intent OCR temporary paths must have the exact generated shape and count')
+    expected = corrected_intent_contract(case, temp_paths=paths)
+    observed = {key: copy.deepcopy(before.get(key)) for key in expected}
+    # PS5 tie sorting is not assumed by the independent semantic contract. Keep
+    # complete tied members/scores and best-membership; the differential below
+    # still requires the candidate's exact corrected-body order and chosen best.
+    for want, actual in zip(expected['responses'], observed['responses']):
+        result, got = want['result'], actual['result']
+        if isinstance(got, dict) and result.get('schema') in ('cucp.modal-detect/v1', 'cucp.uia-find/v1'):
+            key = 'modal_candidates' if result['schema'] == 'cucp.modal-detect/v1' else 'candidates'
+            if isinstance(got.get(key), list) and all(isinstance(v, dict) and type(v.get('score')) is int for v in got[key]):
+                if [v['score'] for v in got[key]] != sorted((v['score'] for v in got[key]), reverse=True):
+                    raise AssertionError('Corrected-intent candidates must be ordered by descending score')
+                if key == 'candidates' and got[key]:
+                    best = got.get('best')
+                    if (not same_json_types(best, got[key][0])
+                            or not any(same_json_types(best, candidate) for candidate in result[key])
+                            or not same_json_types(best['score'], result['score'])):
+                        raise AssertionError('Corrected-intent best must be the first highest-scoring supported candidate')
+                    got['best'] = result['best']
+                result[key].sort(key=lambda v: json.dumps(v, sort_keys=True))
+                got[key].sort(key=lambda v: json.dumps(v, sort_keys=True))
+    if not same_json_types(observed, expected):
+        raise AssertionError('Corrected-intent outputs or action effect order violate the independent contract: ' + case['id']
+                             + '\nexpected=' + repr(expected) + '\nobserved=' + repr(observed))
 
 
 def captured_calls(case, trace):
@@ -162,6 +342,54 @@ def captured_calls(case, trace):
 
 
 class HelperParityCorpusTests(unittest.TestCase):
+    def test_uia_best_rejects_numeric_type_changes_after_json_round_trip(self):
+        case = next(case for case in cases() if case['id'] == 'uia-en-US')
+        before = corrected_intent_contract(case)
+        before['oracle_mode'] = 'corrected-intent'
+        before = json.loads(json.dumps(before))
+        result = before['responses'][0]['result']
+        self.assertIsNot(result['best'], result['candidates'][0])
+        validate_corrected_intent_behavior(case, before)
+        for path, value in [(('score',), 100.0), (('click_point', 'x'), 50.0)]:
+            altered = copy.deepcopy(before)
+            target = altered['responses'][0]['result']['best']
+            for key in path[:-1]:
+                target = target[key]
+            target[path[-1]] = value
+            with self.subTest(path=path), self.assertRaises(AssertionError):
+                validate_corrected_intent_behavior(case, altered)
+
+    def test_independent_contract_preserves_json_types(self):
+        for value, changed in [(False, 0), (True, 1), (1, 1.0), ([], {}), (None, ''),
+                               ({'x': [False]}, {'x': [0]})]:
+            with self.subTest(value=value, changed=changed):
+                self.assertFalse(same_json_types(value, changed))
+                self.assertTrue(same_json_types(value, copy.deepcopy(value)))
+
+    def test_independent_corrected_contract_covers_every_case_and_rejects_canned_results(self):
+        paths = [r'C:\Temp\cucp-srv-ocr-' + letter * 32 + '.png' for letter in ('a', 'b')]
+        for case in cases():
+            before = corrected_intent_contract(case, temp_paths=paths)
+            before['oracle_mode'] = 'corrected-intent'
+            with self.subTest(case=case['id']):
+                validate_corrected_intent_behavior(case, before)
+                captured_calls(case, before['calls'])
+                self.assertEqual(len(before['responses']), len(case['requests']))
+                for field, value in [('calls', []), ('effects', []), ('oracle_mode', 'exact-original')]:
+                    if before[field] == value: continue
+                    altered = copy.deepcopy(before); altered[field] = value
+                    with self.assertRaises(AssertionError): validate_corrected_intent_behavior(case, altered)
+                altered = copy.deepcopy(before)
+                altered['responses'][0]['result'] = dict(status='ok')
+                with self.assertRaises(AssertionError): validate_corrected_intent_behavior(case, altered)
+                if len(before['calls']) > 1:
+                    altered = copy.deepcopy(before)
+                    different = next(index for index, call in enumerate(altered['calls']) if call != altered['calls'][0])
+                    altered['calls'][0], altered['calls'][different] = altered['calls'][different], altered['calls'][0]
+                    with self.assertRaises(AssertionError): validate_corrected_intent_behavior(case, altered)
+        with self.assertRaisesRegex(AssertionError, 'independent behavior contract'):
+            corrected_intent_contract(dict(id='new-unreviewed-case', requests=[]))
+
     def test_capture_replay_preserves_empty_single_and_ordered_calls(self):
         self.assertEqual(captured_calls({}, []), [])
         trace = [dict(op='uia.loadModal', args=[]), dict(op='uia.load', args=[]),
@@ -213,7 +441,7 @@ class HelperActionsWindowsParityTests(unittest.TestCase):
         """Classify the binding defect without correcting published function text.
 
         This is a diagnostic baseline, not successful original action parity.
-        The original action differential below still must pass independently.
+        The exact-original action run below remains independently classified.
         """
         with tempfile.TemporaryDirectory(prefix='CUCP binding probe ') as directory:
             root = Path(directory)
@@ -269,6 +497,7 @@ class HelperActionsWindowsParityTests(unittest.TestCase):
                         for text in (error['message'], error['invocation']['line'],
                                      error['invocation']['position'], error['script_stack_trace']):
                             self.assertLessEqual(len(text.encode('utf-16-le')), 4096)
+            save_classification(classify_binding_probe(result, source=source), result['evidence_path'])
             source.write_bytes(source.read_bytes() + b'\n# changed binding-probe source\n')
             refused = run_evidence(command, directory=logs, label='original-dispatch-binding-source-refusal',
                                    cwd=root, timeout=20, limit=256 * 1024)
@@ -276,7 +505,8 @@ class HelperActionsWindowsParityTests(unittest.TestCase):
             self.assertEqual(refused['stdout'], b'')
             self.assertIn('Published server source hash mismatch', refused['stderr'].decode('utf-8-sig'))
 
-    def oracle(self, root, logs, label, *, source, stubs=None, wrong_binding=False, extent_fault=None):
+    def oracle(self, root, logs, label, *, source, stubs=None, wrong_binding=False, extent_fault=None,
+               corrected_intent=False, args_extent_fault=None):
         command = [shutil.which('powershell.exe'), '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
                    '-File', str(FIXTURES / 'oracle.ps1'), '-Source', str(source),
                    '-Manifest', str(FIXTURES / 'source-manifest.json'), '-CasePath', str(root / 'case.json')]
@@ -286,6 +516,10 @@ class HelperActionsWindowsParityTests(unittest.TestCase):
             command += ['-TestWrongBinding']
         if extent_fault is not None:
             command += ['-TestTypeExtentFault', extent_fault]
+        if corrected_intent:
+            command += ['-CorrectedIntent']
+        if args_extent_fault is not None:
+            command += ['-TestArgsExtentFault', args_extent_fault]
         return run_evidence(command, directory=logs, label=label, cwd=root, timeout=40, limit=2 * 1024 * 1024)
 
     def test_oracle_type_edit_order_and_refusals(self):
@@ -305,6 +539,8 @@ class HelperActionsWindowsParityTests(unittest.TestCase):
             self.assertEqual(seam, expected_type_seam(raw))
             self.assertEqual(before['responses'], [])
             self.assertEqual(before['calls'], [])
+            self.assertEqual(before['oracle_mode'], 'exact-original')
+            self.assertIsNone(before['args_seam'])
             self.assertEqual(success['stderr'], b'')
             first = next(s for s in seam['type_substitutions'] if s['function'] == '_Action-Windows')
             for fault, reason, planned, applied in [('duplicate', 'overlap_or_order', 12, 11),
@@ -325,6 +561,48 @@ class HelperActionsWindowsParityTests(unittest.TestCase):
                     self.assertIn('Overlapping or changed oracle type extent', '\n'.join(lines[1:]))
                     self.assertEqual(result['stdout'], b'')
 
+    def test_corrected_intent_args_extents_and_faults_are_separately_evidenced(self):
+        with tempfile.TemporaryDirectory(prefix='CUCP corrected intent extent ') as directory:
+            root = Path(directory)
+            logs = Path(os.environ.get('CUCP_HELPER_EVIDENCE_DIR', root / 'evidence'))
+            raw = published_source('scripts/cucp-helper-server.ps1', logs)
+            source = root / 'published.ps1'; source.write_bytes(raw)
+            (root / 'case.json').write_text(json.dumps(dict(requests=[])), encoding='utf-8')
+            result = self.oracle(root, logs, 'corrected-intent-args-census', source=source, corrected_intent=True)
+            require_success(result)
+            self.assertEqual(result['stderr'], b'')
+            observed = json.loads(result['stdout'].decode('utf-8-sig'))
+            self.assertEqual(observed['oracle_mode'], 'corrected-intent')
+            self.assertEqual(observed['responses'], [])
+            self.assertEqual(observed['calls'], [])
+            observed['oracle_seam']['guarded_types'].sort()
+            observed['oracle_seam']['type_substitutions'].sort(key=lambda site: site['start_utf16'])
+            self.assertEqual(observed['oracle_seam'], expected_type_seam(raw))
+            observed['args_seam']['args_substitutions'].sort(key=lambda site: site['start_utf16'])
+            self.assertEqual(observed['args_seam'], expected_args_seam(raw))
+            first = expected_args_seam(raw)['args_substitutions'][0]
+            for fault, reason in [('duplicate', 'overlap_or_order'), ('changed', 'text_mismatch'), ('wrongname', 'wrong_replacement_name')]:
+                with self.subTest(fault=fault):
+                    refused = self.oracle(root, logs, 'corrected-intent-args-' + fault, source=source,
+                                          corrected_intent=True, args_extent_fault=fault)
+                    require_success(refused, expected_exit=1)
+                    self.assertEqual(refused['stdout'], b'')
+                    lines = refused['stderr'].decode('utf-8-sig').splitlines()
+                    diagnostic = json.loads(lines[0])
+                    self.assertEqual(diagnostic['schema'], 'cucp.oracle-args-extent-refusal/v1')
+                    self.assertEqual(diagnostic['reason'], reason)
+                    self.assertEqual(diagnostic['function'], first['function'])
+                    self.assertEqual(diagnostic['start_utf16'], first['start_utf16'])
+                    self.assertEqual(diagnostic['end_utf16'], first['end_utf16'])
+                    self.assertEqual(diagnostic['planned'], 16 if fault == 'duplicate' else 15)
+                    self.assertEqual(diagnostic['applied'], 15 if fault == 'duplicate' else 14)
+                    self.assertLessEqual(len(diagnostic['actual_prefix'].encode('utf-16-le')), 256)
+                    self.assertIn('Unsafe corrected-intent Args extent', '\n'.join(lines[1:]))
+            refused = self.oracle(root, logs, 'original-refuses-args-fault-switch', source=source, args_extent_fault='duplicate')
+            require_success(refused, expected_exit=1)
+            self.assertEqual(refused['stdout'], b'')
+            self.assertIn('Args extent faults require explicit corrected-intent mode', refused['stderr'].decode('utf-8-sig'))
+
     def test_oracle_rejects_source_facade_and_type_binding_changes_before_dispatch(self):
         with tempfile.TemporaryDirectory(prefix='CUCP guarded oracle ') as directory:
             root = Path(directory)
@@ -335,12 +613,14 @@ class HelperActionsWindowsParityTests(unittest.TestCase):
             (root / 'case.json').write_text(json.dumps(dict(win32=True, ocr=True, requests=[dict(action='ocr-screen-fast', args={})])), encoding='utf-8')
 
             def expect_failure(label, message, **kwargs):
-                result = self.oracle(root, logs, label, source=source, **kwargs)
-                # Timeout, launch error, truncated output, etc. never count as a
-                # successful refusal. All raw evidence already exists on disk.
-                require_success(result, expected_exit=1)
-                self.assertIn(message, result['stderr'].decode('utf-8-sig', errors='replace'))
-                self.assertEqual(result['stdout'], b'')
+                for corrected in (False, True):
+                    result = self.oracle(root, logs, label + ('-corrected-intent' if corrected else ''),
+                                         source=source, corrected_intent=corrected, **kwargs)
+                    # Timeout, launch error, truncated output, etc. never count
+                    # as a successful refusal. Raw evidence is already saved.
+                    require_success(result, expected_exit=1)
+                    self.assertIn(message, result['stderr'].decode('utf-8-sig', errors='replace'))
+                    self.assertEqual(result['stdout'], b'')
 
             expect_failure('oracle-missing-facade', 'An inert acquisition facade is required', stubs=False)
             source.write_bytes(original_source.replace(b'[Windows.Storage.StorageFile]', b'[System.String]', 1))
@@ -353,30 +633,40 @@ class HelperActionsWindowsParityTests(unittest.TestCase):
             # only a switch. No executable PowerShell string is manufactured.
             expect_failure('oracle-wrong-assembly-binding', 'Unsafe oracle type resolution: CucpFixture.HelperWin32', wrong_binding=True)
 
-    def test_published_actions_inert_providers_and_exact_query_order(self):
+    def test_original_binding_classification_and_corrected_intent_action_differential(self):
         with tempfile.TemporaryDirectory(prefix='CUCP helper oracle 한글 ') as directory:
             root=Path(directory)
             logs=Path(os.environ.get('CUCP_HELPER_EVIDENCE_DIR', root/'evidence'))
             source=root/'published.ps1';source.write_bytes(published_source('scripts/cucp-helper-server.ps1',logs))
             expected_seam=expected_type_seam(source.read_bytes())
+            expected_args=expected_args_seam(source.read_bytes())
             for case in cases():
                 with self.subTest(case=case['id']):
                     path=root/'case.json';path.write_text(json.dumps(case,ensure_ascii=True),encoding='utf-8')
                     original=self.oracle(root,logs,case['id']+'-oracle',source=source)
                     require_success(original)
-                    before=json.loads(original['stdout'].decode('utf-8-sig'))
+                    # Keep every raw exact-original response. Its known binding
+                    # failure is classified, never renamed successful parity.
+                    save_classification(classify_original_actions(original, case=case, source=source), original['evidence_path'])
+                    corrected=self.oracle(root,logs,case['id']+'-corrected-intent-oracle',source=source,corrected_intent=True)
+                    require_success(corrected)
+                    self.assertEqual(corrected['stderr'], b'')
+                    before=json.loads(corrected['stdout'].decode('utf-8-sig'))
                     seam=before['oracle_seam']
                     seam['guarded_types'].sort()
                     seam['type_substitutions'].sort(key=lambda s:s['start_utf16'])
                     self.assertEqual(seam,expected_seam)
-                    validate_oracle_execution(case,before)
+                    before['args_seam']['args_substitutions'].sort(key=lambda site:site['start_utf16'])
+                    self.assertEqual(before['args_seam'],expected_args)
+                    validate_corrected_intent_behavior(case,before)
                     calls=captured_calls(case,before['calls'])
                     fixture=dict(pid=123,pipe_name='fixture',culture=case.get('culture','en-US'),clock=['2020-01-01T00:00:00Z']*(sum(r['action'].lower()=='health' for r in case['requests'])+1),calls=calls,requests=case['requests'])
                     path.write_text(json.dumps(fixture,ensure_ascii=True),encoding='utf-8')
-                    candidate=run_evidence([HOST,'fixture','--input-file',str(path)],directory=logs,label=case['id']+'-candidate',cwd=root,timeout=20,limit=2*1024*1024)
+                    candidate=run_evidence([HOST,'fixture','--input-file',str(path)],directory=logs,label=case['id']+'-corrected-intent-candidate',cwd=root,timeout=20,limit=2*1024*1024)
                     require_success(candidate)
                     after=json.loads(candidate['stdout'].decode('utf-8-sig'))
                     self.assertEqual(before['responses'],after['responses'])
+                    self.assertTrue(same_json_types(before['responses'],after['responses']), 'Corrected-intent response JSON types differ')
                     self.assertEqual(after['consumed'],len(calls))
                     self.assertEqual([dict(op=x['op'],args=x['args']) for x in before['calls']],after['calls'])
                     # The scripted provider refuses missing, extra, reordered, or

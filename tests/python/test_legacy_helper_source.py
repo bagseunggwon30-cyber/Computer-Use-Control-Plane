@@ -51,6 +51,52 @@ def expected_type_seam(raw):
                 type_substitutions=sites, guarded_types=sorted({s['replacement'] for s in sites}), functions=functions)
 
 
+def expected_args_seam(raw):
+    """Independent pinned-text census; all unedited UTF-16 bytes are preserved.
+
+    This never executes or manufactures PowerShell. The counted driver alone
+    performs AST rewriting. Its emitted hashes must match this byte census.
+    """
+    type_seam = expected_type_seam(raw)  # Includes the unchanged source hash pin.
+    entry = MANIFEST['files'][0]
+    encoded = raw.decode('utf-8-sig').replace('\r\n', '\n').encode('utf-16-le')
+    sites, functions = [], []
+    for record, typed in zip((f for f in entry['functions']
+                             if not f['parent_function'] and f['name'] not in LOADER_NAMES),
+                            type_seam['functions']):
+        body = encoded[2 * record['start_utf16']:2 * record['end_utf16']]
+        text = body.decode('utf-16-le')
+        edits = [s for s in type_seam['type_substitutions'] if s['function'] == record['name']]
+        for match in re.finditer(r'\$Args\b|-Args\b', text):
+            original = match[0]
+            kind = ('command-parameter' if original == '-Args' else
+                    'parameter' if text[:match.start()].endswith('[hashtable]') else 'variable')
+            start = record['start_utf16'] + len(text[:match.start()].encode('utf-16-le')) // 2
+            site = dict(function=record['name'], kind=kind, start_utf16=start, end_utf16=start + 5,
+                        original=original, replacement=original[0] + 'RequestData')
+            sites.append(site)
+            edits.append(site)
+        # Assemble unchanged intervals once, byte for byte. This independently
+        # checks the driver's reverse-offset edits, including cross-seam overlap.
+        cursor, pieces = 0, []
+        for edit in sorted(edits, key=lambda s: s['start_utf16']):
+            start = 2 * (edit['start_utf16'] - record['start_utf16'])
+            end = 2 * (edit['end_utf16'] - record['start_utf16'])
+            if start < cursor or end > len(body) or start >= end:
+                raise AssertionError('Overlapping or out-of-range independent census extent')
+            if body[start:end] != edit['original'].encode('utf-16-le'):
+                raise AssertionError('Changed independent census extent')
+            pieces.extend((body[cursor:start], edit['replacement'].encode('utf-16-le')))
+            cursor = end
+        pieces.append(body[cursor:])
+        corrected = b''.join(pieces).decode('utf-16-le').encode('utf-8')
+        functions.append(dict(name=record['name'], original_sha256=record['sha256'],
+                              type_only_sha256=typed['substituted_sha256'],
+                              corrected_sha256=hashlib.sha256(corrected).hexdigest()))
+    return dict(schema='cucp.oracle-corrected-intent-seam/v1', qualification='corrected-intent-only',
+                source_sha256=entry['normalized_sha256'], args_substitutions=sites, functions=functions)
+
+
 def published_source(path, directory):
     evidence = run_evidence(['git', 'show', f"{MANIFEST['published_tree']}:{path}"],
                             cwd=ROOT, directory=directory, label='published-git-source', limit=2 * 1024 * 1024)
@@ -168,6 +214,66 @@ class HelperSourceTests(unittest.TestCase):
         self.assertIn("[ValidateSet('none','duplicate','changed')][string]$TestTypeExtentFault='none'", driver)
         self.assertIn("if($TestTypeExtentFault -eq 'duplicate')", driver)
         self.assertIn("else{$first.name='FixtureChangedType'}", driver)
+
+    def test_corrected_intent_is_opt_in_and_its_census_preserves_other_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            raw = published_source('scripts/cucp-helper-server.ps1', directory)
+        seam = expected_args_seam(raw)
+        sites = seam['args_substitutions']
+        self.assertEqual(len(sites), 34)
+        self.assertEqual({kind: sum(s['kind'] == kind for s in sites)
+                          for kind in ('parameter', 'variable', 'command-parameter')},
+                         {'parameter': 7, 'variable': 21, 'command-parameter': 6})
+        self.assertEqual({name: sum(s['function'] == name for s in sites) for name in {s['function'] for s in sites}},
+                         {'_Action-Windows': 4, '_Action-Health': 1, '_Action-Focused': 1,
+                          '_Action-ModalDetect': 1, '_Action-OcrScreenFast': 9, '_Action-UiaFindFast': 5, '_Dispatch': 13})
+        self.assertEqual(len({(s['start_utf16'], s['end_utf16']) for s in sites}), 34)
+        driver = (FIXTURES / 'oracle.ps1').read_text(encoding='utf-8')
+        plan = driver.split('$argsPlan=[ordered]@{', 1)[1].split('\n}', 1)[0]
+        tables = re.findall(r"'([^']+)'=@\{([^\n]+)\}", plan)
+        self.assertEqual(len(tables), 7)
+        self.assertEqual({name for name, _ in tables}, {s['function'] for s in sites})
+        for name, table in tables:
+            expected = {kind: [s['start_utf16'] for s in sites if s['function'] == name and s['kind'] == kind]
+                        for kind in {s['kind'] for s in sites if s['function'] == name}}
+            actual = {kind.strip("'"): [int(n) for n in values.split(',')]
+                      for kind, values in re.findall(r"([\w'-]+)=@\(([\d,]+)\)", table)}
+            self.assertEqual(actual, expected, name)
+        for function in seam['functions']:
+            if function['name'] == '_Log':
+                self.assertEqual(function['corrected_sha256'], function['original_sha256'])
+            else:
+                self.assertNotEqual(function['corrected_sha256'], function['type_only_sha256'])
+        self.assertIn('[switch]$CorrectedIntent', driver)
+        self.assertNotIn('$CorrectedIntent=$true', driver)
+        self.assertIn("else{$value=_Dispatch -Action ([string]$r.action) -Args (Convert-Case $r.args)}", driver)
+        self.assertIn("qualification='corrected-intent-only'", driver)
+        self.assertIn("'corrected-intent'}else{'exact-original'", driver)
+        self.assertIn("$typeOnlyHash=Hash-Text $body", driver)
+        self.assertIn("substituted_sha256=$typeOnlyHash", driver)
+        self.assertIn('$owner -ne $node', driver)
+        self.assertIn("$extent.EndOffset -ne ($extent.StartOffset+5)", driver)
+        self.assertIn("$argsSites.Count -ne 34", driver)
+        self.assertIn("$part -is [Management.Automation.Language.VariableExpressionAst]", driver)
+        self.assertIn("$part -is [Management.Automation.Language.CommandParameterAst]", driver)
+        for mutated in (raw.replace(b'$Args', b'$Else', 1), raw.replace(b'-Args', b'-Else', 1), raw + b'\n'):
+            with self.assertRaisesRegex(AssertionError, 'Published server source hash mismatch'):
+                expected_args_seam(mutated)
+
+    def test_corrected_intent_rename_faults_refuse_before_import(self):
+        driver = (FIXTURES / 'oracle.ps1').read_text(encoding='utf-8')
+        self.assertIn("[ValidateSet('none','duplicate','changed','wrongname')][string]$TestArgsExtentFault='none'", driver)
+        self.assertIn("if($TestArgsExtentFault -eq 'duplicate')", driver)
+        self.assertIn("elseif($TestArgsExtentFault -eq 'changed'){$first.original='$Else'}", driver)
+        self.assertIn("else{$first.replacement='$Unplanned'}", driver)
+        for guard in ("$reason='overlap_or_order'", "$reason='text_mismatch'", "$reason='wrong_replacement_name'",
+                      "Missing planned Args AST extent", "Duplicate Args AST extent", "Unplanned Args AST extent"):
+            self.assertIn(guard, driver)
+        diagnostic = driver.index("schema='cucp.oracle-args-extent-refusal/v1'")
+        refusal = driver.index("throw 'Unsafe corrected-intent Args extent'")
+        self.assertLess(diagnostic, refusal)
+        self.assertLess(refusal, driver.index('Microsoft.PowerShell.Utility\\Add-Type'))
+        self.assertLess(refusal, driver.index('[scriptblock]::Create($function.body)'))
 
     def test_binding_probe_preserves_original_functions_and_trace_array_shape(self):
         probe = (FIXTURES / 'binding-probe.ps1').read_text(encoding='utf-8')

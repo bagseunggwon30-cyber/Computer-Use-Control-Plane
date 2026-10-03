@@ -485,3 +485,78 @@ The new 5,596-byte probe and 158-byte trace change add 5,754 counted PowerShell
 bytes: canonical total 907,688 on base `a3adb8c`. No helper source is retired.
 The safe binding observation and typed-array serialization still require the
 next Windows run; these local passes do not settle the binding hypothesis.
+
+### Observed binding defect and isolated corrected-intent comparison
+
+[Run 37104552075](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37104552075)
+at published `f5797783c71b4d2e70ac3649d59ad838ef10cd02` established the binding
+defect on Windows PowerShell 5.1.26100.33438. All five exact-original health
+calls and 15 exact-original dispatch calls failed before dispatch. All five
+automatic-`Args` controls failed, while all five distinct-name controls succeeded.
+Every input was a Hashtable, including literal and converted empty, populated
+and nested objects. Errors were `PSInvalidCastException` with the
+`ConvertToFinalInvalidCastException` FQID and the invoked command suffix.
+The typed empty-trace and extent/refusal tests passed. All 18 original action
+cases still failed before replay, as the diagnostic-first gate required.
+
+The complete 34,021-byte raw probe stdout is retained as
+`tests/fixtures/legacy-helper/observed-binding.stdout.bin`, SHA-256
+`4d7cfb0b5de6c4d76e0685c6d5ff84d7e0c2d29f90590f79646cb444ad99521f`.
+Its adjacent provenance record pins the public commit, run, archive digest,
+process outcome and unchanged counted probe hash. It is diagnostic data, including
+reported invocation lines, and is never evaluated or imported as source.
+
+The original mode remains the default. Every original action case still runs in
+its own process and retains complete raw stdout/stderr before a narrow classifier
+is applied. That classifier requires unchanged source and type-seam hashes,
+original mode, no Args edits, zero dispatch/acquisition, and the exact known
+binding error for every complete response. Changed results, different errors,
+missing/duplicate fields, timeouts, truncation or incomplete drains fail. Saved
+classification explicitly says `raw_oracle_status=failed` and
+`original_dispatch_qualified=false`. The unchanged binding probe also remains
+mandatory. This is a classification of an observed baseline defect, not an
+allowance for infrastructure failures or proof of original action behavior.
+
+An explicit `-CorrectedIntent` switch enables a separate comparison process.
+Only 34 original AST name extents across seven closed functions are renamed:
+seven parameter declarations and 21 `$Args` references become `$RequestData`,
+and six dispatch `-Args` tokens become `-RequestData`. `_Log` is unchanged.
+Absolute UTF-16 offsets, literal spelling, AST kinds, declaring function and
+closed command targets are checked before rewriting. The existing 52 acquisition
+type substitutions and 23-type assembly guard remain independent and unchanged.
+The union of edits must be disjoint and match exact original text; a second parse
+must produce the same single function definition. A separate Python census
+reassembles unchanged byte intervals and verifies original, type-only and corrected
+hashes. Duplicate extents, changed text and wrong replacement names refuse before
+facade compilation or function import. The original source and facade hashes
+are unchanged.
+
+This mode is labelled `corrected-intent-only`, never exact-original parity.
+It independently checks the six supported actions' complete output fields,
+types, query arguments and acquisition order across the 18 cases, including
+failure/retry/cache behavior, Unicode/cultures, caps and tied candidate membership.
+The candidate must additionally consume every captured call and match corrected
+responses and tie order exactly. The exhaustive provider still refuses extra,
+missing, reordered or differently parameterized access. No canned provider call
+is inserted to compensate for absent original execution.
+
+The user-visible intended difference is explicit: the candidate can enter and
+execute the documented actions, where the original typed automatic variable
+prevents dispatch. This oracle patch changes no runtime candidate, production
+caller, loader, autostart or original function. Production compatibility and
+retirement remain separate decisions. Args-only correction may expose additional
+baseline defects: source review flags hashtable `Sort-Object -Property score`
+on PS5 and the nested OCR helper's typed `$T`/`$t` name collision. Neither is
+silently corrected here. Independent action expectations will reject incorrect
+sorting or OCR results and retain their raw observations. Actual corrected PS5
+execution and its negative paths remain required Windows qualification.
+
+Local validation passed 117 action and 45 wire contracts. The helper suite
+reported 93 methods: 68 passed, 25 individually skipped, zero failures/errors and
+no setup skips; five raw-evidence tests also passed. Full discovery reported
+761 methods: 609 passed, 152 individually skipped, zero failures/errors, plus
+two class-setup skips. Counts were checked against verbose outcomes. All 18
+independent semantic fixtures passed the portable candidate host, and the net48
+facade compiled with zero warnings. The counted oracle grows by 7,406 bytes;
+canonical PowerShell is 915,094 bytes across 31 files, with runtime PowerShell
+unchanged at 607,665 bytes. This patch earns no retirement credit.

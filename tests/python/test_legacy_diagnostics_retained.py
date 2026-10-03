@@ -32,8 +32,13 @@ from legacy_diagnostic_number_neighbors import cases as number_neighbor_cases
 # Historical corpus membership must never depend on future production cutovers.
 QUALIFICATION_DIAGNOSTICS = frozenset({'benchmark', 'audit-summary'})
 EXPECTED_CANDIDATE_PARTITION = dict(exact=660, owned_failure=8, terminal_failure=0)
-EXPECTED_PRODUCTION_PARTITION = dict(exact=668, owned_failure=0, terminal_failure=0)
+EXPECTED_PRODUCTION_PARTITION = dict(exact=660, owned_failure=8, terminal_failure=0)
 EXPECTED_AUDIT_PRODUCTION_CASES = 258
+EXPECTED_BENCHMARK_PRODUCTION_CASES = 410
+EXPECTED_BENCHMARK_OWNED_FAILURE_IDS = frozenset({
+    "existing/24", "existing/25", "existing/26", "existing/27",
+    "existing/55", "existing/56", "existing/57", "existing/58",
+})
 
 
 def adversarial_json_cases():
@@ -192,14 +197,13 @@ def assert_actual_candidate(test, fixture, before, after):
 
 
 class RetainedDiagnosticPortableTests(unittest.TestCase):
-    def test_audit_delegate_and_benchmark_original_keep_separate_production_routes(self):
-        self.assertEqual(RETAINED_DIAGNOSTICS, {'benchmark'})
+    def test_both_reports_use_exact_delegates_and_keep_historical_originals(self):
+        self.assertEqual(RETAINED_DIAGNOSTICS, set())
         source = BRIDGE.read_text(encoding='utf-8-sig')
-        for name in ('Benchmark',):
-            start = re.search(r'^function Invoke-Macro' + name + r' \{', source, re.M).start()
-            body = source[start:source.index('\n}', start) + 2].encode('utf-8')
-            size, digest = BODY_HASHES[name]
-            self.assertEqual((len(body), hashlib.sha256(body).hexdigest()), (size, digest))
+        benchmark = "function Invoke-MacroBenchmark {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'benchmark' -Rest $Rest}"
+        self.assertEqual(re.findall(r'^function Invoke-MacroBenchmark[^\n]*', source, re.M), [benchmark])
+        self.assertEqual((len(benchmark.encode()), hashlib.sha256(benchmark.encode()).hexdigest()),
+            (128, 'a19c0690237a12e02824080770153baa48957612af8a90fa5f2aeefd5354fb63'))
         audit = "function Invoke-MacroAuditSummary {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'audit-summary' -Rest $Rest}"
         self.assertEqual(re.findall(r'^function Invoke-MacroAuditSummary[^\n]*', source, re.M), [audit])
         self.assertEqual((len(audit.encode()), hashlib.sha256(audit.encode()).hexdigest()),
@@ -211,7 +215,7 @@ class RetainedDiagnosticPortableTests(unittest.TestCase):
             body = pinned_original[start:pinned_original.index('\n}', start) + 2].encode()
             self.assertEqual((len(body), hashlib.sha256(body).hexdigest()), BODY_HASHES[name])
         self.assertTrue(diagnostic_uses_session('audit-summary', 'production'))
-        self.assertFalse(diagnostic_uses_session('benchmark', 'production'))
+        self.assertTrue(diagnostic_uses_session('benchmark', 'production'))
         pinned = Path('inert-pinned-original.ps1')
         arguments = retained_candidate_adapter_arguments(pinned)
         self.assertEqual(arguments, actual_adapter_arguments(pinned, 'draft'))
@@ -499,17 +503,23 @@ class RetainedDiagnosticWindowsTests(unittest.TestCase):
                             records[name][index] = observed
         partition = dict(exact=0, owned_failure=0, terminal_failure=0)
         production_partition = dict(exact=0, owned_failure=0, terminal_failure=0)
-        audit_production_cases = 0
+        audit_production_cases = benchmark_production_cases = 0
+        candidate_owned_ids, production_owned_ids = set(), set()
         for index, fixture in enumerate(fixtures):
             original = records['original'][index]
             with self.subTest(case=fixture['case_id'], route='production-entry'), capture.comparison(fixture['case_id'], 'production-entry'):
                 if diagnostic_uses_session(fixture['operation'], 'production'):
-                    production_partition[assert_actual_candidate(self, fixture, original, records['production'][index])] += 1
+                    category = assert_actual_candidate(self, fixture, original, records['production'][index])
+                    production_partition[category] += 1
+                    if category == 'owned_failure': production_owned_ids.add(fixture['case_id'])
                 else:
                     self.assertEqual(records['production'][index], original)
                     production_partition['exact'] += 1
             if fixture['operation'] == 'audit-summary':
                 audit_production_cases += 1
+            else:
+                benchmark_production_cases += 1
+            if fixture['operation'] in QUALIFICATION_DIAGNOSTICS:
                 with self.subTest(case=fixture['case_id'], route='production-v-candidate'), capture.comparison(fixture['case_id'], 'production-v-candidate'):
                     self.assertEqual(records['production'][index], records['candidate'][index])
             with self.subTest(case=fixture['case_id'], route='pure-candidate'), capture.comparison(fixture['case_id'], 'pure-candidate'):
@@ -524,14 +534,19 @@ class RetainedDiagnosticWindowsTests(unittest.TestCase):
                     if original['payload'] is not None:
                         self.assertEqual(actual['payload'], decode_wire(original['payload']))
             with self.subTest(case=fixture['case_id'], route='actual-candidate'), capture.comparison(fixture['case_id'], 'actual-candidate'):
-                partition[assert_actual_candidate(self, fixture, original, records['candidate'][index])] += 1
+                category = assert_actual_candidate(self, fixture, original, records['candidate'][index])
+                partition[category] += 1
+                if category == 'owned_failure': candidate_owned_ids.add(fixture['case_id'])
         with capture.comparison('final', 'partition-counts'):
             self.assertEqual(sum(partition.values()), len(fixtures))
             self.assertEqual(partition, EXPECTED_CANDIDATE_PARTITION)
             self.assertEqual(production_partition, EXPECTED_PRODUCTION_PARTITION)
             self.assertEqual(audit_production_cases, EXPECTED_AUDIT_PRODUCTION_CASES)
+            self.assertEqual(benchmark_production_cases, EXPECTED_BENCHMARK_PRODUCTION_CASES)
+            self.assertEqual(candidate_owned_ids, EXPECTED_BENCHMARK_OWNED_FAILURE_IDS)
+            self.assertEqual(production_owned_ids, EXPECTED_BENCHMARK_OWNED_FAILURE_IDS)
         capture.complete()
-        print(f"Compared {len(fixtures)} retained diagnostic cases through original/production-entry/pure-candidate/actual-candidate routes: {partition}; production: {production_partition}; audit production/direct exact pairs: {audit_production_cases}", flush=True)
+        print(f"Compared {len(fixtures)} retained diagnostic cases through original/production-entry/pure-candidate/actual-candidate routes: {partition}; production: {production_partition}; audit production/direct exact pairs: {audit_production_cases}; benchmark production/direct exact pairs: {benchmark_production_cases}", flush=True)
 
 
 if __name__ == '__main__':

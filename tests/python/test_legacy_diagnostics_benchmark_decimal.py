@@ -6,7 +6,8 @@ import unittest
 
 from test_legacy_diagnostics_parity import reply, run_candidate
 from test_legacy_diagnostics_benchmark_functional import (
-    BASELINE_PATH, acquire_routes, compare_failure, original_contract, pure_contract, strict_equal,
+    BASELINE_PATH, acquire_routes, compare_brief, compare_failure, compare_production_entry, original_contract,
+    paired_nonbrief, pure_contract, require_complete_public_record, strict_equal,
 )
 
 
@@ -46,7 +47,8 @@ def assert_numeric_result(test, fixture, observed, expected):
     test.assertEqual(observed['state'], 'complete')
     test.assertEqual(observed['exit'], 0)
     test.assertEqual(observed['consumed'], 6)
-    payload = observed['payload']
+    payload = observed.get('payload')
+    test.assertIsInstance(payload, dict)
     test.assertEqual(payload['schema'], 'cucp.benchmark/v1')
     test.assertEqual(payload['status'], 'ok')
     comparison = payload['baseline_compare']
@@ -78,27 +80,48 @@ class BenchmarkDecimalPortableTests(unittest.TestCase):
                     ['Clock', 'Native', 'Clock'] * 4 + ['FileExists', 'ReadText'])
 
 
+def compare_number_records(test, fixture, p, o, a, assumption):
+    test.assertIs(fixture['brief'], False)
+    for record in (o, a):
+        require_complete_public_record(record, fixture)
+    for observed in (p, original_contract(o), original_contract(a)):
+        assert_numeric_result(test, fixture, observed, assumption)
+    if assumption['converted'] is None:
+        compare_failure(test, fixture, o, p, a)
+    else:
+        test.assertTrue(strict_equal(a, o), 'Successful numeric cases require exact actual-adapter records')
+        test.assertTrue(strict_equal(pure_contract(p), original_contract(o)))
+        test.assertIsNone(p['brief'])
+        test.assertEqual(p['json_depth'], 10)
+        test.assertIs(p['emit_json'], True)
+        test.assertEqual(p['hashtable_paths'], [])
+
+
+def compare_number_case(test, fixtures, pure, records, expected, index):
+    fixture, p, o, a = fixtures[index], pure[index], records['original'][index], records['candidate'][index]
+    assumption = expected[fixture['case_id']]
+    if fixture['brief']:
+        control = paired_nonbrief(test, fixtures, pure, records, index)
+        cf, cp, co, ca = control
+        test.assertTrue(strict_equal(assumption, expected[cf['case_id']]))
+        compare_number_records(test, cf, cp, co, ca, assumption)
+        assert_numeric_result(test, fixture, p, assumption)
+        compare_brief(test, fixture, o, p, a, control)
+    else:
+        compare_number_records(test, fixture, p, o, a, assumption)
+
+
 @unittest.skipUnless(sys.platform == 'win32', 'Windows original/pure/actual typed benchmark conversion qualification')
 class BenchmarkDecimalWindowsTests(unittest.TestCase):
     def test_typed_numeric_conversion_preserves_full_benchmark_contract(self):
         fixtures, expected = number_cases()
         capture, pure, records = acquire_routes(self, fixtures, 'benchmark-decimal-functional', case_source=Path(__file__))
-        for fixture, p, o, a in zip(fixtures, pure, records['original'], records['candidate']):
+        for index, fixture in enumerate(fixtures):
             with self.subTest(case=fixture['case_id']), capture.comparison(fixture['case_id'], 'benchmark-typed-numeric'):
-                assumption = expected[fixture['case_id']]
+                compare_production_entry(self, records, index)
                 # Require the captured Windows original to validate the inferred
                 # outcomes before claiming that any numeric repair is qualified.
-                for observed in (p, original_contract(o), original_contract(a)):
-                    assert_numeric_result(self, fixture, observed, assumption)
-                if assumption['converted'] is None:
-                    compare_failure(self, fixture, o, p, a)
-                else:
-                    self.assertTrue(strict_equal(a, o), 'Successful numeric cases require exact actual-adapter records')
-                    self.assertTrue(strict_equal(pure_contract(p), original_contract(o)))
-                    self.assertEqual(p['brief'], o['console'].removesuffix('\r\n') if fixture.get('brief') else None)
-                    self.assertEqual(p['json_depth'], 10)
-                    self.assertIs(p['emit_json'], not fixture['brief'])
-                    self.assertEqual(p['hashtable_paths'], [])
+                compare_number_case(self, fixtures, pure, records, expected, index)
         capture.complete()
 
 

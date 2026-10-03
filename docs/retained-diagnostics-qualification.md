@@ -1,6 +1,7 @@
 # Retained benchmark and audit-summary qualification
 
-Current staged tree: [audit-only cutover candidate](audit-summary-staged-cutover.md).
+Current staged tree: [benchmark cutover candidate](benchmark-staged-cutover.md),
+following the separately qualified [audit body retirement](audit-summary-staged-cutover.md).
 The original-body statements below describe the preceding candidate checkpoint;
 new Windows and full-regression acceptance remains pending.
 

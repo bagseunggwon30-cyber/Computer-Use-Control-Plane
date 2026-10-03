@@ -94,7 +94,7 @@ function Fixture-ValidatePublicDelegate($Definition,[string]$Operation){
  if($elements[1] -isnot [Management.Automation.Language.CommandParameterAst] -or $elements[1].ParameterName -cne 'Operation' -or $elements[1].Argument -or $elements[2] -isnot [Management.Automation.Language.StringConstantExpressionAst] -or $elements[2].Value -cne $Operation -or $elements[3] -isnot [Management.Automation.Language.CommandParameterAst] -or $elements[3].ParameterName -cne 'Rest' -or $elements[3].Argument -or $elements[4] -isnot [Management.Automation.Language.VariableExpressionAst] -or $elements[4].VariablePath.UserPath -cne 'Rest' -or $elements[4].Splatted){throw 'Delegate changed its fixed operation or argv forwarding'}
 }
 function Fixture-PublicDelegate($Case){
- $names=@{'perf'='Invoke-MacroPerf';'diagnose-lag'='Invoke-MacroDiagnoseLag';'health-quick'='Invoke-MacroHealthQuick';'health-detail'='Invoke-MacroHealthDetail';'log-tail'='Invoke-MacroLogTail';'self-test'='Invoke-MacroSelfTest';'release-notes'='Invoke-MacroReleaseNotes';'audit-summary'='Invoke-MacroAuditSummary'}
+ $names=@{'perf'='Invoke-MacroPerf';'diagnose-lag'='Invoke-MacroDiagnoseLag';'health-quick'='Invoke-MacroHealthQuick';'health-detail'='Invoke-MacroHealthDetail';'log-tail'='Invoke-MacroLogTail';'self-test'='Invoke-MacroSelfTest';'release-notes'='Invoke-MacroReleaseNotes';'audit-summary'='Invoke-MacroAuditSummary';'benchmark'='Invoke-MacroBenchmark'}
  if($Case.operation -cnotin @($names.Keys)){throw 'Unknown production diagnostic delegate'}
  $tokens=$null;$errors=$null;$ast=[Management.Automation.Language.Parser]::ParseFile($BridgeSource,[ref]$tokens,[ref]$errors)
  if($errors.Count){throw 'Current main failed to parse'}

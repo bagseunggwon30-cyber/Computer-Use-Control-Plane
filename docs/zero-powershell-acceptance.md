@@ -169,14 +169,18 @@ real Python case/assertion/fixture-I/O port, not an embedded or renamed PS
 program. Remaining fixed PS boundary drivers are explicit temporary dependencies
 and are subject to the same final zero-execution requirement.
 
-## Isolated audit-only staged source measurement
+## Qualified audit-only source measurement
 
-The [audit-summary cutover candidate](audit-summary-staged-cutover.md) replaces
+The [audit-summary cutover](audit-summary-staged-cutover.md) replaces
 its 2,728-byte original body with a 135-byte delegate, a 2,593-byte runtime
 reduction. Oracle selector/map changes add 58 net bytes, giving a 2,535-byte
 total reduction: 893,908 extension-counted bytes, including 607,665 runtime
-bytes, in the same 30 files. These are staged physical measurements with no
-accepted retirement credit yet. Fresh finite-Double, production-entry/startup,
-and full regression qualification remain required. Benchmark, helper/history
+bytes, in the same 30 files of the isolated staging base. The actual integrated
+checkpoint `3cbbaaad` has 901,934 counted bytes because helper oracles also grew;
+its runtime is likewise 607,665 bytes. Finite-Double, production-entry/startup
+and all 14 active required core jobs passed at run `37103102449`, attempt 2,
+qualifying this body retirement only. The wrapper and file-effect adapter remain
+PowerShell-dependent, and the independent helper candidate gate is still red.
+Benchmark, helper/history
 originals, complete foundation coverage and all inline/encoded-source zero
 requirements above remain unchanged.

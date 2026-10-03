@@ -8,6 +8,26 @@ still uses compatibility hosts and unported PowerShell acquisitions/actions.
 
 ## Latest full automated checkpoint
 
+The latest **required core regression** checkpoint is
+`3cbbaaad0cb7b48b866d7f3cbe3f282252b3115a`, tree
+`8d87343cf9e4c8add7967427200416b9bfd0a488`, with all 14 active jobs passing in
+[run 37103102449, attempt 2](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37103102449).
+Its only first-attempt failure was the existing installer compatibility test's
+15-second process deadline; the same job/source/deadline passed on retry.
+The independent helper candidate workflow still failed its original binding
+oracle and is not qualified by this core result.
+
+Audit's real production entry now passes 258 exact original/production/direct
+pairs, all 668 production records, and no-fallback/startup checks. Its 2,728-byte
+body became a 135-byte delegate: 2,593 runtime bytes retired, 2,535 net after
+58 fixture bytes. This checkpoint has 901,934 counted PS bytes and 607,665
+runtime bytes. Later counted diagnostic probes increase the current inventory;
+they are not runtime retirement. See the [audit qualification](audit-summary-staged-cutover.md).
+PowerShell wrappers and effect adapters remain; main and final-zero acceptance
+are unchanged.
+
+### Previous full checkpoint
+
 Published commit `f09e5200a37022fbdf1580b54a3fad232121950c`, tree
 `50c816c6d1153f23f20496ff31454c9649c6764c`, passed all 14 active jobs in
 [full run 37086869922](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37086869922)
@@ -40,8 +60,8 @@ routes future full jobs through the complete shared foundation gate and retains
 its raw evidence, rather than retroactively claiming those tests ran in f09.
 
 The earlier diagnostic candidates below did not change production routing.
-The current [audit-only staged cutover](audit-summary-staged-cutover.md) replaces
-its body in an isolated candidate tree, with acceptance still pending. Benchmark
+The subsequent [audit-only cutover](audit-summary-staged-cutover.md) has now
+qualified its body replacement at the newer checkpoint above. Benchmark
 and history originals remain. Full zero-PowerShell and interactive Windows
 acceptance remain open; main is unchanged.
 

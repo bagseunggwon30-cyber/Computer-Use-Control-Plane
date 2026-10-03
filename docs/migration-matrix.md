@@ -37,12 +37,15 @@ the [file-image evidence](legacy-file-images-qualification.md),
 [interaction evidence](legacy-interaction-family.md) and
 [diagnostic limits](legacy-diagnostics-candidate.md).
 
-## Staged audit-only continuation
+## Qualified audit-only continuation
 
-The [audit cutover candidate](audit-summary-staged-cutover.md) adds one fixed
-135-byte public delegate while retaining benchmark. This isolated source change
-has no accepted retirement credit yet: fresh finite-Double Windows evidence,
-exact production-entry/startup tests and full regression must all pass.
+The [audit cutover](audit-summary-staged-cutover.md) adds one fixed 135-byte
+public delegate while retaining benchmark. At `3cbbaaad` / run `37103102449`
+attempt 2, all 14 active required core jobs passed. All 258 audit pairs and
+668 production-entry results are exact, including no-fallback/startup gates.
+This qualifies 2,593 runtime bytes retired (2,535 net with fixture changes).
+The separate helper candidate workflow remains unqualified; wrappers and file
+acquisition still require PowerShell.
 The historical corpus and all final zero-PowerShell requirements remain intact.
 
 ## Initial core foundation (historical)

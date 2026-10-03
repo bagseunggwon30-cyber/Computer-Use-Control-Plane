@@ -1,5 +1,31 @@
 # Audit-summary-only staged cutover
 
+## Qualified audit body retirement
+
+Public commit `3cbbaaad0cb7b48b866d7f3cbe3f282252b3115a`, tree
+`8d87343cf9e4c8add7967427200416b9bfd0a488`, passed all 14 active required
+full-regression jobs in [run 37103102449, attempt 2](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37103102449).
+The first attempt passed 13 jobs and hit one unchanged 15-second installer
+compatibility-process deadline. Only that job was requested again on the same
+commit; its installer tests passed with the same deadline and assertions.
+This is evidence of an intermittent observation, not proof of a specific
+infrastructure cause. The full run completed successfully at 07:07:51 UTC on
+2026-10-03. All 441 published blob hashes and modes matched the reviewed tree.
+
+The production diagnostic lane passed 49 Windows tests with zero skips:
+all 668 production-entry records were exact, all 258 audit production/direct
+pairs were exact, and missing-runtime/no-original-fallback plus startup guards
+passed. The separate candidate partition stayed 660 exact/eight specified owned
+failures/zero terminal failures. Archive SHA-256:
+`51b943e0beb9781402dcc58f4ff419b1c63a8a9f5896aee3a54d193524e4e826`.
+
+The 2,593-byte audit runtime-body reduction is therefore qualified. The
+wrapper and filesystem-effect adapter still require PowerShell; this does not
+make the command or project PowerShell-free. The separate helper candidate
+workflow remains unqualified, and newer benchmark/helper candidates are not
+covered by this exact full-run checkpoint. Main is unchanged. The sections
+below preserve the staging history and prerequisite evidence.
+
 ## Integrated qualification candidate
 
 The finite-Double prerequisite subsequently passed on public commit

@@ -1,8 +1,13 @@
 # Diagnostic and reporting assembly candidate
 
-The current [audit-only staged cutover](audit-summary-staged-cutover.md) adds an
-eighth delegate pending qualification. The seven-delegate summary below records
-the preceding checkpoint; benchmark remains original.
+Current staged source routes all nine diagnostic delegates through the managed
+adapter. Audit body retirement is qualified at `3cbbaaad` / required core run
+`37103102449`, attempt 2, with all 258 audit production/direct pairs exact.
+Benchmark production-entry and full-regression acceptance remain pending; see
+[benchmark staging](benchmark-staged-cutover.md). PowerShell wrappers and effect
+acquisition remain.
+
+## Previous seven-delegate checkpoint (historical)
 
 The C# implementation covers nine report/orchestration bodies in
 `PcuCp.LegacyDiagnostics/LegacyDiagnosticCoordinator`. Seven qualified bodies now

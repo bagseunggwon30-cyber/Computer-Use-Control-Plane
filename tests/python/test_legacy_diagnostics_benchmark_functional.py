@@ -87,8 +87,9 @@ def unique_object(pairs):
 
 
 def mask_record(record, fixture):
-    if fixture['operation'] != 'benchmark' or record['state'] != 'complete' or type(record['exit']) is not int or record['exit'] != 0:
-        raise AssertionError('Prose allowance cannot hide operation, completion or exit changes')
+    require_complete_public_record(record, fixture)
+    if fixture.get('brief'):
+        raise AssertionError('Brief has no public payload and cannot use a detail prose allowance')
     payload = decode_wire(record['payload'])
     failure_payload(payload)
     masked = copy.deepcopy(record)
@@ -117,9 +118,66 @@ def pure_contract(record):
 def original_contract(record):
     result = pure_contract(record)
     for key in ('payload', 'effects'):
-        if key in result:
+        # Preserve absent observations as None in the raw comparison. This is
+        # not a success rule: each functional comparator validates the rendering
+        # mode and completion before permitting a Brief-only absent payload.
+        if key in result and result[key] is not None:
             result[key] = decode_wire(result[key])
     return result
+
+
+def require_complete_public_record(record, fixture):
+    if (fixture.get('operation') != 'benchmark' or
+        set(record) != {'state', 'payload', 'exit', 'console', 'effects', 'consumed'} or
+        record['state'] != 'complete' or type(record['exit']) is not int or record['exit'] != 0):
+        raise AssertionError('Benchmark qualification requires an intact successful public record')
+    if not isinstance(record['console'], str) or type(record['consumed']) is not int:
+        raise AssertionError('Invalid public Console or reply count')
+    if not isinstance(record['effects'], dict) or record['effects'].get('kind') != 'array':
+        raise AssertionError('Public effects must remain a tagged array')
+    if fixture.get('brief'):
+        if record['payload'] is not None:
+            raise AssertionError('Brief must preserve the observed absence of a public payload')
+    elif not isinstance(record['payload'], dict) or record['payload'].get('kind') != 'object':
+        raise AssertionError('Non-Brief must expose its complete tagged report')
+
+
+def paired_nonbrief(test, fixtures, pure, records, index):
+    fixture = fixtures[index]
+    test.assertIs(fixture['brief'], True)
+    test.assertGreater(index, 0)
+    control = fixtures[index - 1]
+    test.assertIs(control['brief'], False)
+    test.assertTrue(strict_equal({k: v for k, v in fixture.items() if k not in ('case_id', 'brief')},
+                                 {k: v for k, v in control.items() if k not in ('case_id', 'brief')}),
+                    'Brief data evidence must come from the same input with only rendering changed')
+    return control, pure[index - 1], records['original'][index - 1], records['candidate'][index - 1]
+
+
+def compare_brief(test, fixture, original, pure, actual, control):
+    control_fixture, control_pure, control_original, control_actual = control
+    test.assertIs(fixture['brief'], True)
+    test.assertIs(control_fixture['brief'], False)
+    for record in (original, actual):
+        require_complete_public_record(record, fixture)
+    for record in (control_original, control_actual):
+        require_complete_public_record(record, control_fixture)
+    # Public Brief comparison remains exact, including payload=None. Do not
+    # invent a public payload from the candidate or from the paired report.
+    test.assertTrue(strict_equal(actual, original))
+    test.assertEqual(original['consumed'], len(fixture['replies']))
+    for key in ('state', 'exit', 'consumed', 'effects'):
+        test.assertTrue(strict_equal(original[key], control_original[key]))
+        test.assertTrue(strict_equal(actual[key], control_actual[key]))
+        expected = decode_wire(original[key]) if key == 'effects' else original[key]
+        test.assertTrue(strict_equal(pure[key], expected))
+    test.assertTrue(strict_equal(pure_contract(pure), pure_contract(control_pure)))
+    test.assertIsInstance(pure.get('payload'), dict)
+    test.assertEqual(pure['json_depth'], 10)
+    test.assertIs(pure['emit_json'], False)
+    test.assertEqual(pure['hashtable_paths'], [])
+    test.assertIsInstance(pure['brief'], str)
+    test.assertEqual(pure['brief'] + '\r\n', original['console'])
 
 
 def compare_failure(test, fixture, original, pure, actual):
@@ -131,7 +189,7 @@ def compare_failure(test, fixture, original, pure, actual):
     test.assertEqual(left['state'], 'complete')
     test.assertIs(type(left['exit']), int)
     test.assertEqual(left['exit'], 0)
-    left['payload'] = failure_payload(left['payload'])
+    left['payload'] = failure_payload(left.get('payload'))
     right['payload'] = failure_payload(right['payload'])
     test.assertTrue(strict_equal(left, right))
     test.assertEqual(pure['json_depth'], 10)
@@ -140,10 +198,34 @@ def compare_failure(test, fixture, original, pure, actual):
     test.assertEqual(pure['brief'], original['console'].removesuffix('\r\n') if fixture.get('brief') else None)
 
 
+def compare_calendar_case(test, fixtures, pure, records, index):
+    fixture, p, o, a = fixtures[index], pure[index], records['original'][index], records['candidate'][index]
+    if fixture['brief']:
+        control = paired_nonbrief(test, fixtures, pure, records, index)
+        cf, cp, co, ca = control
+        compare_failure(test, cf, co, cp, ca)
+        compare_brief(test, fixture, o, p, a, control)
+    else:
+        compare_failure(test, fixture, o, p, a)
+
+
+def raw_exact_summary(fixtures, pure, records):
+    return [dict(case_id=fixture['case_id'], public_payload_observed=o.get('payload') is not None,
+                 pure_kernel_contract_exact=strict_equal(pure_contract(p), original_contract(o)),
+                 actual_adapter_record_exact=strict_equal(a, o))
+            for fixture, p, o, a in zip(fixtures, pure, records['original'], records['candidate'])]
+
+
+def compare_production_entry(test, records, index):
+    test.assertIn('production', records, 'Fresh qualification must execute the current public entry')
+    test.assertTrue(strict_equal(records['production'][index], records['candidate'][index]),
+                    'Current production entry must match the independently invoked candidate exactly')
+
+
 def acquire_routes(test, fixtures, label, *, case_source=None):
     capture = DiagnosticEvidence(Path(os.environ.get(CAPTURE_ENV) or
         ROOT / '.migration-logs/diagnostics/retained-diagnostics') / label, fixtures,
-        ['git-head', 'git-status', 'dotnet-info', 'pure-build', 'pure', 'pinned-source', 'original', 'candidate'])
+        ['git-head', 'git-status', 'dotnet-info', 'pure-build', 'pure', 'pinned-source', 'original', 'candidate', 'production'])
     test.addCleanup(capture.finish)
     with capture.comparison('acquisition', label):
         host = os.environ.get('CUCP_DIAGNOSTICS_TEST_HOST')
@@ -178,15 +260,17 @@ def acquire_routes(test, fixtures, label, *, case_source=None):
             inputs.write_text(json.dumps(fixtures), encoding='utf-8-sig')
             command = [powershell, '-NoProfile', '-NonInteractive', '-File', str(runner), '-InputPath', str(inputs)]
             records = {}
-            for name, args in (('original', ['-Source', str(source)]), ('candidate', actual_adapter_arguments(source, 'draft'))):
+            for name, args in (('original', ['-Source', str(source)]), ('candidate', actual_adapter_arguments(source, 'draft')),
+                               ('production', actual_adapter_arguments(source, 'production'))):
                 process = capture.run(name, command + args, case_ids=ids,
                     metadata=dict(pinned_source=file_identity(source), inputs=file_identity(inputs), oracle=file_identity(runner)),
                     cwd=ROOT, timeout=900, env={**os.environ, 'CUCP_NATIVE_HOST': str(Path(host).resolve()), 'CUCP_EXECUTION_DIAGNOSTICS': '1'})
                 records[name] = capture.rows(test, name, process, len(fixtures))
-    exact = [dict(case_id=fixture['case_id'], pure_kernel_contract_exact=strict_equal(pure_contract(p), original_contract(o)),
-                  actual_adapter_record_exact=strict_equal(a, o))
-             for fixture, p, o, a in zip(fixtures, pure, records['original'], records['candidate'])]
-    (capture.directory / 'raw-exact-summary.json').write_text(json.dumps(exact, indent=2) + '\n', encoding='utf-8')
+    with capture.comparison('raw-exact-summary', label):
+        exact = raw_exact_summary(fixtures, pure, records)
+        for index, row in enumerate(exact):
+            row['production_entry_record_exact'] = strict_equal(records['production'][index], records['candidate'][index])
+        (capture.directory / 'raw-exact-summary.json').write_text(json.dumps(exact, indent=2) + '\n', encoding='utf-8')
     return capture, pure, records
 
 
@@ -243,8 +327,10 @@ class BenchmarkCalendarPortableTests(unittest.TestCase):
         self.assertFalse(strict_equal(mask_record(original, fixture), mask_record(changed, fixture)))
         brief_original = copy.deepcopy(original); brief_original['console'] = 'original brief\r\n'
         brief_changed = copy.deepcopy(brief_original); brief_changed['console'] = 'changed brief\r\n'
-        self.assertFalse(strict_equal(mask_record(brief_original, dict(operation='benchmark', brief=True)),
-                                     mask_record(brief_changed, dict(operation='benchmark', brief=True))))
+        with self.assertRaises(AssertionError):
+            mask_record(brief_original, dict(operation='benchmark', brief=True))
+        with self.assertRaises(AssertionError):
+            mask_record(brief_changed, dict(operation='benchmark', brief=True))
         changed = copy.deepcopy(original); changed['console'] = changed['console'].replace('"count": 1', '"count": 2')
         with self.assertRaises(AssertionError):
             mask_record(changed, fixture)
@@ -255,9 +341,10 @@ class BenchmarkCalendarWindowsTests(unittest.TestCase):
     def test_calendar_failures_preserve_full_benchmark_contract(self):
         fixtures = calendar_cases()
         capture, pure, records = acquire_routes(self, fixtures, 'benchmark-calendar-functional')
-        for fixture, p, o, a in zip(fixtures, pure, records['original'], records['candidate']):
+        for index, fixture in enumerate(fixtures):
             with self.subTest(case=fixture['case_id']), capture.comparison(fixture['case_id'], 'benchmark-functional'):
-                compare_failure(self, fixture, o, p, a)
+                compare_production_entry(self, records, index)
+                compare_calendar_case(self, fixtures, pure, records, index)
         capture.complete()
 
 

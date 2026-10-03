@@ -1,6 +1,6 @@
 {
   "baseline_commit": "9ffa354b9904235835a7bc6eb78ed8d3d76317c8",
-  "note": "Current retained legacy navigation after staged Python/C# migration. Original leaf acquisition/input, workflow tokenization and host adapters remain. Exact kernels/adapters passed their Windows/browser gate; integrated production remains subject to the full release gate. Normal Git history holds the baseline. The audit-summary body replacement is a staged candidate, explicitly not an accepted retirement until its new Windows and integrated gates pass.",
+  "note": "Current retained legacy navigation after staged Python/C# migration. Original leaf acquisition/input, workflow tokenization and host adapters remain. Exact kernels/adapters passed their Windows/browser gate; integrated production remains subject to the full release gate. Normal Git history holds the baseline. The audit-summary body replacement qualified at 3cbbaaad / required core run37103102449 attempt2; its wrapper/file-effect adapter remain PowerShell-dependent. Independent helper and newer benchmark candidates remain unqualified. The current staged benchmark continuation routes all nine diagnostic delegates through the managed adapter; its fresh production-entry and full-regression gates remain pending. Historical original-body descriptions below refer to their recorded checkpoints.",
   "files": [
     {
       "path": "scripts/cucp-helper-server.ps1",
@@ -240,7 +240,7 @@
     },
     {
       "path": "scripts/cucp.ps1",
-      "lines": 8453,
+      "lines": 8320,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -1136,19 +1136,19 @@
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 8042
+          "line": 7909
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 8074
+          "line": 7941
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 8189
+          "line": 8056
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 8285
+          "line": 8152
         }
       ]
     },
@@ -1633,8 +1633,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 907688,
-    "removed": 105790,
+    "current": 909903,
+    "removed": 103575,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
@@ -2203,13 +2203,25 @@
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroAuditSummary",
       "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticFiles.cs",
-      "adapter": "One exact public delegate enters the existing closed diagnostic module and shared session; no original audit runtime body or fallback remains in this staged tree.",
-      "status": "staged_candidate_not_accepted",
-      "evidence": "Staged on 9fbc7eb. Prior c2b927e3/run37094100246 passed472 inputs but missed finite-Double data boundaries. Fresh668-case finite-Double Windows evidence, independent cutover review, exact production-entry/startup qualification and full regression are required before acceptance. See docs/audit-summary-staged-cutover.md. Benchmark remains original.",
+      "adapter": "One exact public delegate enters the closed diagnostic module and shared session; no original audit runtime body or fallback remains. PowerShell wrapper and filesystem-effect acquisition remain.",
+      "status": "qualified_body_retirement",
+      "evidence": "Qualified at3cbbaaad0cb7b48b866d7f3cbe3f282252b3115a/tree8d87343cf9e4c8add7967427200416b9bfd0a488: all14 active required core jobs passed run37103102449 attempt2, with same-source/deadline retry of one installer timeout. Windows49 tests: all668 production records and258 audit production/direct pairs exact; no-fallback/startup guards passed. Archive SHA25651b943e0beb9781402dcc58f4ff419b1c63a8a9f5896aee3a54d193524e4e826. Independent helper candidate workflow still unqualified. See docs/audit-summary-staged-cutover.md.",
       "original_body_bytes": 2728,
       "original_body_sha256": "4450f8211f04b7b3c86cea782029e755b82c7568b0354cc923482a9a5a2caa05",
       "delegate_body_bytes": 135,
       "delegate_body_sha256": "752661100756660ec332af82e4c3f440300c80199c6b222d67f206fc66ffe79c"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "Invoke-MacroBenchmark",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticPerformance.cs",
+      "adapter": "One exact public delegate enters the closed diagnostic adapter/shared session; matching runtime is required and no original benchmark runtime fallback remains.",
+      "status": "staged_candidate_not_accepted",
+      "evidence": "Candidate run37103413852 at fa1c830e passed the668-case gate (candidate660 exact plus8 established owned failures). Offline reassessment of retained88 functional observations confirms72 Decimal exact public pairs and calendar12 exact/four bounded prose pairs, after Brief harness correction6ea356c. Fresh current-production-entry Windows, independent review and full regression remain mandatory. See docs/benchmark-staged-cutover.md.",
+      "original_body_bytes": 5389,
+      "original_body_sha256": "dc9424001a488623f7ba7b7c7cd96bc794cc008ec94e0a3f8335c36435320dd7",
+      "delegate_body_bytes": 128,
+      "delegate_body_sha256": "a19c0690237a12e02824080770153baa48957612af8a90fa5f2aeefd5354fb63"
     }
   ]
 }

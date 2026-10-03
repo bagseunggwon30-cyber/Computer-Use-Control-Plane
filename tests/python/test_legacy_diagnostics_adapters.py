@@ -1,7 +1,8 @@
 """Exact retained diagnostic adapter, closed guards, and captured acquisition tests.
 
 Windows tests require the matching NativeHost configured by the qualification job.
-Original macro bodies remain present until these adapter gates pass.
+Current public entries are staged delegates; historical original bodies remain
+pinned in Git and fresh production-entry qualification is mandatory.
 """
 import json
 import hashlib
@@ -28,8 +29,9 @@ MIGRATED_DIAGNOSTICS = {
     'health-quick':'Invoke-MacroHealthQuick', 'health-detail':'Invoke-MacroHealthDetail',
     'log-tail':'Invoke-MacroLogTail', 'self-test':'Invoke-MacroSelfTest',
     'release-notes':'Invoke-MacroReleaseNotes', 'audit-summary':'Invoke-MacroAuditSummary',
+    'benchmark':'Invoke-MacroBenchmark',
 }
-RETAINED_DIAGNOSTICS = {'benchmark'}
+RETAINED_DIAGNOSTICS = set()
 KNOWN_ADAPTER_FAMILIES = ('execution','precision','cdp','interaction','diagnostics','file-images')
 
 
@@ -594,8 +596,8 @@ class DiagnosticAdapterPortableTests(unittest.TestCase):
             self.assertEqual('-ProductionEntry' in arguments,mode=='production')
             for operation in MIGRATED_DIAGNOSTICS:self.assertTrue(diagnostic_uses_session(operation,mode))
             for operation in RETAINED_DIAGNOSTICS:self.assertEqual(diagnostic_uses_session(operation,mode),mode=='draft')
-        self.assertEqual(len(MIGRATED_DIAGNOSTICS),8)
-        self.assertEqual(RETAINED_DIAGNOSTICS, {'benchmark'})
+        self.assertEqual(len(MIGRATED_DIAGNOSTICS),9)
+        self.assertEqual(RETAINED_DIAGNOSTICS, set())
         self.assertEqual(diagnostic_adapter_mode(), 'production')
         for name in ('file','runtime'):
             source=(ROOT/f'tests/fixtures/legacy-diagnostics-{name}-oracle.ps1').read_text(encoding='utf-8-sig')
@@ -618,7 +620,7 @@ class DiagnosticAdapterPortableTests(unittest.TestCase):
             self.assertIn('$operation=$productionDelegates[$name]', source)
             selected.update(mapping)
         self.assertEqual(selected, MIGRATED_DIAGNOSTICS)
-        self.assertNotIn('benchmark', selected)
+        self.assertEqual(selected['benchmark'], 'Invoke-MacroBenchmark')
         guard = GUARDS.read_text(encoding='utf-8-sig')
         block = guard[guard.index('function Fixture-PublicDelegate'):guard.index('$cases=Microsoft.PowerShell.Utility')]
         self.assertEqual(dict(re.findall(r"'([^']+)'='(Invoke-Macro[^']+)'", block)), MIGRATED_DIAGNOSTICS)
@@ -642,6 +644,26 @@ class DiagnosticAdapterPortableTests(unittest.TestCase):
         self.assertEqual(body.count("_Invoke-LegacyExecutionHost -EntryPoint 'legacy-diagnostic-session'"), 1)
         self.assertNotIn('catch', body)
         self.assertNotIn('Invoke-MacroAuditSummary', body)
+
+    def test_benchmark_has_one_fixed_current_body_and_no_original_runtime_copy(self):
+        source = BRIDGE.read_text(encoding='utf-8-sig')
+        expected = "function Invoke-MacroBenchmark {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'benchmark' -Rest $Rest}"
+        self.assertEqual(re.findall(r'^function Invoke-MacroBenchmark[^\n]*', source, re.M), [expected])
+        pinned = subprocess.check_output(['git', 'show', f'{ACCEPTED_TREE}:scripts/cucp.ps1'], cwd=ROOT).decode('utf-8-sig')
+        start = pinned.index('function Invoke-MacroBenchmark {')
+        original = pinned[start:pinned.index('\n}', start) + 2]
+        runtime_files = subprocess.check_output(['git', 'ls-files', '--', 'scripts/*.ps1'], cwd=ROOT).decode().splitlines()
+        for path in runtime_files:
+            current = (ROOT / path).read_text(encoding='utf-8-sig')
+            self.assertNotIn(original, current, path)
+            if path != 'scripts/cucp.ps1':
+                self.assertNotRegex(current, re.compile(r'^function Invoke-MacroBenchmark\b', re.M), path)
+        adapter = ADAPTER.read_text(encoding='utf-8-sig')
+        start = adapter.index('function _Invoke-LegacyDiagnosticFamily {')
+        body = adapter[start:adapter.index('\n}', start) + 2]
+        self.assertEqual(body.count("_Invoke-LegacyExecutionHost -EntryPoint 'legacy-diagnostic-session'"), 1)
+        self.assertNotIn('catch', body)
+        self.assertNotIn('Invoke-MacroBenchmark', body)
 
     def test_guard_inventory_preserves_all_196_original_checks(self):
         from collections import Counter
@@ -729,14 +751,14 @@ class DiagnosticActualAdapterTests(unittest.TestCase):
         rest=['--fixture','한국어','literal; $(inert)']
         requests=[dict(id=f'{operation}/{brief}',mode='public-delegate',operation=operation,rest=rest if brief else [],brief=brief) for operation in MIGRATED_DIAGNOSTICS for brief in (False,True)]
         observations=run_guard_driver(self,requests)
-        self.assertEqual(len(observations),16)
+        self.assertEqual(len(observations),18)
         for request,observed in zip(requests,observations):
             with self.subTest(operation=request['operation'],brief=request['brief']):
                 self.assertEqual(observed['state'],'ok',observed)
                 self.assertIsNone(observed['error'])
                 self.assertEqual(observed['events'],[])
                 self.assertEqual(observed['value'],dict(exit=31,calls=[dict(operation=request['operation'],rest=request['rest'],brief=request['brief'])]))
-    def test_audit_requires_native_runtime_and_never_falls_back_to_original(self):
+    def test_audit_and_benchmark_require_native_runtime_without_fallback(self):
         self.assertEqual(diagnostic_adapter_mode(), 'production')
         with tempfile.TemporaryDirectory(prefix='CUCP audit no fallback ') as temporary:
             temp = Path(temporary)
@@ -758,17 +780,11 @@ class DiagnosticActualAdapterTests(unittest.TestCase):
                     observed = json.loads(process.stdout.decode('utf-8-sig'))
                     self.assertEqual(len(observed), 1)
                     actual = observed[0]
-                    if group == 'file':
-                        self.assertEqual(actual['state'], 'error')
-                        self.assertEqual(actual['error'], 'Matching execution runtime missing. Publish the native runtime or set CUCP_NATIVE_HOST to its executable/DLL.')
-                        self.assertEqual(actual['console'], '')
-                        self.assertEqual(decode_wire(actual['effects']), [])
-                        self.assertEqual(actual['consumed'], 0)
-                    else:
-                        self.assertEqual(actual['state'], 'complete')
-                        self.assertEqual(actual['exit'], 0)
-                        self.assertEqual(actual['consumed'], 4)
-                        self.assertEqual(sum(e['kind'] == 'Native' for e in decode_wire(actual['effects'])), 4)
+                    self.assertEqual(actual['state'], 'error')
+                    self.assertEqual(actual['error'], 'Matching execution runtime missing. Publish the native runtime or set CUCP_NATIVE_HOST to its executable/DLL.')
+                    self.assertEqual(actual['console'], '')
+                    self.assertEqual(decode_wire(actual['effects']), [])
+                    self.assertEqual(actual['consumed'], 0)
                     self.assertFalse(missing.exists())
 
     def test_exact_retained_adapter_all_cases(self):
@@ -799,8 +815,8 @@ class DiagnosticActualAdapterTests(unittest.TestCase):
             with self.subTest(index=index,operation=fixture["operation"],rest=fixture["rest"],brief=fixture.get("brief")):
                 old_effects=decode_wire(before["effects"]);new_effects=decode_wire(after["effects"])
                 failures=captured_failures(fixture,old_effects)
-                # The retained benchmark production body does not enter the shared
-                # session: preserve their ordinary errors through full equality.
+                # Every current diagnostic public entry uses the same closed
+                # session and its established mutation-uncertainty boundary.
                 uses_session=diagnostic_uses_session(fixture['operation'],mode)
                 # The assertion leaf converts its original catch-any rejection
                 # into a completed Boolean policy result. It still counts as an

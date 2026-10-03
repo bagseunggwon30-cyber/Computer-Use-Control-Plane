@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Source,[Parameter(Mandatory=$true)][string]$Manifest,[Parameter(Mandatory=$true)][string]$CasePath,[string]$Stubs,[switch]$TestWrongBinding,[ValidateSet('none','duplicate','changed')][string]$TestTypeExtentFault='none')
+param([Parameter(Mandatory=$true)][string]$Source,[Parameter(Mandatory=$true)][string]$Manifest,[Parameter(Mandatory=$true)][string]$CasePath,[string]$Stubs,[switch]$TestWrongBinding,[ValidateSet('none','duplicate','changed')][string]$TestTypeExtentFault='none',[switch]$CorrectedIntent,[ValidateSet('none','duplicate','changed','wrongname')][string]$TestArgsExtentFault='none')
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 function Hash-Text([string]$Text) {
@@ -58,6 +58,20 @@ $typeCounts=[ordered]@{
   'Windows.Media.Ocr.OcrResult'=1
   'System.Windows.Automation.Condition'=2
 }
+if($TestArgsExtentFault -ne 'none' -and -not $CorrectedIntent){throw 'Args extent faults require explicit corrected-intent mode'}
+# This separately labelled, opt-in seam fixes only the published automatic
+# $Args collision. Absolute UTF-16 offsets describe the ORIGINAL pinned AST;
+# they are not search/replace patterns. The default retains the original defect.
+$argsPlan=[ordered]@{
+  '_Action-Windows'=@{parameter=@(3847);variable=@(3968,3979,3997)}
+  '_Action-Health'=@{parameter=@(6046)}
+  '_Action-Focused'=@{parameter=@(6402)}
+  '_Action-ModalDetect'=@{parameter=@(7336)}
+  '_Action-OcrScreenFast'=@{parameter=@(13109);variable=@(13704,13720,13753,13769,13802,13818,13853,13869)}
+  '_Action-UiaFindFast'=@{parameter=@(16595);variable=@(16812,16830,16876,16894)}
+  '_Dispatch'=@{parameter=@(20016);variable=@(20124,20185,20247,20313,20381,20447);'command-parameter'=@(20118,20179,20241,20307,20375,20441)}
+}
+$argsSites=New-Object Collections.ArrayList;$correctedFunctions=New-Object Collections.ArrayList;$argsFaultInjected=$false
 $seen=@{};$functions=New-Object Collections.ArrayList;$sites=New-Object Collections.ArrayList;$faultInjected=$false
 foreach($item in $verified){
   $record=$item.record;$node=$item.node
@@ -113,10 +127,71 @@ foreach($item in $verified){
   $rewriteTokens=$null;$rewriteErrors=$null
   $rewriteAst=[Management.Automation.Language.Parser]::ParseInput($body,[ref]$rewriteTokens,[ref]$rewriteErrors)
   if($rewriteErrors.Count -or $rewriteAst.EndBlock.Statements.Count -ne 1 -or $rewriteAst.EndBlock.Statements[0] -isnot [Management.Automation.Language.FunctionDefinitionAst] -or $rewriteAst.EndBlock.Statements[0].Name -cne $record.name){throw 'Invalid substituted oracle function'}
-  [void]$functions.Add(@{name=$record.name;original_sha256=$record.sha256;substituted_sha256=(Hash-Text $body);body=$body})
+  $typeOnlyHash=Hash-Text $body
+  if($CorrectedIntent){
+    $renames=New-Object Collections.ArrayList;$observed=@{}
+    foreach($part in @($node.FindAll({param($n) $n -is [Management.Automation.Language.VariableExpressionAst] -or $n -is [Management.Automation.Language.CommandParameterAst]},$true))){
+      $kind=$null;$original=$null;$replacement=$null
+      if($part -is [Management.Automation.Language.VariableExpressionAst] -and $part.VariablePath.UserPath -ieq 'Args'){
+        if($part.VariablePath.UserPath -cne 'Args' -or $part.Splatted){throw 'Unplanned Args variable spelling'}
+        $kind='variable';if($part.Parent -is [Management.Automation.Language.ParameterAst] -and $part.Parent.Name -eq $part){$kind='parameter'}
+        $original='$Args';$replacement='$RequestData'
+      }elseif($part -is [Management.Automation.Language.CommandParameterAst] -and $part.ParameterName -ieq 'Args'){
+        if($part.ParameterName -cne 'Args' -or $part.Argument -or $record.name -cne '_Dispatch' -or $argsPlan.Keys -cnotcontains $part.Parent.GetCommandName() -or $part.Parent.GetCommandName() -ceq '_Dispatch'){throw 'Unplanned Args command parameter'}
+        $kind='command-parameter';$original='-Args';$replacement='-RequestData'
+      }
+      if(-not $kind){continue}
+      $owner=$part.Parent
+      while($owner -and $owner -isnot [Management.Automation.Language.FunctionDefinitionAst]){$owner=$owner.Parent}
+      $extent=$part.Extent
+      if($owner -ne $node -or -not $argsPlan.Contains($record.name) -or -not $argsPlan[$record.name].ContainsKey($kind) -or $argsPlan[$record.name][$kind] -cnotcontains $extent.StartOffset -or $extent.EndOffset -ne ($extent.StartOffset+5) -or $extent.Text -cne $original){throw 'Unplanned Args AST extent'}
+      $key=$kind+':'+$extent.StartOffset
+      if($observed.ContainsKey($key)){throw 'Duplicate Args AST extent'}
+      $observed[$key]=$true
+      [void]$renames.Add(@{start=$extent.StartOffset-$node.Extent.StartOffset;end=$extent.EndOffset-$node.Extent.StartOffset;original=$original;replacement=$replacement;kind=$kind})
+      [void]$argsSites.Add(@{function=$record.name;kind=$kind;start_utf16=$extent.StartOffset;end_utf16=$extent.EndOffset;original=$original;replacement=$replacement})
+    }
+    if($argsPlan.Contains($record.name)){
+      foreach($kind in $argsPlan[$record.name].Keys){foreach($start in $argsPlan[$record.name][$kind]){if(-not $observed.ContainsKey($kind+':'+$start)){throw 'Missing planned Args AST extent'}}}
+    }elseif($renames.Count){throw 'Args correction escaped closed functions'}
+    if($TestArgsExtentFault -ne 'none' -and -not $argsFaultInjected -and $renames.Count){
+      $first=$renames[0]
+      if($TestArgsExtentFault -eq 'duplicate'){[void]$renames.Add(@{start=$first.start;end=$first.end;original=$first.original;replacement=$first.replacement;kind=$first.kind})}
+      elseif($TestArgsExtentFault -eq 'changed'){$first.original='$Else'}
+      else{$first.replacement='$Unplanned'}
+      $argsFaultInjected=$true
+    }
+    # Rebuild from original bytes using the union of verified disjoint edits.
+    # The type-only body/hash above remains independent evidence in both modes.
+    $combined=New-Object Collections.ArrayList
+    foreach($edit in $edits){[void]$combined.Add(@{start=$edit.start;end=$edit.end;original=$edit.name;replacement=$fixturePrefix+$edit.name;kind='type'})}
+    foreach($edit in $renames){[void]$combined.Add($edit)}
+    $body=$node.Extent.Text;$previous=$body.Length;$applied=0
+    foreach($edit in @($combined|Sort-Object -Property {[int]$_['start']} -Descending)){
+      if($edit.start -lt 0 -or $edit.end -gt $node.Extent.Text.Length -or $edit.end -le $edit.start){throw 'Corrected-intent extent is out of bounds'}
+      $actual=$body.Substring($edit.start,$edit.end-$edit.start)
+      $reason=$null
+      if($edit.end -gt $previous){$reason='overlap_or_order'}
+      elseif($actual -cne $edit.original){$reason='text_mismatch'}
+      elseif($edit.kind -ne 'type' -and (($edit.original -cne '$Args' -or $edit.replacement -cne '$RequestData') -and ($edit.original -cne '-Args' -or $edit.replacement -cne '-RequestData'))){$reason='wrong_replacement_name'}
+      if($reason){
+        $diagnostic=@{schema='cucp.oracle-args-extent-refusal/v1';function=$record.name;reason=$reason;start_utf16=$node.Extent.StartOffset+$edit.start;end_utf16=$node.Extent.StartOffset+$edit.end;applied=$applied;planned=$combined.Count;actual_prefix=$actual.Substring(0,[Math]::Min(128,$actual.Length))}
+        [Console]::Error.WriteLine((ConvertTo-Json -InputObject $diagnostic -Depth 4 -Compress))
+        throw 'Unsafe corrected-intent Args extent'
+      }
+      $body=$body.Substring(0,$edit.start)+$edit.replacement+$body.Substring($edit.end)
+      $previous=$edit.start;$applied++
+    }
+    $correctedTokens=$null;$correctedErrors=$null
+    $correctedAst=[Management.Automation.Language.Parser]::ParseInput($body,[ref]$correctedTokens,[ref]$correctedErrors)
+    if($correctedErrors.Count -or $correctedAst.EndBlock.Statements.Count -ne 1 -or $correctedAst.EndBlock.Statements[0] -isnot [Management.Automation.Language.FunctionDefinitionAst] -or $correctedAst.EndBlock.Statements[0].Name -cne $record.name){throw 'Invalid corrected-intent oracle function'}
+    [void]$correctedFunctions.Add(@{name=$record.name;original_sha256=$record.sha256;type_only_sha256=$typeOnlyHash;corrected_sha256=(Hash-Text $body)})
+  }
+  [void]$functions.Add(@{name=$record.name;original_sha256=$record.sha256;substituted_sha256=$typeOnlyHash;body=$body})
 }
 if($functions.Count -ne $importNames.Count -or $sites.Count -ne 52){throw 'Oracle substitution scope changed'}
 foreach($name in $typeCounts.Keys){if($seen[$name] -ne $typeCounts[$name]){throw "Oracle type substitution count changed: $name"}}
+if($CorrectedIntent -and ($argsPlan.Count -ne 7 -or $argsSites.Count -ne 34 -or $correctedFunctions.Count -ne 8 -or @($argsSites|Where-Object{$_.kind -eq 'parameter'}).Count -ne 7 -or @($argsSites|Where-Object{$_.kind -eq 'variable'}).Count -ne 21 -or @($argsSites|Where-Object{$_.kind -eq 'command-parameter'}).Count -ne 6)){throw 'Corrected-intent Args substitution scope changed'}
 
 # The fixture is pinned before compilation. Unique namespace names never ask
 # the runtime to resolve native Windows/WinRT types. The assembly guard is
@@ -140,6 +215,8 @@ foreach($typeName in $typeCounts.Keys){
   [void]$resolved.Add($type.FullName)
 }
 $seam=@{schema='cucp.oracle-type-seam/v1';source_sha256=$entry.normalized_sha256;facade_sha256=$facadeHash;type_substitutions=@($sites);guarded_types=@($resolved);functions=@($functions|ForEach-Object{@{name=$_.name;original_sha256=$_.original_sha256;substituted_sha256=$_.substituted_sha256}})}
+$argsSeam=$null
+if($CorrectedIntent){$argsSeam=@{schema='cucp.oracle-corrected-intent-seam/v1';qualification='corrected-intent-only';source_sha256=$entry.normalized_sha256;args_substitutions=@($argsSites);functions=@($correctedFunctions)}}
 foreach($function in $functions){. ([scriptblock]::Create($function.body))}
 $c=[IO.File]::ReadAllText($CasePath,[Text.Encoding]::UTF8)|ConvertFrom-Json
 if($c.culture){[Threading.Thread]::CurrentThread.CurrentCulture=[Globalization.CultureInfo]::GetCultureInfo([string]$c.culture);[Threading.Thread]::CurrentThread.CurrentUICulture=[Threading.Thread]::CurrentThread.CurrentCulture}
@@ -169,7 +246,10 @@ function Remove-Item { param($LiteralPath,[switch]$Force) if($Stubs){[CucpFixtur
 $results=New-Object Collections.ArrayList
 foreach($r in $c.requests){
   $value=$null;$errorValue=$null
-  try {$value=_Dispatch -Action ([string]$r.action) -Args (Convert-Case $r.args)}catch{$errorValue=$_.Exception.Message}
+  try {
+    if($CorrectedIntent){$value=_Dispatch -Action ([string]$r.action) -RequestData (Convert-Case $r.args)}
+    else{$value=_Dispatch -Action ([string]$r.action) -Args (Convert-Case $r.args)}
+  }catch{$errorValue=$_.Exception.Message}
   # Real time/PID are not deterministically replaceable in the exact function.
   if($value -and $value.schema -eq 'cucp.health/v1'){$value.pid=123;$value.uptime_s=0}
   $exitValue=0;if($errorValue -or $value.status -eq 'error'){$exitValue=1}elseif($value.status -eq 'partial'){$exitValue=2}elseif($value.status -eq 'fallback_required'){$exitValue=99};[void]$results.Add(@{id=$r.id;exit_code=$exitValue;result=$value;error=$errorValue})
@@ -177,4 +257,4 @@ foreach($r in $c.requests){
 # Keep the collection as an array even at cardinality zero or one. An untyped
 # assignment from an if/pipeline loses the empty collection's JSON shape on PS5.
 [object[]]$trace=@([CucpFixture.HelperFixture]::Effects.ToArray())
-[Console]::Out.WriteLine((ConvertTo-Json -InputObject @{responses=@($results);effects=@($script:effects);calls=$trace;request_count=$Script:_RequestCount;oracle_seam=$seam} -Depth 50 -Compress))
+[Console]::Out.WriteLine((ConvertTo-Json -InputObject @{oracle_mode=$(if($CorrectedIntent){'corrected-intent'}else{'exact-original'});responses=@($results);effects=@($script:effects);calls=$trace;request_count=$Script:_RequestCount;oracle_seam=$seam;args_seam=$argsSeam} -Depth 50 -Compress))
