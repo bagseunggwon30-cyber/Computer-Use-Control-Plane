@@ -25,12 +25,28 @@ foreach ($name in @('_Read-OptValue','_Safety-Truncate','_Classify-SafetyFromTex
   finally { $sha.Dispose() }
   . ([scriptblock]::Create($function[0].Extent.Text))
 }
-$cases=@(Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json)
+# PS5 emits a JSON root array as one pipeline object. An outer @(...)
+# therefore nests that array instead of materializing its individual cases.
+# Assign the JSON result directly, then validate exactly one array level.
+$cases=ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($InputPath, [Text.Encoding]::UTF8))
+if ($cases -isnot [Array]) { throw 'Diagnostic input root must be an array.' }
 if ($cases.Count -lt 1 -or $cases.Count -gt 128) { throw 'Case count exceeds the bounded capture' }
+$seenIds=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+foreach ($case in $cases) {
+  if ($case -isnot [Management.Automation.PSCustomObject]) { throw 'Diagnostic input case must be an object.' }
+  $names=@($case.PSObject.Properties.Name)
+  if ($names.Count -ne 2 -or $names -cnotcontains 'id' -or $names -cnotcontains 'step') {
+    throw 'Diagnostic input case fields must be exactly id and step.'
+  }
+  if ($case.id -isnot [string] -or [string]::IsNullOrEmpty($case.id)) { throw 'Diagnostic input id must be a nonempty string.' }
+  if ($case.step -isnot [string]) { throw 'Diagnostic input step must be a string.' }
+  if ($case.step.Length -gt 65536) { throw 'Case text exceeds the bounded capture' }
+  if (-not $seenIds.Add($case.id)) { throw 'Duplicate diagnostic input id.' }
+}
 $results=New-Object Collections.ArrayList
 foreach ($case in $cases) {
-  $step=[string]$case.step
-  if ($step.Length -gt 65536) { throw 'Case text exceeds the bounded capture' }
+  # Fields have already been checked as scalar strings; never join array values.
+  $step=$case.step
   $parseErrors=$null
   $parsedTokens=[Management.Automation.PSParser]::Tokenize($step,[ref]$parseErrors)
   $diagnostics=New-Object Collections.ArrayList
@@ -49,7 +65,7 @@ foreach ($case in $cases) {
   }
   $parsed=_Parse-WorkflowStepTokens -Step $step
   $plan=_Build-WorkflowPlan -Rest @('--step',$step)
-  [void]$results.Add(@{id=[string]$case.id; step=$step; parsed=$parsed; plan=$plan;
+  [void]$results.Add(@{id=$case.id; step=$step; parsed=$parsed; plan=$plan;
     parse_errors=@($diagnostics); first_unsupported_token_type=$firstUnsupported})
 }
 $provenance=@{evidence='observed-windows-powershell-5.1-raw-diagnostics'; baseline_tree=$BaselineTree;

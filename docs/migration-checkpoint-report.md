@@ -87,6 +87,31 @@ The staged repair's explicit oracle totals 4,237 PowerShell bytes. All 27 tracke
 PS files total 871,399 bytes: 612,709 runtime and 258,690 other source/test bytes,
 a net reduction of 142,079 from baseline. No new production retirement is claimed.
 
+The repaired candidate was published as `accdc9c490a6e70eda426f3a6f45286962356bb5`
+and tested in [focused run 37081771939](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37081771939).
+Fast contracts passed. The Windows foundation suite ran 35 tests with one failed
+assertion: the raw diagnostic driver materialized the 101-item JSON input array
+as one PS5 pipeline object, producing one concatenated case. The strict expected
+count rejected it; its retained capture is marked `comparison_completed=false`
+and is not valid per-case diagnostic evidence. Exact-byte hashing and source
+provenance checks passed before that failure.
+
+All accepted-token/non-relaxation comparisons passed. The fresh normalized gap
+sets contain the same 49 previously recorded differences plus six newly observed
+conservative rejections among the new inferred probes: 27 boundary and 28 literal
+rows, 55 total. These input differences are separate from the single failed
+fixture assertion. The next fixture-only repair preserves all strict shape and
+identity checks and needs another Windows run before claiming diagnostic capture.
+
+The fixture-only follow-up at local `148f3c6` assigns the JSON root directly,
+requires one array level and exact object/string fields, and rejects duplicate
+ordinal IDs before tokenizing any case. One-case, multi-case and 18 invalid-shape
+protocol probes were added for both portable validation and actual PS5 execution.
+All original 101-case identity/provenance and strict diagnostic assertions remain.
+Local Python discovery ran 543 tests: 423 passed and 120 platform checks skipped.
+No candidate grammar or production code changed. Explicit oracle growth is fully
+counted: 27 PS files now total 872,501 bytes (612,709 runtime), 140,977 below baseline.
+
 ## Actual source replacement
 
 The baseline is commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tree
