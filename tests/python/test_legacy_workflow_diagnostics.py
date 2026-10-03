@@ -21,6 +21,14 @@ from test_legacy_workflow_parity import BASELINE_TREE, ROOT, PROJECT, original_s
 FIXTURES = ROOT / "tests/fixtures/legacy-workflow-diagnostic-candidate.json"
 PREFLIGHT = PROJECT / "LegacyWorkflowParseErrorPreflight.cs"
 CONTEXT_FIXTURES = ROOT / "tests/fixtures/legacy-workflow-diagnostic-repair-37082726512.json"
+MAX_DIAGNOSTIC_CASES = 152
+TOKEN_KIND_FIXTURES = ROOT / "tests/fixtures/legacy-workflow-token-kind-repair-37086299736.json"
+
+
+def token_kind_fixtures():
+    return json.loads(TOKEN_KIND_FIXTURES.read_text(encoding="utf-8"))
+
+
 COMMAND_POSITION_FIXTURES = ROOT / "tests/fixtures/legacy-workflow-command-position-observed-37084621275.json"
 
 
@@ -32,7 +40,7 @@ def validate_diagnostic_inputs(cases):
     """Validate one root array without coercing fields or flattening nested arrays."""
     if not isinstance(cases, list):
         raise ValueError("Diagnostic input root must be an array.")
-    if not 1 <= len(cases) <= 128:
+    if not 1 <= len(cases) <= MAX_DIAGNOSTIC_CASES:
         raise ValueError("Case count exceeds the bounded capture")
     seen_ids = set()
     for case in cases:
@@ -57,7 +65,7 @@ def invalid_diagnostic_inputs():
     valid = {"id": "one", "step": "macro windows"}
     return [
         ("object_root", valid), ("null_root", None), ("string_root", "root"),
-        ("empty", []), ("too_many", [{"id": str(i), "step": ""} for i in range(129)]),
+        ("empty", []), ("too_many", [{"id": str(i), "step": ""} for i in range(MAX_DIAGNOSTIC_CASES + 1)]),
         ("nested_array", [[valid]]), ("null_case", [None]), ("scalar_case", [3]),
         ("missing_id", [{"step": "macro windows"}]), ("missing_step", [{"id": "one"}]),
         ("extra_field", [{**valid, "extra": "not allowed"}]),
@@ -92,6 +100,7 @@ def diagnostic_cases():
     cases.extend({"id": prior_neighbors[id]["id"], "step": prior_neighbors[id]["step"]}
                  for id in context["captured_neighbor_order"])
     cases.extend({"id": case["id"], "step": case["step"]} for case in position["inferred_live_neighbors"])
+    cases.extend({"id": case["id"], "step": case["step"]} for case in token_kind_fixtures()["inferred_live_neighbors"])
     return validate_diagnostic_inputs(cases)
 
 
@@ -116,7 +125,9 @@ class WorkflowDiagnosticFixtureTests(unittest.TestCase):
         for cases in (one, many):
             self.assertIs(validate_diagnostic_inputs(cases), cases)
             self.assertEqual(validate_diagnostic_inputs(json.loads(json.dumps(cases))), cases)
-        self.assertEqual(len(diagnostic_cases()), 128)
+        self.assertEqual(len(diagnostic_cases()), MAX_DIAGNOSTIC_CASES)
+        maximum = [{"id": str(i), "step": ""} for i in range(MAX_DIAGNOSTIC_CASES)]
+        self.assertIs(validate_diagnostic_inputs(maximum), maximum)
 
     def test_input_validation_rejects_invalid_shapes_and_duplicate_ids(self):
         for name, cases in invalid_diagnostic_inputs():
@@ -143,7 +154,8 @@ class WorkflowDiagnosticFixtureTests(unittest.TestCase):
             self.assertEqual(case["observed"], {"ok": False, "error": "parse_error", "tokens": []})
             self.assertNotIn("detail", case["observed"])
         cases = diagnostic_cases()
-        self.assertLessEqual(len(cases), 128)
+        self.assertLessEqual(len(cases), MAX_DIAGNOSTIC_CASES)
+        self.assertIn(f"$cases.Count -gt {MAX_DIAGNOSTIC_CASES}", ORACLE_RUNNER)
         self.assertEqual(len({case["id"] for case in cases}), len(cases))
         unknown = [case for case in fixtures["cases"] if case.get("oracle_expectation") == "capture-only"]
         self.assertEqual(len(unknown), 6)
@@ -319,6 +331,10 @@ class WorkflowWindowsDiagnosticTests(unittest.TestCase):
             position = command_position_fixtures()
             positives = {case["id"]: case for case in position["observed_positive_targets"]}
             live_neighbors = {case["id"]: case for case in position["inferred_live_neighbors"]}
+            token_kinds = token_kind_fixtures()
+            kind_raw = json.loads(TOKEN_KIND_FIXTURES.with_name(token_kinds["provenance"]["raw_capture_file"]).read_bytes())
+            kind_targets = {case["id"]: case for case in kind_raw["cases"] if case["id"] in token_kinds["target_ids"]}
+            kind_neighbors = {case["id"]: case for case in token_kinds["inferred_live_neighbors"]}
             normalized_gaps = []
             capture["exact_diagnostic_gap_ids"] = gaps
             capture["normalized_diagnostic_gap_ids"] = normalized_gaps
@@ -340,6 +356,19 @@ class WorkflowWindowsDiagnosticTests(unittest.TestCase):
                     elif observed["first_unsupported_token_type"]:
                         self.assertEqual(original["error"], "unsupported_token")
                         self.assertEqual(original["detail"], "unsupported token type '" + observed["first_unsupported_token_type"] + "'")
+                    if target := kind_targets.get(requested["id"]):
+                        self.assertEqual(original, target["parsed"], "Observed token-kind oracle changed")
+                        self.assertEqual(observed["plan"], target["plan"], "Observed full diagnostic plan changed")
+                        self.assertEqual(candidate, {key: target[key] for key in ("parsed", "plan")}, "Exact observed token-kind repair")
+                    if neighbor := kind_neighbors.get(requested["id"]):
+                        self.assertFalse(original["ok"], "Rejected diagnostic probe must stay rejected")
+                        self.assertFalse(candidate["parsed"]["ok"], "Diagnostic repair cannot enable acceptance")
+                        if neighbor["comparison"] == "exact":
+                            self.assertEqual(original, neighbor["candidate"], "Inferred exact token-kind contract must match PS5.1")
+                            self.assertEqual(candidate, {key: observed[key] for key in ("parsed", "plan")}, "Exact new parsed detail and full plan message")
+                        else:
+                            self.assertEqual({key: original[key] for key in ("ok", "error", "tokens")}, neighbor["candidate"], "Syntax guard must match PS5.1")
+                            self.assertEqual({key: candidate["parsed"][key] for key in ("ok", "error", "tokens")}, neighbor["candidate"], "Syntax diagnostics retain precedence")
                     if positive := positives.get(requested["id"]):
                         self.assertEqual(original, positive["parsed"], "Observed positive oracle changed")
                         self.assertEqual(actual[i * 2], original, "Observed positive token contract")

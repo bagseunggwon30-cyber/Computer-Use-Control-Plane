@@ -30,7 +30,7 @@ foreach ($name in @('_Read-OptValue','_Safety-Truncate','_Classify-SafetyFromTex
 # Assign the JSON result directly, then validate exactly one array level.
 $cases=ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($InputPath, [Text.Encoding]::UTF8))
 if ($cases -isnot [Array]) { throw 'Diagnostic input root must be an array.' }
-if ($cases.Count -lt 1 -or $cases.Count -gt 128) { throw 'Case count exceeds the bounded capture' }
+if ($cases.Count -lt 1 -or $cases.Count -gt 152) { throw 'Case count exceeds the bounded capture' }
 $seenIds=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 foreach ($case in $cases) {
   if ($case -isnot [Management.Automation.PSCustomObject]) { throw 'Diagnostic input case must be an object.' }

@@ -66,7 +66,13 @@ internal static partial class LegacyWorkflowKernel
                 return Reject("unsupported_token", "Expression and dot-sourcing prefixes require further parser qualification.");
             if (first == '[' && (index + 1 == step.Length || char.IsWhiteSpace(step[index + 1]) || step[index + 1] is '\0' or '(' or ')' or '{' or '}' or ';' or '|' or '&' or ','))
                 return Reject("unsupported_token", "A standalone bracket is not a literal argument.");
-            if (first == '#' || first == '@' && !startsHereString)
+            // Rejection-only token kinds observed in PS5.1 run 37086299736.
+            // The whole-step syntax preflight above keeps error precedence.
+            if (first == '#')
+                return Reject("unsupported_token", "unsupported token type 'Comment'");
+            if (first == '@' && index + 1 < step.Length && step[index + 1] is '(' or '{')
+                return Reject("unsupported_token", "unsupported token type 'GroupStart'");
+            if (first == '@' && !startsHereString)
                 return Reject("unsupported_token", "Comments and splatting are outside the literal-command subset.");
             if (first == '-' && index + 1 < step.Length && (char.IsLetter(step[index + 1]) || step[index + 1] is '_' or '?'))
                 return Reject("unsupported_token", "unsupported token type 'CommandParameter'");
@@ -99,7 +105,15 @@ internal static partial class LegacyWorkflowKernel
                     if (failure is not null) return failure;
                     continue;
                 }
-                if (c is '(' or ')' or '{' or '}' or ';' or '|' or '&' or '<' or '>' or ',')
+                if ((c is '(' or '{') && index - 1 == tokenStart)
+                    return Reject("unsupported_token", "unsupported token type 'GroupStart'");
+                if (c == '<' && index - 1 == tokenStart && index < step.Length && step[index] == '#')
+                    return Reject("unsupported_token", "unsupported token type 'Comment'");
+                if (c == ';')
+                    return Reject("unsupported_token", "unsupported token type 'StatementSeparator'");
+                if (c is '|' or '>')
+                    return Reject("unsupported_token", "unsupported token type 'Operator'");
+                if (c is '(' or ')' or '{' or '}' or '&' or '<' or ',')
                     return Reject("unsupported_token", "Operators, variables and execution constructs are not literal command tokens.");
                 if (c == '`')
                 {

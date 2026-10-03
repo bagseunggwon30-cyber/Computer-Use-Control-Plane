@@ -27,6 +27,7 @@ internal static partial class LegacyWorkflowKernel
         }
         check(observed == 9 && inferred > 30, "Explicitly separate observed errors from inferred precedence contracts");
         CheckObservedDiagnosticRepair(check);
+        CheckTokenKindRepair(check);
         Console.WriteLine($"Diagnostic candidate replay: {observed} observed top-level errors and {inferred} inferred precedence/opaque-region contracts. Exact localized diagnostics remain unqualified.");
     }
 

@@ -40,6 +40,24 @@ The following diagnostic candidate changes are not a new production cutover.
 Benchmark/audit-summary bodies and the history reducers remain retained. Full
 zero-PowerShell and interactive Windows acceptance remain open; main is unchanged.
 
+## Local rejected-token diagnostic candidate (after 7b4f163)
+
+A bounded rejection-only candidate repairs 20 observed exact unsupported-token
+messages for group openers, comments, semicolons and pipeline/output-redirection
+punctuation. The complete 128-row raw Windows evidence from run 37086299736 is
+retained unchanged. Local replay checks the full parsed and plan objects: 20
+now match the oracle exactly and the other 108 prior candidate results are
+unchanged. Replay debt is 86 exact differences, including 78 text-only and the
+same eight normalized differences. No accepted input or token output changes.
+
+The existing mandatory diagnostic gate appends 24 inferred rejection probes
+without reordering its 128 prior rows; its explicit cap is now 152. Sixteen probes
+require exact detail/full-plan agreement and eight preserve syntax-error
+precedence. The strict raw parity flags, all historical fixtures, production
+PSParser route and NativeHost parser exclusion remain. All-source/runtime
+PowerShell counts are unchanged. This is local historical replay, not a new
+Windows pass or publication. See the [evidence and remaining scope](../plans/evidence/workflow-token-kind-diagnostics-37086299736.md).
+
 ## Earlier qualified checkpoint (c414)
 
 Commit `c414f0240a6a3fde78719f4ae44baddaf990e92b`, tree

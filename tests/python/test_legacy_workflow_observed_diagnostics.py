@@ -78,12 +78,48 @@ class WorkflowObservedDiagnosticTests(unittest.TestCase):
     def test_future_raw_capture_appends_neighbors_without_rewriting_original_cases(self):
         manifest, raw = evidence()
         live = diagnostics.diagnostic_cases()
-        self.assertEqual(len(live), 128)
+        self.assertEqual(len(live), diagnostics.MAX_DIAGNOSTIC_CASES)
         self.assertEqual(live[:101], [{key: case[key] for key in ("id", "step")} for case in raw["cases"]])
         position = diagnostics.command_position_fixtures()
         prior = {case["id"]: case for case in manifest["inferred_neighbors"] + position["observed_positive_targets"]}
         self.assertEqual(live[101:124], [{key: prior[id][key] for key in ("id", "step")} for id in manifest["captured_neighbor_order"]])
-        self.assertEqual(live[124:], [{key: case[key] for key in ("id", "step")} for case in position["inferred_live_neighbors"]])
+        self.assertEqual(live[124:128], [{key: case[key] for key in ("id", "step")} for case in position["inferred_live_neighbors"]])
+
+    def test_token_kind_evidence_is_immutable_and_appends_exactly_24_probes(self):
+        manifest = diagnostics.token_kind_fixtures()
+        provenance = manifest["provenance"]
+        path = FIXTURES / provenance["raw_capture_file"]
+        raw = json.loads(path.read_bytes())
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), "c60e8e0a7d975b37090d434d9ced26f6acc37dd85a0a89a5c1ec0668572bfbb8")
+        indexed = subprocess.check_output(["git", "show", ":" + path.relative_to(workflow.ROOT).as_posix()], cwd=workflow.ROOT)
+        self.assertEqual(hashlib.sha256(indexed).hexdigest(), provenance["raw_capture_sha256"])
+        self.assertEqual(provenance["artifact_zip_sha256"], "baf26d7a36c9fc56c570dbdef5d1434c329ac7b376e82d0e1c5f5de94af14b30")
+        self.assertEqual(raw["provenance"]["candidate_commit"], "1e3d534a1d244bcc9ed6bfd318a1976b95c22eb0")
+        self.assertEqual(provenance["run_id"], "37086299736")
+        self.assertTrue(raw["comparison_completed"])
+        cases = diagnostics.diagnostic_cases()
+        self.assertEqual(cases[:128], [{key: case[key] for key in ("id", "step")} for case in raw["cases"]])
+        neighbors = manifest["inferred_live_neighbors"]
+        self.assertEqual(len(neighbors), 24)
+        self.assertEqual(cases[128:], [{key: case[key] for key in ("id", "step")} for case in neighbors])
+        self.assertEqual(sum(case["comparison"] == "exact" for case in neighbors), 16)
+        self.assertEqual(sum(case["comparison"] == "code-and-tokens" for case in neighbors), 8)
+        for case in neighbors:
+            self.assertEqual(case["evidence"], "inferred-unqualified")
+            self.assertFalse(case["candidate"]["ok"])
+            self.assertEqual(case["candidate"]["tokens"], [])
+        exact = [case["id"] for case in raw["cases"] if case["candidate"] != {key: case[key] for key in ("parsed", "plan")}]
+        normalized = [case["id"] for case in raw["cases"] if workflow.normalized(case["candidate"]) != workflow.normalized({key: case[key] for key in ("parsed", "plan")})]
+        self.assertEqual(exact, raw["exact_diagnostic_gap_ids"])
+        self.assertEqual(normalized, raw["normalized_diagnostic_gap_ids"])
+        self.assertEqual((len(exact), len(normalized), len(set(exact) - set(normalized))), (106, 8, 98))
+        targets = [case for case in raw["cases"] if case["id"] in manifest["target_ids"]]
+        self.assertEqual(len(targets), 20)
+        for case in targets:
+            self.assertEqual(case["parse_errors"], [])
+            self.assertEqual(case["parsed"]["error"], "unsupported_token")
+            self.assertEqual(case["parsed"]["detail"], "unsupported token type '" + case["first_unsupported_token_type"] + "'")
+            self.assertIn(case["id"], set(exact) - set(normalized))
 
     def test_adversarial_neighbors_stay_inferred_rejections(self):
         manifest, raw = evidence()

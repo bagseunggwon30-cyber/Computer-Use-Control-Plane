@@ -21,5 +21,7 @@
     <Content Include="../../../tests/fixtures/legacy-workflow-ps51-raw-diagnostics-37082726512.json" Link="workflow-raw-diagnostics-observed.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../../tests/fixtures/legacy-workflow-diagnostic-repair-37082726512.json" Link="workflow-diagnostic-repair.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../../tests/fixtures/legacy-workflow-command-position-observed-37084621275.json" Link="workflow-command-position-observed.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-ps51-raw-diagnostics-37086299736.json" Link="workflow-token-kind-raw.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-token-kind-repair-37086299736.json" Link="workflow-token-kind-repair.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
