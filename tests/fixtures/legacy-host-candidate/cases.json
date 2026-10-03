@@ -1,0 +1,171 @@
+{
+  "schema": "cucp.legacy-host-ci-cases/v1",
+  "candidate_only": true,
+  "groups": {
+    "host": {
+      "test_legacy_dispatch_contract": [
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_all_seven_exact_not_implemented_hints",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_argv_is_copied_not_parsed_as_grants_or_code",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_caller_only_mutation_and_missing_source_fail_closed",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_checkout_bom_and_crlf_do_not_create_false_source_drift",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_checkpoint_matches_current_production_sources",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_contract_records_and_nested_metadata_are_immutable",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_direct_safety_list_is_exact_and_does_not_imply_authority",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_duplicate_returns_first_clause_without_deduplication",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_every_frozen_source_rejects_owned_fixture_drift",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_every_macro_resolves_case_insensitively_to_first_record",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_exact_ordered_clauses_independently_match_production",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_only_two_macro_aliases_inject_fixed_options",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_real_macro_callers_remain_entry_recorder_daemon_and_serve",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_resolving_never_starts_a_process_or_performs_network_io",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_sensitive_live_and_effect_gate_order_is_bound",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_source_assertions_bind_every_dispatch_handler_and_inventory_location",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_source_relative_contract_ignores_working_directory_and_env",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_tampered_manifest_cannot_introduce_arbitrary_handler",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_top_level_routing_order_and_case",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_unknown_unavailable_and_not_implemented_remain_distinct",
+        "test_legacy_dispatch_contract.LegacyDispatchContractTests.test_wrapper_option_aliases_defaults_and_binding_are_frozen"
+      ],
+      "test_legacy_host_protocol": [
+        "test_legacy_host_protocol.CodecTests.test_authority_immutable_exact_booleans_and_child_intersection",
+        "test_legacy_host_protocol.CodecTests.test_byte_ingress_accepts_only_strict_utf8_without_bom",
+        "test_legacy_host_protocol.CodecTests.test_chunks_reassemble_utf8_payload_without_truncation",
+        "test_legacy_host_protocol.CodecTests.test_completion_int32_boolean_and_shape_boundaries",
+        "test_legacy_host_protocol.CodecTests.test_effect_fields_ceiling_and_types_rejected",
+        "test_legacy_host_protocol.CodecTests.test_outcome_classification_matches_retained_semantics",
+        "test_legacy_host_protocol.CodecTests.test_reject_duplicate_unknown_and_malformed_values",
+        "test_legacy_host_protocol.CodecTests.test_shapes_are_preserved_without_value_count_unwrapping",
+        "test_legacy_host_protocol.SessionTests.test_bad_frames_authority_and_policy_never_dispatch",
+        "test_legacy_host_protocol.SessionTests.test_cancellation_stops_only_owned_worker_without_restart",
+        "test_legacy_host_protocol.SessionTests.test_failed_reply_encoding_after_dispatch_preserves_uncertainty",
+        "test_legacy_host_protocol.SessionTests.test_fixed_runtime_locator_rejects_shell_or_python_script_override",
+        "test_legacy_host_protocol.SessionTests.test_inherited_pipe_does_not_make_cleanup_wait_for_unowned_descendant",
+        "test_legacy_host_protocol.SessionTests.test_lost_final_outcome_and_timeout_never_replay",
+        "test_legacy_host_protocol.SessionTests.test_owned_process_round_trip_finishes_once",
+        "test_legacy_host_protocol.SessionTests.test_post_completion_extra_exit_mismatch_and_error_rejected",
+        "test_legacy_host_protocol.SessionTests.test_signal_style_cancellation_keeps_possible_dispatch_metadata"
+      ],
+      "test_legacy_host_owned": [
+        "test_legacy_host_owned.CdpRootTests.test_actual_daemon_process_preserves_existing_envelopes",
+        "test_legacy_host_owned.CdpRootTests.test_actual_process_rejects_request_authority_before_network",
+        "test_legacy_host_owned.CdpRootTests.test_actual_python_entry_and_typed_child_use_owned_http_only",
+        "test_legacy_host_owned.CdpRootTests.test_daemon_big_integer_or_duplicate_options_fail_before_ready",
+        "test_legacy_host_owned.CdpRootTests.test_duplicate_startup_options_fail_before_provider_acquisition",
+        "test_legacy_host_owned.CdpRootTests.test_each_guarded_cdp_read_root_reuses_existing_audited_algorithm",
+        "test_legacy_host_owned.CdpRootTests.test_signal_while_transport_lock_is_held_unwinds_before_cleanup",
+        "test_legacy_host_owned.HostBoundaryTests.test_closed_host_cannot_restart_or_create_provider",
+        "test_legacy_host_owned.HostBoundaryTests.test_daemon_quarantines_provider_output_containing_sentinel_tokens",
+        "test_legacy_host_owned.HostBoundaryTests.test_daemon_rejects_sentinel_injection_authority_and_untyped_argv",
+        "test_legacy_host_owned.HostBoundaryTests.test_daemon_uses_one_owner_preserves_sentinel_and_control_order",
+        "test_legacy_host_owned.HostBoundaryTests.test_default_format_and_unknown_are_distinct_from_not_implemented",
+        "test_legacy_host_owned.HostBoundaryTests.test_every_unavailable_registered_macro_fails_before_acquisition",
+        "test_legacy_host_owned.HostBoundaryTests.test_in_process_typed_reentry_retains_one_cdp_adapter_and_cache",
+        "test_legacy_host_owned.HostBoundaryTests.test_provider_exact_order_path_and_count",
+        "test_legacy_host_owned.HostBoundaryTests.test_provider_rejects_non_regular_and_replaced_files_before_read",
+        "test_legacy_host_owned.HostBoundaryTests.test_text_boundary_bom_empty_lines_and_unicode_separator",
+        "test_legacy_host_owned.HostBoundaryTests.test_typed_child_cannot_forge_ceiling_or_object_flags",
+        "test_legacy_host_owned.KernelOwnedTests.test_actual_root_kernel_owned_file_output_and_filters",
+        "test_legacy_host_owned.KernelOwnedTests.test_actual_typed_child_and_daemon_reenter_same_root_contract",
+        "test_legacy_host_owned.KernelOwnedTests.test_missing_file_failure_is_terminal_without_claiming_mutation",
+        "test_legacy_host_owned.KernelOwnedTests.test_real_source_entry_has_no_powershell_execution_or_lookup",
+        "test_legacy_host_owned.KernelOwnedTests.test_source_entry_runs_with_powershell_absent_from_path",
+        "test_legacy_host_owned.WindowsOriginalBriefTests.test_original_release_notes_brief_and_exit_match_new_root"
+      ],
+      "test_legacy_dispatch_refresh": [
+        "test_legacy_dispatch_refresh.RegistryRefreshTests.test_all_dispatch_handler_and_safety_invariants_remain_identical",
+        "test_legacy_dispatch_refresh.RegistryRefreshTests.test_entire_cli_json_capture_list_includes_numeric_name",
+        "test_legacy_dispatch_refresh.RegistryRefreshTests.test_exact_reviewed_two_line_delta_and_public_baseline_provenance",
+        "test_legacy_dispatch_refresh.RegistryRefreshTests.test_only_native_helper_function_extent_changed"
+      ]
+    },
+    "windows-safeguards": {
+      "test_legacy_execution_startup": [
+        "test_legacy_execution_startup.ExecutionStartupTests.test_actual_confirmation_wrapper_preserves_large_argv_and_value_positions",
+        "test_legacy_execution_startup.ExecutionStartupTests.test_forged_startup_authority_is_rejected_before_any_effect",
+        "test_legacy_execution_startup.ExecutionStartupTests.test_larger_pure_entry_accepts_only_confirmation",
+        "test_legacy_execution_startup.ExecutionStartupTests.test_top_level_gate_does_not_treat_option_values_as_confirmation",
+        "test_legacy_execution_startup.ExecutionStartupTests.test_utf8_bom_reaches_first_read_request_without_executing_it"
+      ],
+      "test_legacy_interaction_startup": [
+        "test_legacy_interaction_startup.InteractionProductionStartupTests.test_actual_main_entry_maps_all_promoted_operations_and_literal_argv",
+        "test_legacy_interaction_startup.InteractionProductionStartupTests.test_duplicate_production_support_load_fails",
+        "test_legacy_interaction_startup.InteractionProductionStartupTests.test_missing_support_file_never_reaches_family",
+        "test_legacy_interaction_startup.InteractionProductionStartupTests.test_native_leaf_is_stopped_before_its_body"
+      ],
+      "test_legacy_diagnostics_startup": [
+        "test_legacy_diagnostics_startup.DiagnosticProductionStartupTests.test_actual_main_entry_maps_all_promoted_operations_and_literal_argv",
+        "test_legacy_diagnostics_startup.DiagnosticProductionStartupTests.test_duplicate_production_support_load_fails",
+        "test_legacy_diagnostics_startup.DiagnosticProductionStartupTests.test_missing_support_file_never_reaches_family",
+        "test_legacy_diagnostics_startup.DiagnosticProductionStartupTests.test_native_leaf_is_stopped_before_its_body"
+      ],
+      "test_legacy_production_startup_harness": [
+        "test_legacy_production_startup_harness.ProductionStartupHarnessTests.test_exact_closed_operation_sets_include_all_nine_diagnostics",
+        "test_legacy_production_startup_harness.ProductionStartupHarnessTests.test_failure_controls_keep_original_routes_and_explicitly_exercise_audit",
+        "test_legacy_production_startup_harness.ProductionStartupHarnessTests.test_subprocess_uses_fixed_bootstrap_and_owned_provider_roots",
+        "test_legacy_production_startup_harness.ProductionStartupHarnessTests.test_typed_bootstrap_is_visible_and_does_not_ast_install_public_delegates"
+      ],
+      "test_legacy_execution_protocol_integers": [
+        "test_legacy_execution_protocol_integers.ProtocolIntegerInventoryTests.test_inventory_covers_all_twelve_fields_and_numeric_representations",
+        "test_legacy_execution_protocol_integers.ProtocolIntegerWindowsTests.test_powershell_5_integer_representations",
+        "test_legacy_execution_protocol_integers.ProtocolIntegerWindowsTests.test_powershell_7_integer_representations"
+      ]
+    },
+    "orchestration": {
+      "test_legacy_host_candidate_qualification": [
+        "test_legacy_host_candidate_qualification.CandidateQualificationTests.test_ast_source_map_requires_every_frozen_ps_source_and_function",
+        "test_legacy_host_candidate_qualification.CandidateQualificationTests.test_exact_cases_include_registry_refresh_and_original_oracle",
+        "test_legacy_host_candidate_qualification.CandidateQualificationTests.test_explicit_platform_requirements_never_turn_missing_trace_into_success",
+        "test_legacy_host_candidate_qualification.CandidateQualificationTests.test_failed_bounded_capture_is_persisted_before_assertion",
+        "test_legacy_host_candidate_qualification.CandidateQualificationTests.test_missing_duplicate_extra_skip_failure_and_xfail_fail_closed",
+        "test_legacy_host_candidate_qualification.CandidateQualificationTests.test_raw_process_evidence_requires_all_entry_modes_and_exact_oracles",
+        "test_legacy_host_candidate_qualification.CandidateQualificationTests.test_raw_process_tamper_timeout_and_oracle_vacuity_are_rejected",
+        "test_legacy_host_candidate_qualification.CandidateQualificationTests.test_windows_startup_safeguards_cannot_skip",
+        "test_legacy_host_candidate_qualification.CandidateQualificationTests.test_workflow_is_narrow_candidate_only_read_only_and_bounded"
+      ],
+      "test_legacy_host_trace": [
+        "test_legacy_host_trace.TraceParserTests.test_bytes_and_text_have_identical_evidence",
+        "test_legacy_host_trace.TraceParserTests.test_c_escaped_unicode_quote_slash_and_control_argv_round_trip",
+        "test_legacy_host_trace.TraceParserTests.test_collection_denial_diagnostics_and_detach_fail",
+        "test_legacy_host_trace.TraceParserTests.test_empty_truncated_or_oversized_capture_is_not_evidence",
+        "test_legacy_host_trace.TraceParserTests.test_every_root_argument_and_executable_must_match",
+        "test_legacy_host_trace.TraceParserTests.test_exact_interrupted_resumed_execve_is_reassembled",
+        "test_legacy_host_trace.TraceParserTests.test_expected_configuration_is_itself_a_closed_read_only_contract",
+        "test_legacy_host_trace.TraceParserTests.test_fork_and_process_clone_forms_are_owned_process_creation",
+        "test_legacy_host_trace.TraceParserTests.test_initial_unprefixed_root_but_later_root_prefix_is_bound",
+        "test_legacy_host_trace.TraceParserTests.test_literal_ellipsis_inside_quoted_path_is_not_truncation",
+        "test_legacy_host_trace.TraceParserTests.test_malformed_escaping_control_characters_and_prefixes_fail",
+        "test_legacy_host_trace.TraceParserTests.test_missing_or_extra_process_spawn_is_not_valid_worker_ownership",
+        "test_legacy_host_trace.TraceParserTests.test_no_prefix_worker_exec_cannot_prove_separate_ownership",
+        "test_legacy_host_trace.TraceParserTests.test_normal_owned_group_cleanup_esrch_and_thread_signals_are_accepted",
+        "test_legacy_host_trace.TraceParserTests.test_opaque_environment_pointer_and_null_forms",
+        "test_legacy_host_trace.TraceParserTests.test_reject_argv_abbreviation_and_environment_expansion",
+        "test_legacy_host_trace.TraceParserTests.test_reject_failed_or_unexpected_execve_and_execveat",
+        "test_legacy_host_trace.TraceParserTests.test_repeated_attachment_and_pid_reuse_fail_closed",
+        "test_legacy_host_trace.TraceParserTests.test_root_cannot_exec_replace_itself_instead_of_spawning_worker",
+        "test_legacy_host_trace.TraceParserTests.test_runtime_signal_names_and_wait_restart_are_supported",
+        "test_legacy_host_trace.TraceParserTests.test_synthetic_modes_and_supported_prefixes",
+        "test_legacy_host_trace.TraceParserTests.test_unknown_or_incomplete_interrupted_calls_fail",
+        "test_legacy_host_trace.TraceParserTests.test_unowned_and_broad_signal_targets_are_rejected",
+        "test_legacy_host_trace.TraceParserTests.test_unprefixed_final_root_exit_binds_numeric_initial_root",
+        "test_legacy_host_trace.TraceParserTests.test_unprefixed_root_vfork_resumes_with_new_root_prefix",
+        "test_legacy_host_trace.TraceParserTests.test_untraced_clone_flag_is_rejected_even_with_thread_flag",
+        "test_legacy_host_trace.TraceParserTests.test_wrong_order_missing_and_failed_exit_evidence_rejected"
+      ]
+    }
+  },
+  "allowed_skips": {
+    "linux": [
+      "test_legacy_host_owned.WindowsOriginalBriefTests.test_original_release_notes_brief_and_exit_match_new_root"
+    ],
+    "windows": [
+      "test_legacy_host_protocol.SessionTests.test_inherited_pipe_does_not_make_cleanup_wait_for_unowned_descendant",
+      "test_legacy_host_owned.KernelOwnedTests.test_real_source_entry_has_no_powershell_execution_or_lookup"
+    ]
+  },
+  "required_original_oracle_processes": 4,
+  "trace_modes": [
+    "root",
+    "typed-child",
+    "daemon"
+  ]
+}

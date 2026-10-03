@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../PcuCp.LegacyExecution/*.cs" Link="Execution/%(Filename)%(Extension)" />
+    <Compile Include="../PcuCp.LegacyDiagnostics/*.cs" Link="Diagnostics/%(Filename)%(Extension)" />
+    <Compile Include="../PcuCp.NativeHost/Contracts.cs" Link="Contracts.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyExecutionStartup.cs" Link="LegacyExecutionStartup.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacySessionInput.cs" Link="LegacySessionInput.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyTextKernel.cs" Link="LegacyTextKernel.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacySafetyKernel.cs" Link="LegacySafetyKernel.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyDiagnosticCulture.cs" Link="LegacyDiagnosticCulture.cs" />
+    <Compile Include="../PcuCp.NativeHost/ParentLifetimeGuard.cs" Link="ParentLifetimeGuard.cs" />
+    <Compile Include="../PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs" Link="LegacyTaskPresetKernel.cs" />
+    <Compile Include="../PcuCp.LegacyTaskForm/LegacyTaskFormKernel.cs" Link="LegacyTaskFormKernel.cs" />
+  </ItemGroup>
+</Project>
