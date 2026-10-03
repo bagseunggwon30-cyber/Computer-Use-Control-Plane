@@ -167,3 +167,30 @@ No real CLI, Node, or package is installed or executed. Other partial/error
 outcomes remain failures. Start/status/stop expectations and all deadlines are
 unchanged; production exit codes and source are untouched. Both cases require
 fresh Windows execution rather than a skipped local result.
+
+## Void write-completion isolation
+
+[Windows run 37113277556](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37113277556)
+at `bf19d768b2cc4d539feae0743dd6eb11dbeeb101` reached a successful real helper
+start, but its wrapper start envelope contained Count/Length/SyncRoot metadata
+for two objects: an empty implementation completion object and the successful
+start reply. The raw malformed envelope and artifact provenance are retained in
+`observed-staged-void-completion.stdout.bin` and its adjacent JSON manifest;
+artifact SHA-256 is
+`91feb7851c19dad76c44f6f9b4960b0c1be91f71d4a4edcf09718ec105d13d55`.
+
+The staged bridge's WriteAsync completion was the sole unassigned, unsuppressed
+GetAwaiter().GetResult() in this bridge. The qualified CDP bridge already uses
+an explicit void cast for that same implementation completion. This repair
+reuses that cast and changes no other production expression. Completion errors
+still throw; public data is neither filtered nor normalized.
+
+A shared Pester regression copies the actual adapter bytes into an owned temporary
+source layout with an inert Python response fixture. Real async pipe handling
+must return exactly one object with its nested empty array/zero/false intact,
+and separately preserve null, false and true replies. The fixture performs no
+file, service, desktop or lock operation, including for its inert delete label.
+The actual production lifecycle test additionally requires the exact start and
+status public key sets. Previous assertions and deadlines remain. Fresh Windows
+execution of both paths is required; portable source/fixture checks alone do not
+qualify the corrected wrapper.

@@ -1,0 +1,13 @@
+{
+  "schema": "cucp.staged-void-completion-observation/v1",
+  "status": "failed-unqualified-baseline",
+  "public_commit": "bf19d768b2cc4d539feae0743dd6eb11dbeeb101",
+  "published_tree": "510a2f2597fd17363f2abdc1ed424195c9a18aaa",
+  "run": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37113277556",
+  "artifact_id": 11270861294,
+  "artifact_sha256": "91feb7851c19dad76c44f6f9b4960b0c1be91f71d4a4edcf09718ec105d13d55",
+  "raw_file": "observed-staged-void-completion.stdout.bin",
+  "raw_bytes": 613,
+  "raw_sha256": "0d8d8b10e3b5fef09ba04192fd197f6d9bc6077d98e253b88bdeb63159f35539",
+  "artifact_entry": "staged-wrapper-start-89ca34430301.stdout.bin"
+}

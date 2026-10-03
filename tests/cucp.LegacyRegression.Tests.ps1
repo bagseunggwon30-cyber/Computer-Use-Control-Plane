@@ -242,6 +242,46 @@ Describe "legacy command boundaries" {
       $Script:StagedCompiledHelper = $originalSelected; $Script:StagedHelperDesktop = $originalCeiling; $Script:HelperLockPath = $originalLock
     }
   }
+  It "does not emit async write completion objects beside the staged bridge reply" {
+    $originalStaged = $env:CUCP_STAGED_COMPILED_HELPER
+    $originalDesktop = $env:CUCP_STAGED_HELPER_READONLY_DESKTOP
+    $originalSelected = $Script:StagedCompiledHelper
+    $originalCeiling = $Script:StagedHelperDesktop
+    $originalLock = $Script:HelperLockPath
+    try {
+      # Copy the actual adapter byte-for-byte into an owned source layout, with
+      # an inert Python reply fixture at its fixed bridge path. No real helper.
+      $layout = Join-Path $TestDrive 'staged-void-completion'
+      $scripts = Join-Path $layout 'scripts'
+      $python = Join-Path $layout 'pcucp-next/python'
+      [void](New-Item -ItemType Directory -Path $scripts -Force)
+      [void](New-Item -ItemType Directory -Path $python -Force)
+      $adapter = Join-Path $scripts 'cucp-staged-helper-adapter.ps1'
+      Copy-Item -LiteralPath (Join-Path $repoRoot 'scripts/cucp-staged-helper-adapter.ps1') -Destination $adapter
+      Copy-Item -LiteralPath (Join-Path $repoRoot 'tests/fixtures/legacy-helper-staged-reply.py') -Destination (Join-Path $python 'legacy_helper_bridge.py')
+      $env:CUCP_STAGED_COMPILED_HELPER = '1'; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $null
+      . $adapter
+      $replies = @(_Invoke-StagedHelper -Operation 'status')
+      $replies.Count | Should -Be 1
+      $reply = $replies[0]
+      $reply.marker | Should -Be 'owned-scalar-reply'
+      @($reply.PSObject.Properties.Name).Count | Should -Be 4
+      $reply.empty.Count | Should -Be 0
+      $reply.number | Should -Be 0
+      $reply.flag | Should -BeFalse
+      $missing = _Invoke-StagedHelper -Operation 'read'
+      ($null -eq $missing) | Should -BeTrue
+      $falseReply = _Invoke-StagedHelper -Operation 'stale' -Arguments @{snapshot=$null}
+      ($falseReply -is [bool]) | Should -BeTrue
+      $falseReply | Should -BeFalse
+      $trueReply = _Invoke-StagedHelper -Operation 'delete' -Arguments @{snapshot=$null}
+      ($trueReply -is [bool]) | Should -BeTrue
+      $trueReply | Should -BeTrue
+    } finally {
+      $env:CUCP_STAGED_COMPILED_HELPER = $originalStaged; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $originalDesktop
+      $Script:StagedCompiledHelper = $originalSelected; $Script:StagedHelperDesktop = $originalCeiling; $Script:HelperLockPath = $originalLock
+    }
+  }
   It "classifies cdp-eval as a live workflow step" {
     $plan = _Build-WorkflowPlan -Rest @("--step", 'macro cdp-eval --expr 1+1')
     $plan.steps[0].allowed | Should -Be $true

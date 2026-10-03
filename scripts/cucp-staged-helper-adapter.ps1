@@ -83,7 +83,7 @@ function _Invoke-StagedHelper {
     while (-not ($inputClosed -and $outDone -and $errDone -and $process.HasExited)) {
       if ($timer.ElapsedMilliseconds -gt $budget) { throw 'Staged helper timed out; operation not retried.' }
       if (-not $inputClosed -and $write.IsCompleted) {
-        $write.GetAwaiter().GetResult(); $process.StandardInput.Close(); $inputClosed=$true
+        [void]$write.GetAwaiter().GetResult(); $process.StandardInput.Close(); $inputClosed=$true
       }
       if (-not $outDone -and $outTask.IsCompleted) {
         $n=$outTask.GetAwaiter().GetResult()

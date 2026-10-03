@@ -1,0 +1,22 @@
+{
+    "schema":  "cucp.helper-server-start/v1",
+    "Count":  2,
+    "Length":  2,
+    "LongLength":  2,
+    "Rank":  1,
+    "SyncRoot":  [
+                     {
+
+                     },
+                     {
+                         "status":  "ok",
+                         "reused":  false,
+                         "pid":  6308,
+                         "pipe_name":  "cucp-helper-6308",
+                         "started_at":  "2026-10-03T09:31:06.4505829Z"
+                     }
+                 ],
+    "IsReadOnly":  false,
+    "IsFixedSize":  true,
+    "IsSynchronized":  false
+}

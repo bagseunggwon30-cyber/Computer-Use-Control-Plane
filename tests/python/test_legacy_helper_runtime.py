@@ -217,6 +217,29 @@ class StagedWrapperStructureTests(unittest.TestCase):
         self.assertIn('actual staged helper bridge',shared)
         self.assertIn('without discovering a replacement',shared)
 
+    def test_void_completion_failure_record_and_inert_reply_vectors(self):
+        pin=json.loads((ROOT/'tests/fixtures/legacy-helper/observed-staged-void-completion.json').read_text())
+        raw=(ROOT/'tests/fixtures/legacy-helper'/pin['raw_file']).read_bytes()
+        self.assertEqual(len(raw),pin['raw_bytes']);self.assertEqual(hashlib.sha256(raw).hexdigest(),pin['raw_sha256'])
+        value=json.loads(raw)
+        self.assertEqual(value['Count'],2);self.assertEqual(value['SyncRoot'][0],{})
+        self.assertEqual(value['SyncRoot'][1]['status'],'ok');self.assertNotIn('status',value)
+        fixture=ROOT/'tests/fixtures/legacy-helper-staged-reply.py'
+        for operation,arguments,expected in (('read',{},None),('stale',{'snapshot':None},False),
+                ('delete',{'snapshot':None},True),('status',{},dict(marker='owned-scalar-reply',empty=[],number=0,flag=False))):
+            completed=subprocess.run([sys.executable,str(fixture),'--staged-unqualified','--lock-file','unused'],
+                input=json.dumps(dict(operation=operation,arguments=arguments)).encode(),capture_output=True,timeout=5)
+            self.assertEqual(completed.returncode,0,completed.stderr)
+            self.assertEqual(json.loads(completed.stdout)['data'],expected)
+
+    def test_async_write_completion_suppression_matches_qualified_cdp_bridge(self):
+        expression='[void]$write.GetAwaiter().GetResult()'
+        for name in ('cucp-staged-helper-adapter.ps1','cucp-legacy-cdp-adapter.ps1'):
+            self.assertIn(expression,(ROOT/'scripts'/name).read_text(encoding='utf-8-sig'))
+        shared=(ROOT/'tests/cucp.LegacyRegression.Tests.ps1').read_text()
+        self.assertIn('does not emit async write completion objects',shared)
+        self.assertIn('$replies.Count | Should -Be 1',shared)
+
     def test_service_encodes_streams_without_console_codepage_mutation(self):
         source=(ROOT/'pcucp-next/dotnet/PcuCp.LegacyHelper/Program.cs').read_text()
         self.assertNotIn('Console.OutputEncoding =',source)
@@ -388,8 +411,12 @@ class StagedProductionWrapperWindowsTests(unittest.TestCase):
                 require_success(evidence,expected_exit=expected_exit)
                 return json.loads(evidence['stdout'].decode('utf-8-sig'))
             try:
-                started=call('start');self.assertEqual(started['status'],'ok');self.assertFalse(started['reused'])
-                status=call('status');self.assertTrue(status['alive']);self.assertEqual(started['pid'],status['pid'])
+                started=call('start')
+                self.assertEqual(set(started),{'schema','status','reused','pid','pipe_name','started_at'})
+                self.assertEqual(started['status'],'ok');self.assertFalse(started['reused'])
+                status=call('status')
+                self.assertEqual(set(status),{'schema','alive','pid','pipe_name','started_at','uptime_s','request_count','helper_version'})
+                self.assertTrue(status['alive']);self.assertEqual(started['pid'],status['pid'])
                 version=call('version')
                 self.assertEqual(version['schema'],'cucp.version/v1')
                 self.assertEqual(version['status'],'ok')
