@@ -1,0 +1,114 @@
+{
+  "Operation": "refine",
+  "Options": {
+    "X": 10,
+    "Y": 10
+  },
+  "Windows": [
+    {
+      "Hwnd": 100,
+      "Title": "Fixture 한글",
+      "Foreground": true
+    }
+  ],
+  "Elements": [
+    {
+      "Id": "e0",
+      "Parent": "e1",
+      "Name": "d0",
+      "Rect": [
+        0,
+        0,
+        20,
+        20
+      ],
+      "Patterns": [],
+      "LocalizedControlType": "custom"
+    },
+    {
+      "Id": "e1",
+      "Parent": "e2",
+      "Name": "d1",
+      "Rect": [
+        0,
+        0,
+        20,
+        20
+      ],
+      "Patterns": [],
+      "LocalizedControlType": "custom"
+    },
+    {
+      "Id": "e2",
+      "Parent": "e3",
+      "Name": "d2",
+      "Rect": [
+        0,
+        0,
+        20,
+        20
+      ],
+      "Patterns": [],
+      "LocalizedControlType": "custom"
+    },
+    {
+      "Id": "e3",
+      "Parent": "e4",
+      "Name": "d3",
+      "Rect": [
+        0,
+        0,
+        20,
+        20
+      ],
+      "Patterns": [],
+      "LocalizedControlType": "custom"
+    },
+    {
+      "Id": "e4",
+      "Parent": "e5",
+      "Name": "d4",
+      "Rect": [
+        0,
+        0,
+        20,
+        20
+      ],
+      "Patterns": [],
+      "LocalizedControlType": "custom"
+    },
+    {
+      "Id": "e5",
+      "Parent": "e6",
+      "Name": "d5",
+      "Rect": [
+        0,
+        0,
+        20,
+        20
+      ],
+      "Patterns": [],
+      "LocalizedControlType": "custom"
+    },
+    {
+      "Id": "e6",
+      "Parent": null,
+      "Name": "d6",
+      "Rect": [
+        0,
+        0,
+        20,
+        20
+      ],
+      "Patterns": [
+        "Invoke"
+      ],
+      "LocalizedControlType": "custom"
+    }
+  ],
+  "Descendants": [
+    "a"
+  ],
+  "Name": "refine-depth6-excluded",
+  "PointElement": "e0"
+}

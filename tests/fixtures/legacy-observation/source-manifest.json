@@ -1,0 +1,160 @@
+{
+  "schema": "cucp.legacy-observation-source/v1",
+  "local_commit": "5232048f68300f3d536822f96713124fc13b3757",
+  "published_commit": "8f3cdde59d2d9574cfd036bab0b4c0bae0940c89",
+  "published_tree": "c84b6c3963bb20f7f8f76562f0d0d8cc549beafb",
+  "path": "scripts/cucp-native-helper.ps1",
+  "git_blob": "bfce080676a9ccbe34b2a7028024f625eba1e12d",
+  "raw_sha256": "48503267e37f5237f8a488bea6a782951d11b60775fe5032fb49c88b7b5a7e7a",
+  "raw_bytes": 113988,
+  "normalized_sha256": "77400e269a26f3616deaf3f9c5b8c33e400246baa37f6b41c4cf0f1ea5f098e6",
+  "normalization": "utf-8-no-bom-lf",
+  "retirement_credit": 0,
+  "functions": [
+    {
+      "name": "_Get-UiaSupportedPatternName",
+      "start_utf16": 16770,
+      "end_utf16": 17343,
+      "sha256": "745fd7fd6d99c8bfa44c60c0481ef2f8aa0c15154ba4ed4af91ff6a3359eb602",
+      "utf8_bytes": 573,
+      "type_seams": {
+        "System.Windows.Automation.InvokePattern": 1,
+        "System.Windows.Automation.TogglePattern": 1,
+        "System.Windows.Automation.SelectionItemPattern": 1
+      }
+    },
+    {
+      "name": "_New-UiaMatchPayload",
+      "start_utf16": 17345,
+      "end_utf16": 18592,
+      "sha256": "ba37f732e9283faa020e35e5188c9cd2d686ab1688a41c3fcb5b625fcd1138cf",
+      "utf8_bytes": 1247,
+      "type_seams": {}
+    },
+    {
+      "name": "_Get-RoleWeight",
+      "start_utf16": 18594,
+      "end_utf16": 18949,
+      "sha256": "5f7302476b33197a34f34e02dc94afff33372f2c930dc8b7c21daaf5bb1e071d",
+      "utf8_bytes": 355,
+      "type_seams": {}
+    },
+    {
+      "name": "_Clamp-UiaPointToRect",
+      "start_utf16": 18951,
+      "end_utf16": 20101,
+      "sha256": "51123cdb837d0de5eb1bd558f0c1cdcc6c39123f9ef82adc18afa78e70311848",
+      "utf8_bytes": 1150,
+      "type_seams": {}
+    },
+    {
+      "name": "_Get-UiaPreferredClickPoint",
+      "start_utf16": 20103,
+      "end_utf16": 20807,
+      "sha256": "ddff6cccdaf122097d900885017fed113515cb37facb50de2437f1cced47776b",
+      "utf8_bytes": 704,
+      "type_seams": {}
+    },
+    {
+      "name": "_Resolve-UiaPointRefinement",
+      "start_utf16": 20809,
+      "end_utf16": 23330,
+      "sha256": "1d55698888766938679529636ddc703637057a13f2a3fa04f38038dbddaca431",
+      "utf8_bytes": 2521,
+      "type_seams": {
+        "System.Windows.Automation.AutomationElement": 1,
+        "System.Windows.Automation.TreeWalker": 1
+      }
+    },
+    {
+      "name": "_Test-CoordsInTarget",
+      "start_utf16": 35924,
+      "end_utf16": 37247,
+      "sha256": "c0de7a9633c4ccbae95ef8b33d0484ec8fc4c6df3e10bc4018233bab60c8419b",
+      "utf8_bytes": 1373,
+      "type_seams": {
+        "CucpNative": 5
+      }
+    },
+    {
+      "name": "_Action-HitTest",
+      "start_utf16": 37657,
+      "end_utf16": 40538,
+      "sha256": "934ca7b5c7b1d47074f46513d8523d10c29b9ca8b01c8a868642cd143599f5b4",
+      "utf8_bytes": 2895,
+      "type_seams": {
+        "CucpNative": 8
+      }
+    },
+    {
+      "name": "_Action-HitScan",
+      "start_utf16": 40540,
+      "end_utf16": 46643,
+      "sha256": "2fd1e6db09cf55b10d9a31137a8bdb1fc9c53c97e0fade2edff8c249b8d43d60",
+      "utf8_bytes": 6103,
+      "type_seams": {
+        "CucpNative": 8
+      }
+    },
+    {
+      "name": "_Action-UiaTree",
+      "start_utf16": 56992,
+      "end_utf16": 60004,
+      "sha256": "2b7244694a07bca873aecbf1b5aab02eae31902974bdfa0e660a41b101a11b34",
+      "utf8_bytes": 3026,
+      "type_seams": {
+        "CucpNative": 1,
+        "System.Windows.Automation.AutomationElement": 1
+      }
+    },
+    {
+      "name": "_Action-UiaFind",
+      "start_utf16": 60203,
+      "end_utf16": 65308,
+      "sha256": "568302756fe666c4cf419f580f681405d167b6be7c105717945dfb652d30a11f",
+      "utf8_bytes": 5269,
+      "type_seams": {
+        "CucpNative": 1,
+        "System.Windows.Automation.AutomationElement": 1,
+        "System.Windows.Automation.ValuePattern": 1
+      }
+    },
+    {
+      "name": "_Action-Click",
+      "start_utf16": 48844,
+      "end_utf16": 52361,
+      "sha256": "6cca25fa9ae169b011b66cefc7f435f403180d0c6cc4b063e6254441db3405d3",
+      "utf8_bytes": 3611,
+      "type_seams": {
+        "CucpNative": 11
+      }
+    },
+    {
+      "name": "_Find-SmallestUiaElementAtPoint",
+      "start_utf16": 23332,
+      "end_utf16": 24053,
+      "sha256": "dbdb77166a060a3f984b679f4b215cdd6513d28c6abf74c2bc4f333ea56219a4",
+      "utf8_bytes": 721,
+      "type_seams": {}
+    },
+    {
+      "name": "_Resolve-OcrUiaFusionCandidate",
+      "start_utf16": 24055,
+      "end_utf16": 26278,
+      "sha256": "e571b55a1e7aab1a7a770a15f65c9ad71860be44f04cf2b8fbdb27bb2e2349f8",
+      "utf8_bytes": 2223,
+      "type_seams": {
+        "System.Windows.Automation.TreeWalker": 1
+      }
+    }
+  ],
+  "type_seams": {
+    "CucpNative": "PcuCp.LegacyObservation.Qualification.FixtureNative",
+    "System.Windows.Automation.AutomationElement": "PcuCp.LegacyObservation.Qualification.FixtureElement",
+    "System.Windows.Automation.TreeWalker": "PcuCp.LegacyObservation.Qualification.FixtureWalker",
+    "System.Windows.Automation.InvokePattern": "PcuCp.LegacyObservation.Qualification.FixtureInvoke",
+    "System.Windows.Automation.TogglePattern": "PcuCp.LegacyObservation.Qualification.FixtureToggle",
+    "System.Windows.Automation.SelectionItemPattern": "PcuCp.LegacyObservation.Qualification.FixtureSelectionItem",
+    "System.Windows.Automation.ValuePattern": "PcuCp.LegacyObservation.Qualification.FixtureValue"
+  }
+}

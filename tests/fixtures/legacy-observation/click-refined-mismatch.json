@@ -1,0 +1,53 @@
+{
+  "Operation": "click",
+  "Options": {
+    "X": 10,
+    "Y": 10,
+    "TargetHwnd": 100,
+    "ClickRefine": "uia-safe"
+  },
+  "Windows": [
+    {
+      "Hwnd": 100,
+      "Title": "Fixture 한글",
+      "Foreground": true
+    }
+  ],
+  "Elements": [
+    {
+      "Id": "root",
+      "Name": "Root",
+      "Rect": [
+        0,
+        0,
+        600,
+        400
+      ],
+      "Patterns": [],
+      "LocalizedControlType": "window"
+    },
+    {
+      "Id": "a",
+      "Parent": "root",
+      "Name": "Run 한글",
+      "Rect": [
+        0,
+        0,
+        40,
+        20
+      ],
+      "Clickable": [
+        15,
+        15
+      ]
+    }
+  ],
+  "Descendants": [
+    "a"
+  ],
+  "Name": "click-refined-mismatch",
+  "PointWindows": {
+    "10,10": 101,
+    "15,15": 999
+  }
+}

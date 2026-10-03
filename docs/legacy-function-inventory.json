@@ -54,7 +54,7 @@
     },
     {
       "path": "scripts/cucp-native-helper.ps1",
-      "lines": 2792,
+      "lines": 2796,
       "functions": [
         {
           "name": "_Ensure-Win32Native",
@@ -1407,6 +1407,64 @@
           "line": 15
         }
       ]
+    },
+    {
+      "path": "scripts/cucp-legacy-observation-adapter.ps1",
+      "lines": 92,
+      "functions": [
+        {
+          "name": "_Require-LegacyObservation",
+          "line": 3
+        },
+        {
+          "name": "_New-LegacyObservationOptions",
+          "line": 17
+        },
+        {
+          "name": "_Get-UiaSupportedPatternName",
+          "line": 26
+        },
+        {
+          "name": "_New-UiaMatchPayload",
+          "line": 32
+        },
+        {
+          "name": "_Get-RoleWeight",
+          "line": 37
+        },
+        {
+          "name": "_Clamp-UiaPointToRect",
+          "line": 42
+        },
+        {
+          "name": "_Get-UiaPreferredClickPoint",
+          "line": 48
+        },
+        {
+          "name": "_Resolve-UiaPointRefinement",
+          "line": 54
+        },
+        {
+          "name": "_Test-CoordsInTarget",
+          "line": 59
+        },
+        {
+          "name": "_Action-HitTest",
+          "line": 64
+        },
+        {
+          "name": "_Action-HitScan",
+          "line": 71
+        },
+        {
+          "name": "_Action-UiaTree",
+          "line": 78
+        },
+        {
+          "name": "_Action-UiaFind",
+          "line": 85
+        }
+      ]
     }
   ],
   "baseline_function_count": 298,
@@ -1643,8 +1701,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 942925,
-    "removed": 70553,
+    "current": 955322,
+    "removed": 58156,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",

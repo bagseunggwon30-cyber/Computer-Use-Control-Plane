@@ -2746,6 +2746,10 @@ function _Action-ModalDetect {
 # Dispatch
 # ============================================================================
 try {
+if ($env:CUCP_LEGACY_OBSERVATION_CANDIDATE) {
+  if ($env:CUCP_LEGACY_OBSERVATION_CANDIDATE -ne '1') { throw 'Invalid observation candidate selector; expected 1 or unset.' }
+  . (Join-Path $PSScriptRoot 'cucp-legacy-observation-adapter.ps1')
+}
 switch ($Action) {
   "health"        { _Action-Health }
   "windows"       { _Action-Windows }

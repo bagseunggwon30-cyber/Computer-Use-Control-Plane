@@ -1,0 +1,48 @@
+{
+  "Operation": "uia-find",
+  "Options": {
+    "X": 10,
+    "Y": 10,
+    "Label": "Run"
+  },
+  "Windows": [
+    {
+      "Hwnd": 100,
+      "Title": "Fixture 한글",
+      "Foreground": true
+    }
+  ],
+  "Elements": [
+    {
+      "Id": "root",
+      "Name": "Root",
+      "Rect": [
+        0,
+        0,
+        600,
+        400
+      ],
+      "Patterns": [],
+      "LocalizedControlType": "window"
+    },
+    {
+      "Id": "a",
+      "Parent": "root",
+      "Name": "Run 한글",
+      "Rect": [
+        0,
+        0,
+        40,
+        20
+      ],
+      "Clickable": [
+        9.5,
+        10.5
+      ]
+    }
+  ],
+  "Descendants": [
+    "a"
+  ],
+  "Name": "find-substring"
+}
