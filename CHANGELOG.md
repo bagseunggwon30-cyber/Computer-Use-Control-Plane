@@ -1,3 +1,12 @@
+# Changelog
+
+## 0.5.0 proposal
+
+- Select the generic Python/C# core and retire the old PowerShell macro runtime, launchers and Pester/CI paths. This is a breaking retirement proposal, not full legacy parity.
+- Integrate typed workflows/forms/tasks/watch, UIA patterns, same-pixel OCR/fusion/diff and optional guarded CDP from migration/python-csharp-runtime.
+- Add Python user installer and optional Pi/UAC launcher; fix source CLI Unicode output and add PowerShell-free regression guards.
+- See docs/migration-matrix.md for explicitly retired behavior and docs/core-validation.md for verification limits.
+
 # CUCP Changelog
 
 ## v2.4.2 - Public positioning cleanup (2026-05-31)

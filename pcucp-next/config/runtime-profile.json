@@ -3,8 +3,8 @@
   "name": "pcucp-next",
   "status": "core-preview",
   "compatibility": {
-    "legacy_wrapper": "scripts/cucp.ps1",
-    "strategy": "New engine uses explicit Python/native commands. Legacy PowerShell is available only via the separate legacy command; no automatic fallback."
+    "legacy_included": false,
+    "strategy": "Generic Python/C# core; old macro CLI retired. See docs/migration-matrix.md."
   },
   "safety": {
     "default_live_control": false,
@@ -14,8 +14,7 @@
   "language_roles": {
     "python": "core and build tooling",
     "dotnet": "Windows native worker",
-    "typescript": "Pi adapter only",
-    "powershell": "source-only legacy and optional launchers"
+    "typescript": "Pi adapter only"
   },
   "distribution": {
     "format": "portable folder",

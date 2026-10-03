@@ -1,3 +1,5 @@
+> Historical 0.3.0 notes. Pester and legacy paths described below are retired in the 0.5.0 proposal; see [current verification](core-validation.md).
+
 # 상주 네이티브 실행기 — 0.3.0
 
 Pi → Python `serve` → C# `serve` 구조로 한 세션 동안 네이티브 프로세스를 재사용한다. 첫 실제 네이티브 요청 전에는 C# 프로세스를 띄우지 않는다. `capabilities`만 조회할 때는 Windows 실행 파일이 없어도 동작한다. 별도 관리자 서비스나 UIA 요소 캐시는 이번 구현에 포함하지 않는다.

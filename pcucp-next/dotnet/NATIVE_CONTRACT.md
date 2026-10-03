@@ -4,7 +4,7 @@ The native host supports one-command execution and a persistent `serve` mode.
 Python `serve` owns one native worker and imposes a hard request timeout.
 See [the resident session contract](../../docs/resident-native-session.md).
 Standalone commands retain one JSON document on stdout. Publish once with
-`./publish-native.ps1`; normal operations invoke the published executable, never
+`python pcucp-next/packaging/publish_native.py`; normal operations invoke the published executable, never
 `dotnet run`.
 
 ## Commands

@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Automation;
 
 internal sealed record UiaNode(string Name, string ControlType, string AutomationId, string ClassName, int ProcessId,
-    string NativeWindowHandle, RectInfo? BoundingRectangle, IReadOnlyList<string> Patterns, IReadOnlyList<UiaNode> Children, string? ElementRef);
+    string NativeWindowHandle, RectInfo? BoundingRectangle, IReadOnlyList<string> Patterns, IReadOnlyList<UiaNode> Children, string? ElementRef, IReadOnlyDictionary<string, object> PatternStates);
 
 internal static class UiaTreeObserver
 {
@@ -111,7 +111,9 @@ internal static class UiaTreeObserver
                     }
                     catch (Exception ex) when (IsProviderFailure(ex)) { Error("uia_children_unavailable", ex.Message); }
                 }
-                return new UiaNode(name, type, id, className, pid, handle, geometry, patterns, children, UiaElementActions.Register(element, Target));
+                var states = UiaElementActions.ReadPatternStates(element, patterns);
+                var reference = UiaElementActions.Register(element, Target, states);
+                return new UiaNode(name, type, id, className, pid, handle, geometry, patterns, children, reference, states);
             }
             catch (Exception ex) when (IsProviderFailure(ex)) { Error("uia_element_unavailable", ex.Message); return null; }
         }

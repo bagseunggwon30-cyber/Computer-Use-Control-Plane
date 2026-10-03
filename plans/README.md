@@ -1,9 +1,3 @@
-# Plans
+# Typed workflow example
 
-This directory contains example CUCP plan files.
-
-Plans should be deterministic JSON workflows with explicit observation,
-readiness, live-control, and verification steps. Keep examples generic and avoid
-private desktop state, credentials, URLs, or vendor-specific workflow details.
-
-Use dry-run and readiness checks before publishing any new live-control example.
+Preview `cucp workflow-plan --file plans/observe-windows.json --json`; run with workflow-run. The example is read-only. Old command-string plans are retired. Keep secrets out of plans.

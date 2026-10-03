@@ -18,7 +18,7 @@ class PlannerTests(unittest.TestCase):
         self.assertIn('unknown_command', result['errors'])
 
     def test_launch_close_and_js_evaluation_are_mutations(self):
-        for command in ('app-launch', 'app-close', 'cdp-eval', 'cdp-click', 'safe-type', 'focus'):
+        for command in ('app-launch', 'app-close', 'cdp-eval', 'cdp-click', 'uia-set-value', 'focus'):
             with self.subTest(command=command):
                 result = plan_command(command)
                 self.assertEqual(result['status'], 'ok')
@@ -34,11 +34,19 @@ class PlannerTests(unittest.TestCase):
                 self.assertFalse(result['safety']['live_control_required'])
                 self.assertEqual(result['route']['fallback'], 'none')
 
-    def test_legacy_route_never_becomes_implicit_engine_capability(self):
+    def test_retired_legacy_names_fail_closed_without_fallback(self):
+        for command in ('safe-type', 'vision-click', 'clipboard', 'goal'):
+            result = plan_command(command)
+            self.assertEqual(result['status'], 'blocked')
+            self.assertEqual(result['route']['primary'], 'blocked')
+            self.assertEqual(result['route']['fallback'], 'none')
+            self.assertNotIn(command, {item['name'] for item in capabilities()})
+
+    def test_migrated_cdp_requires_explicit_optional_adapter_and_live_eval(self):
         result = plan_command('cdp-eval')
-        self.assertEqual(result['route']['primary'], 'legacy-powershell')
-        self.assertFalse(COMMANDS['cdp-eval'].available_in_engine)
-        self.assertNotIn('cdp-eval', {item['name'] for item in capabilities()})
+        self.assertEqual(result['route']['primary'], 'python-cdp-adapter')
+        self.assertTrue(result['safety']['live_control_required'])
+        self.assertTrue(COMMANDS['cdp-eval'].available_in_engine)
 
     def test_normalization_does_not_bypass_mutation_classification(self):
         result = plan_command(' APP_LAUNCH ')

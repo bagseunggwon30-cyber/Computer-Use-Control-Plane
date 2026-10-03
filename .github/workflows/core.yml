@@ -1,7 +1,12 @@
 name: CUCP core
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
+env:
+  PYTHONUTF8: '1'
 jobs:
   core:
     runs-on: ubuntu-latest
@@ -34,17 +39,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Native resident transport (no desktop input)
-        shell: pwsh
-        run: |
-          $env:PYTHONPATH = Join-Path (Get-Location).Path 'pcucp-next/python'
-          $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
-          python -m unittest discover -s tests/python -p test_native_session.py -v
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - shell: pwsh
-        run: |
-          Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
-          Invoke-Pester -Path tests/cucp.LegacyRegression.Tests.ps1 -CI
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Python and real resident transport (no desktop input)
+        run: python -m unittest discover -s tests/python -v
+        env:
+          PYTHONPATH: pcucp-next/python
+          CUCP_NATIVE_TEST_HOST: ${{ github.workspace }}/pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll
       # No interactive desktop input tests on hosted runners. See manual Windows checks.
   windows-portable:
     runs-on: windows-latest
@@ -68,19 +70,24 @@ jobs:
       - run: npm ci --ignore-scripts
         working-directory: integrations/pi
       - name: Pi adapter with packaged engine and no Python on child PATH
-        shell: pwsh
-        run: |
-          $env:CUCP_EXECUTABLE = (Resolve-Path '../../dist/CUCP-0.4.0-win-x64/CUCP.exe').Path
-          $node = (Get-Command node).Source
-          $env:PATH = Join-Path $env:SystemRoot 'System32'
-          & $node --import tsx test/engine-smoke.ts
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        working-directory: integrations/pi
+        run: python pcucp-next/packaging/verify_pi_portable.py --bundle dist/CUCP-0.5.0-win-x64
       - uses: actions/upload-artifact@v4
         with:
-          name: CUCP-0.4.0-win-x64
+          name: CUCP-0.5.0-win-x64
           path: |
-            dist/CUCP-0.4.0-win-x64.zip
-            dist/CUCP-0.4.0-win-x64.zip.sha256
+            dist/CUCP-0.5.0-win-x64.zip
+            dist/CUCP-0.5.0-win-x64.zip.sha256
           if-no-files-found: error
           retention-days: 30
+  browser-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fresh-profile browser protocol fixtures
+        run: python -m unittest discover -s tests/python -p test_cdp_browser.py -v
+        env:
+          PYTHONPATH: pcucp-next/python
+          CUCP_CHROME_TEST: '1'

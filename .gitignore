@@ -55,8 +55,4 @@ TestResult.xml
 coverage/
 dist/
 
-# Test scratch files.
-tests/_*.ps1
-tests/scratch-*.ps1
-tests/.*.ps1
-tests/.*.txt
+.migration-logs/

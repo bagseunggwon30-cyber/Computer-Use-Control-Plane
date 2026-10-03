@@ -11,11 +11,16 @@ internal static class ScreenshotObserver
     {
         options.Allow("--hwnd", "--pid", "--max-width", "--max-height");
         var target = WindowTarget.Read(options, false);
+        var maximumWidth = options.Integer("--max-width", 1600, 64, 4096);
+        var maximumHeight = options.Integer("--max-height", 1000, 64, 4096);
+        return NativeResult.Ok("screenshot", CaptureWindow(target, maximumWidth, maximumHeight));
+    }
+
+    internal static ScreenshotData CaptureWindow(WindowTarget target, int maximumWidth, int maximumHeight)
+    {
         PrivilegeInspector.RequireDefaultDesktop();
         if (!NativeMethods.IsWindowVisible(target.Hwnd) || NativeMethods.IsIconic(target.Hwnd))
             throw new NativeFailure("target_not_visible", "Cannot capture a hidden or minimized window from the visible desktop.");
-        var maximumWidth = options.Integer("--max-width", 1600, 64, 4096);
-        var maximumHeight = options.Integer("--max-height", 1000, 64, 4096);
         var window = target.Rect();
         var screen = NativeMethods.VirtualScreen;
         var left = Math.Max(window.X, screen.X);
@@ -41,17 +46,11 @@ internal static class ScreenshotObserver
         using var stream = new MemoryStream();
         encoder.Save(stream);
         if (stream.Length > 24 * 1024 * 1024) throw new NativeFailure("capture_too_large", "Encoded screenshot exceeds the 24 MiB limit.");
-        return NativeResult.Ok("screenshot", new
-        {
-            image = new { mime_type = "image/png", data = Convert.ToBase64String(stream.ToArray()), width = output.PixelWidth, height = output.PixelHeight },
-            target = target.Identity,
-            geometry = new { x = left, y = top, width, height, image_width = output.PixelWidth, image_height = output.PixelHeight },
-            window_geometry = window,
-            captured_at = DateTimeOffset.UtcNow.ToString("O"), coordinate_space = "physical_screen_pixels",
-            capture_semantics = "visible_desktop_crop_may_include_occluding_windows",
-            target_foreground = NativeMethods.GetForegroundWindow() == target.Hwnd,
-            cursor_included = false
-        });
+        return new ScreenshotData(
+            new ScreenshotImage("image/png", Convert.ToBase64String(stream.ToArray()), output.PixelWidth, output.PixelHeight),
+            target.Identity, new ScreenshotGeometry(left, top, width, height, output.PixelWidth, output.PixelHeight), window,
+            DateTimeOffset.UtcNow.ToString("O"), "physical_screen_pixels", "visible_desktop_crop_may_include_occluding_windows",
+            NativeMethods.GetForegroundWindow() == target.Hwnd, false);
     }
 
     private static BitmapSource Capture(int x, int y, int width, int height)

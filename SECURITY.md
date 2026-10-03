@@ -12,7 +12,7 @@ trajectory logs, and live verification captures.
 ## Live Control
 
 CUCP can operate the local Windows desktop. Live actions must be user-approved
-and must include `-AllowLiveControl`.
+and must include the startup flag `--allow-live-control`.
 
 CUCP should refuse or pause on:
 

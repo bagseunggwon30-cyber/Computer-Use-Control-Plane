@@ -13,7 +13,6 @@ LANGUAGE_ROLES: dict[str, str] = {
     "python": "session, protocol, orchestration, diagnostics, packaging",
     "dotnet": "Windows capture, UIA, OCR, input, privilege diagnostics",
     "typescript": "optional Pi host adapter",
-    "powershell": "source-only legacy compatibility and optional developer launchers",
 }
 
 
@@ -46,14 +45,13 @@ def component_paths() -> dict[str, str]:
         return {"engine": str(Path(sys.executable).resolve()),
                 "native_host": str(repo_root() / "native" / "PcuCp.NativeHost.exe"),
                 "pi_adapter": str(repo_root() / "integrations" / "pi"),
-                "legacy_wrapper": "not included"}
+                "source_launcher": "not included"}
     root = repo_root()
     nxt = next_root()
     return {
         "python_cli": rel(nxt / "python" / "pcucp_cli"),
         "native_host_project": rel(nxt / "dotnet" / "PcuCp.NativeHost" / "PcuCp.NativeHost.csproj"),
-        "thin_launcher": rel(nxt / "powershell" / "cucp-next.ps1"),
-        "legacy_wrapper": rel(root / "scripts" / "cucp.ps1"),
+        "source_launcher": rel(nxt / "python" / "run_source.py"),
         "runtime_profile": rel(nxt / "config" / "runtime-profile.json"),
     }
 
@@ -71,6 +69,8 @@ def version_payload() -> dict[str, Any]:
 
 
 def emit(payload: dict[str, Any], as_json: bool = True) -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     if as_json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return

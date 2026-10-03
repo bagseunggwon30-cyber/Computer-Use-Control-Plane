@@ -1,57 +1,12 @@
 ---
 name: cucp
-description: Use CUCP when a task needs local Windows desktop observation, grounded GUI automation, label-based clicking, UI Automation, OCR, Chromium CDP, screenshots, workflow planning, or safety-gated live control.
+description: Connect a host to Python/C# Windows computer use with MCP or UTF-8 JSONL.
 ---
 
-# CUCP
+# CUCP core
 
-CUCP is a Windows Computer Use Control Plane. Use it to observe the desktop,
-ground UI targets, plan actions, run approved live control, and verify results.
+Read [setup](../../docs/host-neutral-setup.md) and [migration](../../docs/migration-matrix.md). Start installed cucp mcp, portable CUCP.exe mcp, or absolute Python with absolute pcucp-next/python/run_source.py mcp. Custom hosts use serve JSONL.
 
-Primary command after installation:
+Discover actual commands with capabilities. Observe exact HWND/PID, select an unambiguous target, act only with user-approved startup --allow-live-control, then verify a new observation. Requests cannot enable permission; never replay uncertain input. Private text/screenshots remain host-policy data.
 
-```powershell
-cucp <args>
-```
-
-Direct wrapper path from the repository root:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\cucp.ps1 <args>
-```
-
-## Operating Rules
-
-- Start with read-only observation.
-- Prefer labels, UI Automation, OCR, or CDP DOM evidence before coordinates.
-- Require explicit user approval and `-AllowLiveControl` before clicks, typing,
-  shortcuts, app launch/close, or live workflow execution.
-- Do not operate UAC prompts, credential dialogs, payment screens, private
-  messages, or identity documents unless the user approved that exact action.
-- Verify immediately after every live action.
-
-## Useful Commands
-
-Read-only:
-
-```powershell
-cucp macro windows
-cucp macro find-label --label "Save" --explain
-cucp macro list-affordances --window "Notepad" --limit 20
-cucp macro smart-plan --label "Save" --match "Notepad"
-cucp macro health-quick
-```
-
-Live control after explicit approval:
-
-```powershell
-cucp -AllowLiveControl macro smart-click --label "Save" --match "Notepad"
-cucp -AllowLiveControl macro fill-label --label "Name" --text "Alice"
-cucp -AllowLiveControl macro shortcut --keys "ctrl+s"
-```
-
-## Scope
-
-This public plugin package is limited to Windows computer-use automation. It
-does not include unfinished industrial, vendor-specific, or project-specific
-automation plans.
+Build/install are explicit. No automatic build, PowerShell fallback, detached helper or legacy macro execution exists. UAC belongs to the user and its secure desktop is unsupported. Tests do not prove a real GUI goal completed.

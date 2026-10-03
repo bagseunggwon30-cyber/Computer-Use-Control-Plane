@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "pcucp-next" / "python"))
-from pcucp_cli import native_host, legacy
+from pcucp_cli import native_host
 
 
 def observation(**overrides):
@@ -74,7 +74,7 @@ class TransportTests(unittest.TestCase):
 
     def test_valid_utf8_and_stderr(self):
         body = observation(data={"windows": [{"title": "메모장"}]})
-        code, payload, error = self.run_host(f"import sys\nprint({json.dumps(body, ensure_ascii=False)!r})\nprint('diagnostic', file=sys.stderr)")
+        code, payload, error = self.run_host(f"import sys\nsys.stdout.reconfigure(encoding='utf-8')\nprint({json.dumps(body, ensure_ascii=False)!r})\nprint('diagnostic', file=sys.stderr)")
         self.assertEqual(code, 0)
         self.assertEqual(payload["data"]["windows"][0]["title"], "메모장")
         self.assertIsNone(payload["route"]["fallback"])
@@ -163,22 +163,6 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(native_host.run_native("windows", "--string-not-list")[0], 2)
         self.assertEqual(native_host.run_native("")[0], 2)
 
-    def test_legacy_launch_error(self):
-        with patch.object(legacy, "legacy_wrapper_path", return_value=self.host), patch.object(legacy.subprocess, "Popen", side_effect=OSError("missing")), contextlib.redirect_stderr(io.StringIO()) as errors:
-            self.host.touch()
-            self.assertEqual(legacy.run_legacy([]), 2)
-        self.assertIn("launch failed", errors.getvalue())
-
-    def test_legacy_timeout(self):
-        with patch.object(legacy, "legacy_wrapper_path", return_value=self.host), patch.object(legacy.subprocess, "Popen") as popen, patch.object(legacy, "_terminate_process_tree") as terminate, contextlib.redirect_stderr(io.StringIO()):
-            self.host.touch()
-            popen.return_value.wait.side_effect = [subprocess.TimeoutExpired('powershell', 0.01), 0]
-            popen.return_value.poll.return_value = 0
-            self.assertEqual(legacy.run_legacy([], timeout_s=0.01), 124)
-            terminate.assert_called_once()
-            command = popen.call_args.args[0]
-            self.assertNotIn('-ExecutionPolicy', command)
-            self.assertNotIn('shell', popen.call_args.kwargs)
 
 
 if __name__ == "__main__":
