@@ -29,6 +29,7 @@ class PiLauncherTests(unittest.TestCase):
     def npm_fixture(self, entry='dist/cli.js'):
         shim = self.root / 'pi.cmd'
         shim.write_text('INVALID SHELL CODE; must not execute', encoding='utf-8')
+        shim.chmod(0o755)  # POSIX lookup fixture; the shell content is never run.
         package = self.root / 'node_modules/@earendil-works/pi-coding-agent'
         package.mkdir(parents=True)
         (package / 'package.json').write_text(json.dumps({'bin': {'pi': entry}}), encoding='utf-8')
@@ -62,7 +63,7 @@ class PiLauncherTests(unittest.TestCase):
 
     def test_elevation_is_explicit_and_preserves_startup_argv(self):
         args = ['--elevated', '--python-exe', sys.executable, '--pi-executable', sys.executable]
-        with patch.object(launcher, 'ROOT', self.root), patch.object(sys, 'platform', 'win32'), \
+        with patch.object(launcher, 'prepare', return_value=(['fixture.exe'], {})), patch.object(sys, 'platform', 'win32'), \
              patch.object(launcher, 'is_admin', return_value=False), patch.object(launcher, 'elevate', return_value=37) as elevate, \
              patch.object(launcher.subprocess, 'run') as run:
             self.assertEqual(launcher.main(args), 37)
@@ -74,7 +75,7 @@ class PiLauncherTests(unittest.TestCase):
             args = ['--python-exe', sys.executable, '--pi-executable', sys.executable]
             if admin:
                 args.append('--elevated')
-            with patch.object(launcher, 'ROOT', self.root), patch.object(sys, 'platform', 'win32'), \
+            with patch.object(launcher, 'prepare', return_value=(['fixture.exe'], {})), patch.object(sys, 'platform', 'win32'), \
                  patch.object(launcher, 'is_admin', return_value=admin), patch.object(launcher, 'elevate') as elevate, \
                  patch.object(launcher.subprocess, 'run', return_value=subprocess.CompletedProcess([], 37)) as run:
                 self.assertEqual(launcher.main(args), 37)
