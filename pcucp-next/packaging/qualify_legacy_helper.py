@@ -21,6 +21,7 @@ def main(argv=None):
     logs = args.log_dir.resolve()
     logs.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, PYTHONPATH=str(ROOT / 'pcucp-next/python'), PYTHONIOENCODING='utf-8', CUCP_HELPER_EVIDENCE_DIR=str(logs))
+    env.pop('CUCP_REQUIRE_HELPER_DIRECT', None)
     index = 0
     def run(command, timeout=120):
         nonlocal index
@@ -52,6 +53,7 @@ def main(argv=None):
             env['CUCP_LEGACY_HELPER_TEST_HOST'] = str(host / 'bin/Release/net48/PcuCp.LegacyHelper.exe')
             env['CUCP_LEGACY_HELPER_TRANSPORT_PROBE'] = str(probe / 'bin/Release/net48/PcuCp.LegacyHelper.TransportTests.exe')
             env['CUCP_REQUIRE_HELPER_ORACLE'] = '1'
+            env['CUCP_REQUIRE_HELPER_DIRECT'] = '1'
         for pattern, timeout in [('test_helper_process_evidence.py', 120), ('test_legacy_helper*.py', 300)]:
             try: run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests/python', '-p', pattern, '-v'], timeout=timeout)
             except Exception as error: failures.append(str(error))

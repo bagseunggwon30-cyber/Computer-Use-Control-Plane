@@ -26,7 +26,7 @@ internal static class Program
     }
     private static int Main(string[] args)
     {
-        if (args.SequenceEqual(new[] { "--self-test" })) { HelperContractChecks.Run(); WireContractChecks.Run(); return 0; }
+        if (args.SequenceEqual(new[] { "--self-test" })) { HelperContractChecks.Run(); WireContractChecks.Run(); DirectContractChecks.Run(); return 0; }
         if (args.SequenceEqual(new[] { "--fixture" }) || args.SequenceEqual(new[] { "--fixtures" }))
         {
             using (var document = JsonDocument.Parse(Console.In.ReadToEnd()))

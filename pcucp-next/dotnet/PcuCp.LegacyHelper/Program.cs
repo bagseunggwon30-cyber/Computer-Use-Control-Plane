@@ -31,22 +31,29 @@ namespace PcuCp.LegacyHelper
                     Console.Out.WriteLine(json.Serialize(LegacyHelperFixtureRunner.Evaluate(fixture)));
                     return 0;
                 }
-                if (args[0] == "exchange")
+                if (args[0] == "exchange" || args[0] == "exchange-direct")
                 {
-                    Only(options, "pipe", "request-file", "connect-timeout-ms", "read-timeout-ms", "diagnostic-phases");
+                    bool directExchange = args[0] == "exchange-direct";
+                    Only(options, directExchange ? "pipe-name" : "pipe", "request-file", "connect-timeout-ms", "read-timeout-ms", "diagnostic-phases");
+                    string target = directExchange ? LegacyHelperDirect.WindowsPipeName(Required(options, "pipe-name")) : null;
                     string request = LegacyHelperWire.ReadRequestFile(Required(options, "request-file"));
-                    var response = LegacyHelperService.Exchange(Required(options, "pipe"), request,
-                        Integer(options, "connect-timeout-ms", 2000), Integer(options, "read-timeout-ms", 30000), phase);
+                    if (!directExchange) target = Required(options, "pipe"); // Preserve old malformed-input precedence.
+                    var response = directExchange
+                        ? LegacyHelperService.ExchangeDirect(target, request, Integer(options, "connect-timeout-ms", 2000), Integer(options, "read-timeout-ms", 30000), phase)
+                        : LegacyHelperService.Exchange(target, request, Integer(options, "connect-timeout-ms", 2000), Integer(options, "read-timeout-ms", 30000), phase);
                     if (response == null) throw new IOException("pipe_empty_response");
                     Console.Out.Write(response + "\n");
                     return 0;
                 }
-                if (args[0] != "serve") throw new ArgumentException("unknown candidate mode");
-                Only(options, "lock-file", "idle-timeout-ms", "allow-readonly-desktop", "fixture", "diagnostic-phases", "diagnostic-acl");
+                bool direct = args[0] == "serve-direct";
+                if (args[0] != "serve" && !direct) throw new ArgumentException("unknown candidate mode");
+                if (direct) Only(options, "pipe-name", "lock-file", "idle-timeout-ms", "allow-readonly-desktop", "fixture", "diagnostic-phases", "diagnostic-acl", "debug-log");
+                else Only(options, "lock-file", "idle-timeout-ms", "allow-readonly-desktop", "fixture", "diagnostic-phases", "diagnostic-acl");
+                string directName = direct ? LegacyHelperDirect.WindowsPipeName(Required(options, "pipe-name")) : null;
                 string lockFile = Path.GetFullPath(Required(options, "lock-file"));
-                if (!Directory.Exists(Path.GetDirectoryName(lockFile))) throw new DirectoryNotFoundException("candidate lock directory must exist");
+                if (!direct && !Directory.Exists(Path.GetDirectoryName(lockFile))) throw new DirectoryNotFoundException("candidate lock directory must exist");
                 int pid = Process.GetCurrentProcess().Id;
-                string pipe = "cucp-helper-" + pid.ToString(CultureInfo.InvariantCulture);
+                string pipe = direct ? directName : "cucp-helper-" + pid.ToString(CultureInfo.InvariantCulture);
                 if (options.ContainsKey("fixture") && options.ContainsKey("allow-readonly-desktop")) throw new ArgumentException("fixture and desktop provider are mutually exclusive");
                 ILegacyHelperProvider provider = options.ContainsKey("allow-readonly-desktop")
                     ? (ILegacyHelperProvider)new WindowsLegacyHelperProvider() : new DeniedDesktopProvider();
@@ -66,9 +73,17 @@ namespace PcuCp.LegacyHelper
                     if (++aclRecords <= 16) Console.Error.WriteLine("helper_acl_evidence=" + LegacyHelperService.NewJson().Serialize(value));
                     else if (aclRecords == 17) Console.Error.WriteLine("helper_acl_evidence_limit=16");
                 };
+                var debug = direct && options.ContainsKey("debug-log") ? new LegacyHelperDebugLog(Console.Error.WriteLine) : null;
+                Action<string> log = message => Console.Error.WriteLine(message);
+                if (direct) log = message => { if (debug != null) debug.Event("pipe.error"); };
                 var service = new LegacyHelperService(actions, pid, pipe, lockFile,
-                    Integer(options, "idle-timeout-ms", 60000), clock, message => Console.Error.WriteLine(message), phase, aclEvidence);
-                service.Run();
+                    Integer(options, "idle-timeout-ms", 60000), clock, log, phase, aclEvidence, debug);
+                if (direct)
+                {
+                    // Validate the original explicit spelling, not a silently normalized path.
+                    using (var directory = new LegacyHelperDirectLockDirectory(Required(options, "lock-file"))) service.Run();
+                }
+                else service.Run();
                 if (scripted != null) scripted.AssertExhausted();
                 return 0;
             }
@@ -85,7 +100,7 @@ namespace PcuCp.LegacyHelper
             {
                 if (!args[i].StartsWith("--", StringComparison.Ordinal)) throw new ArgumentException("named candidate options required");
                 string key = args[i].Substring(2);
-                string value = key == "allow-readonly-desktop" || key == "diagnostic-phases" || key == "diagnostic-acl" ? "true" : ++i < args.Length ? args[i] : null;
+                string value = key == "allow-readonly-desktop" || key == "diagnostic-phases" || (key == "debug-log" && args[0] == "serve-direct") || key == "diagnostic-acl" ? "true" : ++i < args.Length ? args[i] : null;
                 if (value == null || result.ContainsKey(key)) throw new ArgumentException("missing or repeated candidate option");
                 result.Add(key, value);
             }

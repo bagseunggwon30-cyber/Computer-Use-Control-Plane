@@ -118,7 +118,9 @@ not changed here.
   documentation search found no broader product CLI contract for them. This
   stage does not remove that script or silently remap custom names. If the direct
   script is retired, its supported direct-use surface needs an explicit decision
-  and migration path first.
+  and migration path first. The later [explicit direct candidate](legacy-helper-direct-candidate.md)
+  maps custom launch/exchange only; it keeps automatic discovery and old modes
+  unchanged and leaves original optional/default lock semantics unretired.
 - Version reporting: staged path reads verified compiled-package metadata,
   reports that manifest as its source, and retains partial/recoverable failure
   behavior. Default mode still uses the original PS header.

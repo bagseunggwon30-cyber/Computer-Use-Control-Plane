@@ -16,6 +16,7 @@ internal static class Program
         {
             if (args.Length == 1 && args[0] == "acl-contracts") return OwnedPipeAclProbe.Run();
             if (args.Length == 2 && args[0] == "peer") return OwnedPipePeer.Run(args[1]);
+            if (args.Length == 2 && args[0] == "peer-direct") return OwnedPipePeer.Run(args[1], true);
             if (args.Length == 2 && args[0] == "handshake-server") return OwnedHandshakeProbe.RunServer(args[1]);
             if (args.Length == 2 && args[0] == "handshake-client") return OwnedHandshakeProbe.RunClient(args[1]);
             var phase = LegacyHelperDiagnostics.Create(true, Console.Error.WriteLine);

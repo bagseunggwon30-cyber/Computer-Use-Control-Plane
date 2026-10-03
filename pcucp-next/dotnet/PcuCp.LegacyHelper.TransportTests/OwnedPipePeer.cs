@@ -10,13 +10,19 @@ using PcuCp.LegacyHelper;
 // Disposable hostile wire peer, never a desktop provider or discovered service.
 internal static class OwnedPipePeer
 {
-    public static int Run(string path)
+    public static int Run(string path, bool direct = false)
     {
         var json = LegacyHelperService.NewJson();
         var spec = (IDictionary<string, object>)json.DeserializeObject(File.ReadAllText(path, Encoding.UTF8));
         string mode = Convert.ToString(spec["mode"]), ready = Convert.ToString(spec["ready"]);
         string name = "cucp-helper-" + Process.GetCurrentProcess().Id;
-        if (Array.IndexOf(new[] { "stall-read", "stall-write", "oversized", "unicode-split", "exact-boundary", "unterminated", "invalid-utf8", "slow-drip", "absent" }, mode) < 0)
+        if (direct)
+        {
+            name = LegacyHelperDirect.WindowsPipeName(Convert.ToString(spec["pipe_name"]));
+            if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"\Acucp-owned-direct-[0-9a-f]{32}\z"))
+                throw new ArgumentException("direct peer requires a generated owned fixture name");
+        }
+        if (!(direct && mode == "disconnect") && Array.IndexOf(new[] { "stall-read", "stall-write", "oversized", "unicode-split", "exact-boundary", "unterminated", "invalid-utf8", "slow-drip", "absent" }, mode) < 0)
             throw new ArgumentException("unknown owned peer mode");
         if (mode == "absent")
         {
@@ -24,7 +30,7 @@ internal static class OwnedPipePeer
             Thread.Sleep(1800);
             return 0;
         }
-        using (var pipe = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 512, 512))
+        using (var pipe = Create(name, direct))
         {
             File.WriteAllText(ready, json.Serialize(new { pipe_name = name }), new UTF8Encoding(false));
             var connect = pipe.WaitForConnectionAsync();
@@ -42,6 +48,7 @@ internal static class OwnedPipePeer
                 reader.ReadLine();
                 Console.Out.WriteLine("peer_read_one_request");
             }
+            if (direct && mode == "disconnect") return 0;
             if (mode == "stall-write") { Thread.Sleep(1500); return 0; }
             byte[] response;
             if (mode == "unicode-split") response = Encoding.UTF8.GetBytes("\ufeff한글😀\r\n");
@@ -66,4 +73,11 @@ internal static class OwnedPipePeer
         }
         return 0;
     }
+    private static NamedPipeServerStream Create(string name, bool direct)
+    {
+        if (!direct) return new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 512, 512);
+        using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+            return LegacyHelperPipeSecurity.Create(name, identity.User);
+    }
+
 }

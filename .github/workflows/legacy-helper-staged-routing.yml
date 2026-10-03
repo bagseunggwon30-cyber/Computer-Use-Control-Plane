@@ -17,6 +17,9 @@ on:
       - 'scripts/cucp-staged-helper-adapter.ps1'
       - 'scripts/cucp.ps1'
       - 'tests/python/test_legacy_helper_runtime.py'
+      - 'tests/python/test_legacy_helper_direct.py'
+      - 'pcucp-next/dotnet/PcuCp.LegacyHelper.ContractTests/**'
+      - 'pcucp-next/dotnet/PcuCp.LegacyHelper.TransportTests/**'
       - 'tests/python/test_legacy_helper_package.py'
       - 'tests/fixtures/legacy-helper-staged-*.ps1'
       - 'tests/fixtures/legacy-helper-staged-*.py'
@@ -45,10 +48,10 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Portable staged contracts
         if: runner.os != 'Windows'
-        run: python pcucp-next/packaging/qualify_staged_legacy_helper.py --autostart
+        run: python pcucp-next/packaging/qualify_staged_legacy_helper.py --autostart --direct
       - name: Owned Windows adapters and production wrapper (desktop disabled)
         if: runner.os == 'Windows'
-        run: python pcucp-next/packaging/qualify_staged_legacy_helper.py --windows --autostart
+        run: python pcucp-next/packaging/qualify_staged_legacy_helper.py --windows --autostart --direct
       - uses: actions/upload-artifact@v4
         if: always()
         with:

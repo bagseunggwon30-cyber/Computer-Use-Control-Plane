@@ -19,6 +19,7 @@ namespace PcuCp.LegacyHelper
         private readonly Func<DateTime> clock;
         private readonly Action<string> log;
         private readonly Action<string> phase;
+        private readonly LegacyHelperDebugLog debug;
         private readonly Action<Dictionary<string, object>> aclEvidence;
         private readonly string pipeName;
         private readonly string lockPath;
@@ -28,12 +29,13 @@ namespace PcuCp.LegacyHelper
 
         public LegacyHelperService(LegacyHelperActions actions, int pid, string pipeName, string lockPath,
             int idleMs, Func<DateTime> clock, Action<string> log, Action<string> phase = null,
-            Action<Dictionary<string, object>> aclEvidence = null)
+            Action<Dictionary<string, object>> aclEvidence = null, LegacyHelperDebugLog debug = null)
         {
             this.actions = actions; this.pid = pid; this.pipeName = pipeName;
             this.lockPath = lockPath; this.idleMs = idleMs; this.clock = clock; this.log = log;
             this.phase = phase ?? (_ => { });
             this.aclEvidence = aclEvidence;
+            this.debug = debug;
         }
         public static JavaScriptSerializer NewJson()
         {
@@ -66,9 +68,11 @@ namespace PcuCp.LegacyHelper
             }
             catch (Exception exception)
             {
+                if (debug != null) debug.Event("request.invalid");
                 return new Dictionary<string, object> { ["id"] = id, ["exit_code"] = 1, ["result"] = null,
                     ["error"] = "invalid_json: " + exception.Message };
             }
+            if (debug != null) debug.Request(id, action);
             int exitCode = 0;
             try
             {
@@ -81,6 +85,7 @@ namespace PcuCp.LegacyHelper
             catch (LegacyHelperFixtureException) { throw; }
             catch (Exception exception) { error = exception.Message; exitCode = 1; }
             shutdown = String.Equals(action, "shutdown", StringComparison.OrdinalIgnoreCase);
+            if (debug != null) debug.Response(exitCode);
             return new Dictionary<string, object> { ["id"] = id, ["exit_code"] = exitCode, ["result"] = result, ["error"] = error };
         }
         public void Run()
@@ -110,6 +115,7 @@ namespace PcuCp.LegacyHelper
             bool running = true;
             try
             {
+                if (debug != null) { debug.Event("lock.written"); debug.Event("server.start"); }
                 while (running)
                 {
                     try
@@ -129,6 +135,7 @@ namespace PcuCp.LegacyHelper
                                     if ((clock() - lastActivity).TotalMilliseconds > idleMs)
                                     {
                                         running = false;
+                                        if (debug != null) debug.Event("idle.exit");
                                         cancellation.Cancel();
                                         pipe.Dispose();
                                         break;
@@ -150,6 +157,7 @@ namespace PcuCp.LegacyHelper
                                 }
                                 wait.GetAwaiter().GetResult();
                                 phase("connection.wait.complete");
+                                if (debug != null) debug.Event("client.connected");
                             }
                             using (var reader = new StreamReader(pipe, Encoding.UTF8, true, 1024, true))
                             {
@@ -169,7 +177,7 @@ namespace PcuCp.LegacyHelper
                                     phase("response.write.start");
                                     try { writer.WriteLine(json.Serialize(response)); } catch (IOException) { break; }
                                     phase("response.write.complete");
-                                    if (shutdown) { running = false; break; }
+                                    if (shutdown) { if (debug != null) debug.Event("shutdown.requested"); running = false; break; }
                                 }
                             }
                         }
@@ -188,6 +196,7 @@ namespace PcuCp.LegacyHelper
                 phase("lock.cleanup.start");
                 TryCleanupOwnedLock(lockPath, pid, identity, expectedLockBytes, json, log);
                 phase("lock.cleanup.complete");
+                if (debug != null) { debug.Event("lock.cleanup"); debug.Event("server.exit"); }
             }
         }
         // Lock contents are checked under an exclusive-write/delete native handle;
@@ -246,6 +255,14 @@ namespace PcuCp.LegacyHelper
             phase = phase ?? (_ => { });
             if (!System.Text.RegularExpressions.Regex.IsMatch(name ?? "", "^cucp-helper-[0-9]+$"))
                 throw new ArgumentException("candidate pipe must be cucp-helper-<pid>");
+            return ExchangeValidated(name, request, connectMs, readMs, phase);
+        }
+        public static string ExchangeDirect(string name, string request, int connectMs, int readMs, Action<string> phase = null)
+        {
+            return ExchangeValidated(LegacyHelperDirect.WindowsPipeName(name), request, connectMs, readMs, phase ?? (_ => { }));
+        }
+        private static string ExchangeValidated(string name, string request, int connectMs, int readMs, Action<string> phase)
+        {
             if (connectMs <= 0 || readMs <= 0) throw new ArgumentOutOfRangeException("bounded connection and I/O timeouts required");
             byte[] frame = LegacyHelperWire.RequestBytes(request);
             using (var pipe = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous))
