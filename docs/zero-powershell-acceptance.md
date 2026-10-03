@@ -37,7 +37,36 @@ not retire it and cannot earn credit toward the final goal.
 
 ## Latest automated checkpoint
 
-The latest full automated checkpoint is `f09e5200`, with all 14 active jobs
+The latest **required core** full checkpoint is
+`7b7e0d28bee82a7ae4818a0f9cfd753771ff8e5b`, tree
+`41fc1aa16e3de591f85d6c085887bac0e6eccc5d`, with all 14 active required core jobs
+passing in [run 37109440464, attempt 1](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37109440464)
+and four focused-only skips. Pester passed 22 tests and diagnostics passed 63,
+both without skips or failures. This qualifies the
+[benchmark body retirement](benchmark-staged-cutover.md#qualified-fresh-full-gate):
+5,389 original bytes become a 128-byte delegate, saving **5,261 runtime bytes**
+(5,191 net in its isolated staging change after 70 support bytes).
+
+The 668 production/direct-candidate records each meet the unchanged partition of
+660 exact original agreements, eight pinned owned failures and no terminal
+failures. All 410 benchmark and 258 audit production/direct pairs are exact;
+16 calendar and 72 Decimal/control cases meet the existing bounded functional
+criteria. The earlier `bb98df41` full-gate failure remains historical evidence.
+The separate helper action and lifecycle workflows at this checkpoint failed;
+this core success does not qualify them or imply that all CI is green.
+
+The exact green checkpoint has **921,730 counted PS bytes in 35 files**, including
+**609,211 scripts-only runtime bytes**, 91,748 below the 1,013,478-byte baseline.
+Current local `a7f0da28` includes newer unqualified helper-oracle probes and has
+**933,222 counted bytes**, the same **609,211 runtime bytes**, and 80,256 bytes
+below baseline. Helper staging/oracle growth is counted openly; neither these
+figures nor the benchmark decision grant whole-helper retirement. Main remains
+`9ffa354b9904235835a7bc6eb78ed8d3d76317c8`. All final and interactive gates below
+remain required.
+
+### Historical full checkpoint and candidate growth
+
+The earlier full automated checkpoint `f09e5200` had all 14 active jobs
 successful in [run 37086869922](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37086869922).
 A single pinned-original image-process timeout was retried on the same commit;
 its 15-second limit and assertions were unchanged. Seven orphaned private helpers
@@ -181,6 +210,6 @@ its runtime is likewise 607,665 bytes. Finite-Double, production-entry/startup
 and all 14 active required core jobs passed at run `37103102449`, attempt 2,
 qualifying this body retirement only. The wrapper and file-effect adapter remain
 PowerShell-dependent, and the independent helper candidate gate is still red.
-Benchmark, helper/history
-originals, complete foundation coverage and all inline/encoded-source zero
-requirements above remain unchanged.
+The later benchmark retirement is qualified at the latest checkpoint above;
+this does not change audit's evidence. Helper/history qualification, complete
+foundation coverage and all inline/encoded-source zero requirements remain open.

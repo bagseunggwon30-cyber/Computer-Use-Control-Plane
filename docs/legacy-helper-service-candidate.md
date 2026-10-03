@@ -566,11 +566,33 @@ The production-staging document supersedes the earlier no-production-caller
 description for the opt-in staged route. Existing candidate idle-timeout
 admission boundaries remain unchanged. Historical
 candidate evidence above remains evidence for its recorded implementation.
-### Next functional tier after observed OCR and ranking defects
+
+### Qualified fixture semantics after observed OCR and ranking defects
 
 The Args-only Windows run at `bb98df41` confirmed the additional OCR type-variable
 failure and ranking/selection differences. A separately labelled four-site
-functional tier is staged with explicit numeric descending order and stable
-acquisition-order ties. Original and Args-only raw evidence remain distinct and
-unqualified; the runtime candidate is unchanged. See the
+functional tier uses explicit numeric descending order and stable acquisition-order
+ties. Original and Args-only raw evidence remain distinct and unqualified; the
+oracle correction changed no runtime candidate. See the
 [functional-intent scope, evidence and compatibility decisions](legacy-helper-functional-intent.md).
+
+[Windows run 37110868531](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37110868531)
+passed at public `89aa36fdae7b11f901fc1d1332b2391ef226c436`, tree
+`e12363426425f3ebe8c355775b757d6748d04155`: 165 helper methods,
+157 passed, eight individual skips, zero failures/errors and no setup skips.
+The 20 complete functional oracle/candidate pairs cover 47 requests and match
+exact typed responses, order/selection, acquisition effects and state. All 18
+Args-only observations match their retained classified baseline and remain
+unqualified. Source hashes and the 52-type/34-name/four-site edit boundaries
+remain exact. Artifact `11269787440` contains 1,099 files with archive SHA-256
+`15bb68b4da10c36ecd066f5fc57d2cb42ac9aa38efd7a1e68aa6a0f98a08e35a`;
+the linked functional-intent document records raw evidence and normalization limits.
+
+This establishes Windows fixture semantics and owned transport contracts, with
+real desktop/UIA/WinRT acquisition still unqualified. Seven staged lifecycle
+methods were deliberately outside this gate (the eighth skip was a Linux control).
+The separate [staged lifecycle run 37110868522](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37110868522)
+failed concrete detached startup and wrapper start/bridge launch at the same
+commit. Production lifecycle qualification remains outstanding. The original
+startup/dispatch defects remain failed observations; helper retirement credit
+is still zero.

@@ -133,9 +133,67 @@ different actions. Wrapper forwarding still omits Label/X/Y/W/H; that limitation
 is neither repaired nor used to drop direct-pipe coverage. Interactive acquisition,
 real OCR capture, focus/input, mixed DPI and elevation remain unqualified.
 
-Windows execution of this new tier, its refusal paths and distinct-geometry cases
-is still required. Portable validation cannot qualify those runtime observations,
-authorize production activation or earn source retirement.
+The Windows fixture qualification below covers this tier, its refusal paths and
+distinct-geometry cases. It does not qualify real acquisition, authorize production
+activation or earn source retirement.
+
+## Windows fixture qualification at 89aa36fd
+
+[Run 37110868531](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37110868531)
+passed at public commit
+[`89aa36fdae7b11f901fc1d1332b2391ef226c436`](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/commit/89aa36fdae7b11f901fc1d1332b2391ef226c436),
+tree `e12363426425f3ebe8c355775b757d6748d04155`. The helper suite recorded
+165 methods: 157 passed, eight individually skipped, zero failures/errors and
+no class-setup skips. The skips were one Linux refusal control and seven separately
+gated staged lifecycle methods. Verbose raw outcomes establish these counts;
+one passing diagnostic method prints its description on a separate line.
+The same run passed 117 action contracts, 45 wire contracts and six raw-process
+evidence tests. The portable host, net48 service/transport and inert facade builds
+completed with zero warnings/errors.
+
+The retained [artifact 11269787440](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37110868531/artifacts/11269787440)
+contains 1,099 files. Its archive SHA-256 is
+`15bb68b4da10c36ecd066f5fc57d2cb42ac9aa38efd7a1e68aa6a0f98a08e35a`.
+The helper-suite evidence is `06-gate-34c463488f31.json`; its 30,233-byte raw
+stderr has SHA-256
+`f1ea4d8602360168cfd4778054c947bf65e456398422843752ac4d0edc2b72e5`.
+Reinspection verified all 20 PowerShell 5.1.26100.33438 oracle/net48 candidate
+fixture pairs, covering 47 requests and 1,449 ordered acquisition calls across
+all six actions. Every one of the 40 processes exited zero with
+complete bounded raw streams, empty stderr and no timeout, truncation, launch,
+read, stdin or drain error. Full typed responses, array order, score/best/click
+selection, acquisition arguments/order and cache/clock/request state match the
+independent functional expectations and candidate replay. No functional order or
+selection normalization was applied.
+
+All pairs retain the published source pin above and the exact 52 type-name,
+34 Args-name and four functional-site censuses, including all 23 guarded types,
+eight function hash records and the pinned stable-sort helper. Extracted server
+bytes retain raw SHA-256
+`31742c3a48c3305f26751ea9c3b8b8db5592a0aa5f192ccdfea5795252731e81`
+and normalized SHA-256
+`173c5cde4c9ef282835d5add1e3e11fbf9f0756a7aed359750b00030f32ab7a8`.
+Source/facade/type/Args/functional edit refusals and the distinct-geometry tie
+checks passed on Windows. No guard or original body changed for this result.
+
+All 18 historical Args-only classifications recorded `exact_recorded_match=true`
+and `args_only_qualified=false`. Only the OCR success-history case used the
+explicitly bounded two-path and one diagnostic-assembly-name normalization;
+its original raw streams remain intact. None needed the changed-permutation
+classification. Original startup and dispatch observations still say failed and
+unqualified, including the unchanged startup exit 1 and zero-dispatch binding
+failure. A passing observation classifier does not qualify those original bodies.
+
+This qualifies the intended action semantics under inert acquisition fixtures
+on Windows, together with the run's owned pipe/lock/process contracts. It does
+not qualify desktop enumeration, interactive UIA, actual WinRT OCR capture,
+focus/input, IME/clipboard, mixed DPI, elevation or cross-principal access.
+The independent [staged lifecycle run 37110868522](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37110868522)
+at the same commit failed: concrete detached startup returned an error, direct
+service boundary probes exited `3762504530`, and the wrapper start process
+exited 1. That production startup/bridge boundary remains unqualified; successful
+fixture service tests cannot substitute for it. No production promotion or helper
+retirement follows from this qualification. This record changes documentation only.
 
 ## Local validation
 

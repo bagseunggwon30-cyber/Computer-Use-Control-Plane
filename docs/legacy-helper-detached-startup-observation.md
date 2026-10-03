@@ -1,4 +1,4 @@
-# Staged helper startup diagnostic (no runtime fix yet)
+# Staged helper startup diagnostic and confirmed repair
 
 The first staged-routing Windows run, [37109440409](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37109440409),
 used public commit `7b7e0d28bee82a7ae4818a0f9cfd753771ff8e5b`, tree
@@ -26,7 +26,7 @@ Source analysis found two boundaries:
   requires explicit propagation by this outer script. The 860 ms observed runtime
   also suggests failure before the client's three-second startup deadline.
 
-This diagnostic patch changes no production service, client, provider or wrapper
+The initial diagnostic patch changed no production service, client, provider or wrapper
 behavior. It strengthens the fixture exit propagation, saves the bounded owned
 wrapper log before assertions/cleanup, and adds twelve startup observations:
 exact packaged executable and separate console-boundary probe under inherited,
@@ -57,3 +57,52 @@ The diagnostic collector redirects standard streams to pipes to preserve bytes;
 the production detached launcher uses DEVNULL. These are deliberately distinct
 conditions. Existing exact-production launcher tests must pass after any fix;
 a pipe-captured console probe alone cannot qualify the DEVNULL startup path.
+
+## Confirmed detached boundary and narrowly scoped repair
+
+[Windows run 37110868522](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37110868522)
+at public `89aa36fdae7b11f901fc1d1332b2391ef226c436` (tree
+`e12363426425f3ebe8c355775b757d6748d04155`) retained all twelve complete observations. Artifact SHA-256
+is `193b94049eec4c6f03c08f733f52f63c3bf10fef031a51af0f1917ddd0a74cfc`.
+The exact packaged executable rejects negative-one and completes zero-idle under
+inherited and no-window modes, but detached mode throws `System.IO.IOException`
+with “The handle is invalid” at `Console.set_OutputEncoding`. The separate old
+setter probe reproduces that boundary; the stream-writer probe emits exact UTF-8
+Unicode stdout/stderr and exits zero under all three modes.
+
+The repair replaces only that console-codepage setter with explicit UTF-8,
+no-BOM, autoflushing stdout/stderr StreamWriters inside the existing try. It does
+not add exception suppression, CLI allowances, launch retries or provider/action
+changes. A new mandatory Windows fixture checks actual packaged Unicode output
+and exact Unicode CLI-error bytes under all three startup modes. Existing
+production DETACHED_PROCESS + DEVNULL start/reuse/health/shutdown and negative
+CLI tests retain their assertions and deadlines. Their fresh result is still
+required; the repaired service is not qualified by the earlier tiny probe alone.
+
+The corrected outer wrapper driver now reports exit one. Its preserved log
+establishes a separate Process.Start “system cannot find the file specified”
+failure before the client's startup wait. It does not identify the resolved
+executable. Get-Command and .Source selection remain unchanged. Only this launch
+failure path adds a bounded record of command count, up to four command types,
+Path/Source values and the assigned FileName (each path capped at 1,024 chars),
+then rethrows the original ErrorRecord. No environment, request/argv, unrelated
+path, alternative resolver or retry is added. Fresh Windows evidence must settle
+that cause before resolver semantics change.
+
+Both raw failure records and their hashes/package identity are pinned under
+`tests/fixtures/legacy-helper/observed-staged-startup-manifest.json`. They are
+failed historical observations, not acceptance expectations for the repaired
+candidate. The earlier unmodified PowerShell startup and argument-binding
+observations remain separate and unchanged.
+
+“Inherited” in this matrix means inherited console attachment with captured
+PIPE stdout/stderr. It does not qualify Unicode rendering into an attached
+legacy-codepage console. Direct stream encoding intentionally avoids changing
+that console's codepage; inspected production exchange/service routes use
+redirected streams or DEVNULL. Interactive-console rendering remains unqualified.
+
+Local repair validation: net48 build passed with zero warnings/errors; the
+helper suite reported 169 methods, 135 passed and 34 skipped. The portable
+staged gate passed. Full Python discovery reported 847 methods and
+`OK (skipped=223)` (including class-setup skips). These are local checks, not a
+fresh Windows result for the repaired package or the unresolved wrapper launch.

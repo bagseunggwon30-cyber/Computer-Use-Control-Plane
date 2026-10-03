@@ -9,6 +9,37 @@ still uses compatibility hosts and unported PowerShell acquisitions/actions.
 ## Latest full automated checkpoint
 
 The latest **required core regression** checkpoint is
+`7b7e0d28bee82a7ae4818a0f9cfd753771ff8e5b`, tree
+`41fc1aa16e3de591f85d6c085887bac0e6eccc5d`, with all 14 active required core
+jobs passing in [run 37109440464, attempt 1](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37109440464),
+completed 2026-10-03 at 08:38:57 UTC. Four focused-only jobs were intentionally
+skipped. Windows Pester passed 22 tests and diagnostics passed 63, both without
+skips or failures. The independent helper action and lifecycle workflows at this
+commit failed and remain unqualified; the core result is not an all-CI-green claim.
+
+Benchmark's 5,389-byte original body is now qualified as a 128-byte delegate:
+**5,261 runtime bytes retired**, or 5,191 net in its isolated staging change after
+70 support bytes. All 668 production and direct-candidate records meet the closed
+contract (660 exact original agreements, eight pinned owned failures, zero
+terminal failures). All 410 benchmark and 258 audit production/direct pairs are
+exact. The 16 calendar and 72 Decimal/control cases meet their unchanged bounded
+functional criteria. The [benchmark qualification](benchmark-staged-cutover.md#qualified-fresh-full-gate)
+records the verified artifact/hash, source extents, and the earlier `bb98df41`
+full-gate failure. That failed run is retained, not relabeled successful.
+
+The exact green tree has **921,730 counted PS bytes in 35 files**, including
+**609,211 scripts-only runtime bytes**. Physical removal from the original
+1,013,478-byte baseline is 91,748 bytes; this includes counted helper staging and
+oracle source and does not establish whole-helper retirement. The current local
+`a7f0da28` source contains newer, unqualified helper probes: **933,222 counted
+bytes**, the same **609,211 runtime bytes**, and 80,256 bytes below baseline.
+The inventory records those current-source counts separately from the qualified
+benchmark evidence. Wrappers/effect adapters, final-zero and interactive Windows
+acceptance remain open; main remains `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`.
+
+### Previous audit-qualified checkpoint
+
+The preceding required core checkpoint was
 `3cbbaaad0cb7b48b866d7f3cbe3f282252b3115a`, tree
 `8d87343cf9e4c8add7967427200416b9bfd0a488`, with all 14 active jobs passing in
 [run 37103102449, attempt 2](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37103102449).
@@ -61,8 +92,8 @@ its raw evidence, rather than retroactively claiming those tests ran in f09.
 
 The earlier diagnostic candidates below did not change production routing.
 The subsequent [audit-only cutover](audit-summary-staged-cutover.md) has now
-qualified its body replacement at the newer checkpoint above. Benchmark
-and history originals remain. Full zero-PowerShell and interactive Windows
+qualified its body replacement, followed by benchmark at the latest checkpoint
+above. History originals remain. Full zero-PowerShell and interactive Windows
 acceptance remain open; main is unchanged.
 
 ## Local rejected-token diagnostic candidate (after 7b4f163)

@@ -40,7 +40,26 @@ function _Invoke-StagedHelper {
   $process.StartInfo=$psi
   $started=$false
   try {
-    [void]$process.Start(); $started=$true
+    try { [void]$process.Start(); $started=$true }
+    catch {
+      $launchError = $_
+      # Only resolution metadata on this failure path; no environment, argv,
+      # request data, retries or alternate executable selection.
+      try {
+        $commands = @($python)
+        $resolved = @(foreach ($command in @($commands | Select-Object -First 4)) {
+          $pathText = [string]$command.Path; $sourceText = [string]$command.Source
+          [pscustomobject]@{command_type=[string]$command.CommandType;
+            path=$pathText.Substring(0,[Math]::Min(1024,$pathText.Length));
+            source=$sourceText.Substring(0,[Math]::Min(1024,$sourceText.Length))}
+        })
+        $fileName = [string]$psi.FileName
+        $launchMetadata = @{command_count=$commands.Count; commands=$resolved;
+          file_name=$fileName.Substring(0,[Math]::Min(1024,$fileName.Length))} | ConvertTo-Json -Depth 4 -Compress
+        Write-WrapperLog -Message ('STAGED HELPER LAUNCH RESOLUTION ' + $launchMetadata)
+      } catch { }
+      throw $launchError
+    }
     $write=$process.StandardInput.BaseStream.WriteAsync($bytes,0,$bytes.Length)
     $inputClosed=$false
     $outBuffer=New-Object char[] 4096; $errBuffer=New-Object char[] 4096

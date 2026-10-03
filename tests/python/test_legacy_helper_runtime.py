@@ -190,6 +190,33 @@ class StagedWrapperStructureTests(unittest.TestCase):
         body=text.split('function Install-HelperAutostart {',1)[1].split('\nfunction ',1)[0]
         self.assertLess(body.index('staged_helper_autostart_unqualified'),body.index('WriteAllText'))
 
+    def test_observed_startup_failures_remain_hash_pinned(self):
+        fixtures=ROOT/'tests/fixtures/legacy-helper'
+        pin=json.loads((fixtures/'observed-staged-startup-manifest.json').read_text())
+        self.assertEqual(pin['status'],'failed-unqualified-baseline')
+        for name, entry in pin['files'].items():
+            raw=(fixtures/name).read_bytes()
+            self.assertEqual(len(raw),entry['bytes'])
+            self.assertEqual(hashlib.sha256(raw).hexdigest(),entry['sha256'])
+        self.assertIn(b'Console.set_OutputEncoding',(fixtures/'observed-detached-startup.stderr.bin').read_bytes())
+        self.assertIn(b'The system cannot find the file specified',(fixtures/'observed-staged-wrapper-launch.log.bin').read_bytes())
+
+    def test_service_encodes_streams_without_console_codepage_mutation(self):
+        source=(ROOT/'pcucp-next/dotnet/PcuCp.LegacyHelper/Program.cs').read_text()
+        self.assertNotIn('Console.OutputEncoding =',source)
+        self.assertIn('Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false))',source)
+        self.assertIn('Console.SetError(new StreamWriter(Console.OpenStandardError(), new UTF8Encoding(false))',source)
+        self.assertIn('AutoFlush = true',source)
+
+    def test_failed_launch_metadata_preserves_original_resolution(self):
+        source=(ROOT/'scripts/cucp-staged-helper-adapter.ps1').read_text()
+        self.assertIn('Get-Command python.exe -CommandType Application -ErrorAction Stop',source)
+        self.assertIn('$psi.FileName = $python.Source',source)
+        self.assertIn('STAGED HELPER LAUNCH RESOLUTION',source)
+        self.assertIn('command_count=$commands.Count',source)
+        self.assertIn('Select-Object -First 4',source)
+        self.assertEqual(source.count('$process.Start()'),1)
+
     def test_wrapper_fixture_propagates_nested_exit(self):
         text=(ROOT/'tests/fixtures/legacy-helper-staged-wrapper.ps1').read_text()
         self.assertIn('exit [int]$LASTEXITCODE',text)
@@ -240,6 +267,37 @@ class StagedWindowsRuntimeTests(unittest.TestCase):
                 process=self.runtime.launcher.launch(idle_timeout_ms=value)
                 self.assertEqual(process.process.wait(timeout=5),expected_exit)
                 self.assertFalse(self.lock.exists())
+
+    def test_packaged_utf8_streams_and_cli_rejection_under_all_start_modes(self):
+        from helper_process_evidence import run_evidence, require_success
+        logs=Path(os.environ.get('CUCP_HELPER_EVIDENCE_DIR',self.root/'evidence'))
+        host=ROOT/'pcucp-next/bin/legacy-helper/PcuCp.LegacyHelper.exe'
+        fixture=self.root/'inert-unicode.json'
+        text='한글😀'
+        fixture.write_text(json.dumps(dict(calls=[],clock=['2026-01-01T00:00:00Z'],
+            requests=[dict(id=text,action='unsupported-'+text,args={})])),encoding='utf-8')
+        outputs=[]
+        for mode, flags in (('inherited',0),('no-window',subprocess.CREATE_NO_WINDOW),
+                            ('detached',subprocess.DETACHED_PROCESS|subprocess.CREATE_NEW_PROCESS_GROUP)):
+            with self.subTest(mode=mode):
+                result=run_evidence([host,'fixture','--input-file',fixture],directory=logs,
+                    label='packaged-utf8-'+mode,timeout=5,limit=65536,creationflags=flags)
+                require_success(result)
+                self.assertFalse(result['stdout'].startswith(b'\xef\xbb\xbf'))
+                self.assertTrue(result['stdout'].endswith(b'\r\n'))
+                decoded=json.loads(result['stdout'].decode('utf-8',errors='strict'))
+                self.assertEqual(decoded['responses'][0]['id'],text)
+                self.assertEqual(decoded['responses'][0]['result']['action'],'unsupported-'+text)
+                self.assertEqual(decoded['responses'][0]['exit_code'],99)
+                self.assertEqual(result['stderr'],b'')
+                outputs.append(result['stdout'])
+                rejected=run_evidence([host,'serve','--lock-file',self.lock,'--bad_'+text,'value'],
+                    directory=logs,label='packaged-utf8-reject-'+mode,timeout=5,limit=65536,creationflags=flags)
+                require_success(rejected,expected_exit=1)
+                self.assertEqual(rejected['stdout'],b'')
+                self.assertEqual(rejected['stderr'],('ArgumentException: unknown candidate option: bad_'+text+'\r\n').encode('utf-8'))
+                self.assertFalse(self.lock.exists())
+        self.assertTrue(all(value==outputs[0] for value in outputs))
 
     def test_cas_same_file_change_and_identical_replacement_survive(self):
         store=self.runtime.client.store

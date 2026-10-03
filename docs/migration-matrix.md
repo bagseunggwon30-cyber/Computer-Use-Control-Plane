@@ -48,6 +48,29 @@ The separate helper candidate workflow remains unqualified; wrappers and file
 acquisition still require PowerShell.
 The historical corpus and all final zero-PowerShell requirements remain intact.
 
+## Qualified benchmark continuation
+
+The [benchmark cutover](benchmark-staged-cutover.md#qualified-fresh-full-gate)
+qualifies its 5,389-byte original body becoming a 128-byte delegate: **5,261
+runtime bytes retired**, 5,191 net in the isolated change after support overhead.
+Public `7b7e0d28bee82a7ae4818a0f9cfd753771ff8e5b`, tree
+`41fc1aa16e3de591f85d6c085887bac0e6eccc5d`, passed all 14 active required core
+jobs in [run 37109440464, attempt 1](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37109440464)
+with four focused-only skips. Pester passed 22 tests and diagnostics passed 63,
+both with zero skips. The 668 production/direct-candidate records each partition
+into 660 exact original agreements, eight pinned owned failures and zero terminal
+failures; all 410 benchmark and 258 audit production/direct pairs are exact.
+The 16 calendar and 72 Decimal/control cases meet unchanged bounded criteria.
+
+The qualified tree contains 921,730 PS bytes in 35 files, with 609,211 scripts-only
+runtime bytes. Current local `a7f0da28` contains newer unqualified helper probes:
+933,222 counted bytes and the same 609,211 runtime bytes. Neither total grants
+whole-helper retirement. Separate helper action and lifecycle workflows at the
+qualified core commit failed; wrappers, helper qualification, history/tokenizer,
+interactive Windows and final zero-PowerShell gates remain open. The earlier
+failed `bb98df41` gate and both assertion-preserving repairs remain recorded in
+the benchmark evidence. Main and audit's qualified metadata are unchanged.
+
 ## Initial core foundation (historical)
 
 | Capability | Python responsibility | C# responsibility | Compatibility / parity status |

@@ -1,4 +1,14 @@
-# Benchmark-only staged production cutover
+# Benchmark-only production cutover and qualification
+
+The benchmark body retirement is qualified at public
+`7b7e0d28bee82a7ae4818a0f9cfd753771ff8e5b`, tree
+`41fc1aa16e3de591f85d6c085887bac0e6eccc5d`, by the required core full gate
+below. The staging and failed-run sections preserve the evidence chronology;
+they do not describe the current acceptance decision. This qualifies only the
+benchmark body and its bounded functional contract. PowerShell effects and
+wrappers remain, and the independent helper gates are still unqualified.
+
+## Historical staging boundary
 
 This local stage follows the Brief harness correction in `6ea356c` and the
 separately qualified audit-summary body retirement at `3cbbaaad` /
@@ -108,3 +118,51 @@ Two independent harness problems kept the full gate red:
 The production observations are retained, but accepted body retirement still
 requires the repaired fresh full gate. The separate helper action candidate
 remains unqualified and does not change these diagnostic results.
+
+## Qualified fresh full gate
+
+[Required core run 37109440464, attempt 1](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37109440464)
+completed successfully on 2026-10-03 at 08:38:57 UTC for public commit
+`7b7e0d28bee82a7ae4818a0f9cfd753771ff8e5b`, tree
+`41fc1aa16e3de591f85d6c085887bac0e6eccc5d` (matching local source commit
+`5d2075774a67bdaf302ab67402156ce4f5c9a23d`). All 14 active required core jobs
+passed; four focused-only jobs were intentionally skipped. Windows Pester passed
+22 tests with no skips or failures, and diagnostics passed 63 with no skips or
+failures. The repaired provenance and fixture-byte assertions above both ran.
+
+The full 668-case production and direct-candidate partitions each contain 660
+exact original agreements, the same eight pinned owned failures, and zero
+terminal failures. All 410 benchmark and 258 audit production/direct pairs are
+exact. The 16 calendar and 72 typed Decimal/control cases meet the existing
+[bounded functional criteria](benchmark-functional-qualification.md): every
+production/direct pair is exact, all 72 Decimal public pairs match the original,
+and calendar has 12 exact original/public pairs plus four previously permitted
+detail-only differences. Brief public-payload absence, numeric results, effects,
+errors, exits, and no-fallback/startup assertions remain enforced.
+
+The diagnostics artifact is `11269965756`, SHA-256
+`a703c15375bf532ac73495ed8749f7bbb164c3d65ff3f2b3dc9746567d34a16a`.
+Its three raw manifests identify this exact public commit/run/attempt and record
+`finished`, `comparison_completed`, and `qualification_passed` as true. The
+source map's whole-file and UTF-16 function-range hashes reproduce the 128-byte
+delegate, SHA-256
+`a19c0690237a12e02824080770153baa48957612af8a90fa5f2aeefd5354fb63`.
+The original 5,389-byte body at pinned tree `c0d15371` has SHA-256
+`dc9424001a488623f7ba7b7c7cd96bc794cc008ec94e0a3f8335c36435320dd7`.
+The accepted body retirement is therefore **5,261 runtime bytes**. The isolated
+staging net reduction remains 5,191 bytes after its 70-byte support overhead;
+it is not the delta between the later integrated checkpoints.
+
+The qualified checkpoint has 35 tracked PS files totaling **921,730 bytes**,
+including **609,211 scripts-only runtime bytes**. That total is 91,748 below the
+1,013,478-byte baseline. It includes helper staging and counted oracle source;
+it does not qualify an entire helper retirement. The newer helper-oracle source
+at local `a7f0da28` has **933,222 counted bytes** and the same 609,211 runtime
+bytes (80,256 below baseline), and is not this full-qualified checkpoint.
+These documentation/inventory changes alter no implementation or byte counts.
+
+The separate helper action and lifecycle workflows at `7b7e0d28` failed. Their
+remaining qualification is independent of the successful required core gate;
+this is not an all-CI-green claim. Audit's earlier qualified retirement remains
+unchanged. Main remains `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, and final
+zero-PowerShell plus interactive Windows acceptance remain open.

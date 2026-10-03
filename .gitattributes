@@ -11,3 +11,6 @@ tests/fixtures/legacy-helper/observed-binding.stdout.bin -text -diff
 # Exact observed benchmark route records retain their captured byte digest.
 tests/fixtures/legacy-benchmark-brief-observed-37103413852.json -text
 tests/fixtures/legacy-helper/observed-args-only/*.bin -text -diff
+# Exact observed staged-launch failures are raw diagnostics, never executable source.
+tests/fixtures/legacy-helper/observed-detached-startup.stderr.bin -text -diff
+tests/fixtures/legacy-helper/observed-staged-wrapper-launch.log.bin -text -diff

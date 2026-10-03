@@ -12,9 +12,13 @@ namespace PcuCp.LegacyHelper
         [STAThread]
         private static int Main(string[] args)
         {
-            Console.OutputEncoding = new UTF8Encoding(false);
             try
             {
+                // Detached workers have no console codepage to set. Encode the
+                // retained standard streams directly; preserve UTF-8 without BOM.
+                // Do not suppress initialization errors or retry startup.
+                Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true });
+                Console.SetError(new StreamWriter(Console.OpenStandardError(), new UTF8Encoding(false)) { AutoFlush = true });
                 if (args.Length == 0) throw new ArgumentException("candidate mode required: serve or exchange");
                 var options = Options(args);
                 var phase = LegacyHelperDiagnostics.Create(options.ContainsKey("diagnostic-phases"), Console.Error.WriteLine);
