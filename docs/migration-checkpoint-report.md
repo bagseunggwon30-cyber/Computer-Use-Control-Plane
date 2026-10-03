@@ -115,6 +115,25 @@ explicit skips. Windows qualification is still pending. Its 1,793 added oracle
 bytes bring the current extension count to 882,666, with runtime unchanged at
 610,258. Main and all retained production bodies remain unchanged.
 
+The second history run verified both actual PowerShell hosts and the null-output
+capture, then passed 34 of 35 Windows tests, including the owned CP949/1252 probe.
+One source-isolation test failed because an implicit CP1252 read encountered
+UTF-8 C# text; no full differential run occurred. The repaired check uses strict
+UTF-8 without removing its forbidden-dependency assertions. Eighteen source and
+metadata reads were made explicit, with real-path CP1252 regression coverage.
+
+The independent detached helper candidate is now integrated for its first
+Windows qualification alongside that history test repair. Its reviewed async
+wait/cancellation, bounded wire exchange, byte-exact lock cleanup and finite-JSON
+corrections remain candidate-only. The new source total is 896,443 bytes in 30
+tracked PowerShell files, including 13,777 explicitly counted helper oracle bytes;
+runtime remains 610,258 bytes. No helper original or production caller changed.
+
+The repaired diagnostic candidate separately passed all 472 four-route inputs
+in [run 37094100246](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37094100246)
+at `c2b927e3`, with complete raw evidence. Its remaining cutover review is recorded
+in the [diagnostic qualification report](retained-diagnostics-qualification.md).
+
 ## Earlier qualified checkpoint (c414)
 
 Commit `c414f0240a6a3fde78719f4ae44baddaf990e92b`, tree

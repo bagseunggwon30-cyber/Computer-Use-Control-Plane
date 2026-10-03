@@ -1,0 +1,187 @@
+{
+  "schema": "cucp.legacy-helper-source/v1",
+  "published_commit": "3e892ab02395bdc916a5814e39d4154efd1f6249",
+  "published_tree": "e36329b2a6b07539faacd070d661bc0e3819140d",
+  "provenance_url": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/commit/3e892ab02395bdc916a5814e39d4154efd1f6249",
+  "normalization": "utf-8-no-bom-lf",
+  "files": [
+    {
+      "path": "scripts/cucp-helper-server.ps1",
+      "git_blob": "d1cb12bdf80e0534872c63e6983bca99deecfc71",
+      "raw_sha256": "31742c3a48c3305f26751ea9c3b8b8db5592a0aa5f192ccdfea5795252731e81",
+      "raw_bytes": 27427,
+      "normalized_sha256": "173c5cde4c9ef282835d5add1e3e11fbf9f0756a7aed359750b00030f32ab7a8",
+      "functions": [
+        {
+          "name": "_Log",
+          "parent_function": null,
+          "start_utf16": 2267,
+          "end_utf16": 2411,
+          "sha256": "e55bb96a324c3dd6503c9c3174f109b00b26bb038ab54720b562b2fd4e9879c8",
+          "utf8_bytes": 144
+        },
+        {
+          "name": "_Ensure-Win32Loaded",
+          "parent_function": null,
+          "start_utf16": 2670,
+          "end_utf16": 3609,
+          "sha256": "c331a6cb6409bd95e06a2cb590f45e751469b7da566b6fcc3b10e719ebf86d11",
+          "utf8_bytes": 939
+        },
+        {
+          "name": "_Action-Windows",
+          "parent_function": null,
+          "start_utf16": 3801,
+          "end_utf16": 5999,
+          "sha256": "29b7fe702e38c6479e200d2c0b0dddc16b8169ba85a2611af708650043e63a84",
+          "utf8_bytes": 2198
+        },
+        {
+          "name": "_Action-Health",
+          "parent_function": null,
+          "start_utf16": 6001,
+          "end_utf16": 6354,
+          "sha256": "ecc8ab05cb092d2df3533c41f9d10192a860059c431cc31262414748d96da448",
+          "utf8_bytes": 353
+        },
+        {
+          "name": "_Action-Focused",
+          "parent_function": null,
+          "start_utf16": 6356,
+          "end_utf16": 7284,
+          "sha256": "0ba2b23fe615ef024fde182102a00861f4ba9a0b028039f5715e59941af60446",
+          "utf8_bytes": 928
+        },
+        {
+          "name": "_Action-ModalDetect",
+          "parent_function": null,
+          "start_utf16": 7286,
+          "end_utf16": 10530,
+          "sha256": "24751f99791034f2b2cc680b4632a8daf3f31789595482f45f621760e2863680",
+          "utf8_bytes": 3244
+        },
+        {
+          "name": "_Server-Ensure-OCR",
+          "parent_function": null,
+          "start_utf16": 11139,
+          "end_utf16": 12419,
+          "sha256": "38a22c76735d6f72a675c0a6ed4e6e4068e126f8446bad2b778dacaae793255b",
+          "utf8_bytes": 1280
+        },
+        {
+          "name": "_Server-Ensure-UIA",
+          "parent_function": null,
+          "start_utf16": 12421,
+          "end_utf16": 12763,
+          "sha256": "6c7424129067d3e168e15bb2a8b2ea798645fa9d7afa66e8e060361c522e5687",
+          "utf8_bytes": 342
+        },
+        {
+          "name": "_Action-OcrScreenFast",
+          "parent_function": null,
+          "start_utf16": 13057,
+          "end_utf16": 16261,
+          "sha256": "cccb5d5ef9070bb9cb88d2ad63ff7afde979033f0b212e5fa2bb9ada2953e461",
+          "utf8_bytes": 3234
+        },
+        {
+          "name": "_AsyncWait",
+          "parent_function": "_Action-OcrScreenFast",
+          "start_utf16": 14948,
+          "end_utf16": 15112,
+          "sha256": "1b83f1f87ce84210a50bd230692da084d60b90d647c5f661bbfd82443480cbf4",
+          "utf8_bytes": 164
+        },
+        {
+          "name": "_Action-UiaFindFast",
+          "parent_function": null,
+          "start_utf16": 16545,
+          "end_utf16": 19707,
+          "sha256": "9f77c63312cd610cd28cd3a87d3e89836b17f102c4f14ffa8bde0f1619f2ef7b",
+          "utf8_bytes": 3210
+        },
+        {
+          "name": "_Dispatch",
+          "parent_function": null,
+          "start_utf16": 19959,
+          "end_utf16": 20777,
+          "sha256": "68a4aa86fb148d2642eef0870d33d539e4f7dc1b28b97f6f9ceb081663303e17",
+          "utf8_bytes": 818
+        }
+      ]
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "git_blob": "cfd8bfa4b998fe2cd44392be18c091e6f9dadac6",
+      "raw_sha256": "b21a75a9249e9eb38d45d6dd70bc8eff940444894b4482cac81d07fc811844da",
+      "raw_bytes": 408441,
+      "normalized_sha256": "7683e9a5416d5fc94c2d061882c548709617b864e0473cc2a9a51d08b122c993",
+      "functions": [
+        {
+          "name": "_Read-LockSafely",
+          "parent_function": null,
+          "start_utf16": 11117,
+          "end_utf16": 11520,
+          "sha256": "9eabf37d7a6d026f752fe105f20a1828317185fc5a9450585ad53fe53f5d6ea1",
+          "utf8_bytes": 411
+        },
+        {
+          "name": "_Is-StaleLock",
+          "parent_function": null,
+          "start_utf16": 11522,
+          "end_utf16": 12643,
+          "sha256": "e514e4bf3a4c9bc78ddac925940fa0ce91d311ba37b4461e90162d165b77fa5c",
+          "utf8_bytes": 1267
+        },
+        {
+          "name": "_Try-Delete-Lock",
+          "parent_function": null,
+          "start_utf16": 12645,
+          "end_utf16": 13081,
+          "sha256": "3511fb03667046d688aaa3fc2c5a85c7ec8073cb269f4b2b1a6e4c9d8852bc03",
+          "utf8_bytes": 468
+        },
+        {
+          "name": "Get-HelperServerStatus",
+          "parent_function": null,
+          "start_utf16": 13083,
+          "end_utf16": 14197,
+          "sha256": "11138cff736993c6906b5771d5bec51ed152b32344504c02ec4f6bcad761b33e",
+          "utf8_bytes": 1156
+        },
+        {
+          "name": "Invoke-HelperPipe",
+          "parent_function": null,
+          "start_utf16": 14199,
+          "end_utf16": 16269,
+          "sha256": "da7b5505acb207905e979214dc2b1c9cc497e21260a37e6e80df73a3cf184168",
+          "utf8_bytes": 2138
+        },
+        {
+          "name": "Start-HelperServer",
+          "parent_function": null,
+          "start_utf16": 16271,
+          "end_utf16": 17876,
+          "sha256": "bb96608c379a2ae4fd859d04ea0433fb8ab8ae5b6328f099c88f40875b21ccc7",
+          "utf8_bytes": 1657
+        },
+        {
+          "name": "Stop-HelperServer",
+          "parent_function": null,
+          "start_utf16": 17878,
+          "end_utf16": 18859,
+          "sha256": "6eeca075dc13845ba5ab05e0de4c850898d9b6fd9759c71eeb87c01083eb59ab",
+          "utf8_bytes": 981
+        },
+        {
+          "name": "Invoke-NativeHelper",
+          "parent_function": null,
+          "start_utf16": 48385,
+          "end_utf16": 58303,
+          "sha256": "2001dcf57bebc65a981dc980afcdad8681244045a8879204defe958892f45a85",
+          "utf8_bytes": 10518
+        }
+      ]
+    }
+  ]
+}

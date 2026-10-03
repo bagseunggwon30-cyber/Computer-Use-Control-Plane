@@ -53,7 +53,7 @@ class HistoryScopeTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError,'Missing required'):
                         gate.run(root,log,check_adapters=lambda _:set())
                     hosts.assert_not_called()
-                summary=json.loads((log/'candidate-summary.json').read_text())
+                summary=json.loads((log/'candidate-summary.json').read_text(encoding='utf-8', errors='strict'))
                 self.assertEqual(summary['status'],'blocked')
                 self.assertIs(summary['production_cutover'],False)
     def test_nonwindows_and_missing_hosts_leave_blocked_evidence(self):
@@ -62,7 +62,7 @@ class HistoryScopeTests(unittest.TestCase):
                 log=Path(owned)/'logs'
                 with patch.object(gate,'windows_host',return_value=windows), patch.object(gate,'resolve_hosts',side_effect=ValueError('missing host')), contextlib.redirect_stdout(io.StringIO()):
                     with self.assertRaises(ValueError): gate.run(ROOT,log,check_adapters=lambda _:set())
-                summary=json.loads((log/'candidate-summary.json').read_text())
+                summary=json.loads((log/'candidate-summary.json').read_text(encoding='utf-8', errors='strict'))
                 self.assertEqual(summary['status'],'blocked')
                 self.assertEqual(summary['completed_stages'],[])
     def test_windows_contract_mode_is_nonzero_on_portable_host(self):
@@ -70,7 +70,7 @@ class HistoryScopeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as owned:
             path=Path(owned)/'contracts.json'
             self.assertEqual(history.windows_contracts(path),1)
-            report=json.loads(path.read_text())
+            report=json.loads(path.read_text(encoding='utf-8', errors='strict'))
             self.assertEqual(report['status'],'blocked')
             with self.assertRaises(ValueError): gate.validate_contract_report(path)
     def test_contract_evidence_requires_no_skips_and_codepage_probe(self):
@@ -124,12 +124,12 @@ class HistoryScopeTests(unittest.TestCase):
             for flag,name in (('--ps51','ps51'),('--ps7','ps7')):
                 self.assertEqual(calls[5][0][calls[5][0].index(flag)+1],str(hosts[name]))
             self.assertTrue(all('artifact_prefix' in kwargs for _,kwargs in calls))
-            summary=json.loads((log/'candidate-summary.json').read_text())
+            summary=json.loads((log/'candidate-summary.json').read_text(encoding='utf-8', errors='strict'))
             self.assertEqual(summary['status'],'passed-candidate-only')
             self.assertIs(summary['production_cutover'],False)
             self.assertEqual(summary['differential_runs'],6)
     def test_workflow_has_separate_complete_candidate_job(self):
-        text=(ROOT/'.github/workflows/migration-qualification.yml').read_text()
+        text=(ROOT/'.github/workflows/migration-qualification.yml').read_text(encoding='utf-8', errors='strict')
         self.assertIn('history-candidate, full]',text)
         job=text.split('  windows-history-candidate:\n',1)[1].split('  cdp-browser:\n',1)[0]
         for required in ("contains(fromJSON(needs.scope.outputs.families), 'history-candidate')",'runs-on: windows-latest','fetch-depth: 0',"dotnet-version: '8.0.x'",'--family history-candidate --log-dir .migration-logs/history-candidate','if: always()','if-no-files-found: error','include-hidden-files: true'):
@@ -183,7 +183,7 @@ class HistoryRequiredArtifactTests(unittest.TestCase):
     def test_timeout_missing_flags_and_raw_changes_cannot_pass(self):
         with tempfile.TemporaryDirectory() as owned:
             root=Path(owned);self.make_evidence(root)
-            path=root/'ps51-many-0-candidate.process.json';original=json.loads(path.read_text())
+            path=root/'ps51-many-0-candidate.process.json';original=json.loads(path.read_text(encoding='utf-8', errors='strict'))
             for changes in ({'timed_out':True},{'stdout_truncated':True},{'exit_code':7},{'exit_code':False}):
                 path.write_text(json.dumps(dict(original,**changes)))
                 with self.assertRaises(ValueError):gate.validate_differential(root,history)

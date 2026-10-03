@@ -7,6 +7,7 @@ unittest is NOT that gate.
 from __future__ import annotations
 
 import argparse
+import ast
 import copy
 import hashlib
 import json
@@ -21,6 +22,7 @@ import threading
 import time
 import signal
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyHistory.Qualification'
@@ -452,11 +454,12 @@ class HistoryEvidenceTests(unittest.TestCase):
     def test_failed_process_preserves_both_pipes_and_exit(self):
         with tempfile.TemporaryDirectory(prefix='history-evidence-') as owned:
             prefix=Path(owned)/'failed'
-            command=[sys.executable, '-c', "import sys;sys.stdout.buffer.write(b'first output');sys.stderr.buffer.write(b'first error');sys.exit(7)"]
+            command=[sys.executable, '-c', "import sys;sys.stdout.buffer.write(b'first output');sys.stderr.buffer.write(b'first error');sys.exit(7) # 한글 ”"]
             with self.assertRaises(RuntimeError): run_bounded(command, artifact_prefix=prefix)
             self.assertEqual(Path(str(prefix)+'.stdout.bin').read_bytes(), b'first output')
             self.assertEqual(Path(str(prefix)+'.stderr.bin').read_bytes(), b'first error')
-            metadata=json.loads(Path(str(prefix)+'.process.json').read_text())
+            metadata=json.loads(Path(str(prefix)+'.process.json').read_text(encoding='utf-8', errors='strict'))
+            self.assertEqual(metadata['command'], command)
             self.assertEqual(metadata['exit_code'], 7)
             self.assertFalse(metadata['timed_out'])
     def test_timeout_preserves_partial_output(self):
@@ -465,13 +468,13 @@ class HistoryEvidenceTests(unittest.TestCase):
             command=[sys.executable, '-c', "import sys,time;sys.stdout.buffer.write(b'before timeout');sys.stdout.flush();time.sleep(5)"]
             with self.assertRaises(RuntimeError): run_bounded(command, timeout=0.5, artifact_prefix=prefix)
             self.assertEqual(Path(str(prefix)+'.stdout.bin').read_bytes(), b'before timeout')
-            self.assertTrue(json.loads(Path(str(prefix)+'.process.json').read_text())['timed_out'])
+            self.assertTrue(json.loads(Path(str(prefix)+'.process.json').read_text(encoding='utf-8', errors='strict'))['timed_out'])
     def test_output_limit_preserves_bounded_prefix_and_failure(self):
         with tempfile.TemporaryDirectory(prefix='history-evidence-') as owned:
             prefix=Path(owned)/'oversize'
             with self.assertRaises(RuntimeError): run_bounded([sys.executable, '-c', "import sys;sys.stdout.buffer.write(b'x'*4096)"], stdout_limit=64, artifact_prefix=prefix)
             self.assertEqual(Path(str(prefix)+'.stdout.bin').read_bytes(), b'x'*64)
-            self.assertTrue(json.loads(Path(str(prefix)+'.process.json').read_text())['stdout_truncated'])
+            self.assertTrue(json.loads(Path(str(prefix)+'.process.json').read_text(encoding='utf-8', errors='strict'))['stdout_truncated'])
     def test_automatic_contract_evidence_survives_parse_and_launch_failures(self):
         global CONTRACT_CAPTURE_ROOT
         old=CONTRACT_CAPTURE_ROOT
@@ -484,7 +487,7 @@ class HistoryEvidenceTests(unittest.TestCase):
                 capture_process([str(Path(owned)/'absent')])
                 added=set(root.glob('*.process.json'))-before
                 self.assertEqual(len(added),2)
-                records=[json.loads(path.read_text()) for path in added]
+                records=[json.loads(path.read_text(encoding='utf-8', errors='strict')) for path in added]
                 self.assertTrue(any(record['launch_error'] for record in records))
                 self.assertTrue(any((root/record['stdout_artifact']).read_bytes()==b'not-json' for record in records))
             finally:CONTRACT_CAPTURE_ROOT=old
@@ -509,7 +512,7 @@ class HistoryEvidenceTests(unittest.TestCase):
             prefix=Path(owned)/'missing'
             with self.assertRaises(RuntimeError): run_bounded([str(Path(owned)/'absent-executable')], artifact_prefix=prefix)
             self.assertEqual(Path(str(prefix)+'.stdout.bin').read_bytes(), b'')
-            self.assertTrue(json.loads(Path(str(prefix)+'.process.json').read_text())['launch_error'])
+            self.assertTrue(json.loads(Path(str(prefix)+'.process.json').read_text(encoding='utf-8', errors='strict'))['launch_error'])
 
 
 class HistoryReportShapeTests(unittest.TestCase):
@@ -526,7 +529,7 @@ class HistoryReportShapeTests(unittest.TestCase):
         self.assertEqual(observed['results'][0]['compact_json'],{})
         self.assertEqual(observed['results'][0]['console'],'')
         self.assertEqual(observed['results'][0]['errors'],[])
-        provenance=json.loads((FIXTURES/'windows-ps51-host-37092069983.provenance.json').read_text())
+        provenance=json.loads((FIXTURES/'windows-ps51-host-37092069983.provenance.json').read_text(encoding='utf-8', errors='strict'))
         self.assertEqual(provenance['raw_sha256'],digest(raw))
         self.assertEqual(provenance['differential_runs'],0)
         # Even with the new items field, an AutomationNull-shaped object is
@@ -599,9 +602,9 @@ class HistorySourceTests(unittest.TestCase):
             self.assertEqual(destination.read_bytes(), b'preserve-owned-file')
     def test_manifest_contains_no_executable_source(self):
         manifest = original_manifest()
-        self.assertNotIn('function ', ORIGINAL.read_text())
+        self.assertNotIn('function ', ORIGINAL.read_text(encoding='utf-8', errors='strict'))
         self.assertTrue(all('source' not in entry for entry in manifest['functions']))
-        oracle = (FIXTURES/'oracle.ps1').read_text()
+        oracle = (FIXTURES/'oracle.ps1').read_text(encoding='utf-8', errors='strict')
         self.assertIn('. ([scriptblock]::Create($body))', oracle)
         self.assertNotRegex(oracle, r'(?i)scriptblock\]\s*::Create\(\$(?:sourceText|sourceBytes)\)')
         self.assertNotRegex(oracle, r'(?im)^\s*(?:&|\.)\s*\$SourcePath')
@@ -617,9 +620,64 @@ class HistorySourceTests(unittest.TestCase):
         for folder in (ROOT / 'pcucp-next/dotnet/PcuCp.NativeHost', ROOT / 'pcucp-next/python'):
             for path in folder.rglob('*'):
                 if path.suffix in ('.cs', '.csproj', '.py'):
-                    self.assertNotIn('PcuCp.LegacyHistory.Qualification', path.read_text())
+                    self.assertNotIn('PcuCp.LegacyHistory.Qualification', path.read_text(encoding='utf-8', errors='strict'))
         for path in PROJECT.glob('*.cs'):
-            self.assertNotRegex(path.read_text(), r'\b(?:File|Directory|Process|HttpClient)\.')
+            self.assertNotRegex(path.read_text(encoding='utf-8', errors='strict'), r'\b(?:File|Directory|Process|HttpClient)\.')
+    def test_source_and_metadata_reads_under_cp1252_default(self):
+        real_open = Path.open
+        decoded_paths = set()
+        def cp1252_open(path, mode='r', buffering=-1, encoding=None, errors=None, newline=None):
+            if 'b' not in mode:
+                if encoding in (None, 'locale'):
+                    encoding = 'cp1252'
+                decoded_paths.add(path)
+            return real_open(path, mode, buffering, encoding, errors, newline)
+        with tempfile.TemporaryDirectory(prefix='history-source-decoding-') as owned:
+            root = Path(owned)
+            production = root/'pcucp-next/dotnet/PcuCp.NativeHost/Source.cs'
+            candidate = root/'candidate/Source.cs'
+            for path in (production, candidate):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes('// 한글 ”'.encode('utf-8'))
+            # U+201D contains 0x9D in UTF-8, reproducing the real CP1252 failure.
+            with self.assertRaises(UnicodeDecodeError):
+                production.read_bytes().decode('cp1252', 'strict')
+            with mock.patch.object(Path, 'open', cp1252_open):
+                # Exercise the exact assertion method against the real sources,
+                # then synthetic violations; no locale or process setting changes.
+                self.test_no_production_reference_or_operation()
+                HistoryEvidenceTests('test_failed_process_preserves_both_pipes_and_exit').test_failed_process_preserves_both_pipes_and_exit()
+                with mock.patch.multiple(sys.modules[__name__], ROOT=root, PROJECT=candidate.parent):
+                    self.test_no_production_reference_or_operation()
+                    production.write_bytes('// 한글 ” PcuCp.LegacyHistory.Qualification'.encode('utf-8'))
+                    with self.assertRaises(AssertionError):
+                        self.test_no_production_reference_or_operation()
+                    production.write_bytes(b'// invalid UTF-8: \xff')
+                    with self.assertRaises(UnicodeDecodeError):
+                        self.test_no_production_reference_or_operation()
+                    production.write_bytes('// 한글 ”'.encode('utf-8'))
+                    candidate.write_bytes('// 한글 ” File.ReadAllText'.encode('utf-8'))
+                    with self.assertRaises(AssertionError):
+                        self.test_no_production_reference_or_operation()
+                    candidate.write_bytes(b'// invalid UTF-8: \xff')
+                    with self.assertRaises(UnicodeDecodeError):
+                        self.test_no_production_reference_or_operation()
+            self.assertTrue(any(path.is_relative_to(ROOT/'pcucp-next/dotnet/PcuCp.NativeHost') for path in decoded_paths))
+            self.assertTrue(any(path.is_relative_to(PROJECT) for path in decoded_paths))
+            self.assertTrue(any(path.name.endswith('.process.json') for path in decoded_paths))
+    def test_source_reads_require_explicit_utf8(self):
+        for path in (Path(__file__), ROOT/'pcucp-next/packaging/history_candidate_qualification.py',
+                     ROOT/'tests/python/test_history_candidate_qualification.py'):
+            tree = ast.parse(path.read_text(encoding='utf-8', errors='strict'))
+            reads = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                     and isinstance(node.func, ast.Attribute) and node.func.attr == 'read_text']
+            self.assertTrue(reads, str(path))
+            for node in reads:
+                with self.subTest(path=path.name, line=node.lineno):
+                    keywords = {item.arg: item.value for item in node.keywords}
+                    self.assertEqual(ast.literal_eval(keywords['encoding']), 'utf-8')
+                    if 'errors' in keywords:
+                        self.assertEqual(ast.literal_eval(keywords['errors']), 'strict')
     def test_gate_retains_exact_order_and_text(self):
         result = dict(id='x', operation='stats', wire={'kind': 'hashtable', 'properties': [{'name': 'a'}, {'name': 'b'}]}, compact_json='{"a":1,"b":2}', compact_json_items=['{"a":1,"b":2}'], console='', errors=[])
         left = dict(results=[result]); right = copy.deepcopy(left)
@@ -640,14 +698,14 @@ class HistorySourceTests(unittest.TestCase):
         with self.assertRaises(ValueError): validate_report(report, cases, 'ps51', observation=True, source_hash=SOURCE_SHA256, manifest_hash=ORIGINAL_SHA256, input_hash='expected')
     def test_singleton_envelope_remains_an_array(self):
         self.assertEqual(len(json.loads(input_bytes(fixtures()[:1]))['fixtures']), 1)
-        self.assertIn('$fixtures=$envelope.fixtures', (FIXTURES / 'oracle.ps1').read_text())
+        self.assertIn('$fixtures=$envelope.fixtures', (FIXTURES / 'oracle.ps1').read_text(encoding='utf-8', errors='strict'))
     def test_new_powershell_is_explicitly_counted(self):
         # The only newly tracked executable PowerShell source is oracle.ps1.
         # Original source remains in its existing .ps1 Git blob, not JSON/data.
         files = [p for p in FIXTURES.rglob('*') if p.is_file()]
         self.assertEqual(sorted(p.name for p in files), ['oracle.ps1', 'original-functions.json','windows-ps51-host-37092069983.provenance.json','windows-ps51-host-37092069983.raw.json'])
         self.assertGreater(len((FIXTURES / 'oracle.ps1').read_bytes()), 0)
-        self.assertNotIn('"source":', ORIGINAL.read_text())
+        self.assertNotIn('"source":', ORIGINAL.read_text(encoding='utf-8', errors='strict'))
 
 
 @unittest.skipUnless(dotnet_command(), 'dotnet SDK/runtime unavailable; no C# candidate claim')

@@ -73,6 +73,19 @@ still contains two inline PowerShell test drivers executed with
 included in the extension-based byte figure. This finding is not an exhaustive
 audit of all embedded drivers; the final checks below cover every source form.
 
+## Candidate-only detached helper service
+
+The [legacy helper service candidate](legacy-helper-service-candidate.md) adds a
+standalone net48 service, six read-only action reducers/providers, and Python
+client/lifecycle/routing contracts without switching any production caller.
+Its gross target is 35,505 original PowerShell bytes; retirement credit remains
+zero. Two explicit temporary oracle drivers add 13,777 counted bytes, bringing
+the integrated tracked PowerShell total to 896,443 bytes in 30 files, with
+runtime unchanged at 610,258 bytes. Existing originals, autostart, discovery and
+historical tests remain. The Windows original-startup, differential and owned
+pipe gates plus documented compatibility decisions must be reviewed before
+promotion; Linux contract success is not Windows qualification.
+
 ## Ordered implementation families
 
 1. **Remaining deterministic planning and observations.** App-profile, task/form,

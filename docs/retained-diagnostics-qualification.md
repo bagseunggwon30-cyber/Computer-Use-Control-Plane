@@ -290,3 +290,29 @@ retaining the documented subprocess-buffering and culture-model limitations.
 The current integrated extension count is 880,873 PowerShell bytes, unchanged
 by this diagnostic repair; the difference from its local 870,201-byte base is
 the separately counted history oracle. No production body has been retired.
+
+## Subsequent Windows result
+
+Published commit `c2b927e3fc5e274869ebd1ff7555ed28245d6425` passed
+[run 37094100246](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37094100246)
+on 2026-10-03 at 03:53:10 UTC. All 43 Windows Python tests passed without skips.
+All 472 retained inputs passed original/current-original/pure-candidate/actual
+adapter comparisons: 464 exact and eight preserved owned-write failures. The
+older 323 production-entry cases also retained their established partition of
+287 exact, 26 owned-write failures and ten terminal postdispatch failures.
+The managed observed/source checks total 30 on Windows, including both NLS checks.
+
+Artifact SHA256 is
+`9a9a5589b278658d42701b22322b4577741c71e8d8b2201d30cae5a7b49cfbcf`.
+Its 34 files include complete raw route data. The manifest declares completed
+comparison and passed qualification, with no unattempted routes; every stored
+route byte count/hash and the input hash were independently verified. Manifest
+SHA256 is `3340fba891b678d33d2a3bfb8d009b790db55148416cf46b1786944f39880ce2`.
+The only captured Git status entry is the generated evidence directory.
+
+This qualifies the tested candidate routes, not production retirement. The
+documented non-Gregorian/textual-date fallback remains reachable but has not yet
+been shown to differ; a bounded Windows characterization is the next review
+step for benchmark. Audit interpolation is invariant and does not enter that
+formatter fallback. Routing, production-entry assertions and complete regression
+must still be reviewed before either original body is removed.
