@@ -20,7 +20,7 @@ class PiLauncherTests(unittest.TestCase):
     def setUp(self):
         folder = tempfile.TemporaryDirectory(prefix='CUCP 한글 space & ')
         self.addCleanup(folder.cleanup)
-        self.root = Path(folder.name)
+        self.root = Path(folder.name).resolve()
         for name in ('pcucp-next/bin/native/PcuCp.NativeHost.exe', 'integrations/pi/src/index.ts'):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
