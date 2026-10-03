@@ -1,6 +1,7 @@
 """Explicit direct modes; generated owned peers/files only, no desktop provider."""
 from datetime import datetime,timezone
 import json
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -18,6 +19,42 @@ ROOT=Path(__file__).resolve().parents[2]
 
 
 class DirectHelperPortableTests(unittest.TestCase):
+    def test_observed_short_path_failure_and_package_provenance_remain_exact(self):
+        directory=ROOT/'tests/fixtures/legacy-helper/observed-direct-path'
+        raw=(directory/'manifest.json').read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),'1f761b60d627f2d1aa598c7015b1ac32fbb90217ef5adf786800368874bd4fc1')
+        manifest=json.loads(raw);self.assertEqual(manifest['status'],'failed-unqualified')
+        for name,record in manifest['files'].items():
+            data=(directory/name).read_bytes()
+            self.assertEqual(len(data),record['bytes']);self.assertEqual(hashlib.sha256(data).hexdigest(),record['sha256'])
+        failed=json.loads((directory/'failed-start.json').read_bytes())
+        self.assertEqual(failed['exit_code'],1);self.assertFalse(failed['timed_out'])
+        self.assertIn('RUNNER~1',failed['argv'][failed['argv'].index('--lock-file')+1])
+        self.assertEqual((directory/'failed-start.stderr.bin').read_bytes(),
+                         b'ArgumentException: direct lock path must not require normalization\r\n')
+        self.assertIn(b'FAILED (failures=10)',(directory/'failed-suite.stderr.bin').read_bytes())
+        package=json.loads((directory/'package-manifest.json').read_bytes())
+        closure=json.loads((directory/'package-build-closure.json').read_bytes())
+        self.assertEqual(package['files'],{name:closure['build_output'][name] for name in closure['included']})
+
+    def test_converting_checkout_preserves_every_direct_observation_and_manifest(self):
+        source=ROOT/'tests/fixtures/legacy-helper/observed-direct-path'
+        with tempfile.TemporaryDirectory(prefix='direct-observed-checkout-') as temporary:
+            root=Path(temporary);target=root/source.relative_to(ROOT);target.mkdir(parents=True)
+            originals={item.name:item.read_bytes() for item in source.iterdir()}
+            for name,data in originals.items(): (target/name).write_bytes(data)
+            (root/'.gitattributes').write_bytes((ROOT/'.gitattributes').read_bytes())
+            control=root/'unprotected-manifest.json';control.write_bytes(originals['manifest.json'])
+            def git(*arguments):
+                return subprocess.run(['git','-c','core.autocrlf=true','-c','core.eol=crlf','-c','core.safecrlf=false',
+                    '-c',f'core.attributesFile={os.devnull}',*arguments],cwd=root,capture_output=True,check=True,timeout=30)
+            git('init','--quiet');git('add','--force','--','.gitattributes',source.relative_to(ROOT).as_posix(),control.name)
+            for name in originals: (target/name).unlink()
+            control.unlink();git('checkout-index','--force','--all')
+            for name,data in originals.items(): self.assertEqual((target/name).read_bytes(),data)
+            self.assertEqual(control.read_bytes(),originals['manifest.json'].replace(b'\n',b'\r\n'))
+            self.assertNotEqual(control.read_bytes(),originals['manifest.json'])
+
     def test_custom_direct_record_remains_unusable_for_automatic_discovery(self):
         record=dict(pid=123,pipe_name='explicit-custom',owner_user='owned',helper_version='2.0.0',started_at='2026-01-01T00:00:00Z')
         state=inspect_lock(LockSnapshot(json.dumps(record).encode(),(1,2,3)),owner_user='owned',
@@ -131,6 +168,51 @@ class DirectHelperWindowsTests(unittest.TestCase):
                     self.assertEqual(row['aces'][0]['type'],'AccessAllowed')
                 self.assertNotIn(b'helper_debug ',evidence['stderr'])
 
+    def alias_directories(self):
+        import ctypes
+        from ctypes import wintypes
+        kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+        def convert(name,path):
+            function=getattr(kernel,name);function.argtypes=[wintypes.LPCWSTR,wintypes.LPWSTR,wintypes.DWORD];function.restype=wintypes.DWORD
+            output=ctypes.create_unicode_buffer(32768)
+            size=function(str(path),output,len(output))
+            self.assertGreater(size,0);self.assertLess(size,len(output));return Path(output.value)
+        long=convert('GetLongPathNameW',self.root);short=convert('GetShortPathNameW',long)
+        self.assertNotEqual(str(short).casefold(),str(long).casefold(),'Owned gate must exercise a genuine 8.3 alias')
+        self.assertTrue(os.path.samefile(short,long))
+        return short,long
+
+    def test_short_and_long_directory_aliases_share_owned_lock_and_lifetime(self):
+        short,long=self.alias_directories()
+        for selected,other in ((short,long),(long,short)):
+            with self.subTest(selected=str(selected)):
+                lock=selected/'literal-owned-한글.pid';alias=other/lock.name
+                process,lock,data=self.start(lock=lock);original=lock.read_bytes()
+                self.assertTrue(os.path.samefile(lock,alias));self.assertEqual(alias.read_bytes(),original)
+                self.assertEqual(self.reply(data['pipe_name'])['result']['pid'],process.process.pid)
+                refusal=self.run_host(['serve-direct','--pipe-name','cucp-owned-direct-'+uuid.uuid4().hex,
+                    '--lock-file',alias],expected=1)
+                self.assertEqual(refusal['stdout'],b'');self.assertEqual(alias.read_bytes(),original)
+                for directory in (short,long):
+                    with self.assertRaises(OSError): directory.rename(directory.parent/('uncreated-move-'+uuid.uuid4().hex))
+                self.reply(data['pipe_name'],'shutdown');self.finish(process)
+                self.assertFalse(lock.exists());self.assertFalse(alias.exists())
+
+    def test_raw_lexical_normalization_is_refused_through_short_and_long_parents(self):
+        short,long=self.alias_directories();ordinary=self.root/'ordinary';ordinary.mkdir()
+        for parent in (short,long):
+            base=str(parent)
+            for tail in ('ordinary\\.\\owned.pid','ordinary\\..\\owned.pid','ordinary\\\\owned.pid',
+                         'ordinary/owned.pid','ordinary.\\owned.pid','ordinary \\owned.pid','ordinary:stream\\owned.pid',
+                         'NUL\\owned.pid','COM1.log\\owned.pid','ordinary\\owned.pid:stream','ordinary\\helper.pid'):
+                with self.subTest(parent=base,tail=tail):
+                    result=self.run_host(['serve-direct','--pipe-name','cucp-owned-direct-'+uuid.uuid4().hex,
+                        '--lock-file',base+'\\'+tail],expected=1)
+                    self.assertIn(b'ArgumentException: direct lock',result['stderr'])
+                    self.assertEqual(result['stdout'],b'')
+        self.assertEqual(list(ordinary.iterdir()),[])
+        self.assertEqual({item.name for item in self.root.iterdir()}-{'evidence'},{'ordinary'})
+
     def test_default_modes_keep_custom_option_and_target_refusal(self):
         lock=self.root/'uncreated.pid';request=self.root/'request.json';request.write_bytes(b'{}')
         for args in (['serve','--lock-file',lock,'--pipe-name','custom'],['serve','--lock-file',lock,'--debug-log','true'],
@@ -226,8 +308,11 @@ class DirectHelperWindowsTests(unittest.TestCase):
         created=run_evidence(command,directory=self.logs,label='direct-owned-junction',timeout=5)
         require_success(created)
         try:
-            self.run_host(['serve-direct','--pipe-name','cucp-owned-direct-'+uuid.uuid4().hex,'--lock-file',junction/'owned.pid'],expected=1)
-            self.assertEqual(list(target.iterdir()),[])
+            for parent in self.alias_directories():
+                result=self.run_host(['serve-direct','--pipe-name','cucp-owned-direct-'+uuid.uuid4().hex,
+                    '--lock-file',parent/junction.name/'owned.pid'],expected=1)
+                self.assertIn(b'directory must exist without reparse components',result['stderr'])
+                self.assertEqual(list(target.iterdir()),[])
         finally: junction.rmdir()
 
     def test_fixture_and_readonly_authority_are_mutually_exclusive_before_acquisition(self):

@@ -1,0 +1,136 @@
+test_custom_direct_record_remains_unusable_for_automatic_discovery (test_legacy_helper_direct.DirectHelperPortableTests.test_custom_direct_record_remains_unusable_for_automatic_discovery) ... ok
+test_direct_contracts_execute_actual_shared_validation_and_log_writer (test_legacy_helper_direct.DirectHelperPortableTests.test_direct_contracts_execute_actual_shared_validation_and_log_writer) ... ok
+test_gate_requires_explicit_owned_windows_selection_despite_inherited_flag (test_legacy_helper_direct.DirectHelperPortableTests.test_gate_requires_explicit_owned_windows_selection_despite_inherited_flag) ... ok
+test_custom_exchange_deadlines_and_uncertain_disconnect_are_not_retried (test_legacy_helper_direct.DirectHelperWindowsTests.test_custom_exchange_deadlines_and_uncertain_disconnect_are_not_retried) ... ok
+test_custom_exchange_frame_bounds_encoding_and_invalid_timeout_refusal (test_legacy_helper_direct.DirectHelperWindowsTests.test_custom_exchange_frame_bounds_encoding_and_invalid_timeout_refusal) ... ok
+test_debug_metadata_is_capped_and_never_contains_raw_request_secrets (test_legacy_helper_direct.DirectHelperWindowsTests.test_debug_metadata_is_capped_and_never_contains_raw_request_secrets) ... FAIL
+test_default_modes_keep_custom_option_and_target_refusal (test_legacy_helper_direct.DirectHelperWindowsTests.test_default_modes_keep_custom_option_and_target_refusal) ... ok
+test_direct_closed_options_and_invalid_names_fail_before_lock (test_legacy_helper_direct.DirectHelperWindowsTests.test_direct_closed_options_and_invalid_names_fail_before_lock) ... ok
+test_direct_lock_refuses_discovery_devices_ads_missing_and_relative_paths (test_legacy_helper_direct.DirectHelperWindowsTests.test_direct_lock_refuses_discovery_devices_ads_missing_and_relative_paths) ... ok
+test_direct_maximum_literal_name_roundtrip (test_legacy_helper_direct.DirectHelperWindowsTests.test_direct_maximum_literal_name_roundtrip) ... FAIL
+test_existing_lock_and_pipe_collision_never_overwrite_or_retry (test_legacy_helper_direct.DirectHelperWindowsTests.test_existing_lock_and_pipe_collision_never_overwrite_or_retry) ... FAIL
+test_fixture_and_readonly_authority_are_mutually_exclusive_before_acquisition (test_legacy_helper_direct.DirectHelperWindowsTests.test_fixture_and_readonly_authority_are_mutually_exclusive_before_acquisition) ... ok
+test_literal_custom_names_schema_owner_acl_and_shutdown (test_legacy_helper_direct.DirectHelperWindowsTests.test_literal_custom_names_schema_owner_acl_and_shutdown) ... 
+  test_literal_custom_names_schema_owner_acl_and_shutdown (test_legacy_helper_direct.DirectHelperWindowsTests.test_literal_custom_names_schema_owner_acl_and_shutdown) (suffix='plain') ... FAIL
+  test_literal_custom_names_schema_owner_acl_and_shutdown (test_legacy_helper_direct.DirectHelperWindowsTests.test_literal_custom_names_schema_owner_acl_and_shutdown) (suffix='한글 공백 (a) %!&^_+=') ... FAIL
+  test_literal_custom_names_schema_owner_acl_and_shutdown (test_legacy_helper_direct.DirectHelperWindowsTests.test_literal_custom_names_schema_owner_acl_and_shutdown) (suffix='MiXeD.Case') ... FAIL
+test_lock_byte_edit_survives_and_lifetime_directory_lease_blocks_replacement (test_legacy_helper_direct.DirectHelperWindowsTests.test_lock_byte_edit_survives_and_lifetime_directory_lease_blocks_replacement) ... FAIL
+test_request_cannot_elevate_default_provider_or_enable_logging (test_legacy_helper_direct.DirectHelperWindowsTests.test_request_cannot_elevate_default_provider_or_enable_logging) ... FAIL
+test_retained_directory_ancestors_and_junction_refusal (test_legacy_helper_direct.DirectHelperWindowsTests.test_retained_directory_ancestors_and_junction_refusal) ... FAIL
+test_zero_idle_success_and_negative_refusal_remain_separate (test_legacy_helper_direct.DirectHelperWindowsTests.test_zero_idle_success_and_negative_refusal_remain_separate) ... FAIL
+
+======================================================================
+FAIL: test_debug_metadata_is_capped_and_never_contains_raw_request_secrets (test_legacy_helper_direct.DirectHelperWindowsTests.test_debug_metadata_is_capped_and_never_contains_raw_request_secrets)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 201, in test_debug_metadata_is_capped_and_never_contains_raw_request_secrets
+    process,lock,data=self.start(debug=True)
+                      ^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 101, in start
+    self.fail('Direct service did not become ready: '+evidence['evidence_path'])
+AssertionError: Direct service did not become ready: D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\.migration-logs\staged-helper\direct-start-failed-33a31320dd55.json
+
+======================================================================
+FAIL: test_direct_maximum_literal_name_roundtrip (test_legacy_helper_direct.DirectHelperWindowsTests.test_direct_maximum_literal_name_roundtrip)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 215, in test_direct_maximum_literal_name_roundtrip
+    process,lock,data=self.start(name=name)
+                      ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 101, in start
+    self.fail('Direct service did not become ready: '+evidence['evidence_path'])
+AssertionError: Direct service did not become ready: D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\.migration-logs\staged-helper\direct-start-failed-53515b7fccb0.json
+
+======================================================================
+FAIL: test_existing_lock_and_pipe_collision_never_overwrite_or_retry (test_legacy_helper_direct.DirectHelperWindowsTests.test_existing_lock_and_pipe_collision_never_overwrite_or_retry)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 164, in test_existing_lock_and_pipe_collision_never_overwrite_or_retry
+    process,lock,data=self.start();other=self.root/'collision.pid'
+                      ^^^^^^^^^^^^
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 101, in start
+    self.fail('Direct service did not become ready: '+evidence['evidence_path'])
+AssertionError: Direct service did not become ready: D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\.migration-logs\staged-helper\direct-start-failed-3b9e6dc2f91b.json
+
+======================================================================
+FAIL: test_literal_custom_names_schema_owner_acl_and_shutdown (test_legacy_helper_direct.DirectHelperWindowsTests.test_literal_custom_names_schema_owner_acl_and_shutdown) (suffix='plain')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 117, in test_literal_custom_names_schema_owner_acl_and_shutdown
+    process,lock,data=self.start(name=name)
+                      ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 101, in start
+    self.fail('Direct service did not become ready: '+evidence['evidence_path'])
+AssertionError: Direct service did not become ready: D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\.migration-logs\staged-helper\direct-start-failed-656917a39a91.json
+
+======================================================================
+FAIL: test_literal_custom_names_schema_owner_acl_and_shutdown (test_legacy_helper_direct.DirectHelperWindowsTests.test_literal_custom_names_schema_owner_acl_and_shutdown) (suffix='한글 공백 (a) %!&^_+=')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 117, in test_literal_custom_names_schema_owner_acl_and_shutdown
+    process,lock,data=self.start(name=name)
+                      ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 101, in start
+    self.fail('Direct service did not become ready: '+evidence['evidence_path'])
+AssertionError: Direct service did not become ready: D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\.migration-logs\staged-helper\direct-start-failed-19a61e100e39.json
+
+======================================================================
+FAIL: test_literal_custom_names_schema_owner_acl_and_shutdown (test_legacy_helper_direct.DirectHelperWindowsTests.test_literal_custom_names_schema_owner_acl_and_shutdown) (suffix='MiXeD.Case')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 117, in test_literal_custom_names_schema_owner_acl_and_shutdown
+    process,lock,data=self.start(name=name)
+                      ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 101, in start
+    self.fail('Direct service did not become ready: '+evidence['evidence_path'])
+AssertionError: Direct service did not become ready: D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\.migration-logs\staged-helper\direct-start-failed-e64940c5493d.json
+
+======================================================================
+FAIL: test_lock_byte_edit_survives_and_lifetime_directory_lease_blocks_replacement (test_legacy_helper_direct.DirectHelperWindowsTests.test_lock_byte_edit_survives_and_lifetime_directory_lease_blocks_replacement)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 172, in test_lock_byte_edit_survives_and_lifetime_directory_lease_blocks_replacement
+    process,lock,data=self.start();original=lock.read_bytes();changed=original+b' '
+                      ^^^^^^^^^^^^
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 101, in start
+    self.fail('Direct service did not become ready: '+evidence['evidence_path'])
+AssertionError: Direct service did not become ready: D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\.migration-logs\staged-helper\direct-start-failed-28486b5ba461.json
+
+======================================================================
+FAIL: test_request_cannot_elevate_default_provider_or_enable_logging (test_legacy_helper_direct.DirectHelperWindowsTests.test_request_cannot_elevate_default_provider_or_enable_logging)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 193, in test_request_cannot_elevate_default_provider_or_enable_logging
+    process,lock,data=self.start()
+                      ^^^^^^^^^^^^
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 101, in start
+    self.fail('Direct service did not become ready: '+evidence['evidence_path'])
+AssertionError: Direct service did not become ready: D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\.migration-logs\staged-helper\direct-start-failed-ad4f765f2391.json
+
+======================================================================
+FAIL: test_retained_directory_ancestors_and_junction_refusal (test_legacy_helper_direct.DirectHelperWindowsTests.test_retained_directory_ancestors_and_junction_refusal)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 221, in test_retained_directory_ancestors_and_junction_refusal
+    process,lock,data=self.start(lock=directory/'owned.pid')
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 101, in start
+    self.fail('Direct service did not become ready: '+evidence['evidence_path'])
+AssertionError: Direct service did not become ready: D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\.migration-logs\staged-helper\direct-start-failed-871234dbeaa4.json
+
+======================================================================
+FAIL: test_zero_idle_success_and_negative_refusal_remain_separate (test_legacy_helper_direct.DirectHelperWindowsTests.test_zero_idle_success_and_negative_refusal_remain_separate)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 188, in test_zero_idle_success_and_negative_refusal_remain_separate
+    self.run_host(['serve-direct','--pipe-name','cucp-owned-direct-'+uuid.uuid4().hex,
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\test_legacy_helper_direct.py", line 81, in run_host
+    require_success(result,expected_exit=expected)
+  File "D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\tests\python\helper_process_evidence.py", line 148, in require_success
+    raise AssertionError(f"Fixture process failed: {result['evidence_path']}: "
+AssertionError: Fixture process failed: D:\a\Computer-Use-Control-Plane\Computer-Use-Control-Plane\.migration-logs\staged-helper\direct-cli-b2e48e62a5d7.json: {"argv": ["D:\\a\\Computer-Use-Control-Plane\\Computer-Use-Control-Plane\\pcucp-next\\bin\\legacy-helper\\PcuCp.LegacyHelper.exe", "serve-direct", "--pipe-name", "cucp-owned-direct-836da3d2d5d14b06875facf0adedde2c", "--lock-file", "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\CUCP direct owned \ud55c\uae00 9piztc53\\idle-0.pid", "--idle-timeout-ms", "0"], "creationflags": 0, "hide_window": false, "exit_code": 1, "timed_out": false, "running": false, "launch_error": null, "kill_error": null, "drain_incomplete": false, "elapsed_ms": 63, "stdin_error": null, "read_errors": {}, "bytes_observed": {"stdout": 0, "stderr": 68}, "truncated": {"stdout": false, "stderr": false}, "evidence_path": "D:\\a\\Computer-Use-Control-Plane\\Computer-Use-Control-Plane\\.migration-logs\\staged-helper\\direct-cli-b2e48e62a5d7.json"}
+
+----------------------------------------------------------------------
+Ran 17 tests in 17.531s
+
+FAILED (failures=10)

@@ -1,0 +1,25 @@
+{
+  "entrypoint": "PcuCp.LegacyHelper.exe",
+  "files": {
+    "PcuCp.LegacyHelper.exe": {
+      "bytes": 63488,
+      "sha256": "0a78b62fa891d353ecc50d479d4450aca376b7b55ae5f6e37e0168d88a363352"
+    },
+    "PcuCp.LegacyHelper.exe.config": {
+      "bytes": 174,
+      "sha256": "051099983b896673909e01a1f631b6652abb88da95c9f06f3efef4be033091fa"
+    },
+    "PcuCp.LegacyInterop.dll": {
+      "bytes": 15872,
+      "sha256": "9b3f8c3e35e662a19aeb2d0339c828f5b5e2e640385f1015e2680c26ad8f43cd"
+    }
+  },
+  "helper_version": "2.0.0",
+  "runtime": "net48",
+  "runtime_dependencies": [
+    "Windows",
+    ".NET Framework 4.8"
+  ],
+  "schema": "cucp.legacy-helper-package/v1",
+  "status": "staged-unqualified"
+}

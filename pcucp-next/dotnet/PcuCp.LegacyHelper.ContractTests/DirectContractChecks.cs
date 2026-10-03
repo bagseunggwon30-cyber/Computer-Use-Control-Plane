@@ -22,6 +22,13 @@ internal static class DirectContractChecks
         Check(LegacyHelperDirect.LockLeaf("owned-한글.pid") == "owned-한글.pid", "lock leaf changed");
         foreach (string name in new[] { "helper.pid", "HELPER-STAGED.PID", "helper.pid::$DATA", "owned.pid:stream", "NUL", "con.txt", "CON .txt", "PRN", "AUX",
             "COM1.pid", "LPT9.pid", "COM¹.pid", "LPT²", "CLOCK$", "CONIN$", "CONOUT$", "ends.", "ends ", "a/b", "a\\b", "a?b", "a*b", "a\n" }) Reject(() => LegacyHelperDirect.LockLeaf(name));
+        foreach (string path in new[] { @"C:\owned.pid", @"c:\Users\RUNNER~1\Temp\owned.pid", @"C:\한글 공백\MiXeD.pid", @"C:\helper.pid\owned.pid" })
+            Check(String.Join("\\", LegacyHelperDirect.LockPathParts(path)) == path.Substring(3), "raw path spelling changed");
+        foreach (string path in new[] { null, "", "owned.pid", @"C:owned.pid", @"C:\", @"C:\\owned.pid", @"C:\a\.\owned.pid", @"C:\a\..\owned.pid",
+            @"C:\a\", @"C:/a/owned.pid", @"C:\a/owned.pid", @"C:\a \owned.pid", @"C:\a.\owned.pid", @"C:\a:stream\owned.pid",
+            @"C:\NUL\owned.pid", @"C:\COM1.log\owned.pid", @"C:\a\helper.pid", @"C:\a\HELPER-STAGED.PID", @"C:\owned.pid:stream",
+            @"\\server\share\owned.pid", @"\\?\C:\owned.pid", @"\\.\C:\owned.pid", "C:\\a\n\\owned.pid", "C:\\\ud800\\owned.pid" })
+            Reject(() => LegacyHelperDirect.LockPathParts(path));
         var rows = new List<string>();
         var log = new LegacyHelperDebugLog(rows.Add);
         log.Event("server.start");

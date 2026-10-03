@@ -24,7 +24,21 @@ namespace PcuCp.LegacyHelper
             return name; // Preserve accepted spelling. Never trim, normalize, or remap.
         }
 
-        public static string LockLeaf(string leaf)
+        // Split before any Framework Path/DirectoryInfo call can expand 8.3 aliases.
+        // Only directory aliases may differ later; lexical normalization is refused.
+        public static string[] LockPathParts(string path)
+        {
+            if (String.IsNullOrEmpty(path) || path.Length < 4 ||
+                !((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) ||
+                path[1] != ':' || path[2] != '\\')
+                throw new ArgumentException("direct lock requires an explicit absolute local path");
+            string[] parts = path.Substring(3).Split('\\');
+            foreach (string part in parts) FileComponent(part);
+            LockLeaf(parts[parts.Length - 1]);
+            return parts;
+        }
+
+        private static void FileComponent(string leaf)
         {
             if (String.IsNullOrEmpty(leaf) || leaf.EndsWith(".", StringComparison.Ordinal) || leaf.EndsWith(" ", StringComparison.Ordinal))
                 throw new ArgumentException("direct lock requires an ordinary file leaf");
@@ -33,8 +47,16 @@ namespace PcuCp.LegacyHelper
                     throw new ArgumentException("direct lock requires an ordinary file leaf");
             string stem = leaf.Split('.')[0].TrimEnd(' ', '.').ToUpperInvariant();
             if (stem == "CON" || stem == "PRN" || stem == "AUX" || stem == "NUL" || stem == "CONIN$" || stem == "CONOUT$" || stem == "CLOCK$" ||
-                System.Text.RegularExpressions.Regex.IsMatch(stem, @"\A(?:COM|LPT)[0-9¹²³]+\z") ||
-                String.Equals(leaf, "helper.pid", StringComparison.OrdinalIgnoreCase) || String.Equals(leaf, "helper-staged.pid", StringComparison.OrdinalIgnoreCase))
+                System.Text.RegularExpressions.Regex.IsMatch(stem, @"\A(?:COM|LPT)[0-9¹²³]+\z"))
+                throw new ArgumentException("direct lock must use non-device path components");
+            try { new UTF8Encoding(false, true).GetByteCount(leaf); }
+            catch (EncoderFallbackException) { throw new ArgumentException("direct lock path must be valid Unicode"); }
+        }
+
+        public static string LockLeaf(string leaf)
+        {
+            FileComponent(leaf);
+            if (String.Equals(leaf, "helper.pid", StringComparison.OrdinalIgnoreCase) || String.Equals(leaf, "helper-staged.pid", StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("direct lock must use an isolated non-device filename");
             return leaf;
         }

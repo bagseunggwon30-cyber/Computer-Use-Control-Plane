@@ -23,3 +23,6 @@ tests/fixtures/legacy-helper/observed-autostart-venv-request.json -text
 tests/fixtures/legacy-helper/observed-autostart-venv-capture.json -text
 tests/fixtures/legacy-helper/observed-autostart-venv-driver.json -text
 tests/fixtures/legacy-helper/observed-autostart-venv-manifest.json -text
+# Exact direct short-path failure, package evidence and provenance manifest.
+tests/fixtures/legacy-helper/observed-direct-path/* -text whitespace=cr-at-eol
+tests/fixtures/legacy-helper/observed-direct-path/*.bin -diff

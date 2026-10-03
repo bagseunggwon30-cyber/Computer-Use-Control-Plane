@@ -50,7 +50,7 @@ namespace PcuCp.LegacyHelper
                 if (direct) Only(options, "pipe-name", "lock-file", "idle-timeout-ms", "allow-readonly-desktop", "fixture", "diagnostic-phases", "diagnostic-acl", "debug-log");
                 else Only(options, "lock-file", "idle-timeout-ms", "allow-readonly-desktop", "fixture", "diagnostic-phases", "diagnostic-acl");
                 string directName = direct ? LegacyHelperDirect.WindowsPipeName(Required(options, "pipe-name")) : null;
-                string lockFile = Path.GetFullPath(Required(options, "lock-file"));
+                string lockFile = direct ? Required(options, "lock-file") : Path.GetFullPath(Required(options, "lock-file"));
                 if (!direct && !Directory.Exists(Path.GetDirectoryName(lockFile))) throw new DirectoryNotFoundException("candidate lock directory must exist");
                 int pid = Process.GetCurrentProcess().Id;
                 string pipe = direct ? directName : "cucp-helper-" + pid.ToString(CultureInfo.InvariantCulture);
@@ -76,14 +76,15 @@ namespace PcuCp.LegacyHelper
                 var debug = direct && options.ContainsKey("debug-log") ? new LegacyHelperDebugLog(Console.Error.WriteLine) : null;
                 Action<string> log = message => Console.Error.WriteLine(message);
                 if (direct) log = message => { if (debug != null) debug.Event("pipe.error"); };
-                var service = new LegacyHelperService(actions, pid, pipe, lockFile,
-                    Integer(options, "idle-timeout-ms", 60000), clock, log, phase, aclEvidence, debug);
+                int idle = Integer(options, "idle-timeout-ms", 60000);
+                Func<string, LegacyHelperService> service = retainedPath => new LegacyHelperService(actions, pid, pipe, retainedPath,
+                    idle, clock, log, phase, aclEvidence, debug);
                 if (direct)
                 {
-                    // Validate the original explicit spelling, not a silently normalized path.
-                    using (var directory = new LegacyHelperDirectLockDirectory(Required(options, "lock-file"))) service.Run();
+                    // Use the path whose original/expanded ancestors are held by this lease.
+                    using (var directory = new LegacyHelperDirectLockDirectory(lockFile)) service(directory.LockPath).Run();
                 }
-                else service.Run();
+                else service(lockFile).Run();
                 if (scripted != null) scripted.AssertExhausted();
                 return 0;
             }

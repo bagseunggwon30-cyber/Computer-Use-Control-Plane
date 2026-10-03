@@ -302,3 +302,93 @@ parity, amend the original failed startup/Args/OCR/ranking observations, authori
 production activation, or retire source. The separate one-shot UIA loader
 compatibility decision and the other environmental limits listed above remain.
 This documentation update changes no executable or test expectation.
+
+## Bounded diagnostic preparation after the later timeout
+
+The later `ed659953` timeout remains unresolved. Its nine complete UIA responses
+end at `uia-root-fallback` (request 9); requests 10 and 11 are absent. The last
+retained reducer call is `uia.name` returning `Filler 741`, followed by the complete
+879-element diagnostic array. The original post-case-only output cannot identify
+whether the next request's acquisition, diagnostic reads, reducer, serialization
+or stdout write was active at termination. Nine independently valid responses do
+not qualify a timed-out group: the later run remains **20/31, unqualified**.
+
+The original eight source hashes are identical across the passing and timed-out
+runs. All four binary hashes differ. A local generated AssemblyInfo inspection
+shows that the SDK embeds the Git SourceRevisionId in AssemblyInformationalVersion
+(for example `1.0.0+51eb240ff26cd34f62dd0987ee4136a5013ced30`). Its SDK target
+explicitly appends that revision. This is a concrete mechanism for binary changes,
+not proof that it explains every difference in the previous CI binaries; their
+generated AssemblyInfo files and executable bytes were not retained.
+
+This next patch changes only the qualification harness and its portable tests:
+
+- Each owned probe writes a separate `<group>-progress.jsonl` using create-new
+  semantics, bounded at 2,048 records and 1 MiB. Every complete record is flushed.
+  Normal progress goes neither to stderr nor into the original response schema.
+- Monotonic group/request ticks bracket dispatch, selected actual acquisitions,
+  subtree evidence materialization, independent diagnostic metadata enumeration,
+  response serialization and stdout write/flush. UIA assembly load, root, children
+  and subtree acquisition have entry/exit markers. Scan and metadata loops emit
+  sparse progress every 128 elements, rather than logging every property getter.
+- `provider_ticks` sums actual `Invoke` durations and excludes independent
+  diagnostic reads. Native window enumeration has separate inclusive markers,
+  avoiding double-counting its nested callbacks. `diagnostic_ticks` measures the
+  metadata getter/snapshot work. `write_ticks` measures prior progress-record
+  formatting/write/flush cost. Dispatch remains an inclusive wall-clock phase;
+  these counters must not be added to it as disjoint work.
+- A missing, partial, misordered or contradictory progress stream remains
+  unqualified. Valid original UIA requests require actual traversal, evidence and
+  metadata intervals. Last complete markers and raw hashes survive a failed
+  group for diagnosis; a retained prefix is never completion evidence.
+- A separate `uia-cold` process makes one valid `uia-run` request as its first
+  helper action. It defers all independent diagnostic `Current` property reads
+  until `Dispatch` has returned and its end marker has been flushed. Exact output
+  and acquisition checks still apply. Negative validator tests reject diagnostic
+  metadata before this cold dispatch returns. This is cold helper/client state,
+  not globally cold Windows/UIA server state: the owned fixture/OS may already
+  have served other groups. It adds new coverage and does not retroactively
+  qualify the earlier first-valid-action result.
+- The original six groups, 31 requests, acquisition order and expected responses
+  remain unchanged. The separate cold control has its own required/validated
+  fields; it cannot turn an incomplete original group into a pass.
+- Every process group still has a 90-second deadline, with the unchanged
+  1,500-second enclosing deadline. The preflight budgets are now 60 seconds for
+  the original expectations and 30 seconds for progress tests; both builds remain
+  300 seconds, readiness/closure remain 30/10 seconds. Seven groups plus setup
+  total 1,360 seconds. Allowing 13 two-second kill/0.4-second drain tails and an
+  additional 30-second orchestration reserve remains below 1,500 seconds. No
+  deadline is extended and no automatic rerun is added.
+- Before fixture launch, exact generated AssemblyInfo bytes, hashes, assembly
+  versions, informational versions and any revision suffix are retained for all
+  four built assemblies, alongside their existing binary hash manifest. Source
+  revision metadata is recorded without inventing a missing revision or claiming
+  that matching source hashes establish executable identity.
+
+The repeated diagnostic reads are a candidate contributor, not a demonstrated
+cause. The completed timeout rows contain 6,843 element diagnostics, implying
+34,215 additional `Current` getter evaluations from the verified source. This is
+a lower bound for that run, not a count of guaranteed cross-process calls. The
+previous successful group used the same instrumentation and completed 38,500
+such evaluations in 45,203 ms. New phase evidence is needed to distinguish
+cumulative harness cost from a slow or stalled production acquisition.
+
+The acquisition gap is a separate production risk. `FindAll(TreeScope.Subtree)`
+materializes its full result before the reducer applies its 800-element scan cap.
+Whole-desktop fallback returned 884 versus 879 elements across the two runs,
+while the owned population remained 852, so it is incidental and nondeterministic.
+It completed in both retained traces and is not the proven timeout cause. Before
+production activation, acquisition needs either a demonstrated order/selection-
+preserving traversal bound or documented, enforced owned-process/deadline
+containment. This diagnostic patch implements neither runtime redesign and earns
+no activation or retirement credit.
+
+Local diagnostic verification passed both net48/portable builds with zero warnings
+or errors, 117 action contracts, 45 wire contracts, 19 real file-writer contracts,
+94 progress/metadata regressions and the original 43 expectation regressions.
+Actual C# progress files round-tripped through the Python validator (58 native
+and 22 cold-control marker records). The integrated portable helper suite reported
+270 methods with 52 skips; full Python discovery reported 1,097 methods,
+`OK (skipped=181)`, including class-setup skips. Independent review approved this
+diagnostic-only patch. No new Windows execution, timeout cause or cold-action
+qualification is claimed.

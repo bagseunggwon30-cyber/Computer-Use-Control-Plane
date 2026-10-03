@@ -60,9 +60,13 @@ validation restrictions, not a claim every name the historical binder accepts
 works identically. Native maximum-length and Unicode execution need Windows proof.
 
 Lock paths must be explicit absolute local paths with existing fixed-drive NTFS,
-non-reparse ancestry. ADS and DOS device leaves (including extensions and
-superscript COM/LPT aliases), ambiguous normalized paths and discovery filenames
-are rejected before lock creation. Root-to-leaf directory handles deny write and
+non-reparse ancestry. Existing 8.3 directory aliases are admitted only when each
+changed full directory prefix identifies the same retained native object as its
+Framework-expanded spelling. Both chains must have equal depth/root and an exact
+unchanged file leaf. Raw syntax is validated before any Framework normalization:
+empty/dot/dotdot components, slash separators, trailing dot/space, invalid Unicode,
+ADS and DOS device components (including extensions and superscript COM/LPT
+aliases), and discovery filenames are rejected before lock creation. Root-to-leaf directory handles deny write and
 delete sharing for the direct service's lifetime and are disposed on every
 partial acquisition/exit path. Existing create-new lock publication, exact
 original-byte plus native-file-identity cleanup, BOM/schema/owner/version fields
@@ -144,7 +148,7 @@ or retired by this patch. Retained historical sources/oracles still count toward
 final zero-PowerShell source and execution. Source-mode installation and the old
 optional/default direct surface remain open acceptance work.
 
-## Local freeze evidence and source accounting
+## Initial local freeze evidence and source accounting
 
 Independent static review found no remaining freeze blocker. Linux builds the
 net48 service and owned transport probe with zero warnings/errors. The actual
@@ -170,3 +174,73 @@ subtotals, not whole-repository totals. New portable links compile existing sour
 without double-counting it; generated JSON peer/request files are non-executable
 fixture inputs. No new hash-pinned raw fixture/manifest is introduced, and no
 PowerShell is concealed in strings or an alternate extension.
+
+## First owned Windows failure and retained-alias correction
+
+The first direct gate, run `37121668355` at public
+`968379e6eca731ff849fd554339601261c291584`, ran 17 direct methods and recorded ten
+failures. Every server-start failure had exactly
+`ArgumentException: direct lock path must not require normalization`; the normal
+runner TEMP prefix was `C:\Users\RUNNER~1`. Custom exchange, its hostile peers,
+and pre-lock refusal cases passed. This was a runtime path-admission defect, not
+an invalid temporary-directory fixture or a reason to widen a deadline.
+
+Framework explicitly expands existing short-name components even when the final
+file does not yet exist ([reference source](https://github.com/microsoft/referencesource/blob/main/mscorlib/system/io/path.cs#L597-L606)).
+The corrected admission splits and validates the supplied string before any
+`Path`/`DirectoryInfo` method can erase its spelling. It retains root-to-parent
+handles for the supplied spelling and each differing full expanded prefix,
+rejects reparses and non-NTFS components in both, and compares volume serial plus
+both native file-index fields. Case-only spelling differences also receive native
+identity proof. These are the documented
+[file identity fields](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information);
+NTFS [directory hard links are unavailable](https://learn.microsoft.com/en-us/windows/win32/fileio/hard-links-and-junctions).
+No separate long-path-name conversion is trusted as an ownership proof.
+
+The direct service now consumes the normalized path from that retained lease.
+It no longer computes an independent earlier path that could become stale before
+validation. Existing `serve` path handling, direct pipe spelling, isolated lock
+leaf, create-new publication, byte/identity cleanup, ACL and transport limits stay
+at their established boundaries. No directory is created, remapped or retried.
+
+The archive is 603,426 bytes, artifact `11274200014`, SHA-256
+`354fecd20d0f9730718490be9eee34ede172713643d02aa2d0a46e480eaab1ea`.
+All 755 extracted files matched the ZIP byte-for-byte. The frozen public and local
+`8fafca8cc4b59d86a34ee6674aaea88b97009afb` trees both equal
+`5fb9191301f91e585efe40c8c86c0f74b296f92c`. Package manifest entries match the
+captured build closure; its Program.cs/project hashes exactly match the Windows
+CRLF checkout of that local source. This comparison does not claim a locally
+rebuilt binary is identical to the Windows package.
+
+`tests/fixtures/legacy-helper/observed-direct-path/` retains the exact failed
+start record/stderr, complete direct-suite stderr and package manifest/closure.
+Its provenance manifest is itself hash-pinned. All six files are protected with
+`-text`; an actual Git checkout with CRLF conversion verifies every protected
+file and an unprotected converting control. The original failure remains failed
+and unqualified.
+
+New native regressions require a genuine distinct short alias, independently
+prove `samefile`, launch through each spelling, exercise health and an existing
+lock collision through the other spelling, refuse ancestor rename through both,
+and verify shutdown removes the one owned lock from both views. Raw lexical
+negatives are passed as strings to avoid Python pre-normalization. Junction
+refusal is checked through both directory spellings. The gate fails if it cannot
+obtain an actual alias; it does not count a no-op conversion as coverage. No
+filesystem setting is changed to provision aliases.
+
+The local linked host passes 117 action, 45 wire and 91 direct contracts. The
+staged portable gate runs 190 methods: 147 passed and 43 skipped. The net48
+service builds with zero warnings/errors. Full Python discovery runs 1,024 methods
+and returns `OK (skipped=197)` with no failure/error. All 16 direct
+Windows methods, including the two new methods, require a fresh actual Windows
+run of the repaired combined package. Local evidence retains the SDK/runtime and
+offline-cache limitations described above under `.migration-logs/direct-path-local/`.
+
+Canonical inventory at this repair base is 979,706 tracked PowerShell bytes,
+including retained tests and newly integrated provider fixtures. This correction
+changes zero PowerShell bytes and retires zero originals. Across
+changed runtime C# files the subtotal grows 1,830 bytes (18,358 to 20,188), and
+changed C#/Python tests grow 7,201 (23,355 to 30,556): 9,031 added executable source
+bytes. The six new retained raw/provenance fixtures add 19,850 non-executable
+bytes; these are included separately rather than hidden from total growth.
+These are changed-file subtotals, not whole-repository totals.

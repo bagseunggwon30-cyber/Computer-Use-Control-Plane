@@ -24,17 +24,20 @@ internal static class Program
     private static Provider provider;
     private static LegacyHelperActions actions;
     private static string title;
+    private static OwnedProviderProgress progress;
     private static int integer(object value) { return Convert.ToInt32(value, CultureInfo.InvariantCulture); }
     [STAThread] private static int Main(string[] args)
     {
         try
         {
             Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true });
-            if (Environment.OSVersion.Platform != PlatformID.Win32NT || args.Length != 3 || !new[] { "native", "uia", "ocr-file", "ocr-owned", "ocr-fallback", "ocr-retry" }.Contains(args[0]))
+            if (Environment.OSVersion.Platform != PlatformID.Win32NT || args.Length != 3 || !new[] { "native", "uia", "ocr-file", "ocr-owned", "ocr-fallback", "ocr-retry", "uia-cold" }.Contains(args[0]))
                 throw new ArgumentException("Windows fixed owned-fixture group, readiness path and owned process ID required");
             ready = Json.DeserializeObject(File.ReadAllText(args[1], Encoding.UTF8)) as IDictionary<string, object>;
             if (ready == null || !(bool)ready["helper_provider"] || !(bool)ready["desktop_interactive"] || integer(ready["pid"]) != int.Parse(args[2], CultureInfo.InvariantCulture)) throw new InvalidOperationException("Owned readiness mismatch");
             title = (string)ready["title"];
+            progress = new OwnedProviderProgress(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[1])), args[0] + "-progress.jsonl"), args[0], Json.Serialize);
+            progress.Emit("group.start");
             provider = new Provider(ready, Path.GetDirectoryName(Path.GetFullPath(args[1])), args[0]);
             actions = new LegacyHelperActions(provider, Process.GetCurrentProcess().Id, "owned-provider-probe", () => DateTime.UtcNow);
             switch (args[0])
@@ -61,6 +64,10 @@ internal static class Program
                     Run("uia-run-reused", "uia-find-fast", Map("Match", title, "Label", "Run 한글"));
                     Run("health-uia", "health");
                     break;
+                case "uia-cold":
+                    // First and only request in a fresh client process.
+                    Run("uia-run", "uia-find-fast", Map("Match", title, "Label", "Run 한글"));
+                    break;
                 case "ocr-file":
                     provider.ImageMode = "text"; Run("ocr-file-text", "ocr-screen-fast", Region());
                     provider.ImageMode = "blank"; Run("ocr-file-blank", "ocr-screen-fast", Region());
@@ -86,9 +93,11 @@ internal static class Program
                     Run("ocr-init-retry", "ocr-screen-fast", Region());
                     break;
             }
+            progress.Emit("group.end");
             return 0;
         }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }
+        finally { if (progress != null) progress.Dispose(); }
     }
     private static Dictionary<string, object> Region()
     {
@@ -97,24 +106,38 @@ internal static class Program
     }
     private static void Run(string name, string action, Dictionary<string, object> arguments = null)
     {
-        provider.Calls.Clear(); provider.Diagnostics.Clear();
+        provider.Calls.Clear(); provider.Diagnostics.Clear(); provider.ResetRequest();
+        progress.StartRequest(name);
+        progress.Emit("dispatch.start");
         object result = null, error = null;
         try { result = actions.Dispatch(action, arguments); }
         catch (Exception exception) { error = Map("type", exception.GetType().FullName, "detail", exception.ToString()); }
-        Console.WriteLine(Json.Serialize(Map("schema", "cucp.helper-provider-case/v1", "name", name, "pid", Process.GetCurrentProcess().Id, "action", action, "args", arguments,
+        progress.Emit("dispatch.end");
+        provider.CompleteDeferredDiagnostics();
+        progress.Emit("serialize.start");
+        string response = Json.Serialize(Map("schema", "cucp.helper-provider-case/v1", "name", name, "pid", Process.GetCurrentProcess().Id, "action", action, "args", arguments,
             "result", result, "error", error, "calls", provider.Calls, "diagnostics", provider.Diagnostics,
-            "state", Map("request_count", actions.RequestCount, "win32_loaded", actions.Win32Loaded, "uia_loaded", actions.UiaLoaded, "ocr_warm", actions.OcrWarm))));
+            "state", Map("request_count", actions.RequestCount, "win32_loaded", actions.Win32Loaded, "uia_loaded", actions.UiaLoaded, "ocr_warm", actions.OcrWarm)));
+        progress.Emit("serialize.end");
+        progress.Emit("write.start");
+        Console.WriteLine(response);
+        progress.Emit("write.end");
+        progress.FinishRequest();
     }
     private sealed class Provider : ILegacyHelperProvider
     {
         private readonly WindowsLegacyHelperProvider real = new WindowsLegacyHelperProvider();
         private readonly IDictionary<string, object> owned;
         private readonly string evidenceDirectory, group;
-        private int imageCount;
+        private int imageCount, scannedNames;
+        private bool subtreeReturned;
+        private readonly bool deferDiagnostics;
+        private object deferredElements;
+        internal void ResetRequest() { scannedNames = 0; subtreeReturned = false; }
         private readonly Dictionary<object, int> identities = new Dictionary<object, int>(new IdentityComparer());
         internal readonly List<object> Calls = new List<object>(), Diagnostics = new List<object>();
         internal string ImageMode, EngineMode;
-        internal Provider(IDictionary<string, object> fixture, string directory, string caseGroup) { owned = fixture; evidenceDirectory = directory; group = caseGroup; VerifyOwner(); }
+        internal Provider(IDictionary<string, object> fixture, string directory, string caseGroup) { owned = fixture; evidenceDirectory = directory; group = caseGroup; deferDiagnostics = caseGroup == "uia-cold"; VerifyOwner(); }
         private void VerifyOwner()
         {
             uint pid; var hwnd = new IntPtr(Convert.ToInt64(owned["hwnd"]));
@@ -142,7 +165,7 @@ internal static class Program
                     {
                         // Negative dimensions throw in Bitmap before CopyFromScreen.
                         if (integer(arguments[2]) > 0 && integer(arguments[3]) > 0) VerifyPixels(arguments);
-                        result = real.Invoke(operation, arguments);
+                        result = ActualInvoke(operation, arguments);
                         if (integer(arguments[2]) > 0 && integer(arguments[3]) > 0) VerifyPixels(arguments);
                     }
                     var bytes = File.ReadAllBytes((string)arguments[4]);
@@ -152,41 +175,86 @@ internal static class Program
                     using (var sha = SHA256.Create()) record["image_sha256"] = BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
                     record["image_bytes"] = bytes.Length; record["image_artifact"] = artifact;
                 }
-                else result = real.Invoke(operation, arguments);
+                else result = ActualInvoke(operation, arguments);
+                if (operation == "uia.subtree") progress.Emit("evidence.start", operation);
                 record["actual_result"] = Snapshot(result);
                 if (operation == "ocr.createProfile" && EngineMode != null)
                 { record["source"] = "actual-provider-plus-explicit-profile-null-seam"; result = null; }
                 if (operation == "ocr.languages" && EngineMode == "no-language")
                 { record["source"] = "actual-provider-plus-explicit-empty-languages-seam"; result = new object[0]; }
                 record["result"] = Snapshot(result);
+                if (operation == "uia.subtree") progress.Emit("evidence.end", operation);
                 if (operation == "ocr.tempPath") VerifyTemp((string)result);
                 if (operation == "ocr.removeTemp") record["remaining_file"] = File.Exists((string)arguments[0]);
                 // Independent, read-only acquisition metadata is labeled separately.
                 // No identity/name/role/geometry is repaired or normalized.
-                if (operation == "uia.subtree") foreach (var element in ((IEnumerable)result).Cast<AutomationElement>())
+                if (operation == "uia.subtree")
                 {
-                    try
-                    {
-                        var current = element.Current; var bounds = current.BoundingRectangle;
-                        Diagnostics.Add(Map("element", Snapshot(element), "name", current.Name, "control_type", current.LocalizedControlType,
-                            "hwnd", current.NativeWindowHandle, "pid", current.ProcessId,
-                            "rect", Map("x", bounds.X, "y", bounds.Y, "w", bounds.Width, "h", bounds.Height)));
-                    }
-                    catch (Exception error)
-                    {
-                        // A side diagnostic cannot change the actual return value.
-                        // Its incomplete schema independently fails qualification.
-                        Diagnostics.Add(Map("element", Snapshot(element), "diagnostic_error", error.ToString()));
-                    }
+                    if (deferDiagnostics) deferredElements = result;
+                    else CaptureDiagnostics(result);
+                    subtreeReturned = true;
                 }
+                if (operation == "uia.name" && subtreeReturned && (++scannedNames == 1 || scannedNames % 128 == 0))
+                    progress.Emit("scan.progress", operation, scannedNames);
                 return result;
             }
             catch (Exception error) { record["error"] = Map("type", error.GetType().FullName, "detail", error.ToString()); throw; }
         }
+        internal void CompleteDeferredDiagnostics()
+        {
+            if (deferredElements == null) return;
+            // Called only after Dispatch returned and dispatch.end was flushed.
+            // No Current property from this independent diagnostic is read sooner.
+            CaptureDiagnostics(deferredElements); deferredElements = null;
+        }
+        private void CaptureDiagnostics(object elements)
+        {
+            progress.Emit("diagnostics.start", "uia.subtree");
+            int index = 0;
+            foreach (var element in ((IEnumerable)elements).Cast<AutomationElement>())
+            {
+                long started = Stopwatch.GetTimestamp();
+                try
+                {
+                    var current = element.Current; var bounds = current.BoundingRectangle;
+                    Diagnostics.Add(Map("element", Snapshot(element), "name", current.Name, "control_type", current.LocalizedControlType,
+                        "hwnd", current.NativeWindowHandle, "pid", current.ProcessId,
+                        "rect", Map("x", bounds.X, "y", bounds.Y, "w", bounds.Width, "h", bounds.Height)));
+                }
+                catch (Exception error)
+                {
+                    // Diagnostic errors remain separate from actual action output.
+                    Diagnostics.Add(Map("element", Snapshot(element), "diagnostic_error", error.ToString()));
+                }
+                finally { progress.DiagnosticTicks += Stopwatch.GetTimestamp() - started; }
+                if (++index % 128 == 0) progress.Emit("diagnostics.progress", "uia.subtree", index);
+            }
+            progress.Emit("diagnostics.end", "uia.subtree", index);
+        }
+        private object ActualInvoke(string operation, object[] arguments)
+        {
+            // Sparse phase records, not synchronous logging of every property.
+            // Aggregate every actual Invoke duration; never include diagnostics.
+            bool coarse = operation == "uia.load" || operation == "uia.loadModal"
+                || operation == "uia.root" || operation == "uia.children" || operation == "uia.subtree"
+                || operation.StartsWith("ocr.", StringComparison.Ordinal) || operation == "win32.ensure";
+            if (coarse) progress.Emit("acquire.start", operation);
+            long started = Stopwatch.GetTimestamp();
+            try { return real.Invoke(operation, arguments); }
+            finally
+            {
+                progress.ProviderTicks += Stopwatch.GetTimestamp() - started;
+                if (coarse) progress.Emit("acquire.end", operation);
+            }
+        }
         public void EnumerateWindows(Action<long> visit)
         {
             var handles = new List<long>(); var record = Map("operation", "win32.enumerate", "arguments", new object[0], "source", "actual-provider", "handles", handles); Calls.Add(record);
-            real.EnumerateWindows(hwnd => { if (handles.Count >= 4096) throw new LegacyHelperFixtureException("Window evidence limit exceeded"); handles.Add(hwnd); visit(hwnd); });
+            progress.Emit("acquire.start", "win32.enumerate");
+            try { real.EnumerateWindows(hwnd => { if (handles.Count >= 4096) throw new LegacyHelperFixtureException("Window evidence limit exceeded"); handles.Add(hwnd); visit(hwnd); }); }
+            finally { progress.Emit("acquire.end", "win32.enumerate"); }
+            // Enumeration's inclusive duration is shown by its markers rather
+            // than added again to ProviderTicks (callbacks contain Invoke calls).
         }
         private object Snapshot(object value)
         {

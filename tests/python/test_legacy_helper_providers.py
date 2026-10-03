@@ -167,7 +167,7 @@ class ProviderGateStructureTests(unittest.TestCase):
         self.assertIn('GetAncestor(WindowFromPoint(new Point(col, row)), 2) != hwnd',code)
     def test_actual_groups_continue_after_failure(self):
         code=(ROOT/'pcucp-next/packaging/qualify_legacy_helper_providers.py').read_text()
-        self.assertIn('for group in GROUPS:',code);self.assertIn('except Exception as error: failures.append(dict(group=group,error=str(error)))',code)
+        self.assertIn("for group in list(GROUPS)+['uia-cold']:",code);self.assertIn('except Exception as error: failures.append(dict(group=group,error=str(error)))',code)
         self.assertIn("same(closed,dict(input_events=0,invoke_events=0,value_events=0))",code)
     def test_empty_discovery_fails(self):
         with self.assertRaises(AssertionError):GATE.require_regressions(dict(stderr=b'Ran 0 tests in 0.001s\n\nOK\n'),False)

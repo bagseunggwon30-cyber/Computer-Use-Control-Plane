@@ -16,34 +16,45 @@ namespace PcuCp.LegacyHelper
         {
             try
             {
-                string root = Path.GetPathRoot(path);
-                if (root == null || root.Length != 3 || !Char.IsLetter(root[0]) || root[1] != ':' || root[2] != '\\')
-                    throw new ArgumentException("direct lock requires an explicit absolute local path");
+                string[] supplied = LegacyHelperDirect.LockPathParts(path);
+                string root = path.Substring(0, 3);
                 LockPath = Path.GetFullPath(path);
-                if (!String.Equals(path, LockPath, StringComparison.OrdinalIgnoreCase))
-                    throw new ArgumentException("direct lock path must not require normalization");
-                if (LockPath.IndexOf(':', 2) >= 0) throw new ArgumentException("direct lock must not use an alternate stream");
-                LegacyHelperDirect.LockLeaf(Path.GetFileName(LockPath));
+                string[] expanded = LegacyHelperDirect.LockPathParts(LockPath);
+                if (!String.Equals(root, LockPath.Substring(0, 3), StringComparison.OrdinalIgnoreCase) ||
+                    supplied.Length != expanded.Length ||
+                    !String.Equals(supplied[supplied.Length - 1], expanded[expanded.Length - 1], StringComparison.Ordinal))
+                    throw new ArgumentException("direct lock path must preserve its root, depth and file leaf");
                 if (GetDriveTypeW(root) != 3) throw new ArgumentException("direct lock requires local fixed NTFS");
-                var chain = new List<string>();
-                for (var directory = new DirectoryInfo(Path.GetDirectoryName(LockPath)); directory != null; directory = directory.Parent)
-                    chain.Add(directory.FullName);
-                chain.Reverse();
-                foreach (string directory in chain)
+                Retain(root);
+                string originalDirectory = root, expandedDirectory = root;
+                for (int i = 0; i < supplied.Length - 1; i++)
                 {
-                    var handle = CreateFileW(directory, 0x80000000u, 1, IntPtr.Zero, 3, 0x02000000u | 0x00200000u, IntPtr.Zero);
-                    if (handle.IsInvalid) { handle.Dispose(); throw new IOException("direct lock directory could not be retained"); }
-                    handles.Add(handle);
-                    FileIdentity identity;
-                    if (!GetFileInformationByHandle(handle, out identity) || (identity.Attributes & 0x10) == 0 || (identity.Attributes & 0x400) != 0)
-                        throw new IOException("direct lock directory must exist without reparse components");
-                    var fileSystem = new StringBuilder(32);
-                    if (!GetVolumeInformationByHandleW(handle, null, 0, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, fileSystem, fileSystem.Capacity) ||
-                        !String.Equals(fileSystem.ToString(), "NTFS", StringComparison.Ordinal))
-                        throw new IOException("direct lock directory requires NTFS");
+                    originalDirectory += (i == 0 ? "" : "\\") + supplied[i];
+                    expandedDirectory += (i == 0 ? "" : "\\") + expanded[i];
+                    FileIdentity original = Retain(originalDirectory);
+                    if (!String.Equals(originalDirectory, expandedDirectory, StringComparison.Ordinal))
+                    {
+                        FileIdentity canonical = Retain(expandedDirectory);
+                        if (original.VolumeSerial != canonical.VolumeSerial || original.IndexHigh != canonical.IndexHigh || original.IndexLow != canonical.IndexLow)
+                            throw new IOException("direct lock directory alias must identify the same retained object");
+                    }
                 }
             }
             catch { Dispose(); throw; }
+        }
+        private FileIdentity Retain(string directory)
+        {
+            var handle = CreateFileW(directory, 0x80000000u, 1, IntPtr.Zero, 3, 0x02000000u | 0x00200000u, IntPtr.Zero);
+            if (handle.IsInvalid) { handle.Dispose(); throw new IOException("direct lock directory could not be retained"); }
+            handles.Add(handle);
+            FileIdentity identity;
+            if (!GetFileInformationByHandle(handle, out identity) || (identity.Attributes & 0x10) == 0 || (identity.Attributes & 0x400) != 0)
+                throw new IOException("direct lock directory must exist without reparse components");
+            var fileSystem = new StringBuilder(32);
+            if (!GetVolumeInformationByHandleW(handle, null, 0, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, fileSystem, fileSystem.Capacity) ||
+                !String.Equals(fileSystem.ToString(), "NTFS", StringComparison.Ordinal))
+                throw new IOException("direct lock directory requires NTFS");
+            return identity;
         }
         public void Dispose()
         {
