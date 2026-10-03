@@ -19,7 +19,7 @@ OCR_CASE = 'ocr-success-truthiness-cache'
 ASSEMBLY_DIAGNOSTIC = re.compile(
     r'Cannot convert the "System.Threading.Tasks.Task`1\[CucpFixture.Windows.Storage.StorageFile\]" '
     r'value of type "System.Threading.Tasks.Task`1\[\[CucpFixture.Windows.Storage.StorageFile, '
-    r'(?P<assembly>[A-Za-z_][A-Za-z0-9_]{0,127}), Version=0\.0\.0\.0, Culture=neutral, PublicKeyToken=null\]\]" '
+    r'(?P<assembly>[A-Za-z0-9_]{1,128}), Version=0\.0\.0\.0, Culture=neutral, PublicKeyToken=null\]\]" '
     r'to type "System.Type"\.')
 
 

@@ -40,10 +40,13 @@ def main(argv=None):
         run(['dotnet','build',project,'-c','Release','-warnaserror','-m:1','-p:UseSharedCompilation=false'],'startup-probe-build')
         run([sys.executable,ROOT/'pcucp-next/packaging/collect_staged_helper_startup.py','--probe',
              project.parent/'bin/Release/net48/LegacyHelperStartupProbe.exe','--log-dir',args.log_dir], 'startup-observations')
-    patterns=['test_legacy_helper_package.py','test_legacy_helper_runtime.py','test_legacy_helper_client.py']
-    if args.autostart: patterns.append('test_legacy_helper_autostart*.py')
-    for pattern in patterns:
-        run([sys.executable,'-m','unittest','discover','-s','tests/python','-p',pattern,'-v'],pattern)
+    suites=[('test_helper_process_evidence.py','evidence-collector-tests'),
+            ('test_legacy_helper_package.py','helper-package-tests'),
+            ('test_legacy_helper_runtime.py','helper-runtime-tests'),
+            ('test_legacy_helper_client.py','helper-client-tests')]
+    if args.autostart: suites.append(('test_legacy_helper_autostart*.py','helper-autostart-tests'))
+    for pattern,label in suites:
+        run([sys.executable,'-m','unittest','discover','-s','tests/python','-p',pattern,'-v'],label)
     return 0
 
 if __name__=='__main__': raise SystemExit(main())

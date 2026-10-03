@@ -29,6 +29,17 @@ STRESS_SEGMENT = '한글 space %CUCP_CAPTURE_EXPANSION% !bang! ^ & (round)'
 DEFAULT_IDLE = 28800000
 
 
+def assert_argument_pair(test, captured, control, expected, executable):
+    # Entire raw vectors must agree, including the venv redirector's index zero.
+    test.assertEqual(captured['original_argv'],control['original_argv'],(captured,control))
+    for record in (captured,control):
+        test.assertEqual(record['original_argv'][1:],expected[1:],record)
+        test.assertEqual(record['argv'],expected[3:],record)
+        test.assertTrue(Path(record['executable']).samefile(executable),record)
+        test.assertEqual(record['ignore_environment'],1)
+        test.assertEqual(record['no_user_site'],1)
+
+
 class AutostartLaunchFixtureTests(unittest.TestCase):
     def run_bounded_fixture(self, root, source, *, timeout=20):
         # Exercise the same collector used by the native driver, against only
@@ -88,6 +99,50 @@ class AutostartLaunchFixtureTests(unittest.TestCase):
             self.assertFalse(result['timed_out'])
             with self.assertRaises(AssertionError):
                 fixture._evidence_helper().require_success(result)
+
+    def test_pair_comparison_keeps_index_zero_tail_flags_and_executable_identity_strict(self):
+        import copy
+        with tempfile.TemporaryDirectory(prefix='cucp-autostart-paired-proof-') as temporary:
+            root=Path(temporary);exe=root/'owned-python.exe';exe.write_bytes(b'inert')
+            other=root/'other.exe';other.write_bytes(b'inert')
+            expected=[str(exe),'-E','-s',str(root/'inert.py'),'--staged-unqualified','--idle-timeout-ms','12345']
+            record=dict(original_argv=['observed-base-interpreter.exe',*expected[1:]],argv=expected[3:],
+                        executable=str(exe),ignore_environment=1,no_user_site=1)
+            assert_argument_pair(self,record,copy.deepcopy(record),expected,exe)
+            for field,value in [('original_argv',['different-base.exe',*expected[1:]]),
+                                ('original_argv',[record['original_argv'][0],'-I',*expected[2:]]),
+                                ('argv',expected[3:]+['extra']),('executable',str(other)),
+                                ('ignore_environment',0),('no_user_site',0)]:
+                changed=copy.deepcopy(record);changed[field]=value
+                for first,second in ((changed,record),(record,changed)):
+                    with self.subTest(field=field):
+                        with self.assertRaises(AssertionError): assert_argument_pair(self,first,second,expected,exe)
+
+    def test_original_venv_argument_mismatch_remains_exact_hash_pinned(self):
+        import hashlib
+        directory=ROOT/'tests/fixtures/legacy-helper'
+        raw_manifest=(directory/'observed-autostart-venv-manifest.json').read_bytes()
+        self.assertEqual(hashlib.sha256(raw_manifest).hexdigest(),'8bbbef74c211bd1fc89c4c6f188717a936de98a30ba5b34cb1b817aeedbabd7e')
+        manifest=json.loads(raw_manifest)
+        self.assertEqual(manifest['status'],'failed-test-expectation-unqualified')
+        for name,record in manifest['files'].items():
+            raw=(directory/name).read_bytes()
+            self.assertEqual(len(raw),record['bytes'])
+            self.assertEqual(hashlib.sha256(raw).hexdigest(),record['sha256'])
+            self.assertIn('tests/fixtures/legacy-helper/'+name+' -text',(ROOT/'.gitattributes').read_text())
+        request=json.loads((directory/'observed-autostart-venv-request.json').read_bytes())
+        captured=json.loads((directory/'observed-autostart-venv-capture.json').read_bytes())
+        self.assertNotEqual(captured['original_argv'][0],request['python_exe'])
+        self.assertEqual(captured['executable'],request['python_exe'])
+        self.assertEqual(captured['original_argv'][1:4],['-E','-s',request['bootstrap']])
+
+    def test_direct_control_command_is_closed_and_independent_of_capture(self):
+        spec=importlib.util.spec_from_file_location('owned_control_capture',FIXTURE)
+        fixture=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixture)
+        self.assertEqual(fixture._control_command('python.exe','inert.py',12345,True),
+                         ['python.exe','-E','-s','inert.py','--staged-unqualified','--idle-timeout-ms','12345','--allow-readonly-desktop'])
+        for idle,desktop in ((0,False),(-1,False),(True,False),(2**31,False),(12345,1),(12345,'true')):
+            with self.assertRaises(ValueError): fixture._control_command('python.exe','inert.py',idle,desktop)
 
     def test_inert_capture_records_full_interpreter_argv_and_exit(self):
         with tempfile.TemporaryDirectory(prefix='cucp-autostart-fixture-') as temporary:
@@ -190,14 +245,15 @@ class AutostartWindowsLaunchTests(unittest.TestCase):
         shim.relative_to(self.root)
         shim.parent.mkdir()
         shim.write_bytes(plan['shim'])
-        capture_output, driver_output = case / 'capture.json', case / 'driver.json'
+        capture_output, control_output, driver_output = case/'capture.json', case/'control.json', case/'driver.json'
         request = {
             'owned_root': str(self.root), 'shim': str(shim), 'bootstrap': str(bootstrap),
             'python_exe': str(self.python_exe), 'capture_output': str(capture_output),
             'driver_output': str(driver_output), 'codepage': codepage,
             'delayed_expansion': delayed_expansion, 'exit_code': exit_code,
             'extra_args': list(extra_args), 'inherited_errorlevel': inherited_errorlevel,
-            'command_extensions': command_extensions,
+            'command_extensions': command_extensions, 'control_output':str(control_output),
+            'idle_timeout_ms':DEFAULT_IDLE if idle_timeout_ms is None else idle_timeout_ms,'desktop':desktop,
         }
         request_path = case / 'request.json'
         request_path.write_text(json.dumps(request, ensure_ascii=True), encoding='utf-8')
@@ -209,7 +265,7 @@ class AutostartWindowsLaunchTests(unittest.TestCase):
             creationflags=subprocess.CREATE_NEW_CONSOLE,hide_window=True)
         # Preserve the inner command/capture records before any assertion or
         # TemporaryDirectory cleanup. Unexpected oversized data cannot pass.
-        for source, label in ((request_path,'request'),(capture_output,'capture'),(driver_output,'driver')):
+        for source, label in ((request_path,'request'),(capture_output,'capture'),(control_output,'control'),(driver_output,'driver')):
             if source.is_file():
                 with source.open('rb') as stream: raw=stream.read(262145)
                 Path(completed['evidence_path']).with_suffix('.'+label+'.json').write_bytes(raw[:262144])
@@ -222,6 +278,10 @@ class AutostartWindowsLaunchTests(unittest.TestCase):
         self.assertEqual(driver['returncode'], exit_code, driver)
         self.assertEqual(driver['before'], {'input': codepage, 'output': codepage}, driver)
         self.assertEqual(driver['after'], driver['before'], driver)
+        self.assertEqual(driver['after_control'],driver['after'],driver)
+        require_success(driver['control_command_evidence'],expected_exit=exit_code)
+        self.assertEqual(base64.b64decode(driver['control_command_evidence']['stdout_base64'],validate=True).strip(),b'legacy-helper-autostart-capture')
+        self.assertEqual(base64.b64decode(driver['control_command_evidence']['stderr_base64'],validate=True),b'')
         self.assertEqual(driver['stdout'].strip(), 'legacy-helper-autostart-capture', driver)
         self.assertEqual(driver['stderr'], '', driver)
         self.assertEqual(base64.b64decode(driver['stdout_base64'], validate=True).strip(),
@@ -229,16 +289,16 @@ class AutostartWindowsLaunchTests(unittest.TestCase):
         self.assertEqual(base64.b64decode(driver['stderr_base64'], validate=True), b'', driver)
         self.assertTrue(capture_output.is_file(), 'Synchronous bootstrap capture must exist on return')
         captured = json.loads(capture_output.read_text(encoding='utf-8'))
+        control = json.loads(control_output.read_text(encoding='utf-8'))
         expected = [str(self.python_exe), '-E', '-s', str(bootstrap), '--staged-unqualified',
                     '--idle-timeout-ms', str(DEFAULT_IDLE if idle_timeout_ms is None else idle_timeout_ms)]
         if desktop:
             expected.append('--allow-readonly-desktop')
         self.assertEqual(tuple(plan['command']), tuple(expected))
-        self.assertEqual(captured['original_argv'], expected, captured)
-        self.assertEqual(captured['argv'], expected[3:], captured)
-        self.assertTrue(Path(captured['executable']).samefile(self.python_exe))
-        self.assertEqual(captured['ignore_environment'], 1)
-        self.assertEqual(captured['no_user_site'], 1)
+        assert_argument_pair(self,captured,control,expected,self.python_exe)
+        self.assertEqual(control['exit_code'],exit_code)
+        self.assertEqual(control['console'],{'input':codepage,'output':codepage})
+        self.assertIsInstance(control['command_line'],str)
         self.assertEqual(captured['exit_code'], exit_code)
         self.assertEqual(captured['console'], {'input': 65001, 'output': 65001})
         self.assertIsInstance(captured['command_line'], str)

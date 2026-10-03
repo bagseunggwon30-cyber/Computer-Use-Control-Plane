@@ -596,3 +596,15 @@ failed concrete detached startup and wrapper start/bridge launch at the same
 commit. Production lifecycle qualification remains outstanding. The original
 startup/dispatch defects remain failed observations; helper retirement credit
 is still zero.
+
+
+## Next actual-provider gate
+
+The [owned actual-provider gate](legacy-helper-provider-qualification.md) now
+requires 31 Windows cases covering all six read actions, real WinRT OCR on
+generated files and the owned label region, exact working UIA controls, cache
+identity and bounded fallback/scan outcomes. It runs independently of historical
+oracle failures and preserves original-provider parity as unqualified. Runtime
+provider code, original bodies and production defaults are unchanged. The new
+local Linux build/validator results are preparation, not a Windows pass or
+retirement credit.

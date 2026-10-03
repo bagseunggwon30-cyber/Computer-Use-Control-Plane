@@ -18,3 +18,7 @@ tests/fixtures/legacy-helper/observed-staged-wrapper-launch.log.bin -text -diff
 tests/fixtures/legacy-helper/observed-staged-python-resolution.log.bin -text -diff
 # Exact malformed start envelope retains observed CRLF and formatting.
 tests/fixtures/legacy-helper/observed-staged-void-completion.stdout.bin -text -diff
+# Exact Windows venv capture data; preserve bytes, never executable source.
+tests/fixtures/legacy-helper/observed-autostart-venv-request.json -text
+tests/fixtures/legacy-helper/observed-autostart-venv-capture.json -text
+tests/fixtures/legacy-helper/observed-autostart-venv-driver.json -text

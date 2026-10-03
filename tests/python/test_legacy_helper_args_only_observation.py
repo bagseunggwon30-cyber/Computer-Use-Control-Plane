@@ -1,5 +1,6 @@
 """Historical permutations are observations; functional order remains strict."""
 import copy
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -19,8 +20,9 @@ class HelperArgsOnlyObservationTests(unittest.TestCase):
         self.source.write_bytes(published_source('scripts/cucp-helper-server.ps1', self.root))
         self.cases = {case['id']: case for case in cases()}
 
-    def record(self, data):
-        raw = json.dumps(data, ensure_ascii=True).encode()
+    def record(self, data, *, raw=None):
+        if raw is None:
+            raw = json.dumps(data, ensure_ascii=True).encode()
         result = dict(running=False, exit_code=0, launch_error=None, timed_out=False, kill_error=None,
                       drain_incomplete=False, stdin_error=None, read_errors={},
                       truncated={'stdout': False, 'stderr': False}, stdout=raw, stderr=b'',
@@ -146,6 +148,43 @@ class HelperArgsOnlyObservationTests(unittest.TestCase):
         with self.assertRaises(AssertionError): classify_args_only_actions(record, case=case, source=self.source)
         self.source.write_bytes(self.source.read_bytes() + b'\n')
         with self.assertRaises(AssertionError): self.classify('focused-partial')
+
+    def test_observed_digit_initial_generated_assembly_retains_exact_raw_evidence(self):
+        # Actual PS5 Add-Type assembly name at run 37118214314 was 0txnh5uz.
+        # An assembly's generated name is not a C# source identifier.
+        from helper_args_only_observation import OBSERVATIONS
+        raw = (OBSERVATIONS / 'ocr-digit-assembly-37118214314.stdout.bin').read_bytes()
+        self.assertEqual(len(raw), 21879)
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),
+                         '3c5eed183dff3c150a7e452d4b8f12db08f52ec9861e51e7c30b7fb7f92487bb')
+        record = self.record(None, raw=raw)
+        value = classify_args_only_actions(record, case=self.cases['ocr-success-truthiness-cache'], source=self.source)
+        self.assertTrue(value['exact_recorded_match'])
+        self.assertFalse(value['args_only_qualified'])
+        self.assertEqual(value['qualification'], 'not-functional-qualification')
+        self.assertEqual(record['stdout'], raw)
+        self.assertEqual(Path(record['evidence_path']).with_suffix('.stdout.bin').read_bytes(), raw)
+
+    def test_generated_assembly_boundary_is_bounded_ascii_and_same_identity(self):
+        from helper_args_only_observation import ASSEMBLY_DIAGNOSTIC
+        case_id = 'ocr-success-truthiness-cache'
+        baseline = retained_args_only(self.cases[case_id])[0]
+        def renamed(name):
+            changed = copy.deepcopy(baseline)
+            for response in changed['responses']:
+                detail = response['result']['detail']
+                match = ASSEMBLY_DIAGNOSTIC.fullmatch(detail)
+                response['result']['detail'] = detail[:match.start('assembly')] + name + detail[match.end('assembly'):]
+            return changed
+        for name in [str(i) + 'owned123' for i in range(10)] + ['0' * 128]:
+            with self.subTest(accepted=name):
+                self.assertTrue(self.classify(case_id, renamed(name))['exact_recorded_match'])
+        for name in ['', '0' * 129, '0 owned', '0\nowned', '0,owned', '0.owned', '0/owned', '0한글']:
+            with self.subTest(rejected=name), self.assertRaises(AssertionError):
+                self.classify(case_id, renamed(name))
+        changed = renamed('0owned123')
+        changed['responses'][1]['result']['detail'] = changed['responses'][1]['result']['detail'].replace('0owned123', '1owned123')
+        with self.assertRaises(AssertionError): self.classify(case_id, changed)
 
     def test_generated_path_alias_controls_and_length_do_not_hide_distinctness(self):
         case_id = 'ocr-success-truthiness-cache'

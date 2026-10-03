@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import time
 
 
 OWNERSHIP = 'owned-temporary-autostart-launch-fixture/v1'
@@ -38,6 +39,15 @@ def _run_bounded_command(command, *, directory, cwd=None, env=None, timeout=20):
         command, directory=directory, label='autostart-inner-command', cwd=cwd,
         env=env, timeout=timeout, limit=STREAM_LIMIT,
     )
+
+
+def _control_command(python_exe, bootstrap, idle_timeout_ms, desktop):
+    # Independent direct launch uses only the same fixed, validated fixture argv.
+    if type(idle_timeout_ms) is not int or not 0<idle_timeout_ms<=2147483647 or type(desktop) is not bool:
+        raise ValueError('Invalid direct-control fixture arguments')
+    command=[str(python_exe),'-E','-s',str(bootstrap),'--staged-unqualified','--idle-timeout-ms',str(idle_timeout_ms)]
+    if desktop: command.append('--allow-readonly-desktop')
+    return command
 
 
 def _write_json(path, value):
@@ -119,12 +129,13 @@ def drive(request_path):
     bootstrap = owned_path('bootstrap', exists=True)
     python_exe = owned_path('python_exe', exists=True)
     output = owned_path('capture_output')
+    control_output = owned_path('control_output')
     report_path = owned_path('driver_output')
     if shim.name != 'cucp-helper-autostart.cmd' or python_exe.name.lower() != 'python.exe':
         raise RuntimeError('Unexpected fixture launch target')
     if bootstrap.read_bytes() != Path(__file__).read_bytes():
         raise RuntimeError('Bootstrap must be an exact copy of this inert capture fixture')
-    if output.exists() or report_path.exists():
+    if output.exists() or control_output.exists() or report_path.exists():
         raise RuntimeError('Fixture outputs must not already exist')
 
     kernel = _kernel()
@@ -155,6 +166,7 @@ def drive(request_path):
     ):
         raise RuntimeError('Unexpected fixture caller arguments')
 
+    direct_command=_control_command(python_exe,bootstrap,request['idle_timeout_ms'],request['desktop'])
     report = {
         'schema': 'cucp.helper-autostart-launch-driver/v1',
         'owned_console': True,
@@ -188,6 +200,7 @@ def drive(request_path):
         # safe for this specific tail; never use this for arbitrary cmd strings.
         # cwd carries the fixture's %, ! and Unicode without caller expansion.
         command = [str(cmd), '/d', f'/e:{extensions}', '/s', f'/v:{delayed}', '/c', shim.name, *extra]
+        deadline=time.monotonic()+20
         completed = _run_bounded_command(
             command, directory=report_path.parent / 'inner-command-evidence',
             cwd=shim.parent, env=environment,
@@ -205,6 +218,17 @@ def drive(request_path):
         }
         report['after'] = _codepages(kernel)
         _evidence_helper().require_success(completed, expected_exit=int(request['exit_code']))
+        # Windows venv redirectors may rewrite original_argv[0] to their base
+        # interpreter. Capture an independent direct invocation, never normalize
+        # the generated launch or assume index zero equals sys.executable.
+        remaining=deadline-time.monotonic()
+        if remaining<=0: raise TimeoutError('Combined fixture deadline exhausted before direct control')
+        control_environment=dict(environment);control_environment[OUTPUT_ENV]=str(control_output)
+        control=_run_bounded_command(direct_command,directory=report_path.parent/'direct-control-evidence',
+            cwd=shim.parent,env=control_environment,timeout=remaining)
+        report['control_command_evidence']={key:value for key,value in control.items() if key not in {'stdout','stderr'}}
+        report['after_control']=_codepages(kernel)
+        _evidence_helper().require_success(control,expected_exit=int(request['exit_code']))
     except Exception as exc:
         report['error'] = f'{type(exc).__name__}: {exc}'
         report['after'] = _codepages(kernel)

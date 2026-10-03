@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Isolated legacy helper candidate gate. Never promotes adapters or touches a desktop."""
+"""Isolated helper gate. Windows mode additionally observes a newly owned fixture."""
 from __future__ import annotations
 import argparse
 import os
@@ -31,20 +31,32 @@ def main(argv=None):
         print(result['stdout'].decode('utf-8', errors='replace')[-16384:], end='', flush=True)
         print(result['stderr'].decode('utf-8', errors='replace')[-16384:], end='', file=sys.stderr, flush=True)
         require_success(result)
-    contracts = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyHelper.ContractTests'
-    run(['dotnet', 'build', str(contracts), '-c', 'Release', '-warnaserror', '-m:1', '-p:UseSharedCompilation=false'])
-    env['CUCP_LEGACY_HELPER_CONTRACT_HOST'] = str(contracts / 'bin/Release/net8.0/PcuCp.LegacyHelper.ContractTests.dll')
-    run(['dotnet', env['CUCP_LEGACY_HELPER_CONTRACT_HOST'], '--self-test'])
-    if args.windows:
-        host = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyHelper'
-        probe = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyHelper.TransportTests'
-        run(['dotnet', 'build', str(probe), '-c', 'Release', '-warnaserror', '-m:1', '-p:UseSharedCompilation=false'])
-        run(['dotnet', 'build', str(ROOT / 'pcucp-next/dotnet/PcuCp.LegacyHelper.OracleFixtures'), '-c', 'Release', '-warnaserror', '-m:1', '-p:UseSharedCompilation=false'])
-        env['CUCP_LEGACY_HELPER_TEST_HOST'] = str(host / 'bin/Release/net48/PcuCp.LegacyHelper.exe')
-        env['CUCP_LEGACY_HELPER_TRANSPORT_PROBE'] = str(probe / 'bin/Release/net48/PcuCp.LegacyHelper.TransportTests.exe')
-        env['CUCP_REQUIRE_HELPER_ORACLE'] = '1'
-    run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests/python', '-p', 'test_helper_process_evidence.py', '-v'])
-    run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests/python', '-p', 'test_legacy_helper*.py', '-v'], timeout=300)
+    # Run independent actual-provider work first, before any historical oracle
+    # setup. One gate's build, execution or assertion failure cannot suppress the
+    # other gate's raw evidence.
+    failures = []
+    try:
+        run([sys.executable, str(ROOT / 'pcucp-next/packaging/qualify_legacy_helper_providers.py'),
+             *(['--windows'] if args.windows else []), '--log-dir', str(logs / 'actual-providers')], timeout=1500)
+    except Exception as error: failures.append(str(error))
+    try:
+        contracts = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyHelper.ContractTests'
+        run(['dotnet', 'build', str(contracts), '-c', 'Release', '-warnaserror', '-m:1', '-p:UseSharedCompilation=false'])
+        env['CUCP_LEGACY_HELPER_CONTRACT_HOST'] = str(contracts / 'bin/Release/net8.0/PcuCp.LegacyHelper.ContractTests.dll')
+        run(['dotnet', env['CUCP_LEGACY_HELPER_CONTRACT_HOST'], '--self-test'])
+        if args.windows:
+            host = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyHelper'
+            probe = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyHelper.TransportTests'
+            run(['dotnet', 'build', str(probe), '-c', 'Release', '-warnaserror', '-m:1', '-p:UseSharedCompilation=false'])
+            run(['dotnet', 'build', str(ROOT / 'pcucp-next/dotnet/PcuCp.LegacyHelper.OracleFixtures'), '-c', 'Release', '-warnaserror', '-m:1', '-p:UseSharedCompilation=false'])
+            env['CUCP_LEGACY_HELPER_TEST_HOST'] = str(host / 'bin/Release/net48/PcuCp.LegacyHelper.exe')
+            env['CUCP_LEGACY_HELPER_TRANSPORT_PROBE'] = str(probe / 'bin/Release/net48/PcuCp.LegacyHelper.TransportTests.exe')
+            env['CUCP_REQUIRE_HELPER_ORACLE'] = '1'
+        for pattern, timeout in [('test_helper_process_evidence.py', 120), ('test_legacy_helper*.py', 300)]:
+            try: run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests/python', '-p', pattern, '-v'], timeout=timeout)
+            except Exception as error: failures.append(str(error))
+    except Exception as error: failures.append(str(error))
+    if failures: raise AssertionError('Independent helper gates failed: ' + '\n'.join(failures))
     return 0
 
 

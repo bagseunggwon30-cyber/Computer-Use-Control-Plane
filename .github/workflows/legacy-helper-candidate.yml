@@ -6,9 +6,10 @@ on:
     paths:
       - 'pcucp-next/dotnet/PcuCp.LegacyHelper*/**'
       - 'pcucp-next/python/pcucp_cli/legacy_helper_client.py'
-      - 'pcucp-next/packaging/qualify_legacy_helper.py'
+      - 'pcucp-next/packaging/qualify_legacy_helper*.py'
       - 'tests/fixtures/legacy-helper*/**'
       - 'tests/fixtures/legacy-helper*.ps1'
+      - 'tests/fixtures/legacy-observation-owned-window/**'
       - 'tests/python/*helper*.py'
       - '.github/workflows/legacy-helper-candidate.yml'
 permissions:
@@ -20,6 +21,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,7 +35,7 @@ jobs:
       - name: Portable contracts and failure evidence
         if: runner.os != 'Windows'
         run: python pcucp-next/packaging/qualify_legacy_helper.py --log-dir .migration-logs/helper-candidate
-      - name: Owned Windows pipe and exact published oracle
+      - name: Owned Windows providers, pipe and retained published oracle
         if: runner.os == 'Windows'
         run: python pcucp-next/packaging/qualify_legacy_helper.py --windows --log-dir .migration-logs/helper-candidate
       - uses: actions/upload-artifact@v4

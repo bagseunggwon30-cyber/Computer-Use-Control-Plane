@@ -9,11 +9,20 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import threading
 import time
 import uuid
+
+
+def validate_evidence_label(label):
+    # Portable artifact basename, also accepted by Windows and CI upload tools.
+    # No suffixes/dots: Path.with_suffix must preserve the UUID in every record.
+    if not isinstance(label,str) or re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,119}',label) is None:
+        raise ValueError('Evidence label must be 1-120 ASCII letters/digits/hyphens/underscores, starting alphanumeric')
+    return label
 
 
 class OwnedProcess:
@@ -104,6 +113,7 @@ class OwnedProcess:
 
     def snapshot(self, directory, label, *, timed_out=False, kill_error=None):
         """Persist currently available prefixes without waiting or killing."""
+        validate_evidence_label(label)
         with self.guard:
             raw = {name: bytes(value) for name, value in self.buffers.items()}
             result = dict(argv=self.argv, creationflags=self.creationflags, hide_window=self.hide_window, exit_code=self.process.poll() if self.process else None,
@@ -126,6 +136,7 @@ class OwnedProcess:
 
 
 def run_evidence(argv, *, directory, label, cwd=None, env=None, input_bytes=None, timeout=30, limit=262144, creationflags=0, hide_window=False):
+    validate_evidence_label(label)  # Reject before Popen, not after a completed run.
     return OwnedProcess(argv, cwd=cwd, env=env, input_bytes=input_bytes, limit=limit, creationflags=creationflags, hide_window=hide_window).finish(directory, label, timeout=timeout)
 
 

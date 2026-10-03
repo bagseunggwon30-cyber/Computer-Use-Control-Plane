@@ -229,3 +229,47 @@ bounded reproduction records `System.IO.IOException: Read-only file system`
 for the default `/home/agent/.dotnet` first-use directory. No system directory
 was changed. Local logs retain both the failed setup probe and the corrected
 full run under `.migration-logs/autostart-local/`.
+
+## First Windows autostart observation and test-evidence repair
+
+Public `76df50689a3ad2f6315063f1bec7f0a5cb6a524d`, staged run `37118214323`,
+failed before qualification. The runner used the unittest discovery wildcard
+`test_legacy_helper_autostart*.py` as a filename label. Linux executed 49 methods
+(31 pass, 18 skip) but artifact upload rejected the star; Windows rejected the
+snapshot filename after execution, losing suite-level stdout/result. Individual
+Windows records survive in artifact SHA-256
+`0ca3b50e08e8d74f312b865a6cc716876b4a0aebf39f765834cebfc588a451da`.
+No missing suite evidence is treated as success.
+
+The repair separates unchanged discovery patterns from fixed ASCII evidence
+labels. `run_evidence` rejects invalid labels before launching; direct
+`OwnedProcess` callers still validate at snapshot time, not constructor time.
+Labels exclude dots as well as path/glob/control characters, so suffix handling
+cannot discard the random identifier. Portable tests prove pre-launch rejection,
+unique complete repeated evidence and unchanged discovery/deadline/output bounds.
+
+Review of all 26 saved launch records found a separate assertion mismatch:
+Windows' venv redirector exposes the base interpreter as `sys.orig_argv[0]`,
+while `sys.executable` identifies the requested temporary venv executable.
+The original representative request/capture/driver bytes are now hash-pinned in
+`observed-autostart-venv-manifest.json`. Their argument-zero mismatch remains an
+explicit failed test observation, not normalized success. Saved driver/bridge
+outcomes do not establish that the other unrecorded suite assertions passed.
+
+Each new launch case also executes an independent direct invocation of that same
+owned venv and inert fixture with the intended fixed argv. It compares **both
+full original_argv vectors including index zero**, checks each exact intended
+argv tail, interpreter flags and `sys.executable` file identity, and retains both
+raw records and command lines. No argument is ignored or filtered. The CMD and
+direct control share the original combined 20-second inner budget; the 40-second
+outer bound and all previous codepage/exit/authority checks remain. Portable
+negative tests reject mismatched index zero, changed arguments/flags and a
+wrong executable. Actual paired Windows execution is still required.
+
+Repair-local validation: the portable staged gate passes 168 methods (141 passed,
+27 skipped), including nine evidence-collector methods and 52 autostart methods
+(34 passed, 18 native skips). SDK-enabled full discovery passes 944 methods:
+765 passed, 179 individual skips plus two setup skips. The same workspace-local
+cache/offline-source and .NET10 Major roll-forward caveats above apply. Canonical
+inventory remains 966,975 PowerShell bytes on the combined 728537e base; this
+fixture repair changes zero PowerShell source bytes and earns zero retirement.

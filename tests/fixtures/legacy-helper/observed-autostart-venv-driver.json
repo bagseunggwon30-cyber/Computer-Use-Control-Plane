@@ -1,0 +1,53 @@
+{
+  "schema": "cucp.helper-autostart-launch-driver/v1",
+  "owned_console": true,
+  "original_console": {
+    "input": 437,
+    "output": 437
+  },
+  "returncode": 0,
+  "before": {
+    "input": 437,
+    "output": 437
+  },
+  "after": {
+    "input": 437,
+    "output": 437
+  },
+  "stdout": "legacy-helper-autostart-capture\r\n",
+  "stderr": "",
+  "error": null,
+  "stdout_base64": "bGVnYWN5LWhlbHBlci1hdXRvc3RhcnQtY2FwdHVyZQ0K",
+  "stderr_base64": "",
+  "command_evidence": {
+    "argv": [
+      "C:\\Windows\\System32\\cmd.exe",
+      "/d",
+      "/e:on",
+      "/s",
+      "/v:off",
+      "/c",
+      "cucp-helper-autostart.cmd"
+    ],
+    "creationflags": 0,
+    "hide_window": false,
+    "exit_code": 0,
+    "timed_out": false,
+    "running": false,
+    "launch_error": null,
+    "kill_error": null,
+    "drain_incomplete": false,
+    "elapsed_ms": 125,
+    "stdin_error": null,
+    "read_errors": {},
+    "bytes_observed": {
+      "stdout": 33,
+      "stderr": 0
+    },
+    "truncated": {
+      "stdout": false,
+      "stderr": false
+    },
+    "evidence_path": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\cucp-autostart-launch-mnefpu_l\\case-1\\inner-command-evidence\\autostart-inner-command-88785d49997a.json"
+  }
+}

@@ -1,5 +1,30 @@
 # Helper functional-intent qualification, candidate only
 
+## Generated assembly-name observation at 76df5068
+
+Windows run `37118214314` at `76df50689a3ad2f6315063f1bec7f0a5cb6a524d`
+reported one historical Args-only classifier failure: the actual PS5-generated
+assembly name was `0txnh5uz`. The classifier had incorrectly required an initial
+letter/underscore as though the assembly name were a C# source identifier. The
+complete Task-to-Type error, both responses, paths, acquisition/effect trace and
+source seams were otherwise unchanged. No functional comparison failed in that
+run, but the overall gate remains failed and requires fresh qualification.
+
+The raw 21,879-byte observation is retained separately as
+`tests/fixtures/legacy-helper/observed-args-only/ocr-digit-assembly-37118214314.stdout.bin`,
+SHA-256 `3c5eed183dff3c150a7e452d4b8f12db08f52ec9861e51e7c30b7fb7f92487bb`.
+It came from artifact `11272089122`, archive SHA-256
+`d8d1921f7fc8352fa0bdcc75d2a8f2dba77627f2ea2f9c928aeb4d7976065b41`.
+The original 18-record manifest and every original raw record remain unchanged.
+
+Only the generated assembly token now permits an ASCII digit in its first
+position, retaining the existing 1–128-character alphanumeric/underscore bound,
+the exact surrounding error, and one shared name across both responses. Tests
+replay the exact raw observation and cover each initial digit, length boundaries,
+invalid/control/Unicode separators and inconsistent names. No runtime/provider,
+functional output, diagnostic text outside that token, or qualification rule is
+relaxed. This classifier still labels the original OCR failure unqualified.
+
 This step corrects the oracle's intended working behavior after observing further
 defects in the published PowerShell bodies. It changes no runtime candidate,
 production caller, launcher, registration, user computer or original source.
@@ -218,3 +243,13 @@ The counted oracle adds 11,387 PowerShell bytes. Canonical total is 926,481 byte
 across 31 `.ps1` files on this isolated base, with runtime PowerShell unchanged at
 607,665 bytes. Raw JSON observation files are non-executable evidence and do not
 replace or hide a driver. No source retirement is credited.
+
+
+## Separate actual-provider qualification
+
+The [owned provider gate](legacy-helper-provider-qualification.md) extends
+qualification beyond the inert acquisition fixtures, with explicit candidate-only
+working-control expectations and actual WinRT OCR. It does not change the four
+functional correction sites, weaken original evidence or normalize the separate
+original/compiled UIA provider-identity discrepancy. Windows execution must pass
+before this new actual-provider layer is qualified.

@@ -1,0 +1,25 @@
+{
+  "schema": "cucp.autostart-venv-observation/v1",
+  "status": "failed-test-expectation-unqualified",
+  "public_commit": "76df50689a3ad2f6315063f1bec7f0a5cb6a524d",
+  "run_id": 37118214323,
+  "artifact_sha256": "0ca3b50e08e8d74f312b865a6cc716876b4a0aebf39f765834cebfc588a451da",
+  "observation": "Windows venv original_argv[0] differs from requested venv path; sys.executable matches it. Suite-level evidence was lost to invalid wildcard artifact name; no suite success inferred.",
+  "files": {
+    "observed-autostart-venv-request.json": {
+      "bytes": 1046,
+      "sha256": "f976c7c5af78357309f1828ea1edebc6838c4e0f925adf25d1f50c837da53bff",
+      "artifact_file": "autostart-launch-1-bac97331c95f.request.json"
+    },
+    "observed-autostart-venv-capture.json": {
+      "bytes": 1334,
+      "sha256": "9b34b2fd9e746554917f068c26226a8054358a667fb9dc1f989332473443aec1",
+      "artifact_file": "autostart-launch-1-bac97331c95f.capture.json"
+    },
+    "observed-autostart-venv-driver.json": {
+      "bytes": 1223,
+      "sha256": "edef58372bbc9cc4ddec9e6b7c96f9b22f981f7261efcd7125e4f8fa40dc7533",
+      "artifact_file": "autostart-launch-1-bac97331c95f.driver.json"
+    }
+  }
+}
