@@ -168,3 +168,21 @@ class HelperSourceTests(unittest.TestCase):
         self.assertIn("[ValidateSet('none','duplicate','changed')][string]$TestTypeExtentFault='none'", driver)
         self.assertIn("if($TestTypeExtentFault -eq 'duplicate')", driver)
         self.assertIn("else{$first.name='FixtureChangedType'}", driver)
+
+    def test_binding_probe_preserves_original_functions_and_trace_array_shape(self):
+        probe = (FIXTURES / 'binding-probe.ps1').read_text(encoding='utf-8')
+        self.assertIn("foreach($name in @('_Action-Health','_Dispatch'))", probe)
+        self.assertIn("Published server source hash mismatch", probe)
+        self.assertIn("Published AST extent changed:", probe)
+        self.assertIn('[scriptblock]::Create($node.Extent.Text)', probe)
+        self.assertNotIn('[scriptblock]::Create($node.Extent.Text.Replace', probe)
+        self.assertIn('param([hashtable]$Args)', probe)
+        self.assertIn('param([hashtable]$RequestData)', probe)
+        self.assertIn('fully_qualified_error_id=$_.FullyQualifiedErrorId', probe)
+        self.assertIn('script_stack_trace=(Limit-Text $_.ScriptStackTrace)', probe)
+        self.assertIn('[Math]::Min(2048,$Text.Length)', probe)
+        for forbidden in ('Add-Type', 'HelperWin32', 'AutomationElement', 'OcrEngine', 'Start-Process'):
+            self.assertNotIn(forbidden, probe)
+        driver = (FIXTURES / 'oracle.ps1').read_text(encoding='utf-8')
+        self.assertIn('[object[]]$trace=@([CucpFixture.HelperFixture]::Effects.ToArray())', driver)
+        self.assertNotIn('$trace=if(', driver)

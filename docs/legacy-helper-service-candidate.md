@@ -422,3 +422,66 @@ Windows-only skips. Full Python discovery passed 711 tests: 563 executed and
 or errors. The Linux SDK/runtime and Major roll-forward limitation above still
 apply. The new PowerShell 5.1 ordering and refusal paths have not yet executed
 locally; their mandatory Windows tests remain a qualification boundary.
+
+### Diagnostic-first binding investigation after the extent repair
+
+Windows run `37103102251` at published `3cbbaaad` reached all 18 action-oracle
+cases. Every recorded response contained the same `System.Object[]` to
+`System.Collections.Hashtable` conversion exception, with `request_count=0`,
+empty effects, and `calls={}`. No acquisition was reached. The subsequent
+candidate `Unplanned provider access` failures therefore do not establish a
+Win32/UIA loader-order defect. The no-request extent case independently exposed
+the incorrect empty trace JSON shape.
+
+The exact published dispatcher and six actions declare `[hashtable]$Args`.
+[PowerShell's automatic-variable documentation](https://learn.microsoft.com/en-us/powershell/module/Microsoft.PowerShell.Core/about/about_automatic_variables?view=powershell-5.1)
+and [the analyzer's automatic-variable rule](https://learn.microsoft.com/en-us/powershell/utility-modules/psscriptanalyzer/rules/avoidassignmenttoautomaticvariable?view=ps-modules)
+identify `$args` as engine-maintained. The current
+[PowerShell binder source](https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/scriptparameterbindercontroller.cs)
+binds named parameters before assigning the remaining-arguments object array to
+that same variable. This supports an automatic-variable collision hypothesis;
+it is not a new Windows PowerShell 5.1 observation by itself.
+
+`tests/fixtures/legacy-helper/binding-probe.ps1` imports only hash-verified,
+unchanged `_Action-Health` and `_Dispatch` definitions. It invokes health,
+shutdown, and unsupported requests, plus harmless automatic-`Args` and
+distinct-parameter controls. Literal hashtables and converted empty, populated,
+and nested JSON inputs isolate conversion from invocation. Thirty records retain
+input types/values, received and bound types when a control enters its body,
+entry/request counts, and bounded exception type, ErrorRecord type, FQID,
+invocation and stack information. A changed source must be rejected before
+import. The diagnostic runs no loader, OCR capture, UIA query or desktop action.
+Its Windows result is still pending; the original differential remains required
+and is expected to continue failing until this binding behavior is resolved.
+
+The relevant source-level loader comparison remains:
+
+| Boundary | Published PowerShell | Candidate and inert seam |
+| --- | --- | --- |
+| Win32 | Cache successful load; check existing assembly identity, resolve/check DLL path, then load; return false on failure | Action caches successful `win32.ensure`; real provider checks Windows and interop assembly identity; fixture records the attempt and uses case success/failure |
+| UIA find | Load UIAutomationClient, UIAutomationTypes, WindowsBase; cache only complete success | Action caches successful `uia.load`; real provider loads those three assemblies; fixture records the attempt and uses case success/failure |
+| Modal UIA | Attempt two UIAutomation assemblies with silent errors on each request; no UIA-find cache | `uia.loadModal` attempts both with caught failures; fixture records the corresponding boundary before Win32 |
+| OCR | Cache a created engine; initialize WinRT types, try profile language, then first available language; retain failure detail | Action/provider expose initialization and language calls; current inert seam covers explicit synthetic profile success or initialization failure |
+
+This comparison does not qualify static binding timing, assembly-load failure
+equivalence, or resource lifetime. Loader calls have not been added, reordered,
+or changed to satisfy the failed replay. The trace now uses an explicit object
+array so zero/one/many counts keep array shape. Portable checks reject a JSON
+object in place of that array, malformed or unknown calls, wrong argument counts,
+and incomplete response/dispatch counts before starting candidate replay. No
+invalid trace is normalized to an empty list. All original source pins, the
+52-site type substitution and 23-type assembly guard remain unchanged. No
+production candidate code or facade is changed in this diagnostic step.
+
+Local validation for this diagnostic step passed 117 action and 45 wire
+contracts. The helper gate reported 81 test methods: 57 passed, 24 individually
+skipped, zero failures or errors, and no class-setup skips. Five raw-evidence
+checks passed. Full Python discovery reported 749 test methods: 598 passed,
+151 individually skipped, zero failures or errors, plus two class-setup skips
+outside that method count. The printed `skipped=153` combines both skip kinds;
+counts here come from the verbose outcomes. The net48 service/probe build had
+zero warnings.
+The new 5,596-byte probe and 158-byte trace change add 5,754 counted PowerShell
+bytes: canonical total 907,688 on base `a3adb8c`. No helper source is retired.
+The safe binding observation and typed-array serialization still require the
+next Windows run; these local passes do not settle the binding hypothesis.

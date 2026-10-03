@@ -174,4 +174,7 @@ foreach($r in $c.requests){
   if($value -and $value.schema -eq 'cucp.health/v1'){$value.pid=123;$value.uptime_s=0}
   $exitValue=0;if($errorValue -or $value.status -eq 'error'){$exitValue=1}elseif($value.status -eq 'partial'){$exitValue=2}elseif($value.status -eq 'fallback_required'){$exitValue=99};[void]$results.Add(@{id=$r.id;exit_code=$exitValue;result=$value;error=$errorValue})
 }
-$trace=if($Stubs){@([CucpFixture.HelperFixture]::Effects)}else{@()};[Console]::Out.WriteLine((ConvertTo-Json -InputObject @{responses=@($results);effects=@($script:effects);calls=$trace;request_count=$Script:_RequestCount;oracle_seam=$seam} -Depth 50 -Compress))
+# Keep the collection as an array even at cardinality zero or one. An untyped
+# assignment from an if/pipeline loses the empty collection's JSON shape on PS5.
+[object[]]$trace=@([CucpFixture.HelperFixture]::Effects.ToArray())
+[Console]::Out.WriteLine((ConvertTo-Json -InputObject @{responses=@($results);effects=@($script:effects);calls=$trace;request_count=$Script:_RequestCount;oracle_seam=$seam} -Depth 50 -Compress))

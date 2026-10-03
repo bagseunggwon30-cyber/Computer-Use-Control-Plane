@@ -25,8 +25,10 @@ helper oracle adds 1,479 temporary counted bytes; neither earns accepted
 retirement credit from integration alone. Benchmark's original production
 body remains in place.
 
-Combined SDK-enabled Linux discovery passed 738 tests with 149 explicit
-platform/environment skips (589 executed). Inventory reproduction and
+Combined SDK-enabled Linux discovery ran 738 tests: 591 passed, 147 individual
+tests skipped, and zero failed. Two additional class-setup skips make the
+printed summary `OK (skipped=149)`; setup skips do not increment `testsRun`.
+Successful outcomes were counted directly. Inventory reproduction and
 `git diff --check` passed. The integrated publication selects `[full regression]`
 and the helper path-triggered Windows candidate workflow. Those new Windows
 and aggregate outcomes are pending; Linux results do not replace them.

@@ -117,3 +117,22 @@ used Major roll-forward for the net8-targeted portable contracts. Canonical
 PowerShell remains 902,990 bytes on this isolated base, unchanged by this patch.
 The independently prepared oracle extent repair may change that combined count;
 this ACL patch adds zero PowerShell bytes and no retirement credit.
+
+## Subsequent owned Windows qualification
+
+[Run 37103413691](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37103413691)
+at published commit `fa1c830e1142b89388551b9577f89dd46138d27f` passed
+the owned ACL probe's 27 checks and all service/transport methods. The retained
+`owned-acl-contracts-ace7704b1941` process record has exit 0, 1,832 stdout bytes,
+empty stderr, complete drains, and no timeout, launch error or truncation. The
+downloaded artifact archive SHA-256 is
+`c1ae8ec8771746424f5cba71ded90189fc52f55a6b5cbe6f33063dc3984b46c6`.
+
+On that runner, the old constructor's normalized readback had an unprotected DACL
+with Everyone and Anonymous read ACEs. The candidate's readback had the current
+user as owner, a protected canonical DACL, and exactly one ordinary current-user
+FullControl ACE. This observes the creation policy and same-user owned fixture
+path. It does not establish cross-principal, session, integrity or SMB behavior.
+The whole helper run remained failed because of the separate action-oracle
+argument-binding and empty-trace cardinality assertions; those failures do not
+erase the successful owned ACL evidence or qualify action parity.
