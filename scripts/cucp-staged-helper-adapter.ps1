@@ -17,7 +17,17 @@ function _Invoke-StagedHelper {
   if (-not $Script:StagedCompiledHelper) { throw 'Staged helper was not selected at startup.' }
   $bridge = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\pcucp-next\python\legacy_helper_bridge.py'))
   if (-not (Test-Path -LiteralPath $bridge -PathType Leaf)) { throw 'Staged helper bridge missing; no fallback.' }
-  $python = Get-Command python.exe -CommandType Application -ErrorAction Stop
+  # Same first-Application selection already qualified in the CDP/execution adapters.
+  # Never coerce multiple .Source values into one ProcessStartInfo.FileName.
+  $pythonCommands = @(Get-Command python.exe -CommandType Application -TotalCount 1 -ErrorAction Stop)
+  if ($pythonCommands.Count -ne 1) { throw 'Staged helper requires one Python application; no fallback.' }
+  $python = $pythonCommands[0]
+  if ($python -isnot [System.Management.Automation.ApplicationInfo] -or
+      $python.Source -isnot [string] -or [string]::IsNullOrWhiteSpace($python.Source) -or
+      -not [IO.Path]::IsPathRooted($python.Source) -or [IO.Path]::GetExtension($python.Source) -ine '.exe' -or
+      -not (Test-Path -LiteralPath $python.Source -PathType Leaf)) {
+    throw 'Staged helper Python application is invalid or missing; no fallback.'
+  }
   foreach ($path in @($bridge, $Script:HelperLockPath)) {
     if ($path.Contains('"') -or $path.Contains("`r") -or $path.Contains("`n") -or $path.EndsWith('\')) {
       throw 'Invalid staged helper bootstrap path.'

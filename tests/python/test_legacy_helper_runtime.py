@@ -201,6 +201,22 @@ class StagedWrapperStructureTests(unittest.TestCase):
         self.assertIn(b'Console.set_OutputEncoding',(fixtures/'observed-detached-startup.stderr.bin').read_bytes())
         self.assertIn(b'The system cannot find the file specified',(fixtures/'observed-staged-wrapper-launch.log.bin').read_bytes())
 
+    def test_multiple_application_failure_is_pinned_and_selection_pattern_shared(self):
+        fixtures=ROOT/'tests/fixtures/legacy-helper'
+        pin=json.loads((fixtures/'observed-staged-python-resolution.json').read_text())
+        raw=(fixtures/pin['raw_file']).read_bytes()
+        self.assertEqual(len(raw),pin['raw_bytes']);self.assertEqual(hashlib.sha256(raw).hexdigest(),pin['raw_sha256'])
+        record=pin['observed']
+        self.assertEqual(record['command_count'],2)
+        self.assertEqual(record['file_name'],' '.join(row['source'] for row in record['commands']))
+        self.assertTrue(all(row['command_type']=='Application' for row in record['commands']))
+        pattern='Get-Command python.exe -CommandType Application -TotalCount 1 -ErrorAction Stop'
+        self.assertIn(pattern,(ROOT/'scripts/cucp-staged-helper-adapter.ps1').read_text())
+        self.assertIn(pattern,(ROOT/'scripts/cucp-legacy-cdp-adapter.ps1').read_text(encoding='utf-8-sig'))
+        shared=(ROOT/'tests/cucp.LegacyRegression.Tests.ps1').read_text()
+        self.assertIn('actual staged helper bridge',shared)
+        self.assertIn('without discovering a replacement',shared)
+
     def test_service_encodes_streams_without_console_codepage_mutation(self):
         source=(ROOT/'pcucp-next/dotnet/PcuCp.LegacyHelper/Program.cs').read_text()
         self.assertNotIn('Console.OutputEncoding =',source)
@@ -208,9 +224,12 @@ class StagedWrapperStructureTests(unittest.TestCase):
         self.assertIn('Console.SetError(new StreamWriter(Console.OpenStandardError(), new UTF8Encoding(false))',source)
         self.assertIn('AutoFlush = true',source)
 
-    def test_failed_launch_metadata_preserves_original_resolution(self):
+    def test_failed_launch_metadata_uses_existing_first_application_pattern(self):
         source=(ROOT/'scripts/cucp-staged-helper-adapter.ps1').read_text()
-        self.assertIn('Get-Command python.exe -CommandType Application -ErrorAction Stop',source)
+        self.assertIn('Get-Command python.exe -CommandType Application -TotalCount 1 -ErrorAction Stop',source)
+        self.assertIn('$python = $pythonCommands[0]',source)
+        self.assertIn('$pythonCommands.Count -ne 1',source)
+        self.assertIn('[System.Management.Automation.ApplicationInfo]',source)
         self.assertIn('$psi.FileName = $python.Source',source)
         self.assertIn('STAGED HELPER LAUNCH RESOLUTION',source)
         self.assertIn('command_count=$commands.Count',source)
@@ -341,9 +360,20 @@ class StagedProductionWrapperWindowsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='cucp staged wrapper 한글 ') as root:
             root=Path(root)
             logs=Path(os.environ.get('CUCP_HELPER_EVIDENCE_DIR',root/'evidence'))
-            env=dict(os.environ,TEMP=str(root),TMP=str(root),CUCP_STAGED_COMPILED_HELPER='1')
+            # Owned metadata-only CLI fixture: the production wrapper may read
+            # it, but executing it writes a tripwire and exits 97. No real CLI,
+            # Node installation, or package installation is performed.
+            profile=root/'empty-profile';profile.mkdir()
+            cli_dir=root/'owned-cli/src';cli_dir.mkdir(parents=True)
+            cli=cli_dir/'cli.mjs';tripwire=root/'unexpected-cli-execution'
+            cli.write_text('// ControlPlane inert metadata fixture\nimport fs from "node:fs";\n'
+                +'fs.writeFileSync('+json.dumps(str(tripwire))+', "unexpected"); process.exit(97);\n',encoding='utf-8')
+            metadata=cli_dir.parent/'package.json'
+            metadata.write_text(json.dumps(dict(name='computer-use-control-plane',version='0.0.0')),encoding='utf-8')
+            env=dict(os.environ,TEMP=str(root),TMP=str(root),USERPROFILE=str(profile),
+                     CUCP_CLI_PATH=str(cli),CUCP_STAGED_COMPILED_HELPER='1')
             env.pop('CUCP_STAGED_HELPER_READONLY_DESKTOP',None)
-            def call(operation):
+            def call(operation, *, expected_exit=0):
                 evidence=run_evidence([shutil.which('powershell.exe'),'-NoProfile','-NonInteractive','-File',
                     str(ROOT/'tests/fixtures/legacy-helper-staged-wrapper.ps1'),'-Wrapper',str(ROOT/'scripts/cucp.ps1'),
                     '-Operation',operation],directory=logs,label='staged-wrapper-'+operation,cwd=ROOT,env=env,timeout=20)
@@ -355,15 +385,34 @@ class StagedProductionWrapperWindowsTests(unittest.TestCase):
                     log_path=Path(evidence['evidence_path']).with_suffix('.wrapper.log.bin')
                     log_path.write_bytes(raw_log[:65536])
                     if len(raw_log)>65536: self.fail('Owned wrapper log exceeded diagnostic bound')
-                require_success(evidence)
+                require_success(evidence,expected_exit=expected_exit)
                 return json.loads(evidence['stdout'].decode('utf-8-sig'))
             try:
                 started=call('start');self.assertEqual(started['status'],'ok');self.assertFalse(started['reused'])
                 status=call('status');self.assertTrue(status['alive']);self.assertEqual(started['pid'],status['pid'])
-                version=call('version');self.assertEqual(version['versions']['helper_server'],'2.0.0')
+                version=call('version')
+                self.assertEqual(version['schema'],'cucp.version/v1')
+                self.assertEqual(version['status'],'ok')
+                self.assertEqual(version['surface'],'wrapper+cli')
+                self.assertEqual(version['helper_mode'],'persistent_server')
+                self.assertEqual(version['versions']['cli'],'0.0.0')
+                self.assertEqual(version['versions']['helper_server'],'2.0.0')
+                self.assertEqual(version['recoverable_errors'],[])
+                self.assertFalse(tripwire.exists(),'Metadata-only CLI fixture was executed')
+                metadata.unlink()  # Only the package metadata created above.
+                partial=call('version',expected_exit=2)
+                self.assertEqual(partial['schema'],'cucp.version/v1')
+                self.assertEqual(partial['status'],'partial')
+                self.assertEqual(partial['surface'],'wrapper_only')
+                self.assertEqual(partial['helper_mode'],'persistent_server')
+                self.assertIsNone(partial['versions']['cli'])
+                self.assertEqual(partial['versions']['helper_server'],'2.0.0')
+                self.assertEqual(partial['recoverable_errors'],[dict(code='package_json_not_found',layer='cli',
+                    recommended_action='Set CUCP_CLI_PATH or run wrapper-only mode')])
                 stopped=call('stop');self.assertEqual(stopped['reason'],'shutdown_requested');self.assertFalse(stopped['forced'])
             finally:
                 # No PID-based termination, including after an assertion failure.
                 deadline=time.monotonic()+15
                 while list(root.rglob('helper-staged.pid')) and time.monotonic()<deadline: time.sleep(.05)
                 self.assertEqual(list(root.rglob('helper-staged.pid')),[], 'staged service did not clean its lock before recovery deadline')
+                self.assertFalse(tripwire.exists(),'Metadata-only CLI fixture was executed')

@@ -106,3 +106,64 @@ helper suite reported 169 methods, 135 passed and 34 skipped. The portable
 staged gate passed. Full Python discovery reported 847 methods and
 `OK (skipped=223)` (including class-setup skips). These are local checks, not a
 fresh Windows result for the repaired package or the unresolved wrapper launch.
+
+## Observed first-Application resolver repair
+
+[Windows run 37111873744](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37111873744)
+at `8f3cdde59d2d9574cfd036bab0b4c0bae0940c89` verified the repaired packaged
+service under detached startup: negative-one returns one, zero-idle returns zero,
+and concrete start/reuse/health/shutdown plus Unicode/CLI mode tests pass. The
+remaining actual wrapper failure has a distinct recorded cause: Get-Command
+returns two Application objects, the hosted Python and a WindowsApps alias, and
+assigning their enumerated Source values constructs one space-joined FileName.
+The exact log and structured observation are retained in
+`observed-staged-python-resolution.log.bin` and its adjacent JSON manifest.
+Artifact SHA-256 is
+`9843496ca05e284ba194f75abb5011f51ac4ad7a2daeca6c4e8062391afc6127`.
+
+The wrapper now uses the already qualified intrinsic selection pattern from
+`cucp-legacy-cdp-adapter.ps1` and the execution adapter:
+Get-Command with Application, TotalCount 1, and ErrorAction Stop. Discovery
+precedence is preserved; there is no new search path, test override, fallback to
+the second executable, or retry. The result must be exactly one ApplicationInfo
+with a scalar, nonempty, rooted, existing .exe Source before process creation.
+ApplicationInfo supplies the discovered path; IsPathRooted alone is not claimed
+to prove a fully qualified absolute path.
+This mirrors the CDP launch boundary and prevents invalid/disappeared selection
+from reaching string coercion or implicit resolution. Other launchers are not
+changed; the broader app-path resolver has different fallback semantics and is
+not reused.
+
+The shared duplicate-Python Pester regression now invokes this actual staged
+bridge with an inert rejected operation. It proves the selected Python reaches
+the real bridge regardless of package availability, without service or desktop
+acquisition. Additional shared tests reject empty, invalid/nonscalar, and
+simulated disappeared-first results before process construction and assert one
+discovery attempt, never replacement discovery. Existing full production-wrapper
+lifecycle tests remain mandatory. The local suite cannot execute those Windows
+checks; this resolver repair still requires a fresh Windows result.
+
+Local resolver checks: the helper suite passed 136 of 170 methods, with 34
+Windows/opt-in skips; the portable staged gate passed. Full Python discovery
+reported 848 methods and `OK (skipped=223)`. Independent source review found no
+blocking issue; the new Pester cases remain unrun locally. No C# service or
+provider code changed in this resolver repair.
+
+### Paired version fixture correction
+
+After nested exit-code propagation was fixed, the lifecycle fixture's unconditional
+version exit-zero expectation conflicted with an absent CLI: the unchanged
+Invoke-MacroVersion returns two for a partial report. The fixture now creates an
+owned metadata-only recognized cli.mjs and package.json under its temporary root.
+Its default version check still requires exit zero, status ok, wrapper+cli,
+helper version 2.0.0, known fixture CLI version 0.0.0, persistent_server, and no
+recoverable errors. The inert CLI contains an execution tripwire that writes an
+owned marker and exits 97; the marker must remain absent.
+
+The fixture then removes only its own package.json and requires exactly exit two,
+cucp.version/v1, partial, wrapper_only, persistent_server, null CLI version,
+helper version 2.0.0, and exactly the package_json_not_found recoverable error.
+No real CLI, Node, or package is installed or executed. Other partial/error
+outcomes remain failures. Start/status/stop expectations and all deadlines are
+unchanged; production exit codes and source are untouched. Both cases require
+fresh Windows execution rather than a skipped local result.

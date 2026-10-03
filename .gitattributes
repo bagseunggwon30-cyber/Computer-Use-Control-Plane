@@ -14,3 +14,5 @@ tests/fixtures/legacy-helper/observed-args-only/*.bin -text -diff
 # Exact observed staged-launch failures are raw diagnostics, never executable source.
 tests/fixtures/legacy-helper/observed-detached-startup.stderr.bin -text -diff
 tests/fixtures/legacy-helper/observed-staged-wrapper-launch.log.bin -text -diff
+# Exact two-Application resolution record; diagnostic bytes, never executable source.
+tests/fixtures/legacy-helper/observed-staged-python-resolution.log.bin -text -diff

@@ -159,6 +159,89 @@ Describe "legacy command boundaries" {
       $env:CUCP_LEGACY_CDP_PYTHON = $originalCdpPython
     }
   }
+  It "uses the same first-Application rule for the actual staged helper bridge" {
+    $originalPath = $env:PATH
+    $originalStaged = $env:CUCP_STAGED_COMPILED_HELPER
+    $originalDesktop = $env:CUCP_STAGED_HELPER_READONLY_DESKTOP
+    $originalSelected = $Script:StagedCompiledHelper
+    $originalCeiling = $Script:StagedHelperDesktop
+    $originalLock = $Script:HelperLockPath
+    try {
+      $realPython = (Get-Command python.exe -CommandType Application -TotalCount 1 -ErrorAction Stop).Source
+      $secondDirectory = Join-Path $TestDrive 'staged-secondary-python'
+      [void](New-Item -ItemType Directory -Path $secondDirectory)
+      $inertPython = Join-Path $secondDirectory 'python.exe'
+      [IO.File]::WriteAllBytes($inertPython, [byte[]]@())
+      $env:PATH = ([IO.Path]::GetDirectoryName($realPython), $secondDirectory, $originalPath) -join [IO.Path]::PathSeparator
+      $candidates = @(Get-Command python.exe -CommandType Application -ErrorAction Stop)
+      $candidates.Count | Should -BeGreaterOrEqual 2
+      $candidates[0].Source | Should -Be $realPython
+      @($candidates.Source) | Should -Contain $inertPython
+      $env:CUCP_STAGED_COMPILED_HELPER = '1'
+      $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $null
+      . (Join-Path $repoRoot 'scripts/cucp-staged-helper-adapter.ps1')
+      # Reach the actual Python bridge with a closed invalid operation. Package
+      # availability may vary in this shared gate; either error is returned by
+      # the launched bridge, never by Process.Start or a second executable.
+      $message = $null
+      try { $null = _Invoke-StagedHelper -Operation 'owned-invalid-operation' }
+      catch { $message = $_.Exception.Message }
+      $message | Should -BeLike 'Staged helper failed; no fallback or retry:*'
+    } finally {
+      $env:PATH = $originalPath
+      $env:CUCP_STAGED_COMPILED_HELPER = $originalStaged
+      $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $originalDesktop
+      $Script:StagedCompiledHelper = $originalSelected
+      $Script:StagedHelperDesktop = $originalCeiling
+      $Script:HelperLockPath = $originalLock
+    }
+  }
+  It "refuses an empty or nonscalar staged Python result before process construction" {
+    $originalStaged = $env:CUCP_STAGED_COMPILED_HELPER
+    $originalDesktop = $env:CUCP_STAGED_HELPER_READONLY_DESKTOP
+    $originalSelected = $Script:StagedCompiledHelper
+    $originalCeiling = $Script:StagedHelperDesktop
+    $originalLock = $Script:HelperLockPath
+    try {
+      $env:CUCP_STAGED_COMPILED_HELPER = '1'; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $null
+      . (Join-Path $repoRoot 'scripts/cucp-staged-helper-adapter.ps1')
+      Mock Get-Command { return $script:InjectedStagedCommands } -ParameterFilter { $Name -eq 'python.exe' }
+      Mock New-Object { throw 'Must not construct a process' } -ParameterFilter { $TypeName -eq 'Diagnostics.Process' }
+      $script:InjectedStagedCommands = @()
+      { _Invoke-StagedHelper -Operation 'version' } | Should -Throw '*one Python application*'
+      $script:InjectedStagedCommands = @([pscustomobject]@{Source='invalid.exe';CommandType='Application'})
+      { _Invoke-StagedHelper -Operation 'version' } | Should -Throw '*invalid or missing*'
+      $script:InjectedStagedCommands = @([pscustomobject]@{Source='first.exe'},[pscustomobject]@{Source='second.exe'})
+      { _Invoke-StagedHelper -Operation 'version' } | Should -Throw '*one Python application*'
+      Assert-MockCalled Get-Command -Times 3 -Exactly -ParameterFilter { $Name -eq 'python.exe' -and $TotalCount -eq 1 }
+      Assert-MockCalled New-Object -Times 0 -Exactly -ParameterFilter { $TypeName -eq 'Diagnostics.Process' }
+    } finally {
+      $env:CUCP_STAGED_COMPILED_HELPER = $originalStaged; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $originalDesktop
+      $Script:StagedCompiledHelper = $originalSelected; $Script:StagedHelperDesktop = $originalCeiling; $Script:HelperLockPath = $originalLock
+    }
+  }
+  It "refuses a disappeared first staged Python without discovering a replacement" {
+    $originalStaged = $env:CUCP_STAGED_COMPILED_HELPER
+    $originalDesktop = $env:CUCP_STAGED_HELPER_READONLY_DESKTOP
+    $originalSelected = $Script:StagedCompiledHelper
+    $originalCeiling = $Script:StagedHelperDesktop
+    $originalLock = $Script:HelperLockPath
+    try {
+      $script:SelectedStagedPython = Get-Command python.exe -CommandType Application -TotalCount 1 -ErrorAction Stop
+      $script:SelectedStagedSource = $script:SelectedStagedPython.Source
+      $env:CUCP_STAGED_COMPILED_HELPER = '1'; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $null
+      . (Join-Path $repoRoot 'scripts/cucp-staged-helper-adapter.ps1')
+      Mock Get-Command { return $script:SelectedStagedPython } -ParameterFilter { $Name -eq 'python.exe' }
+      Mock Test-Path { return $false } -ParameterFilter { $LiteralPath -eq $script:SelectedStagedSource }
+      Mock New-Object { throw 'Must not construct a process' } -ParameterFilter { $TypeName -eq 'Diagnostics.Process' }
+      { _Invoke-StagedHelper -Operation 'version' } | Should -Throw '*invalid or missing*'
+      Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter { $Name -eq 'python.exe' -and $TotalCount -eq 1 }
+      Assert-MockCalled New-Object -Times 0 -Exactly -ParameterFilter { $TypeName -eq 'Diagnostics.Process' }
+    } finally {
+      $env:CUCP_STAGED_COMPILED_HELPER = $originalStaged; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $originalDesktop
+      $Script:StagedCompiledHelper = $originalSelected; $Script:StagedHelperDesktop = $originalCeiling; $Script:HelperLockPath = $originalLock
+    }
+  }
   It "classifies cdp-eval as a live workflow step" {
     $plan = _Build-WorkflowPlan -Rest @("--step", 'macro cdp-eval --expr 1+1')
     $plan.steps[0].allowed | Should -Be $true

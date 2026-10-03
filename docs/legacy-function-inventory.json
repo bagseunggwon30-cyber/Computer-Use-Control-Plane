@@ -1400,7 +1400,7 @@
     },
     {
       "path": "scripts/cucp-staged-helper-adapter.ps1",
-      "lines": 109,
+      "lines": 119,
       "functions": [
         {
           "name": "_Invoke-StagedHelper",
@@ -1643,8 +1643,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 934232,
-    "removed": 79246,
+    "current": 940575,
+    "removed": 72903,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
