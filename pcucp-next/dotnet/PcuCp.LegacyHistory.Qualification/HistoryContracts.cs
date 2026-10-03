@@ -102,6 +102,12 @@ internal static class HistoryContracts
             catch (System.Text.DecoderFallbackException) { checks++; continue; }
             throw new InvalidOperationException("Malformed UTF-8 was replaced or accepted.");
         }
+        Check(HistoryWire.CompactOutput(null, "ps51").Length == 0, "Observed PS5 top-level null emits no JSON item");
+        Check(HistoryWire.CompactOutput(null, "ps7").SequenceEqual(new[] { "null" }), "PS7 literal JSON null remains distinct");
+        Check(HistoryWire.CompactOutput(new List<object?>(), "ps51").SequenceEqual(new[] { "[]" }), "Empty array is one JSON string");
+        Check(HistoryWire.CompactOutput(new List<object?> { null }, "ps51").SequenceEqual(new[] { "[null]" }), "Singleton null array preserves cardinality");
+        Check(HistoryWire.CompactOutput(new Dictionary<string, object?> { ["value"] = null }, "ps51").SequenceEqual(new[] { "{\"value\":null}" }), "Nested null remains explicit JSON null");
+        Check(HistoryWire.CompactOutput("", "ps51").SequenceEqual(new[] { "\"\"" }), "Empty string is not absent output");
         Console.WriteLine($"PASS: {checks} inferred history contracts; no PowerShell, file acquisition, provider or production operations executed.");
     }
 }

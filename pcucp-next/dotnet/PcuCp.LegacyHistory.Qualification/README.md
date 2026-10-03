@@ -76,7 +76,7 @@ dotnet run --project pcucp-next/dotnet/PcuCp.LegacyHistory.Qualification -- --se
 python tests/python/test_legacy_history_reducers.py -v
 ```
 
-The initial batch contains **66 inferred C# contracts, 30 Python tests and 465
+The initial batch contains **72 managed checks (including the observed PS5 null emission), 35 Python tests and 465
 synthetic cases executed under each of two candidate parser profiles**. The
 owned-console transport test requires Windows and is skipped on Linux. These
 are code-derived expectations and transport/guard checks, never fabricated
@@ -186,3 +186,40 @@ job installs .NET 8 with full Git history, verifies actual PS5.1/PS7 engines,
 runs the managed self-test and no-skip Windows contracts, then requires all six
 exact differential executions and their complete artifacts. Default production
 family/full scope selection is unchanged. See `docs/migration-batch-workflow.md`.
+
+
+## Null-output observation contract (schema v2)
+
+The first Windows attempt, [run 37092069983](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37092069983),
+stopped in the PS5.1 singleton host probe before candidate comparison. The exact
+original stdout is pinned as `windows-ps51-host-37092069983.raw.json`, with its
+archive/output hashes in the adjacent provenance file. Its typed result was
+null, while a nested no-output `ConvertTo-Json` expression became `{}` in the
+outer report. That old malformed observation remains rejected; it is never
+converted to the JSON string `"null"`.
+
+Microsoft's [PS5.1 documentation](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/convertto-json?view=powershell-5.1)
+confirms that a null top-level input emits no converter output. The
+[PS7 documentation](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/convertto-json?view=powershell-7.5)
+and [versioned cmdlet source](https://github.com/PowerShell/PowerShell/blob/v7.5.3/src/Microsoft.PowerShell.Commands.Utility/commands/utility/WebCmdlet/ConvertToJsonCommand.cs)
+retain a JSON null string. The PS5 candidate correction is confined to that
+observed top-level emission. PS7's existing candidate expectation and nested-null
+serialization are unchanged; their new probe results are not claimed observed.
+
+Schema `cucp.history-reducer-qualification/v2` captures the converter's exact
+pipeline items first in `compact_json_items`. Zero items requires `compact_json`
+to be a real null field; one item requires it to equal that exact string. A
+missing/flattened/non-string items array, multiple items, `{}`, or inconsistent
+text is rejected. Thus no output, the JSON string `null`, `[]`, `[null]`, and an
+object containing null cannot collapse into one accepted representation. Both
+fields participate in exact differential comparisons alongside typed wire and
+Console bytes. None of the 465 history cases or six-run requirements changed.
+
+Every actual PS5.1/PS7 oracle invocation now also records eight serialization
+probes: explicit null, an empty pipeline result, empty array, singleton null and
+number arrays, a singleton containing an empty array, nested null and empty
+string. Probe IDs, cardinality and strict emitted-string shape are required;
+actual typed values/strings are retained without normalization. These probes
+run inside the verified real hosts, including both host preflights and all six
+fresh differential processes. Their presence is evidence collection, not a
+claim that unobserved Windows behavior already passed.

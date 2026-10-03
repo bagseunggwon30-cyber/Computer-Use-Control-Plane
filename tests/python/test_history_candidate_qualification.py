@@ -153,12 +153,12 @@ class HistoryRequiredArtifactTests(unittest.TestCase):
             subset=self.cases[:1] if batch=='singleton' else self.cases
             (directory/f'{runtime}-{batch}-input.json').write_bytes(history.input_bytes(subset))
             prefix=f'{runtime}-{batch}-{repeat}'
-            results=[dict(id=f['id'],operation=f['operation'],wire={'kind':'null'},compact_json='null',console='',errors=[]) for f in subset]
+            results=[dict(id=f['id'],operation=f['operation'],wire={'kind':'null'},compact_json='null',compact_json_items=['null'],console='',errors=[]) for f in subset]
             hashes={}
             host={'ps_version':'5.1.123' if runtime=='ps51' else '7.5.1'}
             for kind in ('candidate','observed'):
                 value=dict(schema=history.SCHEMA,runtime=runtime,kind='candidate-inferred' if kind=='candidate' else 'windows-observation',host=host,results=results)
-                if kind=='observed':value.update(source_sha256=history.SOURCE_SHA256,manifest_sha256=history.ORIGINAL_SHA256,input_sha256=history.digest(history.input_bytes(subset)))
+                if kind=='observed':value.update(source_sha256=history.SOURCE_SHA256,manifest_sha256=history.ORIGINAL_SHA256,input_sha256=history.digest(history.input_bytes(subset)),serialization_probes=[dict(id=name,wire={'kind':'null'},compact_json=None,compact_json_items=[]) for name in history.SERIALIZATION_PROBES])
                 raw=write(f'{prefix}-{kind}.raw.json',value);hashes[kind]=history.digest(raw)
                 (directory/f'{prefix}-{kind}.stdout.bin').write_bytes(raw)
                 (directory/f'{prefix}-{kind}.stderr.bin').write_bytes(b'')

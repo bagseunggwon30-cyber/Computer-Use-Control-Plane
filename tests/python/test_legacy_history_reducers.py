@@ -1,7 +1,8 @@
 """Inferred candidate contracts and a strict, owned-file PS5/PS7 Windows gate.
 
-No observed Windows results are checked in. Run this file with --differential
-for actual immutable-original observations; ordinary unittest is NOT that gate.
+A pinned PS5.1 host-only failure trace is checked in; it is not candidate parity.
+Run with --differential for actual immutable-original comparisons; ordinary
+unittest is NOT that gate.
 """
 from __future__ import annotations
 
@@ -27,7 +28,8 @@ FIXTURES = ROOT / 'tests/fixtures/history-reducers'
 ORIGINAL = FIXTURES / 'original-functions.json'
 ORIGINAL_SHA256 = '8cba53d610ec92f31be4a9a3d71b946b14ca8b023cda3f1979cba81fdff7f487'
 SOURCE_SHA256 = '8a3140745701a828628b13c4741b30063119babbcbd74e5230caae2d49591c4c'
-SCHEMA = 'cucp.history-reducer-qualification/v1'
+SCHEMA = 'cucp.history-reducer-qualification/v2'
+SERIALIZATION_PROBES = ('explicit-null','empty-pipeline','empty-array','singleton-null-array','singleton-number-array','singleton-empty-array','nested-null','empty-string')
 INPUT_SCHEMA = 'cucp.history-reducer-input/v1'
 CONTRACT_CAPTURE_ROOT = None
 _CAPTURE_SEQUENCE = 0
@@ -166,10 +168,27 @@ def fixtures():
     return cases
 
 
+def validate_json_emission(result):
+    items=result.get('compact_json_items')
+    if not isinstance(items,list) or len(items)>1 or any(not isinstance(item,str) for item in items):
+        raise ValueError('Malformed compact JSON output cardinality/items')
+    if 'compact_json' not in result or (not items and result['compact_json'] is not None) or (items and result['compact_json'] != items[0]):
+        raise ValueError('Compact JSON text does not match its exact emitted items')
+
+
+def validate_serialization_probes(probes):
+    if not isinstance(probes,list) or [probe.get('id') for probe in probes if isinstance(probe,dict)] != list(SERIALIZATION_PROBES):
+        raise ValueError('Missing or reordered real runtime serialization probes')
+    for probe in probes:
+        if set(probe) != {'id','wire','compact_json','compact_json_items'} or not isinstance(probe['wire'],dict):
+            raise ValueError('Malformed runtime serialization probe')
+        validate_json_emission(probe)
+
+
 def validate_report(report, cases, runtime, *, observation=False, source_hash=None, manifest_hash=None, input_hash=None):
     required = {'schema', 'runtime', 'kind', 'host', 'results'}
     if observation:
-        required |= {'source_sha256', 'manifest_sha256', 'input_sha256'}
+        required |= {'source_sha256', 'manifest_sha256', 'input_sha256', 'serialization_probes'}
     if not isinstance(report, dict) or set(report) != required:
         raise ValueError('Unexpected report envelope fields')
     if report['schema'] != SCHEMA or report['runtime'] != runtime or report['kind'] != ('windows-observation' if observation else 'candidate-inferred'):
@@ -178,25 +197,25 @@ def validate_report(report, cases, runtime, *, observation=False, source_hash=No
         raise ValueError('Source/input hash mismatch')
     if not isinstance(report['host'], dict) or not report['host']:
         raise ValueError('Missing runtime identity')
+    if observation:validate_serialization_probes(report['serialization_probes'])
     results = report['results']
     if not isinstance(results, list) or len(results) != len(cases):
         raise ValueError('Strict fixture count mismatch')
     for case, result in zip(cases, results):
-        if not isinstance(result, dict) or set(result) != {'id', 'operation', 'wire', 'compact_json', 'console', 'errors'}:
+        if not isinstance(result, dict) or set(result) != {'id', 'operation', 'wire', 'compact_json', 'compact_json_items', 'console', 'errors'}:
             raise ValueError('Unexpected result fields')
         if result['id'] != case['id'] or result['operation'] != case['operation']:
             raise ValueError('Fixture identity/order mismatch')
         if not isinstance(result['console'], str) or not isinstance(result['errors'], list) or any(not isinstance(e, str) for e in result['errors']):
             raise ValueError('Malformed output capture')
-        if result['compact_json'] is not None and not isinstance(result['compact_json'], str):
-            raise ValueError('Malformed exact JSON capture')
+        validate_json_emission(result)
     return results
 
 
 def compare_reports(candidate, observed):
     mismatches = []
     for left, right in zip(candidate['results'], observed['results']):
-        for field in ('wire', 'compact_json', 'console', 'errors'):
+        for field in ('wire', 'compact_json', 'compact_json_items', 'console', 'errors'):
             if left[field] != right[field]:
                 mismatches.append(dict(id=left['id'], field=field, candidate=left[field], observed=right[field]))
     return mismatches
@@ -493,6 +512,54 @@ class HistoryEvidenceTests(unittest.TestCase):
             self.assertTrue(json.loads(Path(str(prefix)+'.process.json').read_text())['launch_error'])
 
 
+class HistoryReportShapeTests(unittest.TestCase):
+    def test_actual_ps51_host_artifact_is_preserved_without_coercion(self):
+        path=FIXTURES/'windows-ps51-host-37092069983.raw.json'
+        raw=path.read_bytes()
+        self.assertEqual(digest(raw),'1f51698cb1baf3b1e11e153f968840411d208cb263fe39ac7499733fe6d8209f')
+        observed=json.loads(raw)
+        self.assertEqual(observed['host']['ps_version'],'5.1.26100.33438')
+        self.assertEqual(observed['source_sha256'],SOURCE_SHA256)
+        self.assertEqual(observed['manifest_sha256'],ORIGINAL_SHA256)
+        self.assertEqual(observed['input_sha256'],digest(input_bytes(fixtures()[:1])))
+        self.assertEqual(observed['results'][0]['wire'],{'kind':'null'})
+        self.assertEqual(observed['results'][0]['compact_json'],{})
+        self.assertEqual(observed['results'][0]['console'],'')
+        self.assertEqual(observed['results'][0]['errors'],[])
+        provenance=json.loads((FIXTURES/'windows-ps51-host-37092069983.provenance.json').read_text())
+        self.assertEqual(provenance['raw_sha256'],digest(raw))
+        self.assertEqual(provenance['differential_runs'],0)
+        # Even with the new items field, an AutomationNull-shaped object is
+        # malformed evidence. Never translate it into the string 'null'.
+        with self.assertRaises(ValueError):validate_json_emission(dict(observed['results'][0],compact_json_items=[]))
+    def test_zero_items_json_null_empty_and_singleton_arrays_are_distinct(self):
+        states=[dict(compact_json=None,compact_json_items=[]),
+                dict(compact_json='null',compact_json_items=['null']),
+                dict(compact_json='[]',compact_json_items=['[]']),
+                dict(compact_json='[null]',compact_json_items=['[null]']),
+                dict(compact_json='[1]',compact_json_items=['[1]']),
+                dict(compact_json='{"value":null}',compact_json_items=['{"value":null}']),
+                dict(compact_json='""',compact_json_items=['""'])]
+        for state in states:validate_json_emission(state)
+        self.assertEqual(len({dumps(state) for state in states}),len(states))
+        left=dict(results=[dict(id='null-shape',wire={'kind':'null'},console='',errors=[],**states[0])])
+        right=dict(results=[dict(id='null-shape',wire={'kind':'null'},console='',errors=[],**states[1])])
+        self.assertEqual([m['field'] for m in compare_reports(left,right)],['compact_json','compact_json_items'])
+    def test_collapsed_or_inconsistent_converter_output_is_rejected(self):
+        for items in (None,{},'null',[None],[{}],[['null']],['null','null']):
+            with self.subTest(items=items),self.assertRaises(ValueError):
+                validate_json_emission(dict(compact_json=None,compact_json_items=items))
+        for text,items in (({},[]),('null',[]),(None,['null']),('[]',['[null]']),(False,[])):
+            with self.assertRaises(ValueError):validate_json_emission(dict(compact_json=text,compact_json_items=items))
+    def test_real_runtime_probe_array_cannot_collapse_or_drop_cases(self):
+        probes=[dict(id=name,wire={'kind':'null'},compact_json=None,compact_json_items=[]) for name in SERIALIZATION_PROBES]
+        validate_serialization_probes(probes)
+        for bad in ([],probes[0],[probes],probes[:-1],list(reversed(probes))):
+            with self.assertRaises(ValueError):validate_serialization_probes(bad)
+        changed=copy.deepcopy(probes);changed[0]['compact_json']={}
+        with self.assertRaises(ValueError):validate_serialization_probes(changed)
+
+
 class HistorySourceTests(unittest.TestCase):
     def test_pinned_function_bytes_and_current_tracked_helpers(self):
         self.assertEqual(digest(ORIGINAL.read_bytes()), ORIGINAL_SHA256)
@@ -554,14 +621,15 @@ class HistorySourceTests(unittest.TestCase):
         for path in PROJECT.glob('*.cs'):
             self.assertNotRegex(path.read_text(), r'\b(?:File|Directory|Process|HttpClient)\.')
     def test_gate_retains_exact_order_and_text(self):
-        result = dict(id='x', operation='stats', wire={'kind': 'hashtable', 'properties': [{'name': 'a'}, {'name': 'b'}]}, compact_json='{"a":1,"b":2}', console='', errors=[])
+        result = dict(id='x', operation='stats', wire={'kind': 'hashtable', 'properties': [{'name': 'a'}, {'name': 'b'}]}, compact_json='{"a":1,"b":2}', compact_json_items=['{"a":1,"b":2}'], console='', errors=[])
         left = dict(results=[result]); right = copy.deepcopy(left)
         right['results'][0]['wire']['properties'].reverse()
         right['results'][0]['compact_json'] = '{"b":2,"a":1}'
-        self.assertEqual([x['field'] for x in compare_reports(left, right)], ['wire', 'compact_json'])
+        right['results'][0]['compact_json_items'] = [right['results'][0]['compact_json']]
+        self.assertEqual([x['field'] for x in compare_reports(left, right)], ['wire', 'compact_json', 'compact_json_items'])
     def test_gate_rejects_missing_count_identity_and_fields(self):
         cases = fixtures()[:2]
-        report = dict(schema=SCHEMA, runtime='ps51', kind='candidate-inferred', host={'fixture': True}, results=[dict(id=f['id'], operation=f['operation'], wire={'kind':'null'}, compact_json='null', console='', errors=[]) for f in cases])
+        report = dict(schema=SCHEMA, runtime='ps51', kind='candidate-inferred', host={'fixture': True}, results=[dict(id=f['id'], operation=f['operation'], wire={'kind':'null'}, compact_json='null', compact_json_items=['null'], console='', errors=[]) for f in cases])
         validate_report(report, cases, 'ps51')
         for mutate in (lambda r: r['results'].pop(), lambda r: r['results'].reverse(), lambda r: r['results'][0].pop('wire'), lambda r: r.update(extra=True)):
             changed = copy.deepcopy(report); mutate(changed)
@@ -577,7 +645,7 @@ class HistorySourceTests(unittest.TestCase):
         # The only newly tracked executable PowerShell source is oracle.ps1.
         # Original source remains in its existing .ps1 Git blob, not JSON/data.
         files = [p for p in FIXTURES.rglob('*') if p.is_file()]
-        self.assertEqual(sorted(p.name for p in files), ['oracle.ps1', 'original-functions.json'])
+        self.assertEqual(sorted(p.name for p in files), ['oracle.ps1', 'original-functions.json','windows-ps51-host-37092069983.provenance.json','windows-ps51-host-37092069983.raw.json'])
         self.assertGreater(len((FIXTURES / 'oracle.ps1').read_bytes()), 0)
         self.assertNotIn('"source":', ORIGINAL.read_text())
 
@@ -609,9 +677,21 @@ class HistoryCandidateTests(unittest.TestCase):
         report = json.loads(raw)
         validate_report(report, cases, runtime)
         return report['results']
+    def test_null_and_array_result_shapes_for_both_candidate_profiles(self):
+        selected=[f for f in fixtures() if f['id'] in ('pick-missing','last-good-missing','app-read-missing')]
+        for runtime in ('ps51','ps7'):
+            results=self.run_cases(selected,runtime)
+            for result in results:
+                if result['operation']=='app-read':
+                    self.assertEqual(result['wire'],{'kind':'array','items':[]})
+                    self.assertEqual(result['compact_json_items'],['[]'])
+                else:
+                    self.assertEqual(result['wire'],{'kind':'null'})
+                    self.assertEqual(result['compact_json_items'],[] if runtime=='ps51' else ['null'])
+                    self.assertEqual(result['compact_json'],None if runtime=='ps51' else 'null')
     def test_inferred_self_tests(self):
         output = run_bounded([self.dotnet, str(PROJECT / 'bin/Debug/net8.0/PcuCp.LegacyHistory.Qualification.dll'), '--self-test'])
-        self.assertIn(b'66 inferred history contracts', output)
+        self.assertIn(b'72 inferred history contracts', output)
     def test_both_candidate_profiles_complete_full_corpus(self):
         cases = fixtures()
         for runtime in ('ps51', 'ps7'):
@@ -622,7 +702,10 @@ class HistoryCandidateTests(unittest.TestCase):
                 with self.subTest(runtime=runtime, size=size): self.assertEqual(len(self.run_cases(fixtures()[:size], runtime)), size)
     def test_expected_selection_examples_are_inferences(self):
         cases = [f for f in fixtures() if f['id'] in ('pick-most-recent-tie', 'pick-frequency-over-recency', 'pick-failed-consumes-lookback', 'pick-invalid-and-nonmatch-do-not-consume', 'pick-does-not-sort-ts')]
-        results = {r['id']: json.loads(r['compact_json']) for r in self.run_cases(cases)}
+        results = {r['id']: json.loads(r['compact_json']) if r['compact_json_items'] else None for r in self.run_cases(cases)}
+        failed=next(r for r in self.run_cases(cases) if r['id']=='pick-failed-consumes-lookback')
+        self.assertEqual(failed['compact_json_items'],[])
+        self.assertIsNone(failed['compact_json'])
         self.assertEqual(results, {'pick-most-recent-tie':'recent', 'pick-frequency-over-recency':'a', 'pick-failed-consumes-lookback':None, 'pick-invalid-and-nonmatch-do-not-consume':'yes', 'pick-does-not-sort-ts':'last'})
     def test_last_good_preserves_unrelated_fields(self):
         case = next(f for f in fixtures() if f['id'] == 'last-good-full-original-record')

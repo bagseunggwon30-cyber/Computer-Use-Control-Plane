@@ -14,6 +14,8 @@ REQUIRED_FILES = (
     "tests/python/test_legacy_history_reducers.py",
     "tests/fixtures/history-reducers/oracle.ps1",
     "tests/fixtures/history-reducers/original-functions.json",
+    "tests/fixtures/history-reducers/windows-ps51-host-37092069983.raw.json",
+    "tests/fixtures/history-reducers/windows-ps51-host-37092069983.provenance.json",
     *("pcucp-next/dotnet/PcuCp.LegacyHistory.Qualification/" + name for name in (
         "PcuCp.LegacyHistory.Qualification.csproj", "Program.cs", "HistoryContracts.cs",
         "HistoryJson.cs", "HistoryReducer.cs", "HistoryTransport.cs", "HistoryWire.cs")),

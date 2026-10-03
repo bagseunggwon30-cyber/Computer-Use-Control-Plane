@@ -32,11 +32,12 @@ foreach (JsonElement fixture in root.EnumerateArray())
         "last-good" => reducer.LastGood(validated.Capture, validated.AppKey),
         _ => throw new ArgumentException("Unknown operation.")
     };
+    string[] jsonItems = HistoryWire.CompactOutput(value, args[1]);
     results.Add(new { id = validated.Id, operation = validated.Operation, wire = HistoryWire.Encode(value),
-        compact_json = HistoryWire.Compact(value, args[1]), console = "", errors = Array.Empty<string>() });
+        compact_json = jsonItems.Length == 0 ? null : jsonItems[0], compact_json_items = jsonItems, console = "", errors = Array.Empty<string>() });
 }
 Console.WriteLine(JsonSerializer.Serialize(new {
-    schema = "cucp.history-reducer-qualification/v1", runtime = args[1], kind = "candidate-inferred",
+    schema = "cucp.history-reducer-qualification/v2", runtime = args[1], kind = "candidate-inferred",
     host = new { framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
         os = System.Runtime.InteropServices.RuntimeInformation.OSDescription, culture = CultureInfo.CurrentCulture.Name,
         wire_encoding = "utf-8-strict" },

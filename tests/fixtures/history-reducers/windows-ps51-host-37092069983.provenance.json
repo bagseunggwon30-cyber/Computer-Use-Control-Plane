@@ -1,0 +1,10 @@
+{
+  "run_id": 37092069983,
+  "run_url": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37092069983",
+  "artifact_zip_sha256": "e795304aa38f24bbb968e38075bd971a5245f99d804efff16253bc88bbb94821",
+  "raw_file": "windows-ps51-host-37092069983.raw.json",
+  "raw_sha256": "1f51698cb1baf3b1e11e153f968840411d208cb263fe39ac7499733fe6d8209f",
+  "observation": "Actual PS5.1 singleton host probe only; typed null with AutomationNull-shaped compact_json object. No candidate comparison or six-run differential occurred.",
+  "candidate_comparisons": 0,
+  "differential_runs": 0
+}

@@ -67,6 +67,37 @@ function Encode-Wire($Value) {
   if ($Value -is [Collections.IEnumerable]) { return @{kind='array';items=@(foreach ($item in $Value) { Encode-Wire $item })} }
   return @{kind='object';properties=@(foreach ($property in $Value.PSObject.Properties) { @{name=$property.Name;value=(Encode-Wire $property.Value)} })}
 }
+function Capture-CompactJson($Value) {
+  # Capture emitted objects before placing anything in a report. A no-output
+  # pipeline is not an empty string, the JSON string 'null', or an object {}.
+  $items=@(Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $Value -Depth 100 -Compress)
+  if ($items.Count -gt 1) { throw 'One InputObject emitted multiple compact JSON strings.' }
+  foreach ($item in $items) { if ($item -isnot [string]) { throw 'Compact JSON output was not a string.' } }
+  return [pscustomobject]@{items=[string[]]$items}
+}
+function Get-SerializationProbes {
+  $singletonNull=[Array]::CreateInstance([object],1)
+  $singletonEmpty=[Array]::CreateInstance([object],1);$singletonEmpty[0]=@()
+  $cases=@(
+    [pscustomobject]@{id='explicit-null';value=$null},
+    [pscustomobject]@{id='empty-pipeline';value=(& {})},
+    [pscustomobject]@{id='empty-array';value=@()},
+    [pscustomobject]@{id='singleton-null-array';value=$singletonNull},
+    [pscustomobject]@{id='singleton-number-array';value=@(1)},
+    [pscustomobject]@{id='singleton-empty-array';value=$singletonEmpty},
+    [pscustomobject]@{id='nested-null';value=[pscustomobject]@{value=$null}},
+    [pscustomobject]@{id='empty-string';value=''}
+  )
+  $captured=New-Object Collections.ArrayList
+  foreach ($case in $cases) {
+    $json=Capture-CompactJson $case.value
+    $record=[ordered]@{id=$case.id;wire=(Encode-Wire $case.value);compact_json=$null;compact_json_items=[string[]]$json.items}
+    if ($json.items.Count -eq 1) { $record.compact_json=$json.items[0] }
+    [void]$captured.Add($record)
+  }
+  return @($captured)
+}
+$serializationProbes=@(Get-SerializationProbes)
 $inputInfo=New-Object IO.FileInfo -ArgumentList $InputPath
 if ($inputInfo.Length -gt 16777216) { throw 'Oversized fixture input.' }
 $inputBytes=[IO.File]::ReadAllBytes($InputPath)
@@ -130,9 +161,11 @@ try {
         'app-read' { $value=@(_AppStrategy-Read) }
         'last-good' { $value=_AppStrategy-LastGood -AppKey ([string]$fixture.app_key) }
       }
-      $result=[ordered]@{id=$fixture.id;operation=$fixture.operation;wire=(Encode-Wire $value);compact_json=(Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $value -Depth 100 -Compress);console=$writer.ToString();errors=@()}
+      $json=Capture-CompactJson $value
+      $result=[ordered]@{id=$fixture.id;operation=$fixture.operation;wire=(Encode-Wire $value);compact_json=$null;compact_json_items=[string[]]$json.items;console=$writer.ToString();errors=@()}
+      if ($json.items.Count -eq 1) { $result.compact_json=$json.items[0] }
     } catch {
-      $result=[ordered]@{id=$fixture.id;operation=$fixture.operation;wire=$null;compact_json=$null;console=$writer.ToString();errors=@($_.Exception.GetType().FullName+': '+$_.Exception.Message)}
+      $result=[ordered]@{id=$fixture.id;operation=$fixture.operation;wire=$null;compact_json=$null;compact_json_items=@();console=$writer.ToString();errors=@($_.Exception.GetType().FullName+': '+$_.Exception.Message)}
     } finally { [Console]::SetOut($previous);$writer.Dispose() }
     [void]$all.Add($result)
   }
@@ -143,5 +176,5 @@ try {
   [IO.Directory]::Delete($owned,$true)
 }
 if ($all.Count -ne $fixtures.Count) { throw 'Fixture execution count mismatch.' }
-$report=[ordered]@{schema='cucp.history-reducer-qualification/v1';runtime=$Runtime;kind='windows-observation';manifest_sha256=$manifestHash;source_sha256=$sourceHash;input_sha256=$inputHash;host=@{ps_version=$PSVersionTable.PSVersion.ToString();clr=[Environment]::Version.ToString();os=[Environment]::OSVersion.ToString();culture=$oldCulture.Name};results=@($all)}
+$report=[ordered]@{schema='cucp.history-reducer-qualification/v2';runtime=$Runtime;kind='windows-observation';manifest_sha256=$manifestHash;source_sha256=$sourceHash;input_sha256=$inputHash;host=@{ps_version=$PSVersionTable.PSVersion.ToString();clr=[Environment]::Version.ToString();os=[Environment]::OSVersion.ToString();culture=$oldCulture.Name};serialization_probes=@($serializationProbes);results=@($all)}
 [Console]::Out.WriteLine((Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $report -Depth 100 -Compress))

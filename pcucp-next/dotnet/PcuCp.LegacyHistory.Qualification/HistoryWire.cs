@@ -16,6 +16,12 @@ internal static class HistoryWire
         _ => new { kind = "scalar", type = value.GetType().Name, value }
     };
 
+    // PS5.1's actual null host observation (run 37092069983) has no
+    // ConvertTo-Json pipeline output. Keep this distinct from PS7's existing
+    // literal "null" output and from null nested inside an object or array.
+    internal static string[] CompactOutput(object? value, string runtime) =>
+        runtime == "ps51" && value is null ? [] : [Compact(value, runtime)];
+
     // Compact JSON is an exact-string observation, never canonicalized by the
     // Python gate. Hashtable enumeration is intentionally visible; Core's
     // randomized hash order is NOT assumed to match Framework PowerShell.

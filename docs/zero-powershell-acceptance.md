@@ -59,6 +59,14 @@ extension-counted bytes in 28 files, including the unchanged 610,258 runtime
 bytes. This is a temporary qualification cost, not new retirement credit or a
 new full-green checkpoint. Its four retained production function bodies remain.
 
+The first actual history gate then exposed a null/no-output observation-shape
+failure before any candidate comparison. Its schema-v2 capture repair adds
+1,793 openly tracked oracle bytes for exact output cardinality and eight real
+serializer probes. The repaired candidate tree has **882,666** extension-counted
+bytes: 610,258 runtime and 272,408 other bytes in the same 28 files. Updated
+Windows observations remain pending; neither added test code nor a local pass
+earns retirement credit.
+
 The extension count has a concrete known limitation: `test_legacy_interop.py`
 still contains two inline PowerShell test drivers executed with
 `-EncodedCommand`. Those scripts remain dependencies even though they are not

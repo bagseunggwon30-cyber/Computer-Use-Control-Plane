@@ -96,6 +96,25 @@ other bytes), 132,605 below the original extension-counted baseline. This is
 temporary qualification source, not hidden source or new retirement credit.
 Inline/encoded test drivers remain a separate final-zero audit requirement.
 
+The first history run at `514e74a5`,
+[37092069983](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37092069983),
+stopped at the PS5.1 singleton host observation, before any candidate comparison
+or PS7 observation. The original null value was correctly tagged, but nesting
+the no-output ConvertTo-Json result directly in a report serialized its sentinel
+as `{}`. Strict report validation rejected that shape. The exact old raw bytes
+remain pinned and rejected.
+
+The reviewed repair uses schema v2 to preserve zero or one emitted JSON strings
+explicitly, alongside the nullable compact string. It distinguishes PS5 null
+no-output from PS7's existing `null` string expectation and preserves nested
+null serialization. Eight real-host serializer probes are mandatory on each
+oracle invocation. All 465 fixture bytes and six fresh differential runs remain.
+The repair integrates without conflicts after the diagnostic evidence/conversion
+batch. Integrated local Python validation ran 627 tests: 501 passed and 126
+explicit skips. Windows qualification is still pending. Its 1,793 added oracle
+bytes bring the current extension count to 882,666, with runtime unchanged at
+610,258. Main and all retained production bodies remain unchanged.
+
 ## Earlier qualified checkpoint (c414)
 
 Commit `c414f0240a6a3fde78719f4ae44baddaf990e92b`, tree
