@@ -10,3 +10,4 @@ tests/fixtures/legacy-helper/observed-startup.stderr.bin -text -diff
 tests/fixtures/legacy-helper/observed-binding.stdout.bin -text -diff
 # Exact observed benchmark route records retain their captured byte digest.
 tests/fixtures/legacy-benchmark-brief-observed-37103413852.json -text
+tests/fixtures/legacy-helper/observed-args-only/*.bin -text -diff

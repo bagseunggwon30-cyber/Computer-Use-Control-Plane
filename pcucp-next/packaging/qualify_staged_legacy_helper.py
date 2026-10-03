@@ -32,7 +32,11 @@ def main(argv=None):
     if args.windows:
         # Refuse stale/reused artifacts; publisher refuses existing output. Use a
         # clean checkout or explicitly review/remove a previous owned build first.
-        run([sys.executable,ROOT/'pcucp-next/packaging/publish_legacy_helper.py'],'package')
+        run([sys.executable,ROOT/'pcucp-next/packaging/publish_legacy_helper.py','--evidence-dir',args.log_dir],'package')
+        project=ROOT/'tests/fixtures/legacy-helper-startup-probe/LegacyHelperStartupProbe.csproj'
+        run(['dotnet','build',project,'-c','Release','-warnaserror','-m:1','-p:UseSharedCompilation=false'],'startup-probe-build')
+        run([sys.executable,ROOT/'pcucp-next/packaging/collect_staged_helper_startup.py','--probe',
+             project.parent/'bin/Release/net48/LegacyHelperStartupProbe.exe','--log-dir',args.log_dir], 'startup-observations')
     for pattern in ('test_legacy_helper_package.py','test_legacy_helper_runtime.py','test_legacy_helper_client.py'):
         run([sys.executable,'-m','unittest','discover','-s','tests/python','-p',pattern,'-v'],pattern)
     return 0

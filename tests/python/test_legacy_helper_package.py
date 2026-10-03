@@ -280,6 +280,22 @@ class LegacyHelperPackageTests(unittest.TestCase):
         self.assertEqual(list(self.root.glob(".legacy-helper-build-*")), [])
         publisher.validate_package(self.output)
 
+    def test_optional_build_evidence_keeps_closure_outside_package(self):
+        evidence = self.root / 'bounded evidence'
+        def fake_build(argv, **kwargs):
+            target=Path(argv[-1]);self.populate(target)
+            (target/'PcuCp.LegacyHelper.pdb').write_bytes(b'owned symbols')
+            return subprocess.CompletedProcess(argv,0)
+        with patch.object(publisher.shutil,'which',return_value='dotnet'), \
+                patch.object(publisher.subprocess,'run',side_effect=fake_build), redirect_stdout(io.StringIO()):
+            self.assertEqual(publisher.main(['--output',str(self.output),'--evidence-dir',str(evidence)]),0)
+        closure=json.loads((evidence/'package-build-closure.json').read_text())
+        self.assertEqual(closure['included'],list(publisher.REQUIRED_FILES))
+        self.assertIn('PcuCp.LegacyHelper.pdb',closure['build_output'])
+        self.assertEqual(closure['source_program']['sha256'],hashlib.sha256((publisher.PROJECT.parent/'Program.cs').read_bytes()).hexdigest())
+        self.assertEqual(json.loads((evidence/'package-manifest.json').read_text()),publisher.validate_package(self.output))
+        self.assertFalse((self.output/'PcuCp.LegacyHelper.pdb').exists())
+
     def test_main_preserves_build_exit_code_and_leaves_no_package(self):
         with patch.object(publisher.shutil, "which", return_value="dotnet"), \
                 patch.object(publisher.subprocess, "run", return_value=subprocess.CompletedProcess([], 7)):

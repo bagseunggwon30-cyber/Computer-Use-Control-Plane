@@ -190,6 +190,10 @@ class StagedWrapperStructureTests(unittest.TestCase):
         body=text.split('function Install-HelperAutostart {',1)[1].split('\nfunction ',1)[0]
         self.assertLess(body.index('staged_helper_autostart_unqualified'),body.index('WriteAllText'))
 
+    def test_wrapper_fixture_propagates_nested_exit(self):
+        text=(ROOT/'tests/fixtures/legacy-helper-staged-wrapper.ps1').read_text()
+        self.assertIn('exit [int]$LASTEXITCODE',text)
+
     def test_staged_adapter_has_bounded_reads_and_no_command_evaluation(self):
         text=(ROOT/'scripts/cucp-staged-helper-adapter.ps1').read_text()
         self.assertIn('ReadAsync',text);self.assertNotIn('ReadToEnd',text)
@@ -285,6 +289,14 @@ class StagedProductionWrapperWindowsTests(unittest.TestCase):
                 evidence=run_evidence([shutil.which('powershell.exe'),'-NoProfile','-NonInteractive','-File',
                     str(ROOT/'tests/fixtures/legacy-helper-staged-wrapper.ps1'),'-Wrapper',str(ROOT/'scripts/cucp.ps1'),
                     '-Operation',operation],directory=logs,label='staged-wrapper-'+operation,cwd=ROOT,env=env,timeout=20)
+                # Quiet suppresses console diagnostics; preserve the owned wrapper
+                # log before checking exit/JSON and before TemporaryDirectory cleanup.
+                wrapper_log=root/'computer-use-control-plane/cucp-wrapper.log'
+                if wrapper_log.is_file():
+                    with wrapper_log.open('rb') as stream: raw_log=stream.read(65537)
+                    log_path=Path(evidence['evidence_path']).with_suffix('.wrapper.log.bin')
+                    log_path.write_bytes(raw_log[:65536])
+                    if len(raw_log)>65536: self.fail('Owned wrapper log exceeded diagnostic bound')
                 require_success(evidence)
                 return json.loads(evidence['stdout'].decode('utf-8-sig'))
             try:

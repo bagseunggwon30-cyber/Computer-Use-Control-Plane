@@ -15,6 +15,13 @@ class HelperProcessEvidenceTests(unittest.TestCase):
     def run_python(self, code, **kwargs):
         return run_evidence([sys.executable, '-c', code], directory=self.temp.name, label='owned', **kwargs)
 
+    def test_creation_flags_are_recorded_and_privilege_expansion_is_refused(self):
+        result = self.run_python('print("ordinary")')
+        self.assertEqual(result['creationflags'], 0)
+        for flags in (True, -1, 0x01000000, 0x00000004):
+            with self.subTest(flags=flags):
+                with self.assertRaises(ValueError): self.run_python('raise RuntimeError("must not launch")', creationflags=flags)
+
     def test_success_failure_and_both_raw_streams(self):
         result = self.run_python("import os; os.write(1,b'out\\xff'); os.write(2,b'err\\xfe'); raise SystemExit(7)")
         require_success(result, expected_exit=7)

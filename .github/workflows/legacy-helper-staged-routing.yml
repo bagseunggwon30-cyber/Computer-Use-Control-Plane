@@ -15,6 +15,9 @@ on:
       - 'tests/python/test_legacy_helper_runtime.py'
       - 'tests/python/test_legacy_helper_package.py'
       - 'tests/fixtures/legacy-helper-staged-*.ps1'
+      - 'tests/fixtures/legacy-helper-startup-probe/**'
+      - 'tests/python/helper_process_evidence.py'
+      - 'pcucp-next/packaging/collect_staged_helper_startup.py'
       - '.github/workflows/legacy-helper-staged-routing.yml'
 permissions:
   contents: read

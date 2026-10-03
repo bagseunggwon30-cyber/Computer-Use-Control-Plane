@@ -566,3 +566,11 @@ The production-staging document supersedes the earlier no-production-caller
 description for the opt-in staged route. Existing candidate idle-timeout
 admission boundaries remain unchanged. Historical
 candidate evidence above remains evidence for its recorded implementation.
+### Next functional tier after observed OCR and ranking defects
+
+The Args-only Windows run at `bb98df41` confirmed the additional OCR type-variable
+failure and ranking/selection differences. A separately labelled four-site
+functional tier is staged with explicit numeric descending order and stable
+acquisition-order ties. Original and Args-only raw evidence remain distinct and
+unqualified; the runtime candidate is unchanged. See the
+[functional-intent scope, evidence and compatibility decisions](legacy-helper-functional-intent.md).

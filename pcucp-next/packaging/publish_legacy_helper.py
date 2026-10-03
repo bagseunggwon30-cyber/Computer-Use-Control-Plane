@@ -151,6 +151,7 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT,
                         help="new package directory; never overwritten")
     parser.add_argument("--dotnet", default="dotnet", help="SDK executable name or path")
+    parser.add_argument("--evidence-dir", type=Path, help="optional bounded build-output/manifest metadata, never package payload")
     args = parser.parse_args(argv)
     output = args.output.absolute()
     if output.exists() or output.is_symlink():
@@ -164,7 +165,17 @@ def main(argv=None):
             result = subprocess.run(build_command(dotnet, work), cwd=ROOT, shell=False)
             if result.returncode:
                 return result.returncode
+            if args.evidence_dir is not None:
+                args.evidence_dir.mkdir(parents=True, exist_ok=True)
+                closure = {p.name: _file_record(p) for p in sorted(Path(work).iterdir()) if p.is_file()}
+                if len(closure) > 128: raise ValueError("Unexpected helper build-output cardinality")
+                evidence = {"schema": "cucp.helper-package-build-evidence/v1", "build_output": closure,
+                    "included": list(REQUIRED_FILES), "source_program": _file_record(PROJECT.parent / "Program.cs"),
+                    "source_project": _file_record(PROJECT)}
+                (args.evidence_dir / "package-build-closure.json").write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
             manifest = stage_package(work, output)
+            if args.evidence_dir is not None:
+                (args.evidence_dir / "package-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     except (OSError, ValueError) as error:
         parser.error(str(error))
     print(json.dumps({"package": str(output), "status": manifest["status"],

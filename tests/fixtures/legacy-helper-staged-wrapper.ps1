@@ -13,3 +13,6 @@ switch ($Operation) {
   'stop' { & $Wrapper -Quiet -CucpArgs @('macro','session','stop-helper','--force') }
   'version' { & $Wrapper -Quiet -CucpArgs @('macro','version') }
 }
+
+# A nested script exit sets LASTEXITCODE; propagate it to the outer -File host.
+exit [int]$LASTEXITCODE

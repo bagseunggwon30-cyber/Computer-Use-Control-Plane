@@ -97,6 +97,76 @@ def expected_args_seam(raw):
                 source_sha256=entry['normalized_sha256'], args_substitutions=sites, functions=functions)
 
 
+def expected_functional_seam(raw):
+    """Read-only byte census of the four explicit functional corrections.
+
+    This returns evidence and hashes only. No PowerShell is evaluated, emitted,
+    or supplied to the driver. The helper stays literal in the counted .ps1.
+    """
+    type_seam = expected_type_seam(raw)
+    args_seam = expected_args_seam(raw)
+    entry = MANIFEST['files'][0]
+    encoded = raw.decode('utf-8-sig').replace('\r\n', '\n').encode('utf-16-le')
+    nested = next(f for f in entry['functions'] if f['name'] == '_AsyncWait')
+    sites, functions = [], []
+    for record, typed, args_only in zip((f for f in entry['functions']
+                                       if not f['parent_function'] and f['name'] not in LOADER_NAMES),
+                                      type_seam['functions'], args_seam['functions']):
+        body = encoded[2 * record['start_utf16']:2 * record['end_utf16']]
+        text = body.decode('utf-16-le')
+        edits = [s for s in type_seam['type_substitutions'] + args_seam['args_substitutions']
+                 if s['function'] == record['name']]
+        for match in re.finditer(r'\$T\b|Sort-Object -Property score -Descending', text):
+            original = match[0]
+            start = record['start_utf16'] + len(text[:match.start()].encode('utf-16-le')) // 2
+            end = start + len(original.encode('utf-16-le')) // 2
+            if original == '$T':
+                if (record['name'] != nested['parent_function']
+                        or not nested['start_utf16'] <= start < end <= nested['end_utf16']):
+                    raise AssertionError('Unexpected independent functional variable owner')
+                kind = 'parameter' if text[:match.start()].endswith('[Type]') else 'variable'
+                if kind == 'variable' and not text[:match.start()].endswith('$asTask.MakeGenericMethod('):
+                    raise AssertionError('Unexpected independent functional variable use')
+                owner, ast_kind, replacement = nested['name'], 'VariableExpressionAst', '$ResultType'
+            else:
+                if record['name'] not in {'_Action-ModalDetect', '_Action-UiaFindFast'}:
+                    raise AssertionError('Unexpected independent functional score sort owner')
+                kind, owner = 'score-sort-command', record['name']
+                ast_kind, replacement = 'CommandAst', '_Oracle-StableScore'
+            site = dict(function=record['name'], owner_function=owner, kind=kind, ast_kind=ast_kind,
+                        start_utf16=start, end_utf16=end, original=original, replacement=replacement)
+            sites.append(site)
+            edits.append(site)
+        cursor, pieces = 0, []
+        for edit in sorted(edits, key=lambda s: s['start_utf16']):
+            start = 2 * (edit['start_utf16'] - record['start_utf16'])
+            end = 2 * (edit['end_utf16'] - record['start_utf16'])
+            if start < cursor or end > len(body) or start >= end:
+                raise AssertionError('Overlapping or out-of-range independent functional extent')
+            if body[start:end] != edit['original'].encode('utf-16-le'):
+                raise AssertionError('Changed independent functional extent')
+            pieces.extend((body[cursor:start], edit['replacement'].encode('utf-16-le')))
+            cursor = end
+        pieces.append(body[cursor:])
+        corrected = b''.join(pieces).decode('utf-16-le').encode('utf-8')
+        functions.append(dict(name=record['name'], original_sha256=record['sha256'],
+                              type_only_sha256=typed['substituted_sha256'],
+                              args_only_sha256=args_only['corrected_sha256'],
+                              functional_sha256=hashlib.sha256(corrected).hexdigest()))
+    if [s['kind'] for s in sites] != ['score-sort-command', 'parameter', 'variable', 'score-sort-command']:
+        raise AssertionError('Independent functional census is not exactly two type variables and two sorts')
+    driver = (FIXTURES / 'oracle.ps1').read_text(encoding='utf-8-sig').replace('\r\n', '\n')
+    helpers = re.findall(r'(?ms)^  (function _Oracle-StableScore \{.*?^  \})', driver)
+    helper_hash = '12d58b4e481506dd32dfc9b980132d80f1f2274db995bbfaf9a8c09f62757a27'
+    if len(helpers) != 1 or hashlib.sha256(helpers[0].encode()).hexdigest() != helper_hash:
+        raise AssertionError('Counted stable score helper changed')
+    return dict(schema='cucp.oracle-functional-intent-seam/v1', qualification='functional-intent-only',
+                source_sha256=entry['normalized_sha256'], functional_substitutions=sites,
+                stable_sort_helper=dict(name='_Oracle-StableScore', sha256=helper_hash,
+                                        source_path='tests/fixtures/legacy-helper/oracle.ps1'),
+                functions=functions)
+
+
 def published_source(path, directory):
     evidence = run_evidence(['git', 'show', f"{MANIFEST['published_tree']}:{path}"],
                             cwd=ROOT, directory=directory, label='published-git-source', limit=2 * 1024 * 1024)
@@ -276,6 +346,93 @@ class HelperSourceTests(unittest.TestCase):
         self.assertLess(diagnostic, refusal)
         self.assertLess(refusal, driver.index('Microsoft.PowerShell.Utility\\Add-Type'))
         self.assertLess(refusal, driver.index('[scriptblock]::Create($function.body)'))
+
+    def test_functional_intent_has_a_separate_exact_four_site_census(self):
+        with tempfile.TemporaryDirectory() as directory:
+            raw = published_source('scripts/cucp-helper-server.ps1', directory)
+        seam = expected_functional_seam(raw)
+        args_only = expected_args_seam(raw)
+        sites = seam['functional_substitutions']
+        self.assertEqual([(s['start_utf16'], s['end_utf16']) for s in sites],
+                         [(10048, 10087), (14987, 14989), (15028, 15030), (19022, 19061)])
+        self.assertEqual([s['owner_function'] for s in sites],
+                         ['_Action-ModalDetect', '_AsyncWait', '_AsyncWait', '_Action-UiaFindFast'])
+        self.assertEqual([s['ast_kind'] for s in sites],
+                         ['CommandAst', 'VariableExpressionAst', 'VariableExpressionAst', 'CommandAst'])
+        self.assertEqual([s['replacement'] for s in sites],
+                         ['_Oracle-StableScore', '$ResultType', '$ResultType', '_Oracle-StableScore'])
+        self.assertEqual(len(seam['functions']), 8)
+        for final, args_function in zip(seam['functions'], args_only['functions']):
+            self.assertEqual(final['original_sha256'], args_function['original_sha256'])
+            self.assertEqual(final['type_only_sha256'], args_function['type_only_sha256'])
+            self.assertEqual(final['args_only_sha256'], args_function['corrected_sha256'])
+            if final['name'] in {'_Action-ModalDetect', '_Action-OcrScreenFast', '_Action-UiaFindFast'}:
+                self.assertNotEqual(final['functional_sha256'], final['args_only_sha256'])
+            else:
+                self.assertEqual(final['functional_sha256'], final['args_only_sha256'])
+        driver = (FIXTURES / 'oracle.ps1').read_text(encoding='utf-8')
+        plan = driver.split('$functionalPlan=@(', 1)[1].split('\n)', 1)[0]
+        expected = []
+        for row in re.findall(r'@\{([^\n]+)\}', plan):
+            fields = dict(re.findall(r"(\w+)='([^']*)'", row))
+            fields.update((key, int(value)) for key, value in re.findall(r'(\w+)=(\d+)', row))
+            expected.append(fields)
+        self.assertEqual(expected, sites)
+        self.assertIn('[switch]$FunctionalIntent', driver)
+        self.assertNotIn('$FunctionalIntent=$true', driver)
+        self.assertIn("if($FunctionalIntent -and -not $CorrectedIntent)", driver)
+        self.assertIn("Functional-intent mode requires explicit corrected-intent mode", driver)
+        self.assertIn("qualification='functional-intent-only'", driver)
+        self.assertIn("if($FunctionalIntent){'functional-intent'}elseif($CorrectedIntent)", driver)
+        self.assertIn('if($FunctionalIntent){$output.functional_seam=$functionalSeam}', driver)
+        self.assertIn('$functionalSites.Count -ne 4', driver)
+        self.assertIn('$functionalFunctions.Count -ne 8', driver)
+        self.assertLess(driver.index('$correctedFunctions.Add('), driver.index('$argsOnlyHash=Hash-Text $body'))
+        for mutated in (raw.replace(b'[Type]$T', b'[Type]$R', 1),
+                        raw.replace(b'$t.Wait()', b'$t.Wait(1)', 1),
+                        raw.replace(b'Sort-Object -Property score -Descending', b'Sort-Object -Property score', 1)):
+            with self.assertRaisesRegex(AssertionError, 'Published server source hash mismatch'):
+                expected_functional_seam(mutated)
+
+    def test_functional_intent_closed_ast_guards_and_negative_plans_precede_import(self):
+        driver = (FIXTURES / 'oracle.ps1').read_text(encoding='utf-8')
+        self.assertIn("[ValidateSet('none','duplicate','changed','wrongname')][string]$TestFunctionalExtentFault='none'", driver)
+        self.assertIn("[ValidateSet('async-type','score-sort')][string]$TestFunctionalExtentTarget='async-type'", driver)
+        self.assertIn("if($TestFunctionalExtentFault -eq 'duplicate')", driver)
+        self.assertIn("elseif($TestFunctionalExtentFault -eq 'changed'){$first.original='Changed functional extent'}", driver)
+        self.assertIn("else{$first.replacement='UnplannedFunctionalReplacement'}", driver)
+        for guard in ('Unplanned functional AST extent', 'Unplanned functional type variable use',
+                      'Unplanned functional type variable owner', 'Unplanned functional score sort owner',
+                      'Duplicate functional AST extent', 'Missing planned functional AST extent',
+                      'Functional-intent extent is out of bounds', 'Invalid functional-intent oracle function'):
+            self.assertIn(guard, driver)
+            self.assertLess(driver.index(guard), driver.index('Microsoft.PowerShell.Utility\\Add-Type'))
+        self.assertIn("$part.VariablePath.UserPath -ceq 'T'", driver)
+        self.assertIn("$part.Parent.Member.Value -cne 'MakeGenericMethod'", driver)
+        self.assertIn('$owner -ne $nested[0].node -or $outer -ne $node', driver)
+        self.assertIn("$part.GetType().Name -cne $plan.ast_kind", driver)
+        self.assertIn("$extent.Text -cne $plan.original", driver)
+        diagnostic = driver.index("schema='cucp.oracle-functional-extent-refusal/v1'")
+        refusal = driver.index("throw 'Unsafe functional-intent extent'")
+        self.assertLess(diagnostic, refusal)
+        self.assertLess(refusal, driver.index('Microsoft.PowerShell.Utility\\Add-Type'))
+        self.assertLess(refusal, driver.index('[scriptblock]::Create($function.body)'))
+
+    def test_stable_score_helper_is_literal_numeric_stable_and_preserves_record_identity(self):
+        driver = (FIXTURES / 'oracle.ps1').read_text(encoding='utf-8')
+        helper, = re.findall(r'(?ms)^  (function _Oracle-StableScore \{.*?^  \})', driver)
+        digest = hashlib.sha256(helper.encode()).hexdigest()
+        self.assertEqual(digest, '12d58b4e481506dd32dfc9b980132d80f1f2274db995bbfaf9a8c09f62757a27')
+        self.assertIn("-cne '" + digest + "'", driver)
+        self.assertLess(driver.index('Stable score helper definition changed'),
+                        driver.index('Microsoft.PowerShell.Utility\\Add-Type'))
+        self.assertIn("[double]($orderedRecords[$position-1]['score']) -lt [double]($Record['score'])", helper)
+        self.assertNotIn(' -le ', helper)
+        self.assertIn('$orderedRecords.Insert($position,$Record)', helper)
+        self.assertIn('$PSCmdlet.WriteObject($item,$false)', helper)
+        for forbidden in ('Sort-Object', 'Add-Member', 'PSCustomObject', 'Invoke-Expression',
+                          'scriptblock', 'CucpFixture', 'Remove-Item', 'Add-Type', '$Record[\'score\']='):
+            self.assertNotIn(forbidden, helper)
 
     def test_binding_probe_preserves_original_functions_and_trace_array_shape(self):
         probe = (FIXTURES / 'binding-probe.ps1').read_text(encoding='utf-8')
