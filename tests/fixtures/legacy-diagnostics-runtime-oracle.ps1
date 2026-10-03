@@ -122,6 +122,7 @@ function Replace-Pattern([string]$Text,[string]$Pattern,[string]$New){
  return $regex.Replace($Text,[Text.RegularExpressions.MatchEvaluator]{param($m) $New})
 }
 $names=@('_Read-OptValue','_Read-Switch','_Iif','Invoke-MacroPerf','Invoke-MacroDiagnoseLag','Invoke-MacroHealthQuick','Invoke-MacroHealthDetail','Invoke-MacroSelfTest','Invoke-MacroBenchmark')
+if($ProductionEntry){$names=@($names|Where-Object {$_ -ne '_Iif'})}
 $definitions=@{}
 foreach($name in $names){
  $nodes=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))

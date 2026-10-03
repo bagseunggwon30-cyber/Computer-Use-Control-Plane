@@ -180,7 +180,7 @@ $ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[re
 if($errors.Count){throw 'Pinned source did not parse'}
 $names=@('_Read-OptValue','_Read-AllOptValues','_Read-Switch','_TaskPlan-QuoteToken','_TaskPlan-StepString',
          '_AppStrategy-NormalizeRoute','_AppStrategy-Key','_AppProfile-StrategyScore','Invoke-MacroAppProfile')
-if($CurrentBridge){$names=@('_Invoke-LegacyCompatibility','_Read-OptValue','_Read-AllOptValues','_Read-Switch','_AppStrategy-Key','Invoke-MacroAppProfile')}
+if($CurrentBridge){$names=@('_Invoke-LegacyCompatibility','_Read-OptValue','_Read-AllOptValues','_Read-Switch','Invoke-MacroAppProfile')}
 foreach($name in $names){
  $functionAst=$ast
  if($CurrentBridge -and $AdapterPath -and $name -eq 'Invoke-MacroAppProfile'){

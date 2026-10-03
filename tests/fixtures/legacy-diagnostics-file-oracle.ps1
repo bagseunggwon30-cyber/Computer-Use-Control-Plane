@@ -100,6 +100,7 @@ function Replace-ExactSeam {
 
 $names=@('_Read-OptValue','_Read-Switch','_Emit-Envelope','_New-ObservationEnvelope','_Cucp-RedactSecrets',
  'Invoke-MacroAuditSummary','Invoke-MacroLogTail','Invoke-MacroReleaseNotes')
+if($ProductionEntry){$names=@($names|Where-Object {$_ -ne '_Cucp-RedactSecrets'})}
 foreach($name in $names){
  $found=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
  if($found.Count -ne 1){throw "Expected one original diagnostic function: $name"}

@@ -81,7 +81,7 @@ $ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Enco
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[ref]$errors)
 $names=@('_Read-OptValue','_Read-Switch','_TaskPlan-QuoteToken','_TaskPlan-StepString','Invoke-MacroSmartPlan')
-if($CurrentBridge){$names=@('_Invoke-LegacyCompatibility')+$names}
+if($CurrentBridge){$names=@('_Invoke-LegacyCompatibility','_Read-OptValue','_Read-Switch','Invoke-MacroSmartPlan')}
 foreach($name in $names) {
  $fn=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
  if($fn.Count -ne 1){throw "Expected exact source function $name"}

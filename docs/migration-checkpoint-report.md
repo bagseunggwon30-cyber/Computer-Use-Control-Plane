@@ -158,6 +158,23 @@ Local checks passed 1,402 managed assertions and 552 Python tests (429 passed,
 eight normalized and 98 text-only. Production still uses the retained parser;
 this requires a fresh Windows result and does not establish complete parity.
 
+### Local orphaned-helper cleanup after the candidate
+
+A bounded local cleanup removes seven unused private helper extents (2,451
+runtime bytes), retaining every public compatibility delegate and the production
+parser. Original-source oracle imports and historical assertions remain; only
+five current-source loaders omit the retired definitions. The two explicit
+diagnostic fixture guards add 151 PS bytes, so net retirement is 2,300 bytes.
+Integrated locally onto `14ccef5ba48e82041599698f809576040d6fc5c0`, the index
+contains 870,201 tracked PS bytes (610,258 under `scripts/` and 259,943 in other
+source/tests, including launchers), or 143,277 fewer than baseline. All parser
+code, diagnostic fixtures, goldens and `.gitattributes` remain unchanged. Integrated
+local Python discovery passed 432 of 555 tests with 123 explicit platform skips;
+eight managed contract projects passed 2,335 checks under local runtime10
+roll-forward. Fresh source/loader Windows qualification and a bundled full
+regression remain pending. See the
+[exact scope, evidence and acceptance gates](orphaned-pure-helper-retirement.md).
+
 ## Actual source replacement
 
 The baseline is commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tree

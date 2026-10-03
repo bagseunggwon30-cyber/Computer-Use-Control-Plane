@@ -92,7 +92,7 @@ $tokens=$null;$parseErrors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[ref]$parseErrors)
 if($parseErrors.Count){throw 'Source did not parse'}
 $names=@('_Read-OptValue','_Read-Switch','Get-CacheKey','_TaskPlan-QuoteToken','_TaskPlan-StepString','_AnchorHistory-NormDistance','_AnchorHistory-Score','Invoke-MacroCoordAnchor','_PointPlan-CacheKey','Invoke-MacroPointPlan','_TargetValidate-ConfidenceRank','_TargetValidate-SizeClass','_TargetValidate-PointEdgeDistance','Invoke-MacroTargetValidate','_Set-ObjectProperty')
-if($CurrentBridge){$names+=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and ($n.Name -like '_Precision-*' -or $n.Name -like '_Invoke-LegacyPrecision*')},$true)|ForEach-Object {$_.Name})}
+if($CurrentBridge){$names=@($names|Where-Object {$_ -notin @('_TaskPlan-QuoteToken','_TaskPlan-StepString','_Set-ObjectProperty')});$names+=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and ($n.Name -like '_Precision-*' -or $n.Name -like '_Invoke-LegacyPrecision*')},$true)|ForEach-Object {$_.Name})}
 foreach($name in $names){
  $found=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
  if($found.Count -ne 1){throw "Expected one source function $name"}

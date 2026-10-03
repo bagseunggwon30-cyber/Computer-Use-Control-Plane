@@ -240,7 +240,7 @@
     },
     {
       "path": "scripts/cucp.ps1",
-      "lines": 8575,
+      "lines": 8522,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -683,10 +683,6 @@
           "line": 3716
         },
         {
-          "name": "_Iif",
-          "line": 3718
-        },
-        {
           "name": "Invoke-MacroTrajectory",
           "line": 3720
         },
@@ -855,328 +851,304 @@
           "line": 5661
         },
         {
-          "name": "_Set-ObjectProperty",
-          "line": 5702
-        },
-        {
           "name": "_PointPlan-CacheKey",
-          "line": 5709
+          "line": 5704
         },
         {
           "name": "_PointPlan-CachePath",
-          "line": 5714
+          "line": 5709
         },
         {
           "name": "_PointPlan-ReadCache",
-          "line": 5716
+          "line": 5711
         },
         {
           "name": "_PointPlan-WriteCache",
-          "line": 5718
+          "line": 5713
         },
         {
           "name": "Invoke-MacroPointPlan",
-          "line": 5720
+          "line": 5715
         },
         {
           "name": "_TargetValidate-ConfidenceRank",
-          "line": 5722
+          "line": 5717
         },
         {
           "name": "_TargetValidate-SizeClass",
-          "line": 5724
+          "line": 5719
         },
         {
           "name": "_TargetValidate-PointEdgeDistance",
-          "line": 5726
+          "line": 5721
         },
         {
           "name": "_TargetValidate-InvokePointPlanJson",
-          "line": 5728
+          "line": 5723
         },
         {
           "name": "Invoke-MacroTargetValidate",
-          "line": 5740
+          "line": 5735
         },
         {
           "name": "Invoke-MacroSafeType",
-          "line": 5746
+          "line": 5741
         },
         {
           "name": "Test-CdpPortQuick",
-          "line": 5755
+          "line": 5750
         },
         {
           "name": "Invoke-MacroHistory",
-          "line": 5838
+          "line": 5833
         },
         {
           "name": "Invoke-MacroSmartPlan",
-          "line": 5944
+          "line": 5939
         },
         {
           "name": "_Parse-WorkflowStepTokens",
-          "line": 6041
+          "line": 6036
         },
         {
           "name": "_Read-WorkflowStepSpecs",
-          "line": 6076
+          "line": 6071
         },
         {
           "name": "_Build-WorkflowPlan",
-          "line": 6097
+          "line": 6092
         },
         {
           "name": "Invoke-MacroWorkflowPlan",
-          "line": 6111
+          "line": 6106
         },
         {
           "name": "_Invoke-LegacyExecutionChild",
-          "line": 6124
+          "line": 6119
         },
         {
           "name": "_Execution-EncodeWire($Value)",
-          "line": 6177
+          "line": 6172
         },
         {
           "name": "_Execution-Require($Condition,[string]$Message)",
-          "line": 6185
+          "line": 6180
         },
         {
           "name": "_Execution-Fields($Value,[string[]]$Names)",
-          "line": 6189
+          "line": 6184
         },
         {
           "name": "_Execution-DecodeWire($Wire)",
-          "line": 6195
+          "line": 6190
         },
         {
           "name": "_Execution-WriteChunks($Writer,[long]$Id,[string]$Target,$Value)",
-          "line": 6222
+          "line": 6217
         },
         {
           "name": "_Execution-WriteDiagnostic($State,$Process,$Stderr,[string]$ErrorText)",
-          "line": 6235
+          "line": 6230
         },
         {
           "name": "_Execution-ValidateEffect($Effect,$State)",
-          "line": 6255
+          "line": 6250
         },
         {
           "name": "_Execution-SendEscape",
-          "line": 6316
+          "line": 6311
         },
         {
           "name": "_Execution-Dispatch($Effect,$State)",
-          "line": 6321
+          "line": 6316
         },
         {
           "name": "_Execution-EffectMayChangeState($Effect)",
-          "line": 6362
+          "line": 6357
         },
         {
           "name": "_Invoke-LegacyExecutionEffectLoop",
-          "line": 6375
+          "line": 6370
         },
         {
           "name": "_Invoke-LegacyExecutionFamily",
-          "line": 6437
+          "line": 6432
         },
         {
           "name": "_Invoke-LegacyExecutionHost",
-          "line": 6452
+          "line": 6447
         },
         {
           "name": "Invoke-MacroWorkflowRun",
-          "line": 6507
-        },
-        {
-          "name": "_TaskPlan-QuoteToken",
-          "line": 6509
-        },
-        {
-          "name": "_TaskPlan-StepString",
-          "line": 6517
-        },
-        {
-          "name": "_TaskPlan-UnwrapCommand",
-          "line": 6533
+          "line": 6502
         },
         {
           "name": "_AppStrategy-NormalizeRoute",
-          "line": 6541
-        },
-        {
-          "name": "_AppStrategy-Key",
-          "line": 6560
+          "line": 6510
         },
         {
           "name": "_AppStrategy-Read",
-          "line": 6569
+          "line": 6531
         },
         {
           "name": "_AppStrategy-LastGood",
-          "line": 6582
+          "line": 6544
         },
         {
           "name": "_AppStrategy-Append",
-          "line": 6592
+          "line": 6554
         },
         {
           "name": "Invoke-MacroAppProfile",
-          "line": 6635
+          "line": 6597
         },
         {
           "name": "_Invoke-LegacyReadOnlyQuery",
-          "line": 6736
+          "line": 6698
         },
         {
           "name": "Invoke-MacroTaskPreset",
-          "line": 6789
+          "line": 6751
         },
         {
           "name": "Invoke-MacroTaskPlan",
-          "line": 6839
+          "line": 6801
         },
         {
           "name": "Invoke-MacroTaskRun",
-          "line": 6872
+          "line": 6834
         },
         {
           "name": "Invoke-MacroFormPlan",
-          "line": 6874
+          "line": 6836
         },
         {
           "name": "Invoke-MacroFormRun",
-          "line": 6903
+          "line": 6865
         },
         {
           "name": "Invoke-MacroSmartClick",
-          "line": 6905
+          "line": 6867
         },
         {
           "name": "Invoke-MacroWatch",
-          "line": 6920
+          "line": 6882
         },
         {
           "name": "Invoke-MacroOcrScreen",
-          "line": 6934
+          "line": 6896
         },
         {
           "name": "Invoke-MacroOcrImage",
-          "line": 6963
+          "line": 6925
         },
         {
           "name": "Invoke-MacroOcrFindText",
-          "line": 6987
+          "line": 6949
         },
         {
           "name": "Invoke-MacroOcrClick",
-          "line": 7030
+          "line": 6992
         },
         {
           "name": "Invoke-MacroOcrUiaFuse",
-          "line": 7044
+          "line": 7006
         },
         {
           "name": "Invoke-MacroOcrUiaInvoke",
-          "line": 7087
+          "line": 7049
         },
         {
           "name": "Invoke-MacroScreenshotDiff",
-          "line": 7129
+          "line": 7091
         },
         {
           "name": "Invoke-MacroClickAndVerifyScreen",
-          "line": 7168
+          "line": 7130
         },
         {
           "name": "Invoke-MacroAutoDo",
-          "line": 7265
+          "line": 7227
         },
         {
           "name": "_Trajectory-Append",
-          "line": 7374
+          "line": 7336
         },
         {
           "name": "_Trajectory-Read",
-          "line": 7398
+          "line": 7360
         },
         {
           "name": "_Trajectory-Clear",
-          "line": 7412
+          "line": 7374
         },
         {
           "name": "_History-Append",
-          "line": 7436
+          "line": 7398
         },
         {
           "name": "_History-PickBestStrategy",
-          "line": 7475
+          "line": 7437
         },
         {
           "name": "_History-Stats",
-          "line": 7522
+          "line": 7484
         },
         {
           "name": "_Helper-IsUp",
-          "line": 7559
+          "line": 7521
         },
         {
           "name": "_Helper-Ensure",
-          "line": 7564
+          "line": 7526
         },
         {
           "name": "Invoke-MacroSession",
-          "line": 7585
-        },
-        {
-          "name": "_Cucp-RedactSecrets",
-          "line": 7803
+          "line": 7547
         },
         {
           "name": "Invoke-MacroImePaste",
-          "line": 7835
+          "line": 7782
         },
         {
           "name": "Invoke-MacroSafeTypeIme",
-          "line": 7887
+          "line": 7834
         },
         {
           "name": "Invoke-MacroModalDetect",
-          "line": 7967
+          "line": 7914
         },
         {
           "name": "Invoke-MacroRecoveryPlan",
-          "line": 8000
+          "line": 7947
         },
         {
           "name": "Invoke-MacroRecoveryRun",
-          "line": 8008
+          "line": 7955
         },
         {
           "name": "Invoke-MacroPrecisionValidate",
-          "line": 8015
+          "line": 7962
         },
         {
           "name": "Invoke-MacroBenchmark",
-          "line": 8023
+          "line": 7970
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 8164
+          "line": 8111
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 8196
+          "line": 8143
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 8311
+          "line": 8258
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 8407
+          "line": 8354
         }
       ]
     },
@@ -1548,6 +1520,83 @@
       "name": "_Js-StringLiteral",
       "replacement": "pcucp-next/python/pcucp_cli/legacy_cdp.py",
       "evidence": "Exact kernels and retained adapters qualified at e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe / run37007340738; verified UTF-16 AST spans and SHA-256 function hashes used for promotion. Integrated production dispatch and portable packaging are required in the bundled full regression."
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_Iif",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticHealth.cs",
+      "evidence": "SelfTest conditional status assembly; pinned self-test payload, Console, exit and effect comparisons. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "original_body_bytes": 95,
+      "original_body_sha256": "4ce6aa3a73690de129131e41c37ceab54ad6243fde0c6bd28b497484f817c537",
+      "original_start_utf16": 169543,
+      "original_end_utf16": 169638,
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_Set-ObjectProperty",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionPlanners.cs",
+      "evidence": "PointPlan cached payload field replacement; pinned precision cache-hit payload, Console, exit, query and effect comparisons. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "original_body_bytes": 261,
+      "original_body_sha256": "eef94004dbca18fc88a7cb017199cc8d33175a02bf096a23685dce669695b182",
+      "original_start_utf16": 249762,
+      "original_end_utf16": 250023,
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_TaskPlan-QuoteToken",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs",
+      "evidence": "QuoteToken and StepString; pinned task-preset helper, task/form, SmartPlan and culture/alias oracles. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "original_body_bytes": 218,
+      "original_body_sha256": "556fbc8fe3e6acc381ddb583615734b4473b0a8775519c8eebffece3d7c97f41",
+      "original_start_utf16": 299266,
+      "original_end_utf16": 299484,
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_TaskPlan-StepString",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs",
+      "evidence": "StepString and CommandHelpers; pinned task-preset helper, task/form, SmartPlan, app-profile and precision oracles. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "original_body_bytes": 542,
+      "original_body_sha256": "e1c7b3a8132fc857c3e7d45158d37607abbafa2945bcb727761ffd0a5e8e17c9",
+      "original_start_utf16": 299486,
+      "original_end_utf16": 300028,
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_TaskPlan-UnwrapCommand",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs",
+      "evidence": "CommandHelpers (also called by TaskForm.Unwrap); pinned task-preset helper and task/form oracles. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "original_body_bytes": 214,
+      "original_body_sha256": "3e0f5b5e4501644b5d5377bcbf4a1b00a5a4f19a360474c962114d02b6c62470",
+      "original_start_utf16": 300030,
+      "original_end_utf16": 300244,
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_AppStrategy-Key",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyAppProfile/LegacyAppProfileKernel.cs",
+      "evidence": "AppKey with LegacyTextKernel.SanitizeAppKeyPart; pinned app-profile actual-adapter and culture/alias oracles. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "original_body_bytes": 350,
+      "original_body_sha256": "21478517f6ffb7777a77d07a3ec02999435cad1e9281fc09467f00cc310c8835",
+      "original_start_utf16": 300879,
+      "original_end_utf16": 301229,
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+    },
+    {
+      "path": "scripts/cucp.ps1",
+      "name": "_Cucp-RedactSecrets",
+      "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticFiles.cs",
+      "evidence": "DiagnosticReleaseRedactors; pinned release-notes payload, Console, exit and effect comparisons. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "original_body_bytes": 771,
+      "original_body_sha256": "ee6caffec3c7a916df1daf1090be7b9e64242f3197c7ce645a982d09da8a644a",
+      "original_start_utf16": 365367,
+      "original_end_utf16": 366138,
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
     }
   ],
   "compiled_interop": {
@@ -1563,8 +1612,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 872501,
-    "removed": 140977,
+    "current": 870201,
+    "removed": 143277,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",

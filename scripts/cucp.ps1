@@ -3715,7 +3715,7 @@ function Invoke-MacroGoal {
 
 function Invoke-MacroSelfTest {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'self-test' -Rest $Rest}
 
-function _Iif { param([scriptblock]$Cond, $Then, $Else) if (& $Cond) { $Then } else { $Else } }
+
 
 function Invoke-MacroTrajectory {
   param([string[]]$Rest)
@@ -5699,12 +5699,7 @@ function Invoke-MacroHitScan {
   return $exitCode
 }
 
-function _Set-ObjectProperty {
-  param($Object, [string]$Name, $Value)
-  if (-not $Object) { return }
-  if ($Object.PSObject.Properties[$Name]) { $Object.$Name = $Value }
-  else { $Object | Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force }
-}
+
 
 function _PointPlan-CacheKey {
   param([int]$X,[int]$Y,[int]$Radius,[int]$Step,[int]$ClickInset,[int]$TargetHwnd,[string]$TargetMatch,$Precheck,[string]$CoordSignature)
@@ -6506,37 +6501,11 @@ function _Invoke-LegacyExecutionHost {
 
 function Invoke-MacroWorkflowRun {param([string[]]$Rest) return _Invoke-LegacyExecutionFamily -Operation 'workflow-run' -Rest $Rest -ScriptPath $PSCommandPath}
 
-function _TaskPlan-QuoteToken {
-  param([string]$Value)
-  if ($null -eq $Value) { return "''" }
-  $s = "$Value"
-  if ($s -match '^[A-Za-z0-9_\-\.\/\\:=@]+$') { return $s }
-  return "'" + ($s -replace "'", "''") + "'"
-}
 
-function _TaskPlan-StepString {
-  param([object[]]$Command)
-  $tokens = New-Object System.Collections.ArrayList
-  foreach ($item in @($Command)) {
-    if ($null -eq $item) { continue }
-    if (($item -is [array]) -or ($item -is [System.Collections.IEnumerable] -and -not ($item -is [string]))) {
-      foreach ($sub in @($item)) {
-        if ($null -ne $sub) { [void]$tokens.Add("$sub") }
-      }
-    } else {
-      [void]$tokens.Add("$item")
-    }
-  }
-  return ((@($tokens) | ForEach-Object { _TaskPlan-QuoteToken -Value "$_" }) -join " ")
-}
 
-function _TaskPlan-UnwrapCommand {
-  param($Command)
-  if ($null -eq $Command) { return @() }
-  $items = @($Command)
-  if ($items.Count -eq 1 -and $items[0] -is [array]) { return @($items[0]) }
-  return @($items)
-}
+
+
+
 
 function _AppStrategy-NormalizeRoute {
   param([string]$Strategy)
@@ -6557,14 +6526,7 @@ function _AppStrategy-NormalizeRoute {
   }
 }
 
-function _AppStrategy-Key {
-  param([string]$Process, [string]$Class, [string]$AppType)
-  $parts = @($Process, $Class, $AppType) | ForEach-Object {
-    "$_".Trim().ToLowerInvariant() -replace '[^a-z0-9_.-]+', '-'
-  } | Where-Object { $_ }
-  if (@($parts).Count -eq 0) { return "unknown-app" }
-  return (@($parts | Select-Object -First 3) -join "|")
-}
+
 
 function _AppStrategy-Read {
   if (-not $Script:AppStrategyFile -or -not (Test-Path -LiteralPath $Script:AppStrategyFile)) { return @() }
@@ -7800,22 +7762,7 @@ $Script:CucpV14Schema = @{
 # 보안 보완: secret/PII redaction helper (release-notes 출력에 사용)
 # 패턴: GitHub PAT (ghp_/gho_/ghs_/...), OpenAI sk-, AWS AKIA, Bearer/JWT, PEM
 # ----------------------------------------------------------------------------
-function _Cucp-RedactSecrets { param([string]$Text)
-  if (-not $Text) { return $Text }
-  $patterns = @(
-    @{ rx = '\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{16,}'; tag = '[REDACTED:github_pat]' },
-    @{ rx = '\bsk-[A-Za-z0-9]{20,}';                      tag = '[REDACTED:openai_key]' },
-    @{ rx = '\bAKIA[A-Z0-9]{16}\b';                       tag = '[REDACTED:aws_key]' },
-    @{ rx = '(?i)bearer\s+[A-Za-z0-9_\-\.=]{20,}';        tag = '[REDACTED:bearer]' },
-    @{ rx = 'eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}'; tag = '[REDACTED:jwt]' },
-    @{ rx = '-----BEGIN [A-Z ]+PRIVATE KEY-----';         tag = '[REDACTED:pem_block]' }
-  )
-  $out = $Text
-  foreach ($p in $patterns) {
-    $out = [regex]::Replace($out, $p.rx, $p.tag)
-  }
-  return $out
-}
+
 
 # ----------------------------------------------------------------------------
 # 1. cdp-deep-find ─ Shadow DOM/iframe 깊이 보고 (read-only)

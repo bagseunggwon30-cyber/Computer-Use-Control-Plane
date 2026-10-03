@@ -1073,7 +1073,7 @@ CUCP에는 8개 라이브 워크플로우 매트릭스가 있습니다 (browser_
 - schema: `cucp.release-notes/v1`
 - 동작: CHANGELOG.md 를 `## v?(\d+\.\d+\.\d+)` 헤더로 split →
   각 버전 body 에서 `### Added/Improved/Verified/Fixed` 라인 분리 →
-  `_Cucp-RedactSecrets` 로 secret 패턴 치환 후 emit.
+  C# `DiagnosticReleaseRedactors` 로 동일한 secret 패턴 치환 후 emit.
 - redact 패턴 (6종):
   - GitHub PAT: `\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{16,}` → `[REDACTED:github_pat]`
   - OpenAI API key: `\bsk-[A-Za-z0-9]{20,}` → `[REDACTED:openai_key]`
