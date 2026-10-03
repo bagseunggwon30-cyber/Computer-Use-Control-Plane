@@ -17,13 +17,16 @@ import tempfile
 import unittest
 
 from test_legacy_diagnostics_parity import (
-    ACCEPTED_TREE, BODY_HASHES, FILE_OPERATIONS, ROOT, cases, decode_wire,
+    ACCEPTED_TREE, BODY_HASHES, FILE_OPERATIONS, PROJECT, ROOT, cases, decode_wire,
     reply, run_candidate,
 )
 from test_legacy_diagnostics_adapters import (
     ADAPTER, BRIDGE, RETAINED_DIAGNOSTICS, UNCERTAIN_MESSAGE,
     actual_adapter_arguments, captured_failures, changes_owned_state,
 )
+
+from legacy_diagnostic_evidence import CAPTURE_ENV, DiagnosticEvidence, file_identity
+from legacy_diagnostic_json_neighbors import cases as json_neighbor_cases
 
 
 def adversarial_json_cases():
@@ -147,7 +150,7 @@ def retained_candidate_cases():
     retained = [copy.deepcopy(f) for f in cases() if f['operation'] in RETAINED_DIAGNOSTICS]
     for index, fixture in enumerate(retained):
         fixture['case_id'] = 'existing/' + str(index)
-    return retained + adversarial_json_cases() + subtraction_boundary_cases()
+    return retained + adversarial_json_cases() + subtraction_boundary_cases() + json_neighbor_cases()
 
 
 def retained_candidate_adapter_arguments(pinned_source):
@@ -202,7 +205,11 @@ class RetainedDiagnosticPortableTests(unittest.TestCase):
         self.assertEqual(len(existing), 66)
         self.assertEqual(len(adversarial_json_cases()), 236)
         self.assertEqual(len(subtraction_boundary_cases()), 30)
-        self.assertEqual(len(fixtures), 332)
+        self.assertEqual(len(json_neighbor_cases()), 140)
+        self.assertEqual(len(fixtures), 472)
+        self.assertEqual(hashlib.sha256(json.dumps(fixtures[:332], ensure_ascii=False,
+            sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+            '355d50fa883eb909813b939f9d26725338ef4145ab471ad22c3af2cd5e310630')
         # Pin every value and case ID from the previous candidate batch, not
         # merely its case count. New probes append without altering that corpus.
         self.assertEqual(hashlib.sha256(json.dumps(fixtures[:302], ensure_ascii=False,
@@ -324,41 +331,84 @@ class RetainedDiagnosticWindowsTests(unittest.TestCase):
     maxDiff = 2500
 
     def test_pinned_original_current_original_pure_candidate_and_actual_candidate(self):
-        host = os.environ.get('CUCP_DIAGNOSTICS_TEST_HOST')
-        self.assertTrue(host, 'Retained candidate qualification requires CUCP_DIAGNOSTICS_TEST_HOST')
-        self.assertTrue(Path(host).is_file(), 'Matching diagnostic NativeHost does not exist')
         fixtures = retained_candidate_cases()
-        pure = run_candidate(fixtures)
-        records = {name: [None] * len(fixtures) for name in ('original', 'production', 'candidate')}
-        with tempfile.TemporaryDirectory(prefix='CUCP retained diagnostics 한국어 ') as temporary:
-            temp = Path(temporary)
-            source = temp / 'original.ps1'
-            source.write_bytes(subprocess.check_output(['git', 'show', f'{ACCEPTED_TREE}:scripts/cucp.ps1'], cwd=ROOT))
-            for file_group in (True, False):
-                selected = [(i, f) for i, f in enumerate(fixtures) if (f['operation'] in FILE_OPERATIONS) == file_group]
-                inputs = temp / 'cases.json'
-                inputs.write_text(json.dumps([f for _, f in selected]), encoding='utf-8-sig')
-                runner = ROOT / ('tests/fixtures/legacy-diagnostics-file-oracle.ps1' if file_group else 'tests/fixtures/legacy-diagnostics-runtime-oracle.ps1')
-                command = [shutil.which('powershell.exe'), '-NoProfile', '-NonInteractive', '-File', str(runner), '-InputPath', str(inputs)]
-                routes = {
-                    'original': ['-Source', str(source)],
-                    'production': actual_adapter_arguments(source, 'production'),
-                    'candidate': retained_candidate_adapter_arguments(source),
-                }
-                for name, arguments in routes.items():
-                    process = subprocess.run(command + arguments, capture_output=True, timeout=900,
-                        env={**os.environ, 'CUCP_NATIVE_HOST': str(Path(host).resolve()), 'CUCP_EXECUTION_DIAGNOSTICS': '1'})
-                    self.assertEqual(process.returncode, 0, process.stderr.decode(errors='replace'))
-                    observations = json.loads(process.stdout.decode('utf-8-sig'))
-                    self.assertEqual(len(observations), len(selected))
-                    for (index, _), observed in zip(selected, observations):
-                        records[name][index] = observed
+        planned = ['git-head', 'git-status', 'pinned-source', 'dotnet-info', 'pure-build', 'pure']
+        planned += [name + '-' + group for group in ('file', 'runtime') for name in ('original', 'production', 'candidate')]
+        capture = DiagnosticEvidence(os.environ.get(CAPTURE_ENV) or
+            ROOT / '.migration-logs/diagnostics/retained-diagnostics', fixtures, planned)
+        self.addCleanup(capture.finish)
+        with capture.comparison('acquisition', 'all-routes'):
+            host = os.environ.get('CUCP_DIAGNOSTICS_TEST_HOST')
+            powershell = shutil.which('powershell.exe')
+            dotnet = os.environ.get('DOTNET') or shutil.which('dotnet')
+            capture.provenance(accepted_tree=ACCEPTED_TREE,
+                powershell_requirement='5.1; checked independently by both unchanged oracle scripts',
+                executables={name: file_identity(path) for name, path in (
+                    ('powershell', powershell), ('dotnet', dotnet), ('native_host', host))},
+                source_files={str(path.relative_to(ROOT)): file_identity(path) for path in (
+                    BRIDGE, ADAPTER, Path(__file__), ROOT / 'tests/python/legacy_diagnostic_evidence.py',
+                    ROOT / 'tests/python/legacy_diagnostic_json_neighbors.py',
+                    ROOT / 'tests/python/test_legacy_diagnostics_parity.py',
+                    ROOT / 'tests/python/test_legacy_diagnostics_adapters.py',
+                    ROOT / 'tests/fixtures/legacy-diagnostics-file-oracle.ps1',
+                    ROOT / 'tests/fixtures/legacy-diagnostics-runtime-oracle.ps1',
+                    ROOT / 'tests/fixtures/legacy-diagnostics-adapter-guards.ps1',
+                    PROJECT / 'Program.cs', PROJECT / 'PcuCp.LegacyDiagnostics.ContractTests.csproj',
+                    PROJECT.parent / 'PcuCp.NativeHost/LegacyDiagnosticCulture.cs',
+                    PROJECT.parent / 'PcuCp.LegacyTaskForm/LegacyTaskFormKernel.cs',
+                    *sorted((PROJECT.parent / 'PcuCp.LegacyDiagnostics').glob('*.cs')))},
+                fixture_cultures=sorted({f.get('culture', 'en-US') for f in fixtures}))
+            with capture.comparison('setup', 'host-configuration'):
+                self.assertTrue(host, 'Retained candidate qualification requires CUCP_DIAGNOSTICS_TEST_HOST')
+                self.assertTrue(Path(host).is_file(), 'Matching diagnostic NativeHost does not exist')
+            for name, arguments in (('git-head', ['rev-parse', 'HEAD']), ('git-status', ['status', '--porcelain'])):
+                process = capture.run(name, ['git'] + arguments, cwd=ROOT, timeout=30)
+                capture.success(self, name, process)
+                capture.provenance(**{name.replace('-', '_'): process.stdout.decode('utf-8', errors='replace').strip()})
+            process = capture.run('dotnet-info', [dotnet, '--info'], cwd=ROOT, timeout=30)
+            capture.success(self, 'dotnet-info', process)
+            process = capture.run('pure-build', [dotnet, 'build', str(PROJECT), '-c', 'Release'], cwd=ROOT, timeout=180)
+            capture.success(self, 'pure-build', process)
+            dll = PROJECT / 'bin/Release/net8.0/PcuCp.LegacyDiagnostics.ContractTests.dll'
+            capture.provenance(pure_assembly=file_identity(dll),
+                pure_runtime_config=file_identity(dll.with_suffix('.runtimeconfig.json')))
+            process = capture.run('pure', [dotnet, str(dll), '--fixtures'],
+                case_ids=[f['case_id'] for f in fixtures], input=json.dumps(fixtures).encode(), cwd=ROOT, timeout=120)
+            pure = capture.rows(self, 'pure', process, len(fixtures))
+            records = {name: [None] * len(fixtures) for name in ('original', 'production', 'candidate')}
+            with tempfile.TemporaryDirectory(prefix='CUCP retained diagnostics 한국어 ') as temporary:
+                temp = Path(temporary)
+                source = temp / 'original.ps1'
+                process = capture.run('pinned-source', ['git', 'show', f'{ACCEPTED_TREE}:scripts/cucp.ps1'], cwd=ROOT, timeout=30)
+                capture.success(self, 'pinned-source', process)
+                source.write_bytes(process.stdout)
+                capture.provenance(pinned_source=file_identity(source))
+                for file_group in (True, False):
+                    selected = [(i, f) for i, f in enumerate(fixtures) if (f['operation'] in FILE_OPERATIONS) == file_group]
+                    inputs = temp / 'cases.json'
+                    inputs.write_text(json.dumps([f for _, f in selected]), encoding='utf-8-sig')
+                    runner = ROOT / ('tests/fixtures/legacy-diagnostics-file-oracle.ps1' if file_group else 'tests/fixtures/legacy-diagnostics-runtime-oracle.ps1')
+                    command = [powershell, '-NoProfile', '-NonInteractive', '-File', str(runner), '-InputPath', str(inputs)]
+                    routes = {
+                        'original': ['-Source', str(source)],
+                        'production': actual_adapter_arguments(source, 'production'),
+                        'candidate': retained_candidate_adapter_arguments(source),
+                    }
+                    for name, arguments in routes.items():
+                        route = name + ('-file' if file_group else '-runtime')
+                        process = capture.run(route, command + arguments,
+                            case_ids=[f['case_id'] for _, f in selected],
+                            metadata=dict(case_indices=[i for i, _ in selected], input=file_identity(inputs), oracle=file_identity(runner)),
+                            timeout=900, env={**os.environ, 'CUCP_NATIVE_HOST': str(Path(host).resolve()), 'CUCP_EXECUTION_DIAGNOSTICS': '1'})
+                        observations = capture.rows(self, route, process, len(selected))
+                        for (index, _), observed in zip(selected, observations):
+                            records[name][index] = observed
         partition = dict(exact=0, owned_failure=0, terminal_failure=0)
         for index, fixture in enumerate(fixtures):
             original = records['original'][index]
-            with self.subTest(case=fixture['case_id'], route='current-original'):
+            with self.subTest(case=fixture['case_id'], route='current-original'), capture.comparison(fixture['case_id'], 'current-original'):
                 self.assertEqual(records['production'][index], original)
-            with self.subTest(case=fixture['case_id'], route='pure-candidate'):
+            with self.subTest(case=fixture['case_id'], route='pure-candidate'), capture.comparison(fixture['case_id'], 'pure-candidate'):
                 actual = pure[index]
                 self.assertEqual(actual['state'], original['state'])
                 self.assertEqual(actual['effects'], decode_wire(original['effects']))
@@ -369,10 +419,12 @@ class RetainedDiagnosticWindowsTests(unittest.TestCase):
                     self.assertEqual(actual['exit'], original['exit'])
                     if original['payload'] is not None:
                         self.assertEqual(actual['payload'], decode_wire(original['payload']))
-            with self.subTest(case=fixture['case_id'], route='actual-candidate'):
+            with self.subTest(case=fixture['case_id'], route='actual-candidate'), capture.comparison(fixture['case_id'], 'actual-candidate'):
                 partition[assert_actual_candidate(self, fixture, original, records['candidate'][index])] += 1
-        self.assertEqual(sum(partition.values()), len(fixtures))
-        self.assertGreater(partition['owned_failure'], 0)
+        with capture.comparison('final', 'partition-counts'):
+            self.assertEqual(sum(partition.values()), len(fixtures))
+            self.assertGreater(partition['owned_failure'], 0)
+        capture.complete()
         print(f"Compared {len(fixtures)} retained diagnostic cases through original/current-original/pure-candidate/actual-candidate routes: {partition}", flush=True)
 
 

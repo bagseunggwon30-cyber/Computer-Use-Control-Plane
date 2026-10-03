@@ -9,8 +9,10 @@ operations. There is no production cutover or permission expansion.
 
 `tests/python/test_legacy_diagnostics_retained.py` adds a separate gate for all
 66 existing retained-operation fixtures plus 236 JSON adversarial inputs and
-30 subtraction-boundary probes (332 total). The first 302 cases are unchanged
-and protected by a canonical full-corpus SHA-256 assertion. The original
+30 subtraction-boundary probes (332 original cases), followed by 140 bounded
+JSON/culture/numeric-string neighbors (472 total). Both the 302-case and
+332-case prefixes are unchanged and protected by canonical full-corpus SHA-256
+assertions. The original
 323-case nine-operation suite, production-entry comparisons, 196 adapter guards,
 and startup gates remain unchanged.
 
@@ -46,8 +48,9 @@ No new PowerShell oracle, embedded PowerShell source, transport, or effect exist
 ## Source-derived repairs
 
 These implementation findings are confirmed by reading the candidate and the
-reference sources below; exact Windows PowerShell 5.1 execution of the new cases
-has **not** been observed in this environment.
+reference sources below. The first 332-case Windows run and its failed
+assertion fragments are described in the repair checkpoint below; the current
+472-case repaired candidate has not yet received Windows qualification.
 
 - Benchmark previously converted legacy escaped `/Date(...)/` JSON values to
   strings before Int32 conversion. A private parsed-value wrapper now preserves
@@ -123,14 +126,10 @@ execution-family checks and three inventory checks pass. At the initial
 The later integration below inherits the separately reviewed helper cleanup;
 this candidate still contributes no PowerShell source-byte change.
 
-Two concrete source-inferred gaps remain: object numeric casts still use the
-shared scalar kernel's generic error, and audit interpolation of empty/nested
-objects differs from PSObject's shallow display. The new `{}`, nonempty-object
-baseline casts and audit object-value probes remain mandatory exact comparisons;
-they are expected to block Windows qualification until repaired, not accepted
-exceptions. Locale-specific Framework versus modern-runtime display, and the
-full new JSON/property corpus, also need Windows evidence. No green portable
-pass retires either original body.
+The first Windows run confirmed object-cast and shallow-interpolation gaps.
+The repairs below now model those behaviors, with every original exact
+comparison retained. Current repaired-route equality and locale neighbors
+still require Windows evidence. No green portable pass retires either body.
 
 Run on Windows PowerShell 5.1 with the matching .NET SDK:
 
@@ -180,3 +179,114 @@ This is local candidate integration evidence. Windows PowerShell execution,
 raw Console/actual-adapter equality, the known object-conversion gaps, and the
 final qualification decision remain pending. No publication or production
 cutover is performed by this integration.
+
+## Failed Windows checkpoint and bounded repair
+
+[Run 37090071710](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37090071710)
+ran remote `7efbf9d21b3916f5789fe1c214a4294127ad0270` and finished at
+`2026-10-03T02:40:47Z`. The downloaded artifact archive's verified SHA-256 is
+`e93a415dc74d7ca0939a6b752dd53dabda3fced6808c56420185386b5c40f05e`.
+Its six complete logs and source map are available; **the full raw route arrays
+were not saved by that version**. The committed observed-fragment fixture
+labels that distinction and stores only assertions visible in `05.log`.
+
+All 332 current-original comparisons passed. The candidate had 23 failing
+route subtests across 12 inputs (11 pure, 12 actual-adapter), followed by the
+partition-count assertion. The unchanged older 323-case production gate passed.
+Those failures establish these bounded repairs, not retirement approval:
+
+- Nonfinite Int32 error display now uses current culture, preserving `∞` and
+  `-∞` observed in the English fixture. Audit interpolation remains invariant;
+  textual Infinity is not reclassified as a numeric primitive.
+- Boolean baseline p50 already cast correctly to Int32; its percentage divisor
+  incorrectly converted the string `True`. Diagnostic parsed-value Double
+  conversion now retains the Boolean type. Execution/protocol integer validation
+  and the shared scalar kernel are unchanged. Reached numeric-string neighbors
+  include hex, scientific, grouping, whitespace, signed and zero values. The
+  source-derived Double error wrapper preserves a subtle original distinction:
+  a positive hexadecimal string can pass Int32 but fail the later Double cast;
+  zero/negative values still skip that divisor cast. These extensions remain
+  inferred until their mandatory Windows comparisons run.
+- PSObject display is shallow: an empty object prints empty text, nested objects
+  have an empty base string, and nested arrays display `System.Object[]`.
+  Top-level array interpolation also uses shallow element display. Audit strings
+  use invariant scalar formatting; object-cast error members use current culture.
+- Object Int32 errors retain the exact inert custom-object display name. The
+  source guard exempts exactly one declared literal in `LegacyDiagnosticJson.cs`,
+  retains its original forbidden dependencies, and adds negative using/type/
+  duplicate-literal/reflection cases. Independent managed assembly-reference and
+  type checks reject engine dependencies. There is no engine load or type lookup.
+
+The Korean DateTime error exposed Framework NLS versus modern ICU pattern data.
+`LegacyDiagnosticCulture` is a new fixed, read-only locale-data boundary in the
+native host: four bounded GetLocaleInfoEx fields, selected culture and override
+policy, Win32 pattern reescaping, pattern-derived separators, and a private
+DateTimeFormatInfo clone. It neither changes CurrentCulture nor sets a global
+runtime switch. It applies only to reached diagnostic DateTime cast-error text.
+The supported model is **numeric Gregorian date patterns**. Named months,
+weekdays, eras and non-Gregorian calendars still use the prior formatting path
+and remain unqualified. No general culture-parity claim is made. Managed
+formatting retains years 1–9999; GetDateFormatEx was deliberately avoided because
+its documented date floor would truncate the legacy DateTime domain.
+
+The additional 140 inferred cases cover typed versus textual Booleans/nonfinite
+values, empty/nested object and array display, current versus invariant member
+formatting, five named Gregorian cultures, p50/p95 casts, and year-domain edges.
+Every original 332 input remains byte-for-byte equivalent under its pinned
+canonical digest; no case is xfailed, normalized, or removed. Complete new
+Windows candidate/adapter equality and review are still required.
+
+## Durable failed-route evidence
+
+The qualification-only Python capture writes a unique `run-*` directory under
+`CUCP_DIAGNOSTICS_RETAINED_CAPTURE_DIR`. Standalone runs default to
+`.migration-logs/diagnostics/retained-diagnostics` within the checkout. The small
+family-runner environment hook is a separate integration change; existing CI
+artifact paths remain unchanged.
+
+Before checking exit status, decoding, parsing or asserting array length, it
+persists exact bounded stdout/stderr, return code or launch/timeout error,
+per-route case order, exact stdin bytes/hash, source and executable hashes,
+Git identity/status, Python/OS data, .NET runtime information, fixture cultures,
+and the inert fixture inputs. Only explicitly allowed runtime environment fields
+are recorded. A manifest distinguishes unattempted, failed and completed routes;
+no failed route is retried. Comparison failures are recorded before unittest
+subTest suppression, and cleanup never turns incomplete/mismatched work into a
+qualified pass. Original temporary inputs may be deleted after capture without
+losing raw outcomes or pinned source bytes.
+
+Artifacts retain up to 8 MiB of stdout and 1 MiB of stderr per route, and 4 MiB
+of stdin. Overflow is an explicit gate failure with original byte count/hash
+and a marked retained prefix; truncated output is never parsed as a successful
+observation. These are artifact bounds: subprocess.run still buffers child
+output before enforcing them. The bounded fixture corpus and existing process
+timeouts are unchanged. Capture tests cover nonzero exits, decode/JSON/shape/
+count errors, timeout partial bytes, launch errors, output limits, unique paths,
+no retry, real-harness partial acquisition, temporary cleanup and suppressed
+mismatches. No new PowerShell source or acquisition capability is introduced.
+
+Additional primary references:
+- [Framework PSObject display](https://github.com/PowerShell/PowerShell/blob/v6.0.0-alpha.9/src/System.Management.Automation/engine/MshObject.cs)
+- [Runtime NLS pattern escaping and locale data](https://github.com/dotnet/runtime/blob/v8.0.0/src/libraries/System.Private.CoreLib/src/System/Globalization/CultureData.Nls.cs)
+- [Framework DateTimeFormatInfo](https://github.com/microsoft/referencesource/blob/main/mscorlib/system/globalization/datetimeformatinfo.cs)
+- [GetDateFormatEx domain](https://learn.microsoft.com/en-us/windows/win32/api/datetimeapi/nf-datetimeapi-getdateformatex)
+
+Local repaired-candidate validation: the SDK-enabled full Python suite reports
+578 tests with 125 explicit skips and no failures. The matching NativeHost
+builds with zero warnings/errors. Managed checks pass: 14 diagnostic contracts,
+37 accepted benchmark assertions, 24 subtraction assertions, 28 observed/source
+boundary assertions on Linux, 994 execution checks and 110 startup checks.
+Two additional observed NLS assertions run only on Windows. Inventory and diff
+checks pass; tracked PowerShell remains 870,201 bytes, with zero byte change in
+this repair. Current Windows qualification has not yet been run.
+
+The repair was subsequently integrated on the reviewed parser/history candidate
+tree `c57c0c7` without conflicts. The family runner now explicitly routes capture
+to its selected log directory, covered by a regression test; existing artifact
+paths, history scope and full foundation coverage remain intact. The integrated
+Python suite ran 622 tests: 496 passed and 126 explicit environment skips.
+Independent review found no blocker to fresh candidate qualification, while
+retaining the documented subprocess-buffering and culture-model limitations.
+The current integrated extension count is 880,873 PowerShell bytes, unchanged
+by this diagnostic repair; the difference from its local 870,201-byte base is
+the separately counted history oracle. No production body has been retired.

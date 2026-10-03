@@ -19,6 +19,19 @@ spec.loader.exec_module(qualification)
 
 
 class QualificationSelectionTests(unittest.TestCase):
+    def test_logged_diagnostics_capture_stays_under_family_artifacts(self):
+        with tempfile.TemporaryDirectory() as temp:
+            logs = Path(temp) / 'logs'
+            calls = []
+            def capture(argv, **kwargs):
+                calls.append((argv, dict(kwargs['env']), kwargs['log_path']))
+            with patch.object(qualification, 'run_logged', side_effect=capture):
+                qualification.run_family('diagnostics', log_dir=logs)
+            self.assertTrue(any('test_legacy_diagnostics*.py' in argv for argv, _, _ in calls))
+            for _, env, log_path in calls:
+                self.assertEqual(env['CUCP_DIAGNOSTICS_RETAINED_CAPTURE_DIR'], str(logs / 'retained-diagnostics'))
+                self.assertEqual(log_path.parent, logs)
+
     def test_logged_failure_preserves_all_bytes_and_exit_status(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

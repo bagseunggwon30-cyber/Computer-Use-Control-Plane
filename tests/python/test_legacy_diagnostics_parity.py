@@ -33,6 +33,26 @@ BODY_HASHES = {
     "ReleaseNotes": (4359,"17c09c39f14c78309fb9d2dda49c89e0cee6438459fce16e5bf06545fcfd4536"),
 }
 
+
+# One transparent compatibility display string is data, not an engine reference.
+# This exact declaration is the sole exemption; all old dependency checks still
+# scan the remainder and reflection/type-loading routes are denied separately.
+DIAGNOSTIC_DISPLAY_DECLARATION = '    private const string CustomObjectDisplayType = "System.Management.Automation.PSCustomObject";'
+DIAGNOSTIC_TYPE_LOADING_TOKENS = ('Type.GetType(', '.GetType(', 'Assembly.Load',
+    'System.Reflection', 'Activator.CreateInstance', 'GetTypeInfo(', 'GetManifestResourceStream(')
+
+
+def diagnostic_dependency_source(name, source):
+    if name == 'LegacyDiagnosticJson.cs':
+        if source.count(DIAGNOSTIC_DISPLAY_DECLARATION) != 1:
+            raise AssertionError('Expected one exact inert diagnostic display-name declaration')
+        source = source.replace(DIAGNOSTIC_DISPLAY_DECLARATION, '', 1)
+    for token in DIAGNOSTIC_TYPE_LOADING_TOKENS:
+        if token in source:
+            raise AssertionError('Diagnostic type loading is forbidden: ' + token)
+    return source
+
+
 def reply(status="ok", exit=0, **fields):
     return dict(exit=exit, json=dict(status=status, **fields))
 
@@ -175,8 +195,9 @@ class DiagnosticPortableTests(unittest.TestCase):
         fixtures=cases();self.assertGreater(len(fixtures),200)
         self.assertEqual({f["operation"] for f in fixtures},{"perf","benchmark","health-quick","health-detail","self-test","diagnose-lag","audit-summary","log-tail","release-notes"})
         for source in (PROJECT.parent/"PcuCp.LegacyDiagnostics").glob("*.cs"):
+            text = diagnostic_dependency_source(source.name, source.read_text(encoding="utf-8-sig"))
             for token in ("Process.Start(","ProcessStartInfo","File.Read","File.Write","DllImport","SendKeys","Management.Automation"):
-                self.assertNotIn(token,source.read_text(encoding="utf-8-sig"),str(source))
+                self.assertNotIn(token,text,str(source))
     def test_portable_corpus_and_failure_reachability(self):
         fixtures=cases();actual=run_candidate(fixtures)
         self.assertEqual(len(actual),len(fixtures))

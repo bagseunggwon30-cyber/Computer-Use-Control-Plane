@@ -18,6 +18,7 @@ using System.Text.RegularExpressions;
 internal static class LegacyDiagnosticJson
 {
     private const int MaxDepth = 102;
+    private const string CustomObjectDisplayType = "System.Management.Automation.PSCustomObject";
     private static readonly JsonSerializerOptions ElementOptions = new()
     { MaxDepth = MaxDepth + 1, Converters = { new InterpolatedDateTimeConverter(), new InterpolatedDoubleConverter() } };
 
@@ -28,18 +29,56 @@ internal static class LegacyDiagnosticJson
     {
         internal JsonElement Json => JsonSerializer.SerializeToElement(value, ElementOptions);
         internal bool IsNull => value is null;
+        internal DateTime? Date => value is DateTime date ? date : null;
+        internal bool IsTrue => Truth(value);
+        internal string Text => Interpolate(value);
+        internal double Double()
+        {
+            if (value is null || value is string { Length: 0 }) return 0;
+            if (value is not string text) return Convert.ToDouble(value, CultureInfo.InvariantCulture);
+            // LanguagePrimitives.ConvertStringToReal uses invariant conversion,
+            // unlike the integer TypeConverter's hexadecimal acceptance. Retain
+            // that distinction and its legacy exception wrapper at this reached
+            // diagnostic-data cast; no protocol-number coercion changes here.
+            try
+            {
+                double number = Convert.ToDouble(text, CultureInfo.InvariantCulture);
+                if (!double.IsFinite(number) && text.Trim() is not ("NaN" or "Infinity" or "-Infinity"))
+                {
+                    // Framework rejects extra symbol spellings; modern numeric
+                    // overflow instead saturates to infinity. Preserve both
+                    // distinct failure classes before wrapping the legacy text.
+                    if (double.IsNaN(number) || text.Trim().Any(c => !char.IsDigit(c) && c is not ('+' or '-' or '.' or ',' or 'e' or 'E')))
+                        throw new FormatException();
+                    throw new OverflowException();
+                }
+                return number;
+            }
+            catch (Exception error) when (error is FormatException or OverflowException)
+            {
+                string detail = error is FormatException ? "Input string was not in a correct format." :
+                    "Value was either too large or too small for a Double.";
+                throw CommandOptions.Invalid($"Cannot convert value \"{text}\" to type \"System.Double\". Error: \"{detail}\"");
+            }
+        }
         internal Value Property(string name) => new(EventProperty(value, name));
         internal IEnumerable<Value> Elements => value is List<object?> list
             ? list.Select(item => new Value(item)) : value is null ? [] : [this];
         internal int Int32()
         {
             if (value is DateTime date)
-                throw CommandOptions.Invalid($"Cannot convert value \"{date.ToString(CultureInfo.CurrentCulture)}\" to type \"System.Int32\". Error: \"Invalid cast from 'DateTime' to 'Int32'.\"");
+                throw CommandOptions.Invalid($"Cannot convert value \"{LegacyDiagnosticCulture.DateTimeErrorText(date, CultureInfo.CurrentCulture)}\" to type \"System.Int32\". Error: \"Invalid cast from 'DateTime' to 'Int32'.\"");
             if (value is double number && !double.IsFinite(number))
-                throw CommandOptions.Invalid($"Cannot convert value \"{number.ToString(CultureInfo.InvariantCulture)}\" to type \"System.Int32\". Error: \"Value was either too large or too small for an Int32.\"");
+                throw CommandOptions.Invalid($"Cannot convert value \"{number.ToString(CultureInfo.CurrentCulture)}\" to type \"System.Int32\". Error: \"Value was either too large or too small for an Int32.\"");
             // JSON arrays remain Object[] even at length zero or one.
             if (value is List<object?>)
                 throw CommandOptions.Invalid("Cannot convert the \"System.Object[]\" value of type \"System.Object[]\" to type \"System.Int32\".");
+            if (value is Dictionary<string, object?> members)
+            {
+                // This is an inert diagnostic type-display name, never a CLR
+                // type reference or lookup. Keep the engine dependency absent.
+                throw CommandOptions.Invalid($"Cannot convert the \"{ObjectDisplay(members, CultureInfo.CurrentCulture, true)}\" value of type \"{CustomObjectDisplayType}\" to type \"System.Int32\".");
+            }
             return LegacyTaskFormKernel.LegacyInt(Json);
         }
     }
@@ -81,6 +120,42 @@ internal static class LegacyDiagnosticJson
             else writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
         }
     }
+
+    // PowerShell interpolation joins a top-level array, but PSObject's own
+    // member display is shallow: nested custom objects have an empty base
+    // string, and array members retain their CLR array display name.
+    private static string Interpolate(object? value) => value switch
+    {
+        List<object?> elements => string.Join(" ", elements.Select(item => Shallow(item, CultureInfo.InvariantCulture, false))),
+        Dictionary<string, object?> members => ObjectDisplay(members, CultureInfo.InvariantCulture, false),
+        _ => ScalarDisplay(value, CultureInfo.InvariantCulture, false)
+    };
+
+    private static string ObjectDisplay(Dictionary<string, object?> members, CultureInfo culture, bool errorDisplay) => members.Count == 0 ? "" :
+        "@{" + string.Join("; ", members.Select(member => member.Key + "=" + Shallow(member.Value, culture, errorDisplay))) + "}";
+
+    private static string Shallow(object? value, CultureInfo culture, bool errorDisplay) => value switch
+    {
+        Dictionary<string, object?> => "", List<object?> => "System.Object[]",
+        _ => ScalarDisplay(value, culture, errorDisplay)
+    };
+
+    private static string ScalarDisplay(object? value, CultureInfo culture, bool errorDisplay) => value switch
+    {
+        null => "", string text => text,
+        DateTime date when errorDisplay => LegacyDiagnosticCulture.DateTimeErrorText(date, culture),
+        IFormattable formattable => formattable.ToString(null, culture),
+        _ => value.ToString() ?? ""
+    };
+
+    private static bool Truth(object? value) => value switch
+    {
+        null => false, bool boolean => boolean, string text => text.Length != 0,
+        List<object?> elements => elements.Count > 1 || elements.Count == 1 && Truth(elements[0]),
+        int number => number != 0, long number => number != 0,
+        decimal number => number != 0, double number => number != 0,
+        _ => true
+    };
 
     private static object? EventProperty(object? value, string name)
     {

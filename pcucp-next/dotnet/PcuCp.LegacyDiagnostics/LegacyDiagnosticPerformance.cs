@@ -139,7 +139,7 @@ internal sealed partial class LegacyDiagnosticCoordinator
                     object delta = DiagnosticSubtractInt32((int)current["p50_ms"]!, b50);
                     _ = DiagnosticSubtractInt32((int)current["p95_ms"]!, before.Property("p95_ms").Int32());
                     double numericDelta = Convert.ToDouble(delta, System.Globalization.CultureInfo.InvariantCulture);
-                    double pct = b50 > 0 ? Math.Round(numericDelta / N(before.Property("p50_ms").Json) * 100, 1) : 0;
+                    double pct = b50 > 0 ? Math.Round(numericDelta / before.Property("p50_ms").Double() * 100, 1) : 0;
                     string verdict = "neutral"; if (numericDelta <= -10) { verdict = "improved"; improved++; } else if (numericDelta >= 30) { verdict = "regressed"; regressed++; }
                     rows.Add(D("name", current["name"], "baseline_p50_ms", b50, "current_p50_ms", current["p50_ms"], "delta_ms", delta, "delta_pct", pct, "verdict", verdict));
                 }

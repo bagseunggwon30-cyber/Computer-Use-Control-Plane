@@ -45,31 +45,30 @@ internal sealed partial class LegacyDiagnosticCoordinator
             {
                 string line = S(lineElement);
                 if (string.IsNullOrWhiteSpace(line)) continue;
-                JsonElement ev;
-                DateTime? timestamp;
-                try { ev = LegacyDiagnosticJson.Parse(line, out timestamp); }
+                LegacyDiagnosticJson.Value ev;
+                try { ev = LegacyDiagnosticJson.ParseValue(line); }
                 catch (JsonException) { continue; }
-                var ts = DiagnosticEventProperty(ev, "ts");
+                var ts = ev.Property("ts");
                 // Legacy /Date(...)/ values are real DateTime objects. Compare
                 // their clock ticks as PowerShell's [datetime] comparison does;
                 // their string form above is only for output/interpolation.
-                if (cutoff is not null && T(ts) && (timestamp is DateTime date
+                if (cutoff is not null && ts.IsTrue && (ts.Date is DateTime date
                     ? date.Ticks < cutoff.Value.DateTime.Ticks
-                    : DiagnosticTryDate(ts, out var eventTime) && eventTime < cutoff.Value))
+                    : DiagnosticTryDate(ts.Json, out var eventTime) && eventTime < cutoff.Value))
                     continue;
                 totalEvents++;
-                string macro = S(DiagnosticEventProperty(ev, "macro"));
-                if (macro.Length == 0) macro = S(DiagnosticEventProperty(ev, "action"));
+                string macro = ev.Property("macro").Text;
+                if (macro.Length == 0) macro = ev.Property("action").Text;
                 if (macro.Length != 0) byMacro[macro] = byMacro.GetValueOrDefault(macro) + 1;
-                string exitCode = S(DiagnosticEventProperty(ev, "exit_code"));
+                string exitCode = ev.Property("exit_code").Text;
                 if (exitCode.Length != 0) byExit[exitCode] = byExit.GetValueOrDefault(exitCode) + 1;
-                if (T(DiagnosticEventProperty(ev, "sensitive")) || Regex.IsMatch(S(DiagnosticEventProperty(ev, "reason")), "sensitive", RegexOptions.IgnoreCase))
+                if (ev.Property("sensitive").IsTrue || Regex.IsMatch(ev.Property("reason").Text, "sensitive", RegexOptions.IgnoreCase))
                     sensitiveCount++;
-                if (DiagnosticEventEquals(DiagnosticEventProperty(ev, "status"), "blocked") || Comparer.Equals(exitCode, "3"))
+                if (DiagnosticEventEquals(ev.Property("status").Json, "blocked") || Comparer.Equals(exitCode, "3"))
                     blockedCount++;
-                if (T(ts))
+                if (ts.IsTrue)
                 {
-                    string text = S(ts);
+                    string text = ts.Text;
                     if (string.IsNullOrEmpty(earliest) || Comparer.Compare(text, earliest) < 0) earliest = text;
                     if (string.IsNullOrEmpty(latest) || Comparer.Compare(text, latest) > 0) latest = text;
                 }

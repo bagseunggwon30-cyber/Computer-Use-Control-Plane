@@ -152,6 +152,8 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
     env["PYTHONIOENCODING"] = "utf-8"
     if family == "foundation" and log_dir is not None:
         env["CUCP_WORKFLOW_DIAGNOSTIC_CAPTURE"] = str(log_dir / "workflow-parser-raw-diagnostics.json")
+    if family == "diagnostics" and log_dir is not None:
+        env["CUCP_DIAGNOSTICS_RETAINED_CAPTURE_DIR"] = str(log_dir / "retained-diagnostics")
     for name in (*ADAPTER_ENV.values(), "CUCP_EXECUTION_STARTUP_TEST_HOST", "CUCP_EXECUTION_ADAPTER_SOURCE",
                  "CUCP_PRECISION_ADAPTER_DRAFT", "CUCP_LEGACY_CDP_ADAPTER_MODE", "CUCP_INTERACTION_TEST_HOST",
                  "CUCP_LEGACY_IMAGES_ADAPTER_SOURCE"):
