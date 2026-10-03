@@ -1,5 +1,31 @@
 # Compiled helper autostart candidate: owned-temp stage only
 
+## Second Windows fixture result and bounded repair
+
+Run `37119545980` at public `baeed79529485483428caa58eb550d32b477fcd7`
+retained complete evidence for 52 autostart methods: 50 passed, zero skipped,
+one failure and one error. All 26 paired generated-batch/direct-venv captures
+completed with matching argv/executable/flags, exit and codepage assertions.
+The complete gate remains unqualified pending the two repairs below.
+
+- Git converted the newly hash-pinned manifest from LF to CRLF. That alone
+  reproduces the observed `08e8d5fd233ffe6f0abb9857c2d8630f9517e9b9ef1635b6ec310343994c546d`
+  digest. The canonical 1,183 bytes and pinned `8bbbef74c211bd1fc89c4c6f188717a936de98a30ba5b34cb1b817aeedbabd7e`
+  digest are unchanged. An explicit `-text` rule and real converting-checkout
+  regression preserve those bytes without response/hash normalization.
+- The same-byte replacement test received sharing violation 32 while attempting
+  `os.replace` inside a retained directory-operation lease, before its CAS
+  assertion. The revised fixture replaces between completed leases, then requires
+  a different actual file identity, identical bytes, CAS deletion refusal and
+  retained contents. Replacement must succeed; no exception/skip counts as proof.
+  Runtime ownership, handles and deletion code are unchanged.
+
+Artifact `11273225957` contains 308 files; archive SHA-256 is
+`1d16274c9a782535e77815dc6162089101bc17c0aa5335ab146081419cf3ee62`.
+Independent review confirmed both raw errors and the unchanged fixture bytes.
+The revised portable suite passes 53 methods: 35 passed, 18 native skips, zero
+failures/errors. The revised native CAS test still needs a fresh Windows run.
+
 This extends the explicit `CUCP_STAGED_COMPILED_HELPER=1` source-mode route. It
 is candidate code with temporary-directory tests, **not permission or evidence
 for installing/removing a real Startup entry, changing login registration,

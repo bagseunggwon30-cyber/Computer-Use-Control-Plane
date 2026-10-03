@@ -22,3 +22,4 @@ tests/fixtures/legacy-helper/observed-staged-void-completion.stdout.bin -text -d
 tests/fixtures/legacy-helper/observed-autostart-venv-request.json -text
 tests/fixtures/legacy-helper/observed-autostart-venv-capture.json -text
 tests/fixtures/legacy-helper/observed-autostart-venv-driver.json -text
+tests/fixtures/legacy-helper/observed-autostart-venv-manifest.json -text

@@ -144,6 +144,28 @@ class AutostartLaunchFixtureTests(unittest.TestCase):
         for idle,desktop in ((0,False),(-1,False),(True,False),(2**31,False),(12345,1),(12345,'true')):
             with self.assertRaises(ValueError): fixture._control_command('python.exe','inert.py',idle,desktop)
 
+    def test_windows_checkout_preserves_pinned_manifest_with_converting_control(self):
+        import hashlib
+        source=ROOT/'tests/fixtures/legacy-helper/observed-autostart-venv-manifest.json'
+        canonical=source.read_bytes()
+        self.assertNotIn(b'\r\n',canonical)
+        crlf=canonical.replace(b'\n',b'\r\n')
+        self.assertEqual(hashlib.sha256(crlf).hexdigest(),
+                         '08e8d5fd233ffe6f0abb9857c2d8630f9517e9b9ef1635b6ec310343994c546d')
+        relative=source.relative_to(ROOT)
+        with tempfile.TemporaryDirectory(prefix='autostart-observed-checkout-') as temporary:
+            root=Path(temporary);protected=root/relative;protected.parent.mkdir(parents=True)
+            protected.write_bytes(canonical);control=root/'unprotected-manifest.json';control.write_bytes(canonical)
+            (root/'.gitattributes').write_bytes((ROOT/'.gitattributes').read_bytes())
+            def git(*arguments):
+                return subprocess.run(['git','-c','core.autocrlf=true','-c','core.eol=crlf',
+                    '-c','core.safecrlf=false','-c',f'core.attributesFile={os.devnull}',*arguments],
+                    cwd=root,capture_output=True,check=True,timeout=30)
+            git('init','--quiet');git('add','--force','--','.gitattributes',relative.as_posix(),control.name)
+            protected.unlink();control.unlink();git('checkout-index','--force','--all')
+            self.assertEqual(protected.read_bytes(),canonical)
+            self.assertEqual(control.read_bytes(),crlf)
+
     def test_inert_capture_records_full_interpreter_argv_and_exit(self):
         with tempfile.TemporaryDirectory(prefix='cucp-autostart-fixture-') as temporary:
             root = Path(temporary).resolve()

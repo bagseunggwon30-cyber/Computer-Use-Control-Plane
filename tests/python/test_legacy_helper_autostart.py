@@ -283,8 +283,15 @@ class AutostartWindowsStoreTests(unittest.TestCase):
         result=self.controller.install();self.assertEqual(result['status'],'ok',result)
         with self.store.operation():
             expected=self.store.read(SHIM_NAME)
-            replacement=self.root/'owned replacement';replacement.write_bytes(expected.raw)
-            os.replace(replacement,self.startup/SHIM_NAME)
+        # Replace between completed directory-operation leases. Windows refused
+        # the prior attempt under a retained lease with sharing violation 32.
+        # The replacement must really occur; no refusal/skip satisfies CAS proof.
+        replacement=self.root/'owned replacement';replacement.write_bytes(expected.raw)
+        os.replace(replacement,self.startup/SHIM_NAME)
+        with self.store.operation():
+            actual=self.store.read(SHIM_NAME)
+            self.assertNotEqual(actual.identity,expected.identity)
+            self.assertEqual(actual.raw,expected.raw)
             self.assertFalse(self.store.compare_delete(SHIM_NAME,expected))
             self.assertEqual((self.startup/SHIM_NAME).read_bytes(),expected.raw)
     def test_marker_lease_excludes_competing_mutation_rename_and_write(self):
