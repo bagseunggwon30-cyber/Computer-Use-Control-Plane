@@ -230,10 +230,12 @@ and use invariant interpolation for the reported timestamp; bare date-like
 strings stay strings. Non-null `__type` metadata is removed before case-collision
 validation using the desktop resolver's fixed dictionary semantics. No supplied
 type name can load or construct a CLR type. The two additional characterizations
-await Windows comparison. Remaining conversion limits are DateTime-to-number
-error details in benchmark fields, nonfinite primitives, and PSObject empty or
-special property-name behavior. These require an exact retained conversion leaf
-or later bounded companion qualification before claiming full conversion parity.
+await Windows comparison. The [retained diagnostic continuation](retained-diagnostics-qualification.md)
+adds source-derived candidate repairs for DateTime-to-number errors, nonfinite
+primitives, and PSObject empty/reserved property names, plus an independent
+actual-candidate gate. Those new cases have not yet run on Windows; general
+container conversion and runtime-specific formatting remain unqualified. Both
+original production bodies remain retained until exact parity and review.
 The new real adapter is implemented but **not yet Windows-qualified**. Its
 actual-adapter test requires `CUCP_DIAGNOSTICS_TEST_HOST` and compares the entire
 finite corpus against the pinned source. It preserves full equality for ordinary

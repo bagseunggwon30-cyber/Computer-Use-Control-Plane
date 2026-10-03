@@ -6,7 +6,41 @@ The provider-neutral core exposes 52 MCP/JSONL tools through Python and C# witho
 PowerShell, Pi, or an authenticated model provider. The broader legacy surface
 still uses compatibility hosts and unported PowerShell acquisitions/actions.
 
-## Latest qualified checkpoint
+## Latest full automated checkpoint
+
+Published commit `f09e5200a37022fbdf1580b54a3fad232121950c`, tree
+`50c816c6d1153f23f20496ff31454c9649c6764c`, passed all 14 active jobs in
+[full run 37086869922](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37086869922)
+on 2026-10-03 UTC. Three focused-only jobs were intentionally skipped. All 367
+published blob hashes and modes match the reviewed tree. The first attempt had
+one 15-second timeout in a pinned-original image-fixture process; only that job
+was retried on the same commit. Attempt 2 passed with the same deadline and
+assertions. The other 13 successful jobs were retained, not rerun to hide failures.
+
+Seven unused private helpers were removed only after their public callers had
+qualified replacements. Original oracles and every existing assertion remain.
+Exact runtime deletion is 2,451 bytes; 151 fixture-guard bytes make the net total
+reduction 2,300 bytes from its parent. All 27 tracked PS files total **870,201
+bytes**: **610,258 runtime** and **259,943 other source/test bytes**. Reduction
+from the original 1,013,478-byte baseline is **143,277 bytes**. All temporary
+PowerShell oracle source remains counted.
+
+The unchanged parser candidate separately passed all three active jobs in
+[focused run 37086299736](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37086299736)
+at `1e3d534a1d244bcc9ed6bfd318a1976b95c22eb0`: 48 Windows tests without skips and
+1,402 managed checks. Its complete 128-case raw capture still has 106 exact
+parsed/plan differences (eight normalized, 98 text-only); these overlapping
+corpora are not additive totals. Production still retains PSParser. The f09 full
+job used its established 11-test workflow selection; the same parser's expanded
+48-test evidence comes from the focused parent run. A subsequent CI hardening
+routes future full jobs through the complete shared foundation gate and retains
+its raw evidence, rather than retroactively claiming those tests ran in f09.
+
+The following diagnostic candidate changes are not a new production cutover.
+Benchmark/audit-summary bodies and the history reducers remain retained. Full
+zero-PowerShell and interactive Windows acceptance remain open; main is unchanged.
+
+## Earlier qualified checkpoint (c414)
 
 Commit `c414f0240a6a3fde78719f4ae44baddaf990e92b`, tree
 `d4c9660d40c7e909f18afb166a8e846798f63b1d`, passed all 14 active jobs in

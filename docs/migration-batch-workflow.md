@@ -179,7 +179,28 @@ unqualified while known gaps remain; `CUCP_REQUIRE_WORKFLOW_PARSER_PARITY=1` and
 the final full production gate are still required before tokenizer retirement.
 
 The combined parser batch extends that pattern to `test_legacy_workflow*.py` and
-requires the parity, boundary, diagnostic and embedded-fixture suites explicitly.
+requires the parity, boundary, diagnostic, embedded-fixture, observed-diagnostic
+and failure-evidence suites explicitly, alongside the existing inventory check.
 Removing a requested suite fails before any subprocess is started. The raw PS5
 capture driver is a visible, counted `.ps1` fixture; it is not embedded in Python
 or excluded from source accounting. The production parser remains unchanged.
+
+The full regression now invokes that same required foundation gate from its
+Windows contracts workflow step. It preserves `CUCP_NATIVE_TEST_HOST` for the
+real native/PowerShell bridge assertions and includes every workflow suite,
+including future modules matching the wildcard, plus all three foundation
+contract projects. The focused-only job remains skipped during full regression;
+its coverage is rerun inside the full Windows job instead. Complete command
+logs, any generated raw diagnostic capture, and the source map are uploaded as
+`qualification-foundation-full` with `if: always()`. Source mapping is attempted
+even after a build, contract or Python failure; a failure before diagnostics run
+cannot provide a fresh raw capture.
+
+This is future full-gate coverage hardening, not a newly discovered parser
+failure or qualification of the candidate. The prior focused foundation base
+passed 48 tests at `1e3d534a`; the parser in full-regression source `f09e5200` was
+unchanged. Known exact diagnostic and normalized gaps remain documented in the
+[candidate report](legacy-workflow-diagnostic-candidate.md), with strict full
+parser-parity flags still opt-in. No production parser, native candidate
+exclusion, workflow/job condition, source-accounting rule or retirement claim
+changes here.

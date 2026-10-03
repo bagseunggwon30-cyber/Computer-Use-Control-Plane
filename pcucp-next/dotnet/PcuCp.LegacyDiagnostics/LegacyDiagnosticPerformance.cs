@@ -2,6 +2,16 @@ using System.Text.Json;
 
 internal sealed partial class LegacyDiagnosticCoordinator
 {
+    internal static object DiagnosticSubtractInt32(int left, int right)
+    {
+        // PowerShell IntOps.Sub uses a wide intermediate, then returns Int32
+        // inside range or Double on overflow. Never wrap the verdict's sign.
+        // Reference: retained-diagnostics-qualification.md, subtraction section.
+        long difference = (long)left - right;
+        if (difference >= int.MinValue && difference <= int.MaxValue) return (int)difference;
+        return (double)difference;
+    }
+
     private static int DiagnosticSloFailThreshold(int warnMilliseconds)
     {
         // PS promotes the multiply, then binds the nested _SloEval [int] FailMs
@@ -120,15 +130,17 @@ internal sealed partial class LegacyDiagnosticCoordinator
             try
             {
                 string raw = S(Effect(LegacyDiagnosticEffectKind.ReadText, data: baselinePath));
-                var baseline = LegacyDiagnosticJson.Parse(raw); var rows = new List<object>(); int improved = 0, regressed = 0;
+                var baseline = LegacyDiagnosticJson.ParseValue(raw); var rows = new List<object>(); int improved = 0, regressed = 0;
                 foreach (var current in results)
                 {
-                    var before = A(P(baseline, "results")).FirstOrDefault(b => Eq(P(b, "name"), (string)current["name"]!));
-                    if (before.ValueKind == JsonValueKind.Undefined || current["p50_ms"] is null || P(before, "p50_ms").ValueKind == JsonValueKind.Null) continue;
-                    int b50 = I(P(before, "p50_ms")), delta = (int)current["p50_ms"]! - b50;
-                    _ = (int)current["p95_ms"]! - I(P(before, "p95_ms"));
-                    double pct = b50 > 0 ? Math.Round(delta / N(P(before, "p50_ms")) * 100, 1) : 0;
-                    string verdict = "neutral"; if (delta <= -10) { verdict = "improved"; improved++; } else if (delta >= 30) { verdict = "regressed"; regressed++; }
+                    var before = baseline.Property("results").Elements.FirstOrDefault(b => Eq(b.Property("name").Json, (string)current["name"]!));
+                    if (before is null || current["p50_ms"] is null || before.Property("p50_ms").IsNull) continue;
+                    int b50 = before.Property("p50_ms").Int32();
+                    object delta = DiagnosticSubtractInt32((int)current["p50_ms"]!, b50);
+                    _ = DiagnosticSubtractInt32((int)current["p95_ms"]!, before.Property("p95_ms").Int32());
+                    double numericDelta = Convert.ToDouble(delta, System.Globalization.CultureInfo.InvariantCulture);
+                    double pct = b50 > 0 ? Math.Round(numericDelta / N(before.Property("p50_ms").Json) * 100, 1) : 0;
+                    string verdict = "neutral"; if (numericDelta <= -10) { verdict = "improved"; improved++; } else if (numericDelta >= 30) { verdict = "regressed"; regressed++; }
                     rows.Add(D("name", current["name"], "baseline_p50_ms", b50, "current_p50_ms", current["p50_ms"], "delta_ms", delta, "delta_pct", pct, "verdict", verdict));
                 }
                 comparison = D("baseline_path", baselinePath, "compared_targets", rows.Count, "improved_count", improved, "regressed_count", regressed, "rows", rows);

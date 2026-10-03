@@ -1525,78 +1525,99 @@
       "path": "scripts/cucp.ps1",
       "name": "_Iif",
       "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticHealth.cs",
-      "evidence": "SelfTest conditional status assembly; pinned self-test payload, Console, exit and effect comparisons. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "evidence": "SelfTest conditional status assembly; pinned self-test payload, Console, exit and effect comparisons. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression passed at f09e5200a37022fbdf1580b54a3fad232121950c / run 37086869922 (attempt 2, unchanged retry bounds/assertions); see docs/orphaned-pure-helper-retirement.md.",
       "original_body_bytes": 95,
       "original_body_sha256": "4ce6aa3a73690de129131e41c37ceab54ad6243fde0c6bd28b497484f817c537",
       "original_start_utf16": 169543,
       "original_end_utf16": 169638,
-      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9",
+      "removal_qualification_commit": "f09e5200a37022fbdf1580b54a3fad232121950c",
+      "removal_qualification_run": "37086869922",
+      "removal_qualification": "All 14 active full-regression jobs passed; one pinned-original image-process timeout retried on the identical commit with unchanged bounds/assertions."
     },
     {
       "path": "scripts/cucp.ps1",
       "name": "_Set-ObjectProperty",
       "replacement": "pcucp-next/dotnet/PcuCp.LegacyPrecision/LegacyPrecisionPlanners.cs",
-      "evidence": "PointPlan cached payload field replacement; pinned precision cache-hit payload, Console, exit, query and effect comparisons. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "evidence": "PointPlan cached payload field replacement; pinned precision cache-hit payload, Console, exit, query and effect comparisons. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression passed at f09e5200a37022fbdf1580b54a3fad232121950c / run 37086869922 (attempt 2, unchanged retry bounds/assertions); see docs/orphaned-pure-helper-retirement.md.",
       "original_body_bytes": 261,
       "original_body_sha256": "eef94004dbca18fc88a7cb017199cc8d33175a02bf096a23685dce669695b182",
       "original_start_utf16": 249762,
       "original_end_utf16": 250023,
-      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9",
+      "removal_qualification_commit": "f09e5200a37022fbdf1580b54a3fad232121950c",
+      "removal_qualification_run": "37086869922",
+      "removal_qualification": "All 14 active full-regression jobs passed; one pinned-original image-process timeout retried on the identical commit with unchanged bounds/assertions."
     },
     {
       "path": "scripts/cucp.ps1",
       "name": "_TaskPlan-QuoteToken",
       "replacement": "pcucp-next/dotnet/PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs",
-      "evidence": "QuoteToken and StepString; pinned task-preset helper, task/form, SmartPlan and culture/alias oracles. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "evidence": "QuoteToken and StepString; pinned task-preset helper, task/form, SmartPlan and culture/alias oracles. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression passed at f09e5200a37022fbdf1580b54a3fad232121950c / run 37086869922 (attempt 2, unchanged retry bounds/assertions); see docs/orphaned-pure-helper-retirement.md.",
       "original_body_bytes": 218,
       "original_body_sha256": "556fbc8fe3e6acc381ddb583615734b4473b0a8775519c8eebffece3d7c97f41",
       "original_start_utf16": 299266,
       "original_end_utf16": 299484,
-      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9",
+      "removal_qualification_commit": "f09e5200a37022fbdf1580b54a3fad232121950c",
+      "removal_qualification_run": "37086869922",
+      "removal_qualification": "All 14 active full-regression jobs passed; one pinned-original image-process timeout retried on the identical commit with unchanged bounds/assertions."
     },
     {
       "path": "scripts/cucp.ps1",
       "name": "_TaskPlan-StepString",
       "replacement": "pcucp-next/dotnet/PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs",
-      "evidence": "StepString and CommandHelpers; pinned task-preset helper, task/form, SmartPlan, app-profile and precision oracles. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "evidence": "StepString and CommandHelpers; pinned task-preset helper, task/form, SmartPlan, app-profile and precision oracles. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression passed at f09e5200a37022fbdf1580b54a3fad232121950c / run 37086869922 (attempt 2, unchanged retry bounds/assertions); see docs/orphaned-pure-helper-retirement.md.",
       "original_body_bytes": 542,
       "original_body_sha256": "e1c7b3a8132fc857c3e7d45158d37607abbafa2945bcb727761ffd0a5e8e17c9",
       "original_start_utf16": 299486,
       "original_end_utf16": 300028,
-      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9",
+      "removal_qualification_commit": "f09e5200a37022fbdf1580b54a3fad232121950c",
+      "removal_qualification_run": "37086869922",
+      "removal_qualification": "All 14 active full-regression jobs passed; one pinned-original image-process timeout retried on the identical commit with unchanged bounds/assertions."
     },
     {
       "path": "scripts/cucp.ps1",
       "name": "_TaskPlan-UnwrapCommand",
       "replacement": "pcucp-next/dotnet/PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs",
-      "evidence": "CommandHelpers (also called by TaskForm.Unwrap); pinned task-preset helper and task/form oracles. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "evidence": "CommandHelpers (also called by TaskForm.Unwrap); pinned task-preset helper and task/form oracles. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression passed at f09e5200a37022fbdf1580b54a3fad232121950c / run 37086869922 (attempt 2, unchanged retry bounds/assertions); see docs/orphaned-pure-helper-retirement.md.",
       "original_body_bytes": 214,
       "original_body_sha256": "3e0f5b5e4501644b5d5377bcbf4a1b00a5a4f19a360474c962114d02b6c62470",
       "original_start_utf16": 300030,
       "original_end_utf16": 300244,
-      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9",
+      "removal_qualification_commit": "f09e5200a37022fbdf1580b54a3fad232121950c",
+      "removal_qualification_run": "37086869922",
+      "removal_qualification": "All 14 active full-regression jobs passed; one pinned-original image-process timeout retried on the identical commit with unchanged bounds/assertions."
     },
     {
       "path": "scripts/cucp.ps1",
       "name": "_AppStrategy-Key",
       "replacement": "pcucp-next/dotnet/PcuCp.LegacyAppProfile/LegacyAppProfileKernel.cs",
-      "evidence": "AppKey with LegacyTextKernel.SanitizeAppKeyPart; pinned app-profile actual-adapter and culture/alias oracles. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "evidence": "AppKey with LegacyTextKernel.SanitizeAppKeyPart; pinned app-profile actual-adapter and culture/alias oracles. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression passed at f09e5200a37022fbdf1580b54a3fad232121950c / run 37086869922 (attempt 2, unchanged retry bounds/assertions); see docs/orphaned-pure-helper-retirement.md.",
       "original_body_bytes": 350,
       "original_body_sha256": "21478517f6ffb7777a77d07a3ec02999435cad1e9281fc09467f00cc310c8835",
       "original_start_utf16": 300879,
       "original_end_utf16": 301229,
-      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9",
+      "removal_qualification_commit": "f09e5200a37022fbdf1580b54a3fad232121950c",
+      "removal_qualification_run": "37086869922",
+      "removal_qualification": "All 14 active full-regression jobs passed; one pinned-original image-process timeout retried on the identical commit with unchanged bounds/assertions."
     },
     {
       "path": "scripts/cucp.ps1",
       "name": "_Cucp-RedactSecrets",
       "replacement": "pcucp-next/dotnet/PcuCp.LegacyDiagnostics/LegacyDiagnosticFiles.cs",
-      "evidence": "DiagnosticReleaseRedactors; pinned release-notes payload, Console, exit and effect comparisons. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression remain pending; see docs/orphaned-pure-helper-retirement.md.",
+      "evidence": "DiagnosticReleaseRedactors; pinned release-notes payload, Console, exit and effect comparisons. Public callers were qualified at c414f0240a6a3fde78719f4ae44baddaf990e92b / full run 37072046282. Current production has no callers outside this removed helper set; pinned-original fixture imports and all historical assertions remain. Removal uses matching c414 Windows AST source/function hashes. New source/loader Windows qualification and full regression passed at f09e5200a37022fbdf1580b54a3fad232121950c / run 37086869922 (attempt 2, unchanged retry bounds/assertions); see docs/orphaned-pure-helper-retirement.md.",
       "original_body_bytes": 771,
       "original_body_sha256": "ee6caffec3c7a916df1daf1090be7b9e64242f3197c7ce645a982d09da8a644a",
       "original_start_utf16": 365367,
       "original_end_utf16": 366138,
-      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9"
+      "original_source_sha256": "6fa1802661fd935df2c4d643aba8b5300723f8e0f75aac9d8fcf284688c28ba9",
+      "removal_qualification_commit": "f09e5200a37022fbdf1580b54a3fad232121950c",
+      "removal_qualification_run": "37086869922",
+      "removal_qualification": "All 14 active full-regression jobs passed; one pinned-original image-process timeout retried on the identical commit with unchanged bounds/assertions."
     }
   ],
   "compiled_interop": {

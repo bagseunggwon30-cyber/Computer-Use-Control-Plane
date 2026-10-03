@@ -22,6 +22,7 @@ DRAFT_ADAPTERS = {
 REQUIRED_FOUNDATION_TESTS = (
     "test_legacy_workflow_parity.py", "test_legacy_workflow_boundaries.py",
     "test_legacy_workflow_diagnostics.py", "test_legacy_workflow_embedded_fixtures.py",
+    "test_legacy_workflow_observed_diagnostics.py", "test_legacy_workflow_evidence.py",
 )
 REQUIRED_ADAPTER_TESTS = {
     "interaction": "test_legacy_interaction_adapters.py",
@@ -130,6 +131,8 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
         if not required.is_file():
             raise ValueError(f"Missing exact adapter tests: {required.name}; kernel parity alone cannot qualify promotion.")
     env = dict(os.environ)
+    # In the full Windows job, retain the caller's CUCP_NATIVE_TEST_HOST so
+    # workflow parity still exercises the actual native/PowerShell bridge.
     env["PYTHONPATH"] = str(ROOT / "pcucp-next/python")
     # Fixture reports contain Unicode; keep redirected Python stdout/stderr
     # UTF-8 without changing file decoding or PowerShell culture semantics.
@@ -151,62 +154,62 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
     if browser:
         env["CUCP_CHROME_TEST"] = "1"
         env["CUCP_LEGACY_CDP_BROWSER_TEST"] = "1"
-    if not browser:
-        native = ROOT / "pcucp-next/dotnet/PcuCp.NativeHost"
-        run(["dotnet", "build", str(native), "-c", "Release", "-warnaserror"])
-        for project in PROJECTS[family]:
-            path = ROOT / "pcucp-next/dotnet" / project
-            if not path.is_dir():
-                raise ValueError(f"Missing family contract project: {project}")
-            command = ["dotnet", "run", "--project", str(path), "-c", "Release"]
-            if family != "foundation":
-                command += ["--", "--self-test"]
-            run(command)
-        host = native / "bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll"
-        if family == "execution" and (native / "LegacyExecutionStartup.cs").exists():
-            env["CUCP_EXECUTION_STARTUP_TEST_HOST"] = str(host)
-        if family == "file-images":
-            publisher = ROOT / "pcucp-next/packaging/publish_legacy_images.py"
-            if not publisher.is_file():
-                raise ValueError("Missing compiled file-images publisher.")
-            run([sys.executable, str(publisher)])
-            env[ADAPTER_ENV[family]] = str(ROOT / "pcucp-next/bin/legacy/PcuCp.LegacyImages.dll")
-        elif family == "interaction":
-            env[ADAPTER_ENV[family]] = str(ROOT / "pcucp-next/dotnet/PcuCp.LegacyInteraction.ContractTests/bin/Release/net8.0/PcuCp.LegacyInteraction.ContractTests.dll")
-            env["CUCP_INTERACTION_TEST_HOST"] = str(host)
-        elif family in ADAPTER_ENV:
-            env[ADAPTER_ENV[family]] = sys.executable if family == "cdp" else str(host)
-        if family in FAMILIES:
-            promoted = family in enabled_adapters(ROOT)
-            if family in CANDIDATE_ONLY:
-                notice = f"CANDIDATE ONLY: {family} kernel/oracle checks; actual adapter and retirement are NOT qualified."
-                print(notice, flush=True)
-                if summary := env.get("GITHUB_STEP_SUMMARY"):
-                    with open(summary, "a", encoding="utf-8") as stream:
-                        stream.write(notice + "\n")
-            elif promoted:
-                if family == "cdp":
-                    env["CUCP_LEGACY_CDP_ADAPTER_MODE"] = "production"
-                elif family == "file-images":
-                    source = ROOT / "scripts/cucp-native-helper.ps1"
-                    if not source.is_file():
-                        raise ValueError("Missing promoted file-images adapter source.")
-                    env["CUCP_LEGACY_IMAGES_ADAPTER_SOURCE"] = str(source)
-                print(f"Running candidate and promoted {family} adapter gates", flush=True)
-            else:
-                draft = ROOT / DRAFT_ADAPTERS.get(family, f"tests/fixtures/legacy-{family}-adapter.ps1")
-                if not draft.is_file():
-                    raise ValueError(f"Missing exact {family} adapter draft; refusing to skip its gate.")
-                if family == "execution":
-                    env["CUCP_EXECUTION_ADAPTER_SOURCE"] = str(draft)
-                elif family == "precision":
-                    env["CUCP_PRECISION_ADAPTER_DRAFT"] = str(draft)
-                elif family == "cdp":
-                    env["CUCP_LEGACY_CDP_ADAPTER_MODE"] = "draft"
-                elif family == "file-images":
-                    env["CUCP_LEGACY_IMAGES_ADAPTER_SOURCE"] = str(draft)
-                print(f"Running candidate and exact {family} draft adapter gates; production bodies retained", flush=True)
     try:
+        if not browser:
+            native = ROOT / "pcucp-next/dotnet/PcuCp.NativeHost"
+            run(["dotnet", "build", str(native), "-c", "Release", "-warnaserror"])
+            for project in PROJECTS[family]:
+                path = ROOT / "pcucp-next/dotnet" / project
+                if not path.is_dir():
+                    raise ValueError(f"Missing family contract project: {project}")
+                command = ["dotnet", "run", "--project", str(path), "-c", "Release"]
+                if family != "foundation":
+                    command += ["--", "--self-test"]
+                run(command)
+            host = native / "bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll"
+            if family == "execution" and (native / "LegacyExecutionStartup.cs").exists():
+                env["CUCP_EXECUTION_STARTUP_TEST_HOST"] = str(host)
+            if family == "file-images":
+                publisher = ROOT / "pcucp-next/packaging/publish_legacy_images.py"
+                if not publisher.is_file():
+                    raise ValueError("Missing compiled file-images publisher.")
+                run([sys.executable, str(publisher)])
+                env[ADAPTER_ENV[family]] = str(ROOT / "pcucp-next/bin/legacy/PcuCp.LegacyImages.dll")
+            elif family == "interaction":
+                env[ADAPTER_ENV[family]] = str(ROOT / "pcucp-next/dotnet/PcuCp.LegacyInteraction.ContractTests/bin/Release/net8.0/PcuCp.LegacyInteraction.ContractTests.dll")
+                env["CUCP_INTERACTION_TEST_HOST"] = str(host)
+            elif family in ADAPTER_ENV:
+                env[ADAPTER_ENV[family]] = sys.executable if family == "cdp" else str(host)
+            if family in FAMILIES:
+                promoted = family in enabled_adapters(ROOT)
+                if family in CANDIDATE_ONLY:
+                    notice = f"CANDIDATE ONLY: {family} kernel/oracle checks; actual adapter and retirement are NOT qualified."
+                    print(notice, flush=True)
+                    if summary := env.get("GITHUB_STEP_SUMMARY"):
+                        with open(summary, "a", encoding="utf-8") as stream:
+                            stream.write(notice + "\n")
+                elif promoted:
+                    if family == "cdp":
+                        env["CUCP_LEGACY_CDP_ADAPTER_MODE"] = "production"
+                    elif family == "file-images":
+                        source = ROOT / "scripts/cucp-native-helper.ps1"
+                        if not source.is_file():
+                            raise ValueError("Missing promoted file-images adapter source.")
+                        env["CUCP_LEGACY_IMAGES_ADAPTER_SOURCE"] = str(source)
+                    print(f"Running candidate and promoted {family} adapter gates", flush=True)
+                else:
+                    draft = ROOT / DRAFT_ADAPTERS.get(family, f"tests/fixtures/legacy-{family}-adapter.ps1")
+                    if not draft.is_file():
+                        raise ValueError(f"Missing exact {family} adapter draft; refusing to skip its gate.")
+                    if family == "execution":
+                        env["CUCP_EXECUTION_ADAPTER_SOURCE"] = str(draft)
+                    elif family == "precision":
+                        env["CUCP_PRECISION_ADAPTER_DRAFT"] = str(draft)
+                    elif family == "cdp":
+                        env["CUCP_LEGACY_CDP_ADAPTER_MODE"] = "draft"
+                    elif family == "file-images":
+                        env["CUCP_LEGACY_IMAGES_ADAPTER_SOURCE"] = str(draft)
+                    print(f"Running candidate and exact {family} draft adapter gates; production bodies retained", flush=True)
         for pattern in patterns:
             run([sys.executable, "-m", "unittest", "discover", "-s", "tests/python", "-p", pattern, "-v"])
     finally:

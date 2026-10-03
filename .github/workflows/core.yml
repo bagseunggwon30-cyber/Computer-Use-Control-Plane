@@ -162,8 +162,16 @@ jobs:
         shell: pwsh
         run: |
           $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
-          python -m unittest discover -s tests/python -p test_legacy_workflow_parity.py -v
+          python pcucp-next/packaging/migration_qualification.py run --family foundation --log-dir .migration-logs/foundation-full
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Retain full foundation qualification evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qualification-foundation-full
+          path: .migration-logs/foundation-full
+          include-hidden-files: true
+          retention-days: 7
       - name: Legacy task preset recipe qualification (captured child plans)
         if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
         shell: pwsh

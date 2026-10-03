@@ -1,18 +1,23 @@
 # Orphaned private pure-helper retirement
 
-This local cleanup removes seven unused private definitions from
+This cleanup removes seven unused private definitions from
 `scripts/cucp.ps1`. It does not change a public delegate, the production workflow
 parser, an acquisition/action boundary, or the retained
-`_AppStrategy-NormalizeRoute` dependency. Publication and the new source/loader
-Windows full gate remain pending. This is not a new qualified checkpoint.
+`_AppStrategy-NormalizeRoute` dependency. The source/loader Windows full gate passed at published commit
+`f09e5200a37022fbdf1580b54a3fad232121950c`, tree
+`50c816c6d1153f23f20496ff31454c9649c6764c`, in
+[run 37086869922](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37086869922).
+All 14 active jobs passed after one same-commit retry of a pinned-original image
+fixture timeout; no deadline or assertion changed. This qualifies the bounded
+cleanup, not the remaining zero-PowerShell or interactive Windows work.
 
-This cleanup is now integrated locally onto
+The reviewed local cleanup integration was based on
 `14ccef5ba48e82041599698f809576040d6fc5c0`. All its parser code,
 diagnostic fixtures, goldens and `.gitattributes` are preserved byte-for-byte.
 The original cleanup commit
 `38c7dfa111687ccea821111f50b547684cba5b91`, the earlier integration
 `a576440f5e56c3f07df9e274f675b07e5bd7a0a7`, and the current integration base are
-local commit identities; none identifies a newly qualified published checkpoint.
+local commit identities; the published checkpoint is the distinct remote commit cited above.
 
 ## Exact source provenance
 
@@ -82,8 +87,8 @@ public callers:
   exact Console, exit, query and effect comparisons remain.
 
 All these public-caller gates passed at the cited c414 checkpoint. Removing
-unused definitions and adjusting test loading still requires fresh validation;
-old qualification does not certify the new source tree.
+unused definitions and adjusting test loading required the new full gate;
+the older qualification alone did not certify the new source tree.
 
 ## Fixture loading changes
 
@@ -115,13 +120,13 @@ other tracked PowerShell sources/tests** (including launchers, packaging and
 reference scripts). This `scripts/` subtotal uses the prior checkpoint report's
 runtime grouping; all sources still count toward the total. The reduction from
 the 1,013,478-byte original baseline is **143,277 bytes**. The inventory includes every tracked PowerShell file and all fixture
-overhead. These local counts are not newly accepted Windows results.
+overhead. These counts match the exact published tree that passed the full gate.
 
-Before acceptance, rerun the matching NativeHost build and Windows PS5.1
+The full gate reran the matching NativeHost build and Windows PS5.1
 original/current comparisons for task-preset, task/form, SmartPlan, app-profile,
 culture/alias, precision, diagnostic runtime/file and actual adapters. Preserve
 all payload, Console, error, exit, query/effect-order and authority assertions.
-Run the bundled full regression on the coherent integrated commit, including
+The bundled full regression covered the coherent integrated commit, including
 native/Pester boundary, all six migration families, profile, browser and relocated
 portable-package gates. Interactive Windows GUI/IME/clipboard/focus/mixed-DPI
 acceptance remains separate. Main has not been changed by this local cleanup.

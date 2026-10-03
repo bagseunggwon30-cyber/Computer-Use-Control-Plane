@@ -19,17 +19,48 @@ internal static class LegacyDiagnosticJson
 {
     private const int MaxDepth = 102;
     private static readonly JsonSerializerOptions ElementOptions = new()
-    { MaxDepth = MaxDepth + 1, Converters = { new InterpolatedDateTimeConverter() } };
+    { MaxDepth = MaxDepth + 1, Converters = { new InterpolatedDateTimeConverter(), new InterpolatedDoubleConverter() } };
+
+    // Retain source-created CLR scalar types across benchmark property lookup.
+    // A JSON string cannot impersonate DateTime or a nonfinite Double. The
+    // interpolated Json view is only for the existing report string semantics.
+    internal sealed class Value(object? value)
+    {
+        internal JsonElement Json => JsonSerializer.SerializeToElement(value, ElementOptions);
+        internal bool IsNull => value is null;
+        internal Value Property(string name) => new(EventProperty(value, name));
+        internal IEnumerable<Value> Elements => value is List<object?> list
+            ? list.Select(item => new Value(item)) : value is null ? [] : [this];
+        internal int Int32()
+        {
+            if (value is DateTime date)
+                throw CommandOptions.Invalid($"Cannot convert value \"{date.ToString(CultureInfo.CurrentCulture)}\" to type \"System.Int32\". Error: \"Invalid cast from 'DateTime' to 'Int32'.\"");
+            if (value is double number && !double.IsFinite(number))
+                throw CommandOptions.Invalid($"Cannot convert value \"{number.ToString(CultureInfo.InvariantCulture)}\" to type \"System.Int32\". Error: \"Value was either too large or too small for an Int32.\"");
+            // JSON arrays remain Object[] even at length zero or one.
+            if (value is List<object?>)
+                throw CommandOptions.Invalid("Cannot convert the \"System.Object[]\" value of type \"System.Object[]\" to type \"System.Int32\".");
+            return LegacyTaskFormKernel.LegacyInt(Json);
+        }
+    }
+
+    internal static Value ParseValue(string text) => new(Read(text));
 
     internal static JsonElement Parse(string text) => Parse(text, out _);
     internal static JsonElement Parse(string text, out DateTime? timestamp)
+    {
+        object? value = Read(text);
+        timestamp = EventProperty(value, "ts") is DateTime date ? date : null;
+        return JsonSerializer.SerializeToElement(value, ElementOptions);
+    }
+
+    private static object? Read(string text)
     {
         var reader = new Reader(text);
         object? value = reader.ReadValue(0);
         reader.CheckEnd();
         CheckProperties(value);
-        timestamp = EventProperty(value, "ts") is DateTime date ? date : null;
-        return JsonSerializer.SerializeToElement(value, ElementOptions);
+        return value;
     }
 
     // Keep the typed timestamp until the audit cutoff cast. Other audit uses
@@ -39,6 +70,16 @@ internal static class LegacyDiagnosticJson
         public override DateTime Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options) => throw new NotSupportedException();
         public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options) =>
             writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private sealed class InterpolatedDoubleConverter : JsonConverter<double>
+    {
+        public override double Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options) => throw new NotSupportedException();
+        public override void Write(Utf8JsonWriter writer, double value, JsonSerializerOptions options)
+        {
+            if (double.IsFinite(value)) writer.WriteNumberValue(value);
+            else writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
+        }
     }
 
     private static object? EventProperty(object? value, string name)
@@ -63,11 +104,22 @@ internal static class LegacyDiagnosticJson
             var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var member in members)
             {
+                // PSObject.Properties[name] performs these checks before child
+                // conversion. PSTypeNames is an existing generated property;
+                // the other reserved names below are member sets, not properties.
+                if (member.Key.Length == 0)
+                    throw new JsonException("Cannot process argument because the value of argument \"name\" is not valid. Change the value of the \"name\" argument and run the operation again.");
+                if (StringComparer.OrdinalIgnoreCase.Equals(member.Key, "pstypenames"))
+                    throw new JsonException($"Cannot convert the JSON string because a dictionary that was converted from the string contains the duplicated keys 'pstypenames' and '{member.Key}'.");
                 if (names.TryGetValue(member.Key, out string? previous))
                     throw new JsonException($"Cannot convert the JSON string because a dictionary that was converted from the string contains the duplicated keys '{previous}' and '{member.Key}'.");
                 // Validate only retained values, after every exact duplicate was
                 // replaced. An overwritten object's case collision is irrelevant.
                 CheckProperties(member.Value);
+                // PSNoteProperty construction occurs after nested conversion.
+                // These names cannot be added even when their value is null.
+                if (new[] { "psbase", "psadapted", "psextended", "psobject" }.Contains(member.Key, StringComparer.OrdinalIgnoreCase))
+                    throw new JsonException($"The member name \"{member.Key}\" is reserved.");
                 names.Add(member.Key, member.Key);
             }
         }
@@ -198,6 +250,12 @@ internal static class LegacyDiagnosticJson
             if (token == "null") return null;
             if (token == "true") return true;
             if (token == "false") return false;
+            // Framework accepts only these exact invariant nonfinite symbols.
+            // Do not inherit modern .NET's case-insensitive symbols or overflow
+            // saturation: e.g. `nan`, `+Infinity` and `1e999` remain invalid.
+            if (token == "NaN") return double.NaN;
+            if (token == "Infinity") return double.PositiveInfinity;
+            if (token == "-Infinity") return double.NegativeInfinity;
             if (!token.Contains('e', StringComparison.OrdinalIgnoreCase))
             {
                 if (!token.Contains('.'))

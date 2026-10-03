@@ -6,6 +6,7 @@ from unittest.mock import patch
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -126,6 +127,129 @@ class QualificationSelectionTests(unittest.TestCase):
             self.assertIn(str(root / 'pcucp-next/dotnet/PcuCp.LegacyWorkflow.ContractTests'), projects)
             suites = [args[args.index('-p') + 1] for args, _ in calls if '-p' in args]
             self.assertEqual(suites, ['test_migration_inventory.py', 'test_legacy_workflow*.py'])
+
+    def make_foundation_root(self, root):
+        for name in ('tests/python', 'pcucp-next/dotnet/PcuCp.NativeHost', *(
+                'pcucp-next/dotnet/' + p for p in qualification.PROJECTS['foundation'])):
+            (root / name).mkdir(parents=True, exist_ok=True)
+        for name in ('test_migration_inventory.py', *qualification.REQUIRED_FOUNDATION_TESTS):
+            (root / 'tests/python' / name).write_text('# fixture')
+
+    def test_foundation_requires_each_current_suite_before_any_subprocess(self):
+        required = {
+            'test_legacy_workflow_parity.py', 'test_legacy_workflow_boundaries.py',
+            'test_legacy_workflow_diagnostics.py', 'test_legacy_workflow_embedded_fixtures.py',
+            'test_legacy_workflow_observed_diagnostics.py', 'test_legacy_workflow_evidence.py',
+        }
+        self.assertEqual(set(qualification.REQUIRED_FOUNDATION_TESTS), required)
+        for missing in ('test_migration_inventory.py', *sorted(required)):
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                self.make_foundation_root(root)
+                (root / 'tests/python' / missing).unlink()
+                with patch.object(qualification, 'ROOT', root), \
+                     patch.object(qualification.subprocess, 'run') as run:
+                    with self.assertRaisesRegex(ValueError, re.escape(missing)):
+                        qualification.run_family('foundation', log_dir=root / 'logs')
+                    run.assert_not_called()
+
+    def test_full_workflow_uses_shared_foundation_gate_and_always_uploads_evidence(self):
+        core = (ROOT / '.github/workflows/core.yml').read_text(encoding='utf-8')
+        job = core.split('  windows-contracts:\n', 1)[1].split('  windows-profile-candidate:\n', 1)[0]
+        step = job.split('      - name: Workflow exact parsed-plan and candidate qualification (parser retained)\n', 1)[1].split('      - ', 1)[0]
+        self.assertIn("if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}", step)
+        self.assertIn('shell: pwsh', step)
+        host = "$env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path"
+        command = 'python pcucp-next/packaging/migration_qualification.py run --family foundation --log-dir .migration-logs/foundation-full'
+        self.assertIn(host, step)
+        self.assertIn(command, step)
+        self.assertLess(step.index(host), step.index(command))
+        self.assertIn('if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }', step)
+        self.assertNotIn('-p test_legacy_workflow_parity.py', step)
+        upload = job.split('      - name: Retain full foundation qualification evidence\n', 1)[1].split('      - ', 1)[0]
+        for setting in ('uses: actions/upload-artifact@v4', 'if: always()',
+                        'name: qualification-foundation-full', 'path: .migration-logs/foundation-full',
+                        'include-hidden-files: true', 'retention-days: 7'):
+            self.assertIn(setting, upload)
+        focused = (ROOT / '.github/workflows/migration-qualification.yml').read_text(encoding='utf-8')
+        full = focused.split('  full-regression:\n', 1)[1]
+        self.assertIn("if: needs.scope.outputs.full == 'true'", full)
+        self.assertIn('uses: ./.github/workflows/core.yml', full)
+        family = focused.split('  windows-family:\n', 1)[1].split('  cdp-browser:\n', 1)[0]
+        self.assertIn("if: needs.scope.outputs.full != 'true'", family)
+        for source in (core, focused):
+            self.assertNotIn('CUCP_REQUIRE_WORKFLOW_PARSER_PARITY', source)
+            self.assertNotIn('CUCP_REQUIRE_WORKFLOW_DIAGNOSTIC_PARITY', source)
+
+    def test_logged_foundation_selects_all_suites_and_preserves_native_host(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.make_foundation_root(root)
+            # The wildcard must also include future workflow modules.
+            future = 'test_legacy_workflow_future.py'
+            (root / 'tests/python' / future).write_text('# fixture')
+            host = str(root / 'already-built native host.dll')
+            logs = root / 'logs'
+            calls = []
+            def capture(argv, **kwargs):
+                calls.append((argv, dict(kwargs['env']), kwargs['log_path']))
+            with patch.object(qualification, 'ROOT', root), \
+                 patch.object(qualification, 'run_logged', side_effect=capture), \
+                 patch.dict(os.environ, {'CUCP_NATIVE_TEST_HOST': host}):
+                qualification.run_family('foundation', log_dir=logs)
+            self.assertEqual(calls[0][0], ['dotnet', 'build', str(root / 'pcucp-next/dotnet/PcuCp.NativeHost'), '-c', 'Release', '-warnaserror'])
+            projects = [Path(argv[argv.index('--project') + 1]).name for argv, _, _ in calls if '--project' in argv]
+            self.assertEqual(projects, ['PcuCp.LegacyPure.ContractTests', 'PcuCp.LegacyTaskForm.ContractTests', 'PcuCp.LegacyWorkflow.ContractTests'])
+            patterns = [argv[argv.index('-p') + 1] for argv, _, _ in calls if '-p' in argv]
+            self.assertEqual(patterns, ['test_migration_inventory.py', 'test_legacy_workflow*.py'])
+            selected = {path.name for pattern in patterns for path in (root / 'tests/python').glob(pattern)}
+            self.assertEqual(selected, {'test_migration_inventory.py', future, *qualification.REQUIRED_FOUNDATION_TESTS})
+            for index, (_, env, log_path) in enumerate(calls, 1):
+                self.assertEqual(env['CUCP_NATIVE_TEST_HOST'], host)
+                self.assertEqual(env['CUCP_WORKFLOW_DIAGNOSTIC_CAPTURE'], str(logs / 'workflow-parser-raw-diagnostics.json'))
+                self.assertEqual(env['PYTHONPATH'], str(root / 'pcucp-next/python'))
+                self.assertEqual(env['PYTHONIOENCODING'], 'utf-8')
+                self.assertEqual(log_path, logs / f'{index:02d}.log')
+            self.assertEqual(calls[-1][0][-2:], ['-OutputPath', str(logs / 'source-map.json')])
+
+    def test_foundation_failures_keep_complete_logs_raw_capture_and_source_map(self):
+        # Build/contract failures must retain source provenance too. A raw
+        # capture exists only after the diagnostic suite actually runs.
+        for fail_at in (1, 2, 5, 6):
+            with self.subTest(fail_at=fail_at), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                self.make_foundation_root(root)
+                logs = root / 'logs'
+                payload = b'x' * 100000 + b'\xff qualification output\n'
+                raw = b'{"comparison_completed":false,"cases":[{"id":"retained"}]}\r\n'
+                source_map = b'{"schema":"cucp.migration-source-map/v1","files":[]}\n'
+                calls = []
+                def capture(argv, **kwargs):
+                    calls.append(argv)
+                    kwargs['stdout'].write(payload)
+                    if 'test_legacy_workflow*.py' in argv:
+                        Path(kwargs['env']['CUCP_WORKFLOW_DIAGNOSTIC_CAPTURE']).write_bytes(raw)
+                    if '-OutputPath' in argv:
+                        Path(argv[argv.index('-OutputPath') + 1]).write_bytes(source_map)
+                    return subprocess.CompletedProcess(argv, 7 if len(calls) == fail_at else 0)
+                with patch.object(qualification, 'ROOT', root), \
+                     patch.object(qualification.subprocess, 'run', side_effect=capture), \
+                     contextlib.redirect_stdout(io.StringIO()), \
+                     self.assertRaises(subprocess.CalledProcessError) as caught:
+                    qualification.run_family('foundation', log_dir=logs)
+                self.assertEqual(caught.exception.returncode, 7)
+                self.assertEqual(len(calls), fail_at + 1)
+                self.assertEqual(calls[-1][0], 'powershell.exe')
+                self.assertIn(str(root / 'tests/fixtures/migration-source-map.ps1'), calls[-1])
+                self.assertEqual((logs / 'source-map.json').read_bytes(), source_map)
+                self.assertEqual(len(list(logs.glob('*.log'))), len(calls))
+                for path in logs.glob('*.log'):
+                    self.assertEqual(path.read_bytes(), payload)
+                raw_path = logs / 'workflow-parser-raw-diagnostics.json'
+                if fail_at == 6:
+                    self.assertEqual(raw_path.read_bytes(), raw)
+                else:
+                    self.assertFalse(raw_path.exists())
 
     def test_file_images_requires_and_runs_both_exact_suites_with_matching_dll(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -35,17 +35,21 @@ excluded, renamed, embedded elsewhere or padded to change the metric.
 
 ## Latest automated checkpoint
 
-The subsequent interaction/diagnostic/file-image integration and boundary repairs
-passed all 14 active jobs at `c414f024` in
-[full run 37072046282](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37072046282).
-Its 26 tracked PS files total 867,162 bytes, including 612,709 runtime bytes.
-Current net reduction is 146,316 bytes (14.44%) from the original baseline;
-extra temporary oracles and boundary fixtures explain why total source exceeds
-the earlier 823,078-byte checkpoint despite lower runtime source. These test
-files remain counted and must acquire equivalent no-PowerShell coverage before
-removal. The required interactive Windows matrix and all zero-dependency final
-gates below remain open. The unqualified literal-tokenizer candidate is still
-excluded from production.
+The latest full automated checkpoint is `f09e5200`, with all 14 active jobs
+successful in [run 37086869922](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37086869922).
+A single pinned-original image-process timeout was retried on the same commit;
+its 15-second limit and assertions were unchanged. Seven orphaned private helpers
+were removed while retaining their qualified public replacements and old oracles.
+The 27 tracked PS files total **870,201 bytes**, including **610,258 runtime
+bytes**. Net reduction from baseline is **143,277 bytes**. Temporary parser and
+boundary fixtures explain why total source exceeds the earlier 823,078-byte
+milestone despite lower runtime source. They remain fully counted.
+
+The parser candidate's expanded focused Windows gate passed at `1e3d534a`, but
+known conservative syntax and exact diagnostic differences still block its
+promotion. It remains excluded from NativeHost. The required interactive Windows
+matrix and all zero-dependency final gates below remain open. New benchmark/audit
+and history candidates do not earn retirement credit before their exact gates.
 
 ## Ordered implementation families
 

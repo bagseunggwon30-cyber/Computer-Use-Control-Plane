@@ -1,0 +1,380 @@
+"""Captured-only qualification of the two retained diagnostic candidates.
+
+This is an additional gate, independent of the production-selection manifest.
+The existing nine-operation original/production gates and all their assertions
+remain intact. No case here authorizes provider, desktop, account or model use.
+"""
+import copy
+import hashlib
+import json
+from pathlib import Path
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+from test_legacy_diagnostics_parity import (
+    ACCEPTED_TREE, BODY_HASHES, FILE_OPERATIONS, ROOT, cases, decode_wire,
+    reply, run_candidate,
+)
+from test_legacy_diagnostics_adapters import (
+    ADAPTER, BRIDGE, RETAINED_DIAGNOSTICS, UNCERTAIN_MESSAGE,
+    actual_adapter_arguments, captured_failures, changes_owned_state,
+)
+
+
+def adversarial_json_cases():
+    """Raw file text crosses existing captured ReadText/ReadLines seams only.
+
+    IDs describe inputs, not presumed PowerShell outcomes. Source-derived repair
+    expectations below are separate from the mandatory Windows differential.
+    """
+    result = []
+
+    def benchmark(identity, raw, **extra):
+        result.append(dict(case_id='baseline/' + identity, operation='benchmark',
+            rest=['--iters', '1', '--baseline', r'C:\fixture\baseline.json'],
+            replies=[reply()] * 4 + [True, raw], **extra))
+
+    def audit(identity, lines, **extra):
+        result.append(dict(case_id='audit/' + identity, operation='audit-summary',
+            rest=[], replies=[True, [dict(full_name=r'C:\fixture\audit\trajectory-inert.ndjson',
+                last_write_time='2026-10-02T00:00:00Z')], lines], **extra))
+
+    def baseline(value, field='p50_ms'):
+        other = 'p95_ms' if field == 'p50_ms' else 'p50_ms'
+        return '{"results":[{"name":"windows","' + field + '":' + value + ',"' + other + '":100}]}'
+
+    for literal in ('NaN', 'Infinity', '-Infinity', 'nan', 'infinity', '+Infinity', '1e999', '-1e999'):
+        benchmark('number/' + literal, baseline(literal))
+        audit('number/' + literal, ['{"macro":' + literal + ',"ts":' + literal + ',"exit_code":' + literal + '}'])
+    for field in ('p50_ms', 'p95_ms'):
+        for literal in (r'"\/Date(0)\/"', r'"\/Date(-1000)\/"', r'"\/Date(0+0900)\/"', '"/Date(0)/"', '"01/01/1970 00:00:00"'):
+            benchmark('date/' + field + '/' + literal, baseline(literal, field))
+    benchmark('date/ko-KR', baseline(r'"\/Date(0)\/"'), culture='ko-KR')
+    audit('date/nested', [r'{"ts":"\/Date(0)\/","macro":["date","\/Date(-1000)\/"],"exit_code":"\/Date(0)\/"}'])
+    audit('date/overflow', [r'{"ts":"\/Date(9223372036854775807)\/","macro":"overflow"}'])
+    # Retain discovered object-interpolation gaps as exact Windows probes, not
+    # as portable expectations or an allowlist of accepted mismatches.
+    audit('object/empty', ['{"macro":{},"action":"fallback","reason":{},"ts":{}}'])
+    audit('object/nested', ['{"macro":{"nested":{"value":1},"items":[1,2]},"exit_code":{}}'])
+
+    for name in ('', 'PSObject', 'PSBase', 'PSAdapted', 'PSExtended', 'PSTypeNames',
+                 'psobject', 'ToString', 'Count', 'Length', '__proto__', 'constructor'):
+        key = json.dumps(name)
+        benchmark('property/' + name, '{' + key + ':1,"results":[{"name":"windows","p50_ms":100,"p95_ms":100}]}')
+        audit('property/' + name, ['{' + key + ':1,"macro":"property"}', '{"macro":"after"}'])
+    for identity, raw in (
+        ('nested-empty', '{"ignored":{"":1},"results":[]}'),
+        ('empty-before-child-collision', '{"":{"x":1,"X":2},"results":[]}'),
+        ('type-names-before-child-empty', '{"PSTypeNames":{"":1},"results":[]}'),
+        ('reserved-after-child-empty', '{"PSObject":{"":1},"results":[]}'),
+        ('overwritten-empty', '{"ignored":{"":1},"ignored":null,"results":[]}'),
+        ('overwritten-reserved', '{"ignored":{"PSObject":1},"ignored":null,"results":[]}'),
+        ('overwritten-type-names', '{"ignored":{"PSTypeNames":1},"ignored":null,"results":[]}'),
+        ('case-collision', '{"x":1,"X":2,"results":[]}'),
+        ('case-collision-before-empty', '{"x":1,"X":2,"":3,"results":[]}'),
+        ('empty-before-case-collision', '{"":3,"x":1,"X":2,"results":[]}'),
+        ('exact-duplicate', '{"results":[{"name":"windows","p50_ms":1}],"results":[{"name":"windows","p50_ms":100,"p95_ms":100}]}'),
+        ('type-null', '{"__type":null,"results":[]}'),
+        ('type-object', '{"__type":{},"results":[]}'),
+        ('type-array', '{"__type":[],"results":[]}'),
+        ('type-null-collision', '{"__type":null,"__Type":"kept","results":[]}'),
+        ('type-removed-before-collision', '{"__type":"inert","__Type":"kept","results":[]}'),
+        ('type-overwritten-null', '{"__type":"inert","__type":null,"__Type":"kept","results":[]}'),
+        ('type-overwritten-nonnull', '{"__type":null,"__type":"inert","__Type":"kept","results":[]}'),
+        ('scalar-row', '{"results":{"name":"windows","p50_ms":100,"p95_ms":100}}'),
+        ('array-root', '[{"results":[{"name":"windows","p50_ms":100,"p95_ms":100}]}]'),
+        ('missing-p95', '{"results":[{"name":"windows","p50_ms":100}]}'),
+        ('null-p50', '{"results":[{"name":"windows","p50_ms":null,"p95_ms":100}]}'),
+        ('unreached-date', r'{"results":[{"name":"unmatched","p50_ms":"\/Date(0)\/","p95_ms":100}]}'),
+        ('unreached-nonfinite', '{"results":[{"name":"windows","p50_ms":null,"p95_ms":NaN}]}'),
+        ('null-root', 'null'),
+        ('empty-text', ''),
+    ):
+        benchmark(identity, raw)
+        audit(identity, [raw, '{"macro":"after"}'])
+    # Int32 rounding/overflow, text vs numeric, and unsupported containers are
+    # qualification probes too; adding a case never changes the expected oracle.
+    for value in ('2147483648', '-2147483649', '2147483647.49', '"1.5"', 'true',
+                  '[100]', '[]', '{}', '{"value":1}', '{"items":[1,2]}', '"bad"'):
+        benchmark('cast/' + value, baseline(value))
+    # Keep raw rendering and Brief/JSON-only behavior visible for every new input.
+    originals = copy.deepcopy(result)
+    for fixture in originals:
+        fixture['case_id'] += '/brief-json-only'
+        fixture['brief'] = True
+        fixture['rest'].append('--json-only')
+        result.append(fixture)
+    return result
+
+
+def subtraction_boundary_cases():
+    # Append after the original 302 cases. Negative captured clocks deliberately
+    # exercise the full signed arithmetic domain; they are not live timings.
+    low, high = -(2**31), 2**31 - 1
+    vectors = [
+        ('current-37-baseline-min', 37, low, low),
+        ('current-37-baseline-max', 37, high, high),
+        ('zero-baseline-min', 0, low, low),
+        ('zero-baseline-max', 0, high, high),
+        ('exact-min', low, 0, 0),
+        ('exact-max', high, 0, 0),
+        ('below-min', low, 1, 1),
+        ('above-max', high, -1, -1),
+        ('inside-min', low, -1, -1),
+        ('inside-max', high, 1, 1),
+        ('widest-positive', high, low, low),
+        ('widest-negative', low, high, high),
+        ('p95-min', 37, 100, low),
+        ('p95-max', 37, 100, high),
+        ('p95-invalid-after-wide-p50', 37, low, 'bad'),
+    ]
+    result = []
+    for name, current, p50, p95 in vectors:
+        for brief in (False, True):
+            result.append(dict(case_id='subtraction/' + name + ('/brief-json-only' if brief else ''),
+                operation='benchmark', rest=['--iters', '1', '--baseline', r'C:\fixture\baseline.json'] + (['--json-only'] if brief else []),
+                brief=brief, clocks=[current, 37, 37, 37], replies=[reply()] * 4 + [True,
+                    json.dumps(dict(results=[dict(name='windows', p50_ms=p50, p95_ms=p95)]))]))
+    return result
+
+
+def retained_candidate_cases():
+    retained = [copy.deepcopy(f) for f in cases() if f['operation'] in RETAINED_DIAGNOSTICS]
+    for index, fixture in enumerate(retained):
+        fixture['case_id'] = 'existing/' + str(index)
+    return retained + adversarial_json_cases() + subtraction_boundary_cases()
+
+
+def retained_candidate_adapter_arguments(pinned_source):
+    # Deliberately never add -ProductionEntry or consult the manifest. That path
+    # would run original retained functions and could falsely qualify candidates.
+    return ['-Source', str(pinned_source), '-AdapterSource', str(ADAPTER),
+            '-BridgeSource', str(BRIDGE)]
+
+
+def assert_actual_candidate(test, fixture, before, after):
+    old_effects = decode_wire(before['effects'])
+    new_effects = decode_wire(after['effects'])
+    failures = captured_failures(fixture, old_effects)
+    uncertain = next((f for f in failures if changes_owned_state(f['effect']) and
+                      f['effect']['kind'] != 'AssertAuthorized'), None)
+    if uncertain is not None:
+        test.assertEqual(new_effects, old_effects[:uncertain['trace_index'] + 1])
+        test.assertEqual(after['consumed'], uncertain['reply_index'] + 1)
+        test.assertEqual(after['state'], 'error')
+        test.assertEqual(after['error'], UNCERTAIN_MESSAGE)
+        test.assertEqual(after['console'], '')
+        return 'owned_failure'
+    if before['state'] == 'error' and any(changes_owned_state(e) for e in old_effects):
+        test.assertEqual(new_effects, old_effects)
+        test.assertEqual(after['consumed'], before['consumed'])
+        test.assertEqual(after['state'], 'error')
+        test.assertEqual(after['error'], 'mutation_may_have_occurred=true; automatic_retry=false; ' + before['error'])
+        test.assertEqual(after['console'], before['console'])
+        return 'terminal_failure'
+    test.assertEqual(after, before)
+    return 'exact'
+
+
+class RetainedDiagnosticPortableTests(unittest.TestCase):
+    def test_original_production_bodies_and_manifest_gate_remain_retained(self):
+        self.assertEqual(RETAINED_DIAGNOSTICS, {'benchmark', 'audit-summary'})
+        source = BRIDGE.read_text(encoding='utf-8-sig')
+        for name in ('Benchmark', 'AuditSummary'):
+            start = re.search(r'^function Invoke-Macro' + name + r' \{', source, re.M).start()
+            body = source[start:source.index('\n}', start) + 2].encode('utf-8')
+            size, digest = BODY_HASHES[name]
+            self.assertEqual((len(body), hashlib.sha256(body).hexdigest()), (size, digest))
+        pinned = Path('inert-pinned-original.ps1')
+        arguments = retained_candidate_adapter_arguments(pinned)
+        self.assertEqual(arguments, actual_adapter_arguments(pinned, 'draft'))
+        self.assertNotIn('-ProductionEntry', arguments)
+        self.assertNotEqual(arguments, actual_adapter_arguments(pinned, 'production'))
+
+    def test_adversarial_corpus_is_closed_and_preserves_all_66_retained_cases(self):
+        fixtures = retained_candidate_cases()
+        existing = [f for f in cases() if f['operation'] in RETAINED_DIAGNOSTICS]
+        self.assertEqual(len(existing), 66)
+        self.assertEqual(len(adversarial_json_cases()), 236)
+        self.assertEqual(len(subtraction_boundary_cases()), 30)
+        self.assertEqual(len(fixtures), 332)
+        # Pin every value and case ID from the previous candidate batch, not
+        # merely its case count. New probes append without altering that corpus.
+        self.assertEqual(hashlib.sha256(json.dumps(fixtures[:302], ensure_ascii=False,
+            sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+            '6a3949f67bf355818b6a61b53910eca6affe1768993d7727767aa3060a20b561')
+        self.assertEqual([{k: v for k, v in f.items() if k != 'case_id'} for f in fixtures[:66]], existing)
+        self.assertEqual(len({f['case_id'] for f in fixtures}), len(fixtures))
+        self.assertEqual({f['operation'] for f in fixtures}, RETAINED_DIAGNOSTICS)
+        self.assertEqual(json.loads(json.dumps(fixtures)), fixtures)
+        observations = run_candidate(fixtures)
+        self.assertEqual(len(observations), len(fixtures))
+        for fixture, observed in zip(fixtures, observations):
+            with self.subTest(case=fixture['case_id']):
+                self.assertNotIn('Fixture exhausted', observed.get('error', ''))
+                if fixture['case_id'].startswith('existing/'):
+                    continue
+                self.assertEqual(observed['state'], 'complete', observed)
+                self.assertEqual(observed['consumed'], len(fixture['replies']))
+                self.assertTrue(all(effect['kind'] in {'Clock', 'Native', 'FileExists', 'ReadText', 'ListFiles', 'ReadLines'} for effect in observed['effects']))
+
+    def test_source_derived_typed_scalar_repairs_do_not_coerce_json_strings(self):
+        fixtures = adversarial_json_cases()
+        selected = [f for f in fixtures if not f.get('brief') and
+            (f['case_id'].startswith('baseline/date/') or f['case_id'] in {
+                'baseline/number/NaN', 'baseline/number/Infinity', 'baseline/number/-Infinity',
+                'audit/number/NaN', 'audit/number/Infinity', 'audit/number/-Infinity',
+                'audit/number/nan', 'audit/number/1e999'})]
+        for fixture, observed in zip(selected, run_candidate(selected)):
+            with self.subTest(case=fixture['case_id']):
+                payload = observed['payload']
+                if fixture['operation'] == 'benchmark':
+                    detail = payload['baseline_compare']['detail']
+                    if '\\/Date(' in fixture['replies'][-1]:
+                        self.assertIn("Invalid cast from 'DateTime' to 'Int32'.", detail)
+                    elif '/date/' in fixture['case_id']:
+                        self.assertIn('Input string was not in a correct format.', detail)
+                    else:
+                        self.assertIn('Value was either too large or too small for an Int32.', detail)
+                elif fixture['case_id'] in {'audit/number/nan', 'audit/number/1e999'}:
+                    self.assertEqual(payload['event_count'], 0)
+                else:
+                    value = fixture['case_id'].rsplit('/', 1)[-1]
+                    self.assertEqual(payload['event_count'], 1)
+                    self.assertEqual(payload['by_macro'], {value: 1})
+                    self.assertEqual(payload['earliest_ts'], value)
+
+    def test_source_derived_property_validation_order_and_overwrite(self):
+        empty = ('Cannot process argument because the value of argument "name" is not valid. '
+                 'Change the value of the "name" argument and run the operation again.')
+        duplicate = ("Cannot convert the JSON string because a dictionary that was converted "
+                     "from the string contains the duplicated keys 'pstypenames' and 'PSTypeNames'.")
+        expected = {
+            'property/': empty,
+            'property/PSObject': 'The member name "PSObject" is reserved.',
+            'property/psobject': 'The member name "psobject" is reserved.',
+            'property/PSTypeNames': duplicate,
+            'empty-before-child-collision': empty,
+            'type-names-before-child-empty': duplicate,
+            'reserved-after-child-empty': empty,
+            'overwritten-empty': None,
+            'overwritten-reserved': None,
+            'overwritten-type-names': None,
+            'type-removed-before-collision': None,
+            'type-overwritten-nonnull': None,
+            'unreached-date': None,
+            'unreached-nonfinite': None,
+        }
+        fixtures = [f for f in adversarial_json_cases() if not f.get('brief') and
+                    f['case_id'].removeprefix('baseline/') in expected and f['operation'] == 'benchmark']
+        self.assertEqual(len(fixtures), len(expected))
+        for fixture, observed in zip(fixtures, run_candidate(fixtures)):
+            identity = fixture['case_id'].removeprefix('baseline/')
+            with self.subTest(case=identity):
+                comparison = observed['payload']['baseline_compare']
+                if expected[identity] is None:
+                    self.assertNotIn('error', comparison)
+                else:
+                    self.assertEqual(comparison['detail'], expected[identity])
+
+    def test_source_derived_container_cast_errors_do_not_unwrap_singletons(self):
+        expected = {
+            'baseline/cast/[100]': 'Cannot convert the "System.Object[]" value of type "System.Object[]" to type "System.Int32".',
+            'baseline/cast/[]': 'Cannot convert the "System.Object[]" value of type "System.Object[]" to type "System.Int32".',
+        }
+        fixtures = [f for f in adversarial_json_cases() if f['case_id'] in expected]
+        self.assertEqual(len(fixtures), len(expected))
+        for fixture, observed in zip(fixtures, run_candidate(fixtures)):
+            with self.subTest(case=fixture['case_id']):
+                self.assertEqual(observed['payload']['baseline_compare']['detail'], expected[fixture['case_id']])
+
+    def test_source_derived_subtraction_promotion_and_p95_evaluation(self):
+        fixtures = subtraction_boundary_cases()
+        observations = run_candidate(fixtures)
+        self.assertEqual(len(observations), len(fixtures))
+        for fixture, observed in zip(fixtures, observations):
+            with self.subTest(case=fixture['case_id']):
+                self.assertEqual(observed['state'], 'complete')
+                self.assertEqual(observed['consumed'], 6)
+                comparison = observed['payload']['baseline_compare']
+                baseline = json.loads(fixture['replies'][-1])['results'][0]
+                if baseline['p95_ms'] == 'bad':
+                    self.assertEqual(comparison['error'], 'baseline_load_failed')
+                    self.assertEqual(comparison['detail'], 'Cannot convert value "bad" to type "System.Int32". Error: "Input string was not in a correct format."')
+                    continue
+                self.assertNotIn('error', comparison)
+                self.assertEqual(comparison['compared_targets'], 1)
+                delta = fixture['clocks'][0] - baseline['p50_ms']
+                verdict = 'improved' if delta <= -10 else 'regressed' if delta >= 30 else 'neutral'
+                self.assertEqual(comparison['rows'], [dict(name='windows', baseline_p50_ms=baseline['p50_ms'],
+                    current_p50_ms=fixture['clocks'][0], delta_ms=delta,
+                    delta_pct=round(delta / baseline['p50_ms'] * 100, 1) if baseline['p50_ms'] > 0 else 0,
+                    verdict=verdict)])
+                self.assertEqual(comparison['improved_count'], int(verdict == 'improved'))
+                self.assertEqual(comparison['regressed_count'], int(verdict == 'regressed'))
+
+
+@unittest.skipUnless(sys.platform == 'win32', 'Windows PowerShell 5.1 retained candidate qualification')
+class RetainedDiagnosticWindowsTests(unittest.TestCase):
+    maxDiff = 2500
+
+    def test_pinned_original_current_original_pure_candidate_and_actual_candidate(self):
+        host = os.environ.get('CUCP_DIAGNOSTICS_TEST_HOST')
+        self.assertTrue(host, 'Retained candidate qualification requires CUCP_DIAGNOSTICS_TEST_HOST')
+        self.assertTrue(Path(host).is_file(), 'Matching diagnostic NativeHost does not exist')
+        fixtures = retained_candidate_cases()
+        pure = run_candidate(fixtures)
+        records = {name: [None] * len(fixtures) for name in ('original', 'production', 'candidate')}
+        with tempfile.TemporaryDirectory(prefix='CUCP retained diagnostics 한국어 ') as temporary:
+            temp = Path(temporary)
+            source = temp / 'original.ps1'
+            source.write_bytes(subprocess.check_output(['git', 'show', f'{ACCEPTED_TREE}:scripts/cucp.ps1'], cwd=ROOT))
+            for file_group in (True, False):
+                selected = [(i, f) for i, f in enumerate(fixtures) if (f['operation'] in FILE_OPERATIONS) == file_group]
+                inputs = temp / 'cases.json'
+                inputs.write_text(json.dumps([f for _, f in selected]), encoding='utf-8-sig')
+                runner = ROOT / ('tests/fixtures/legacy-diagnostics-file-oracle.ps1' if file_group else 'tests/fixtures/legacy-diagnostics-runtime-oracle.ps1')
+                command = [shutil.which('powershell.exe'), '-NoProfile', '-NonInteractive', '-File', str(runner), '-InputPath', str(inputs)]
+                routes = {
+                    'original': ['-Source', str(source)],
+                    'production': actual_adapter_arguments(source, 'production'),
+                    'candidate': retained_candidate_adapter_arguments(source),
+                }
+                for name, arguments in routes.items():
+                    process = subprocess.run(command + arguments, capture_output=True, timeout=900,
+                        env={**os.environ, 'CUCP_NATIVE_HOST': str(Path(host).resolve()), 'CUCP_EXECUTION_DIAGNOSTICS': '1'})
+                    self.assertEqual(process.returncode, 0, process.stderr.decode(errors='replace'))
+                    observations = json.loads(process.stdout.decode('utf-8-sig'))
+                    self.assertEqual(len(observations), len(selected))
+                    for (index, _), observed in zip(selected, observations):
+                        records[name][index] = observed
+        partition = dict(exact=0, owned_failure=0, terminal_failure=0)
+        for index, fixture in enumerate(fixtures):
+            original = records['original'][index]
+            with self.subTest(case=fixture['case_id'], route='current-original'):
+                self.assertEqual(records['production'][index], original)
+            with self.subTest(case=fixture['case_id'], route='pure-candidate'):
+                actual = pure[index]
+                self.assertEqual(actual['state'], original['state'])
+                self.assertEqual(actual['effects'], decode_wire(original['effects']))
+                self.assertEqual(actual['consumed'], original['consumed'])
+                if actual['state'] == 'error':
+                    self.assertEqual(actual['error'], original['error'])
+                else:
+                    self.assertEqual(actual['exit'], original['exit'])
+                    if original['payload'] is not None:
+                        self.assertEqual(actual['payload'], decode_wire(original['payload']))
+            with self.subTest(case=fixture['case_id'], route='actual-candidate'):
+                partition[assert_actual_candidate(self, fixture, original, records['candidate'][index])] += 1
+        self.assertEqual(sum(partition.values()), len(fixtures))
+        self.assertGreater(partition['owned_failure'], 0)
+        print(f"Compared {len(fixtures)} retained diagnostic cases through original/current-original/pure-candidate/actual-candidate routes: {partition}", flush=True)
+
+
+if __name__ == '__main__':
+    unittest.main()
