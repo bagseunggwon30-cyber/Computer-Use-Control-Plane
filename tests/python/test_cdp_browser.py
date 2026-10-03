@@ -5,6 +5,7 @@ The default suite explicitly skips these tests and never launches a browser.
 No existing profile, desktop browser, account, external page, or package is used.
 """
 from contextlib import ExitStack
+import errno
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -93,6 +94,42 @@ def _stop_owned_browser(process):
             process.wait(timeout=5)
 
 
+def _cleanup_owned_browser_directory(root, process, prior_error=None):
+    """Remove only this fixture's directory, after its exact child is reaped."""
+    if process is not None and process.poll() is None:
+        raise RuntimeError('Owned browser is still running; preserving its temporary directory') from prior_error
+    failure_path = None
+
+    def failed_removal(_function, path, error_info):
+        # Python 3.10/3.11 can report only a basename in OSError.filename.
+        # rmtree supplies the qualified path independently to this callback.
+        nonlocal failure_path
+        failure_path = path
+        raise error_info[1]
+
+    deadline = time.monotonic() + 1
+    retry_error = None
+    for attempt in range(20):
+        if retry_error is not None and time.monotonic() >= deadline:
+            raise retry_error
+        failure_path = None
+        try:
+            shutil.rmtree(root, onerror=failed_removal)
+            return
+        except OSError as exc:
+            # CI reported profile/Default ENOTEMPTY after child shutdown.
+            # Allow bounded settling only for that owned-profile failure;
+            # unrelated errors and a profile that never settles remain errors.
+            if (process is None or exc.errno != errno.ENOTEMPTY or failure_path is None or
+                    not Path(os.path.abspath(failure_path)).is_relative_to(root / 'profile')):
+                raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or attempt == 19:
+                raise
+            retry_error = exc
+            time.sleep(min(.05, remaining))
+
+
 @unittest.skipUnless(os.environ.get('CUCP_CHROME_TEST') == '1',
                      'Set CUCP_CHROME_TEST=1 for sandboxed, temporary-profile Chrome fixture tests')
 class CdpBrowserTests(unittest.TestCase):
@@ -109,7 +146,9 @@ class CdpBrowserTests(unittest.TestCase):
     def setUp(self):
         self.resources = ExitStack()
         self.addCleanup(self.resources.close)
-        root = Path(self.resources.enter_context(tempfile.TemporaryDirectory(prefix='cucp-cdp-browser-')))
+        process = None
+        root = Path(tempfile.mkdtemp(prefix='cucp-cdp-browser-'))
+        self.resources.push(lambda _type, error, _tb: _cleanup_owned_browser_directory(root, process, error))
         self.root = root
         profile = root / 'profile'
         profile.mkdir()

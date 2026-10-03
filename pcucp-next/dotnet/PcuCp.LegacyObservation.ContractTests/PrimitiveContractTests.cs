@@ -13,6 +13,7 @@ internal static class PrimitiveContractTests
         PayloadChecks(check);
         GeometryChecks(check);
         RefinementChecks(check);
+        PowerShellGetterBoundaryChecks(check);
         GuardChecks(check);
     }
 
@@ -57,10 +58,11 @@ internal static class PrimitiveContractTests
         p.Reset();
         foreach (var property in new[] { ObservationProperty.Name, ObservationProperty.AutomationId, ObservationProperty.LocalizedControlType, ObservationProperty.ClassName, ObservationProperty.IsEnabled, ObservationProperty.IsOffscreen }) p.Fail("property:one:" + property);
         payload = primitive.MatchPayload(node.Current, "InvokePattern");
-        check((string)payload["name"] == "" && (string)payload["automation_id"] == "" && (string)payload["class_name"] == "" && (string)payload["role"] == "", "Independent text defaults/catches changed");
-        check((bool)payload["is_enabled"] && !(bool)payload["is_offscreen"] && p.Trace.Count == 7, "Independent bool defaults/catches changed");
+        check((string)payload["name"] == "" && (string)payload["automation_id"] == "" && (string)payload["class_name"] == "" && payload["role"] == null, "Adapted getter null is interpolated for text but uncast for role");
+        check(!(bool)payload["is_enabled"] && !(bool)payload["is_offscreen"] && p.Trace.Count == 7, "Adapted getter null converts to false independently");
         p.Reset(); p.Fail("bounds:one");
-        check(Throws(() => primitive.MatchPayload(node.Current, "")) && Trace(p) == "bounds:one", "Bounds failure must escape before property reads");
+        payload = primitive.MatchPayload(node.Current, "");
+        check((int)((OrderedDictionary)payload["rect"])["width"] == 0 && (int)payload["area"] == 0 && p.Trace.Count == 7, "Adapted Bounds failure produces zero payload geometry after all metadata reads");
         p.Reset(); node.Current.Rect = Rect(0, 0, 50000, 50000);
         check(Throws(() => primitive.MatchPayload(node.Current, "")) && p.Trace.Count == 7, "Area overflow must occur after getter reads");
     }
@@ -123,11 +125,12 @@ internal static class PrimitiveContractTests
         check(Trace(p) == "ensure-uia|from-point:-1:2|control-walker|current:first|bounds:first|pattern:first:Invoke|property:first:LocalizedControlType|property:first:IsEnabled|property:first:IsOffscreen|clickable:first|bounds:first|property:first:Name|property:first:AutomationId|property:first:LocalizedControlType|property:first:ClassName|property:first:IsEnabled|property:first:IsOffscreen|parent:first", "Refinement getter order/identity/re-reads changed");
         check(p.WalkerIdentityPreserved && p.CurrentIdentityPreserved, "Acquisition identity lost");
         p.Reset(); p.Fail("current:first");
-        check(primitive.ResolvePoint(0, 0) == null && !p.Trace.Contains("parent:first"), "Current failure must break before parent");
+        check(primitive.ResolvePoint(0, 0) == null && Trace(p) == "ensure-uia|from-point:0:0|control-walker|current:first|parent:first", "Adapted Current failure skips Bounds and still reads parent");
         p.Reset(); p.Fail("bounds:first");
-        check(primitive.ResolvePoint(0, 0) == null && !p.Trace.Contains("parent:first"), "Bounds failure must break before parent");
+        check(primitive.ResolvePoint(0, 0) == null && Trace(p) == "ensure-uia|from-point:0:0|control-walker|current:first|bounds:first|parent:first", "Adapted Bounds failure skips candidate and still reads parent");
         p.Reset(); p.Fail("bounds:first", 2);
-        check(primitive.ResolvePoint(0, 0) == null && !p.Trace.Contains("parent:first"), "Payload bounds failure must discard candidate and break");
+        result = primitive.ResolvePoint(0, 0);
+        check(result != null && result.Score == 170 && (int)result.Match["area"] == 0 && p.Trace.Last() == "parent:first", "Second Bounds getter failure keeps candidate with zero payload geometry and parent read");
         p.Reset(); p.Fail("parent:first");
         check(primitive.ResolvePoint(0, 0).Score == 170, "Parent read failure must preserve existing best");
         p.Reset(); first.Current.Rect = Rect(0, 0, 1, 20);
@@ -163,7 +166,7 @@ internal static class PrimitiveContractTests
         check(primitive.ResolvePoint(0, 0).Score == 160, "Small-area bonus stops above 800");
         first.Current.Rect = Rect(0, 0, 20, 20); first.Current.Properties[ObservationProperty.LocalizedControlType] = "button";
         p.Reset(); p.Fail("property:first:IsEnabled"); p.Fail("property:first:IsOffscreen");
-        check(primitive.ResolvePoint(0, 0).Score == 170, "Refinement bool getter failures retain defaults");
+        check(primitive.ResolvePoint(0, 0).Score == 120, "Refinement IsEnabled getter null applies disabled penalty; IsOffscreen null is false");
         p.Reset(); p.Fail("clickable:first");
         result = primitive.ResolvePoint(0, 0);
         check(result.Score == 170 && !result.NativeClickable, "Clickable failure retains center candidate without bonus");
@@ -175,7 +178,48 @@ internal static class PrimitiveContractTests
         check(p.Trace.Count(x => x.StartsWith("current:", StringComparison.Ordinal)) == 6 && p.Trace.Contains("current:depth5") && !p.Trace.Contains("current:depth6"), "Traversal must read only depth 0 through 5");
         check(p.Trace.Contains("parent:depth5") && p.Trace.Count(x => x == "control-walker") == 1, "Depth5 parent read/one-time walker acquisition changed");
         p.Reset(); p.Fail("current:depth1");
-        check(primitive.ResolvePoint(0, 0).Depth == 0 && !p.Trace.Contains("current:depth2"), "Broken ancestor must stop, not continue");
+        check(primitive.ResolvePoint(0, 0).Depth == 0 && p.Trace.Contains("current:depth2") && !p.Trace.Contains("bounds:depth1"), "Adapted ancestor Current failure skips its Bounds and continues the depth budget");
+    }
+
+    private static void PowerShellGetterBoundaryChecks(Action<bool, string> check)
+    {
+        // Raw PS 5.1 observation gate 37115453026: no trace or payload normalization.
+        var p = new InertProvider(); var primitive = new ObservationPrimitives(p);
+        var child = new Node("a"); var root = new Node("root");
+        p.PointNode = child; child.Parent = root; child.Patterns.Add(ObservationPattern.Invoke);
+        child.Current.Rect = Rect(0, 0, 40, 20); child.Clickable = true; child.ClickX = 10; child.ClickY = 10;
+        root.Current.Rect = Rect(0, 0, 600, 400); root.Current.Properties[ObservationProperty.LocalizedControlType] = "window";
+        const string prefix = "ensure-uia|from-point:10:10|control-walker|current:a";
+        const string rootReads = "parent:a|current:root|bounds:root|pattern:root:Invoke|pattern:root:Toggle|pattern:root:SelectionItem|property:root:LocalizedControlType|property:root:IsEnabled|property:root:IsOffscreen|clickable:root|parent:root";
+        const string childReads = "|bounds:a|pattern:a:Invoke|property:a:LocalizedControlType|property:a:IsEnabled|property:a:IsOffscreen|clickable:a|bounds:a|property:a:Name|property:a:AutomationId|property:a:LocalizedControlType|property:a:ClassName|property:a:IsEnabled|property:a:IsOffscreen|";
+        p.FailAlways("property:a:LocalizedControlType");
+        var result = primitive.ResolvePoint(10, 10);
+        check(result.Score == 138 && result.Role == "" && result.Match["role"] == null, "Windows getter-LocalizedControlType: interpolated role empty, payload role null, exact score 138");
+        check(Trace(p) == prefix + childReads + rootReads, "Windows getter-LocalizedControlType: exact complete acquisition order");
+        p.Reset(); p.FailAlways("property:a:IsEnabled"); result = primitive.ResolvePoint(10, 10);
+        check(result.Score == 128 && !(bool)result.Match["is_enabled"], "Windows getter-IsEnabled: score 128 and payload enabled false");
+        check(Trace(p) == prefix + childReads + rootReads, "Windows getter-IsEnabled: both reads retained in complete acquisition order");
+        p.Reset(); p.Fail("bounds:a");
+        check(primitive.ResolvePoint(10, 10) == null && Trace(p) == prefix + "|bounds:a|" + rootReads, "Windows getter-Bounds: null candidate with full parent traversal");
+        p.Reset(); p.Fail("current:a");
+        check(primitive.ResolvePoint(10, 10) == null && Trace(p) == prefix + "|" + rootReads, "Windows getter-Current: no Bounds acquisition on null Current, full parent traversal");
+        p.Reset(); child.Current.Rect = Rect(0, 0, -1, 20);
+        check(primitive.ResolvePoint(10, 10) == null && Trace(p) == prefix + "|bounds:a|" + rootReads, "Windows refine-invalid-width: throwing rectangle getter adapts to null and continues parent");
+        p.Reset(); child.Current.Rect = null;
+        check(primitive.ResolvePoint(10, 10) == null && Trace(p) == prefix + "|bounds:a|" + rootReads, "Null Bounds value follows the same parent traversal without retry");
+        p.Reset(); child.Current.Rect = Rect(0, 0, 40, 20); p.Fail("bounds:a", 2);
+        result = primitive.ResolvePoint(10, 10);
+        check(result.Score == 178 && result.Area == 800 && (int)result.Match["area"] == 0 &&
+            ((OrderedDictionary)result.Match["rect"]).Values.Cast<int>().All(value => value == 0) &&
+            ((OrderedDictionary)result.Match["center"]).Values.Cast<int>().All(value => value == 0), "Second Bounds failure keeps scoring rectangle but uses adapted-null payload geometry");
+        check(Trace(p) == prefix + childReads + rootReads, "Second Bounds failure preserves metadata read order and parent traversal");
+        p.Reset(); child.Current.Rect = Rect(0, 0, 50000, 50000);
+        check(primitive.ResolvePoint(10, 10) == null && !p.Trace.Contains("parent:a") && p.Trace.Last() == "property:a:IsOffscreen", "Numeric area overflow still terminates refinement after all payload getters and before parent");
+        p.Reset(); var payload = primitive.MatchPayload(null, null);
+        check(p.Trace.Count == 0 && payload["role"] == null && !(bool)payload["is_enabled"] && (int)payload["area"] == 0, "Null Current payload does not invent acquisitions and preserves null casts");
+        p.Reset(); child.Current.Rect = Rect(0, 0, 40, 20); child.Current.Properties[ObservationProperty.IsEnabled] = "not-a-boolean";
+        payload = primitive.MatchPayload(child.Current, "");
+        check((bool)payload["is_enabled"], "An actual IsEnabled conversion failure still retains the original true default");
     }
 
     private static void GuardChecks(Action<bool, string> check)
@@ -244,12 +288,13 @@ internal static class PrimitiveContractTests
         internal long ChildHwnd, RootHwnd;
         internal string Title = "";
         internal void Fail(string operation, int occurrence = 1) { failures[operation] = occurrence; }
+        internal void FailAlways(string operation) { failures[operation] = -1; }
         internal void Reset() { Trace.Clear(); counts.Clear(); failures.Clear(); }
         private void Record(string operation)
         {
             Trace.Add(operation);
             int count; counts.TryGetValue(operation, out count); counts[operation] = ++count;
-            int fail; if (failures.TryGetValue(operation, out fail) && count == fail) throw new InvalidOperationException(operation);
+            int fail; if (failures.TryGetValue(operation, out fail) && (fail == -1 || count == fail)) throw new InvalidOperationException(operation);
         }
         public bool EnsureUia() { Record("ensure-uia"); return Available; }
         public long WindowFromPoint(int x, int y) { Record("window-point:" + x + ":" + y); return ChildHwnd; }
@@ -260,7 +305,9 @@ internal static class PrimitiveContractTests
         public ObservationRect Bounds(object current)
         {
             var value = (NodeCurrent)current; CurrentIdentityPreserved &= ReferenceEquals(value, value.Element.Current);
-            Record("bounds:" + value.Element.Name); return value.Rect;
+            Record("bounds:" + value.Element.Name);
+            if (value.Rect != null && (value.Rect.Width < 0 || value.Rect.Height < 0)) throw new ArgumentException("Invalid WPF rectangle size");
+            return value.Rect;
         }
         public object Property(object current, ObservationProperty property)
         {

@@ -71,7 +71,7 @@ class SourceTests(unittest.TestCase):
         for name in names:
             case=json.loads((FIXTURES/(name+'.json')).read_text())
             self.assertEqual(name,case['Name'])
-            self.assertIn(case['Operation'],('hit-test','hit-scan','uia-tree','uia-find','guard','refine','click','fusion'))
+            self.assertIn(case['Operation'],('hit-test','hit-scan','uia-tree','uia-find','guard','refine','click','fusion','payload'))
 
     def test_mutation_tripwires_record_before_throw(self):
         source=(ROOT/'pcucp-next/dotnet/PcuCp.LegacyObservation.Qualification/ScriptedObservation.cs').read_text()
@@ -84,6 +84,28 @@ class SourceTests(unittest.TestCase):
         self.assertNotIn('function _Resolve-OcrUiaFusionCandidate',adapter)
         self.assertNotIn('SendMouseClick',adapter)
         self.assertEqual(adapter.count('function _Test-CoordsInTarget'),1)
+
+    def test_wrapper_driver_flattens_json_before_typed_binding(self):
+        source=(ROOT/'tests/fixtures/legacy-observation-wrapper.ps1').read_text(encoding='utf-8-sig')
+        self.assertIn("$arguments=New-Object 'System.Collections.Generic.List[string]'",source)
+        self.assertIn('foreach($item in $decoded)',source)
+        self.assertIn('-CucpArgs ([string[]]$arguments.ToArray())',source)
+        self.assertNotIn('$argv=@(',source)
+
+    def test_provider_probe_cannot_initialize_or_change_uia(self):
+        project=(ROOT/'tests/fixtures/legacy-observation-provider-probe/ObservationProviderProbe.csproj').read_text()
+        code=(ROOT/'tests/fixtures/legacy-observation-provider-probe/ProviderLoadProbe.cs').read_text()
+        self.assertNotIn('<Reference ',project)
+        self.assertNotIn('ProjectReference',project)
+        self.assertIn('FirstChanceException+=Capture',code)
+        self.assertIn('if(errors.Count>=256)',code)
+        for token in ('AutomationElement.', 'RegisterClientSide', 'SetProxyDescription', 'SendInput(', 'SendMouseClick('):self.assertNotIn(token,code)
+
+    def test_side_diagnostics_follow_unchanged_entry_pairs(self):
+        source=(ROOT/'pcucp-next/packaging/qualify_legacy_observation.py').read_text()
+        self.assertLess(source.index('for label, arguments in cases + wrapper_cases:'),source.index("run('provider-identity-'"))
+        self.assertIn("for mode in ('original', 'candidate', 'shared-current'):",source)
+        self.assertIn("processes.append(result)",source)
 
 class ComparisonTests(unittest.TestCase):
     def envelope(self):

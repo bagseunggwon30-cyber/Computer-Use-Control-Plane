@@ -13,6 +13,7 @@ internal static class ActionContractTests
         HitScanChecks(check);
         WindowAndTreeChecks(check);
         FindChecks(check);
+        PowerShellGetterBoundaryChecks(check);
     }
 
     private static void HitTestChecks(Action<bool, string> check)
@@ -161,7 +162,7 @@ internal static class ActionContractTests
         check(!p.Calls.Any(c => c.StartsWith("property:small:", StringComparison.Ordinal)), "uia-tree: small bounds skip all properties");
         check(p.Calls.Where(c => c.StartsWith("property:hidden:", StringComparison.Ordinal)).SequenceEqual(new[] {
             "property:hidden:Name", "property:hidden:AutomationId", "property:hidden:HelpText", "property:hidden:AccessKey", "property:hidden:ClassName", "property:hidden:LocalizedControlType", "property:hidden:IsOffscreen", "property:hidden:IsEnabled" }), "uia-tree: exact getter order even offscreen");
-        check(Equals(items[0]["text"], "help label") && Equals(items[0]["role"], "") && Equals(items[0]["enabled"], true), "uia-tree: whitespace fallback and independent property failures");
+        check(Equals(items[0]["text"], "help label") && items[0]["role"] == null && Equals(items[0]["enabled"], false), "uia-tree: whitespace fallback and adapted getter null/false values");
         var rect = (OrderedDictionary)items[0]["rect"]; var center = (OrderedDictionary)items[0]["center"];
         check(Equals(rect["x"], -2) && Equals(rect["y"], 2) && Equals(rect["width"], 10) && Equals(rect["height"], 8), "uia-tree: midpoint-to-even rectangle conversion");
         check(Equals(center["x"], 3) && Equals(center["y"], 6), "uia-tree: center calculated from unrounded rectangle");
@@ -185,7 +186,7 @@ internal static class ActionContractTests
         p.Root = null; result = a.UiaFind(new ObservationOptions { Label = "Save" });
         check(Equals(result.Payload["reason"], "uia_root_null"), "uia-find: null root partial");
         p = new InertProvider(); a = new ObservationActions(p);
-        var failOffscreen = Node("failed", "Save"); failOffscreen.FailProperties.Add(ObservationProperty.IsOffscreen);
+        var failOffscreen = Node("failed", "Other"); failOffscreen.FailProperties.Add(ObservationProperty.IsOffscreen);
         var wrongRole = Node("wrong-role", "Save"); wrongRole.Values[ObservationProperty.LocalizedControlType] = "edit";
         var noMatch = Node("no-match", "Other");
         var match = Node("match", " SAVE\r\n NOW "); match.Values[ObservationProperty.LocalizedControlType] = "";
@@ -199,11 +200,11 @@ internal static class ActionContractTests
         var top = (OrderedDictionary)result.Payload["top"];
         check(Equals(top["score"], 100) && Equals(top["match_reason"], "exact"), "uia-find: label/hay whitespace normalization");
         check(Equals(top["role"], ""), "uia-find: empty localized role passes supplied Role filter");
-        check(Equals(top["invoke_pattern"], "TogglePattern") && Equals(top["value_pattern"], true) && top["value_readonly"] == null, "uia-find: pattern priority and partial Value read failure");
+        check(Equals(top["invoke_pattern"], "TogglePattern") && Equals(top["value_pattern"], true) && Equals(top["value_readonly"], false), "uia-find: pattern priority and adapted Value getter failure");
         var click = (OrderedDictionary)top["click_point"];
         check(Equals(click["x"], 27) && Equals(click["y"], 23) && Equals(click["native_clickable"], true), "uia-find: native clickable point clamped by inset");
         check(!p.Calls.Contains("current:after"), "uia-find: accepted-only MaxElements stops later current");
-        check(!p.Calls.Contains("property:failed:Name"), "uia-find: throwing IsOffscreen drops element before name");
+        check(p.Calls.Contains("property:failed:Name") && p.Calls.Contains("property:failed:LocalizedControlType"), "uia-find: adapted IsOffscreen getter failure continues all matching metadata reads");
         check(!p.Calls.Any(c => c.EndsWith(":ClassName", StringComparison.Ordinal) || c.EndsWith(":IsEnabled", StringComparison.Ordinal)), "uia-find: does not read ClassName or IsEnabled");
         check(p.Calls.Where(c => c.StartsWith("property:match:", StringComparison.Ordinal)).SequenceEqual(new[] {
             "property:match:IsOffscreen", "property:match:Name", "property:match:AutomationId", "property:match:HelpText", "property:match:AccessKey", "property:match:LocalizedControlType" }), "uia-find: exact property order");
@@ -253,6 +254,46 @@ internal static class ActionContractTests
         check(Equals(((OrderedDictionary)top["click_point"])["source"], "rect_center"), "uia-find: clickable exception falls back to center");
     }
 
+    private static void PowerShellGetterBoundaryChecks(Action<bool, string> check)
+    {
+        // Raw PS 5.1 observation gate 37115453026 preserves these null/false distinctions.
+        var p = new InertProvider(); var a = new ObservationActions(p); var node = Node("a", "Run 한글");
+        node.Values[ObservationProperty.AutomationId] = "run";
+        node.Rect = new ObservationRect { Width = 40, Height = 20 };
+        node.Patterns.Add(ObservationPattern.Invoke); node.Clickable = true; node.ClickX = 10; node.ClickY = 10;
+        p.Nodes.Add(node);
+        const string treeReads = "windows|handle:10|descendants:root|current:a|bounds:a|property:a:Name|property:a:AutomationId|property:a:HelpText|property:a:AccessKey|property:a:ClassName|property:a:LocalizedControlType|property:a:IsOffscreen|property:a:IsEnabled";
+        const string findReads = "windows|handle:10|descendants:root|current:a|bounds:a|property:a:IsOffscreen|property:a:Name|property:a:AutomationId|property:a:HelpText|property:a:AccessKey|property:a:LocalizedControlType|pattern:a:Invoke|pattern:a:Value|clickable:a";
+        node.FailProperties.Add(ObservationProperty.LocalizedControlType);
+        var result = a.UiaTree(new ObservationOptions());
+        var row = ((OrderedDictionary[])result.Payload["affordances"])[0];
+        check(result.ExitCode == 0 && (int)result.Payload["affordance_count"] == 1 && row["role"] == null && (bool)row["enabled"], "Windows tree-getter-LocalizedControlType: retain row with null role and true enabled");
+        check(string.Join("|", p.Calls) == treeReads, "Windows tree-getter-LocalizedControlType: exact acquisition order");
+        node.FailProperties.Clear(); node.FailProperties.Add(ObservationProperty.IsEnabled); p.Calls.Clear();
+        result = a.UiaTree(new ObservationOptions()); row = ((OrderedDictionary[])result.Payload["affordances"])[0];
+        check(result.ExitCode == 0 && (int)result.Payload["affordance_count"] == 1 && Equals(row["role"], "button") && !(bool)row["enabled"], "Windows tree-getter-IsEnabled: retain row with false enabled");
+        check(string.Join("|", p.Calls) == treeReads, "Windows tree-getter-IsEnabled: exact acquisition order");
+        node.FailProperties.Clear(); node.FailProperties.Add(ObservationProperty.LocalizedControlType); p.Calls.Clear();
+        result = a.UiaFind(new ObservationOptions { Label = "Run", Role = "button" }); row = (OrderedDictionary)result.Payload["top"];
+        check(result.ExitCode == 0 && !(bool)result.Payload["ambiguous"] && result.Payload["candidates"] is OrderedDictionary && row["role"] == null && (int)row["score"] == 100, "Windows find-getter-LocalizedControlType: null role passes role filter and keeps exact match");
+        check(string.Join("|", p.Calls) == findReads, "Windows find-getter-LocalizedControlType: exact acquisition order");
+        node.FailProperties.Clear(); node.FailProperties.Add(ObservationProperty.IsOffscreen); p.Calls.Clear();
+        result = a.UiaFind(new ObservationOptions { Label = "Run" }); row = (OrderedDictionary)result.Payload["top"];
+        check(result.ExitCode == 0 && !(bool)result.Payload["ambiguous"] && (int)row["score"] == 100 && Equals(row["text"], "Run 한글") && Equals(row["role"], "button"), "Windows find-getter-IsOffscreen: false adapted null admits exact match");
+        check(string.Join("|", p.Calls) == findReads, "Windows find-getter-IsOffscreen: all later property/pattern/clickable reads retained");
+        node.FailProperties.Clear(); node.Patterns.Clear(); node.Patterns.Add(ObservationPattern.Value); node.ValueReadFailure = true; p.Calls.Clear();
+        result = a.UiaFind(new ObservationOptions { Label = "Run" }); row = (OrderedDictionary)result.Payload["top"];
+        check(result.ExitCode == 0 && row["invoke_pattern"] == null && (bool)row["value_pattern"] && Equals(row["value_readonly"], false), "Windows find-value-readonly-failure: supported Value retains false rather than null");
+        var valueReads = findReads.Replace("pattern:a:Invoke|pattern:a:Value", "pattern:a:Invoke|pattern:a:Toggle|pattern:a:SelectionItem|pattern:a:Value|value-current:a|value-readonly:a");
+        check(string.Join("|", p.Calls) == valueReads, "Windows find-value-readonly-failure: exact Value Current/IsReadOnly acquisition order");
+        node.ValueReadFailure = false; node.ValueCurrentFailure = true; p.Calls.Clear();
+        result = a.UiaFind(new ObservationOptions { Label = "Run" }); row = (OrderedDictionary)result.Payload["top"];
+        check((bool)row["value_pattern"] && Equals(row["value_readonly"], false) && string.Join("|", p.Calls) == valueReads.Replace("|value-readonly:a", ""), "Value Current failure is false and skips only IsReadOnly getter");
+        node.ValueCurrentFailure = false; node.PatternFailures.Add(ObservationPattern.Value); p.Calls.Clear();
+        result = a.UiaFind(new ObservationOptions { Label = "Run" }); row = (OrderedDictionary)result.Payload["top"];
+        check(!(bool)row["value_pattern"] && row["value_readonly"] == null && !p.Calls.Contains("value-current:a"), "Value pattern method failure still leaves readonly null without property acquisition");
+    }
+
     private static string Keys(OrderedDictionary map) { return string.Join(",", map.Keys.Cast<string>()); }
     private static TestNode Node(string id, string name)
     {
@@ -281,7 +322,7 @@ internal static class ActionContractTests
         public readonly HashSet<ObservationProperty> FailProperties = new HashSet<ObservationProperty>();
         public readonly HashSet<ObservationPattern> Patterns = new HashSet<ObservationPattern>();
         public readonly HashSet<ObservationPattern> PatternFailures = new HashSet<ObservationPattern>();
-        public bool CurrentFailure, BoundsFailure, ValueReadFailure, ClickFailure, Clickable;
+        public bool CurrentFailure, BoundsFailure, ValueCurrentFailure, ValueReadFailure, ClickFailure, Clickable;
         public double ClickX, ClickY;
     }
     private sealed class InertProvider : IObservationProvider
@@ -315,7 +356,7 @@ internal static class ActionContractTests
         public ObservationRect Bounds(object current) { var node = (TestNode)current; Record("bounds:" + node.Id); if (node.BoundsFailure) throw new InvalidOperationException("stale bounds"); return node.Rect; }
         public object Property(object current, ObservationProperty property) { var node = (TestNode)current; Record("property:" + node.Id + ":" + property); if (node.FailProperties.Contains(property)) throw new InvalidOperationException("property unavailable"); return node.Values[property]; }
         public object Pattern(object element, ObservationPattern pattern) { var node = (TestNode)element; Record("pattern:" + node.Id + ":" + pattern); if (node.PatternFailures.Contains(pattern)) throw new InvalidOperationException("pattern unavailable"); return node.Patterns.Contains(pattern) ? node : null; }
-        public bool ValueReadOnly(object pattern) { var node = (TestNode)pattern; Record("value-readonly:" + node.Id); if (node.ValueReadFailure) throw new InvalidOperationException("value current unavailable"); return true; }
+        public bool ValueReadOnly(object pattern) { var node = (TestNode)pattern; Record("value-current:" + node.Id); if (node.ValueCurrentFailure) throw new InvalidOperationException("value current unavailable"); Record("value-readonly:" + node.Id); if (node.ValueReadFailure) throw new InvalidOperationException("value readonly unavailable"); return true; }
         public bool ClickablePoint(object element, out double x, out double y) { var node = (TestNode)element; Record("clickable:" + node.Id); if (node.ClickFailure) throw new InvalidOperationException("click point unavailable"); x = node.ClickX; y = node.ClickY; return node.Clickable; }
         public object ControlViewWalker() { Record("walker"); return "walker"; }
         public object Parent(object walker, object element) { Record("parent:" + ((TestNode)element).Id); return null; }

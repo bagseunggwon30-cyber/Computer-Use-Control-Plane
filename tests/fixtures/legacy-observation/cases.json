@@ -93,5 +93,7 @@
   "fusion-root-stop",
   "fusion-parent-identity",
   "find-ambiguity-gap-7",
-  "find-ambiguity-gap-8"
+  "find-ambiguity-gap-8",
+  "payload-bounds-getter",
+  "refine-second-bounds-getter"
 ]

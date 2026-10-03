@@ -208,8 +208,11 @@ namespace PcuCp.LegacyObservation
                     object current = provider.Current(element);
                     ObservationRect rect = provider.Bounds(current);
                     if (rect.IsEmpty || rect.Width < options.MinSize || rect.Height < options.MinSize) continue;
-                    // Unlike tree, an IsOffscreen getter exception discards this find element.
-                    if (Convert.ToBoolean(provider.Property(current, ObservationProperty.IsOffscreen), CultureInfo.InvariantCulture)) continue;
+                    // PowerShell adapts a throwing IsOffscreen getter to null, so the branch is false.
+                    // Keep conversion outside that acquisition boundary.
+                    object offscreenValue = null;
+                    try { offscreenValue = provider.Property(current, ObservationProperty.IsOffscreen); } catch { }
+                    if (Convert.ToBoolean(offscreenValue, CultureInfo.InvariantCulture)) continue;
                     string name = ReadText(current, ObservationProperty.Name);
                     string automationId = ReadText(current, ObservationProperty.AutomationId);
                     string help = ReadText(current, ObservationProperty.HelpText);
@@ -239,7 +242,13 @@ namespace PcuCp.LegacyObservation
                     try
                     {
                         object value = provider.Pattern(element, ObservationPattern.Value);
-                        if (value != null) { valuePattern = true; valueReadonly = provider.ValueReadOnly(value); }
+                        if (value != null)
+                        {
+                            valuePattern = true;
+                            // Both Current and IsReadOnly are adapted property reads; [bool]null is false.
+                            valueReadonly = false;
+                            valueReadonly = provider.ValueReadOnly(value);
+                        }
                     }
                     catch { }
                     ObservationPoint point = null;
@@ -279,9 +288,14 @@ namespace PcuCp.LegacyObservation
         private string ReadText(object current, ObservationProperty property)
         { try { return ObservationData.Text(provider.Property(current, property)); } catch { return ""; } }
         private string ReadRole(object current)
-        { try { return (string)provider.Property(current, ObservationProperty.LocalizedControlType); } catch { return ""; } }
+        { try { return (string)provider.Property(current, ObservationProperty.LocalizedControlType); } catch { return null; } }
         private bool ReadBoolean(object current, ObservationProperty property, bool fallback)
-        { try { return Convert.ToBoolean(provider.Property(current, property), CultureInfo.InvariantCulture); } catch { return fallback; } }
+        {
+            object value = null;
+            try { value = provider.Property(current, property); } catch { }
+            // A getter failure is null, but an actual conversion failure still retains the source default.
+            try { return Convert.ToBoolean(value, CultureInfo.InvariantCulture); } catch { return fallback; }
+        }
         private static string Normalize(string text) { return Regex.Replace(text, "\\s+", " ").Trim(); }
         private static ObservationResult MissingCoordinates()
         { return Result(1, "status", "error", "reason", "missing_coords", "recommended_action", "provide -X and -Y (zero and negative screen coordinates are valid)"); }

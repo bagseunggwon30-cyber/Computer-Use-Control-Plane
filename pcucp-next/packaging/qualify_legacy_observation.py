@@ -177,20 +177,20 @@ def main(argv=None):
         return run('build-' + Path(project).name, [args.dotnet, 'build', str(ROOT / project), '-c', 'Release',
                    '-warnaserror', '-m:1', '-p:UseSharedCompilation=false'], timeout=300)
     summary = {'schema': 'cucp.observation-qualification/v1', 'status': 'running', 'retirement_credit': 0,
-               'oracle_pairs': 0, 'acquisition_calls': 0, 'actual_entry_pairs': 0, 'records': records, 'failures': failures,
+               'oracle_pairs': 0, 'oracle_pairs_attempted': 0, 'acquisition_calls': 0, 'actual_entry_pairs': 0, 'actual_entry_pairs_attempted': 0, 'records': records, 'failures': failures,
                'windows_required': args.windows}
     try:
         raw, manifest = source_bytes()
         (logs / 'source-manifest.json').write_text(json.dumps(manifest, indent=2))
         (logs / 'driver-hashes.json').write_text(json.dumps({str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in [ROOT / 'tests/fixtures/legacy-observation-oracle.ps1', ROOT / 'tests/fixtures/legacy-observation-wrapper.ps1',
+            for p in [ROOT / 'tests/fixtures/legacy-observation-oracle.ps1', ROOT / 'tests/fixtures/legacy-observation-wrapper.ps1', ROOT / 'tests/fixtures/legacy-observation-provider-diagnostic.ps1',
                       ROOT / 'pcucp-next/dotnet/PcuCp.LegacyObservation.Qualification/ScriptedObservation.cs']}, indent=2))
         build('pcucp-next/dotnet/PcuCp.LegacyObservation.ContractTests')
         run('portable-contracts', [args.dotnet, str(ROOT / 'pcucp-next/dotnet/PcuCp.LegacyObservation.ContractTests/bin/Release/net8.0/PcuCp.LegacyObservation.ContractTests.dll')])
         structural = run('python-structural', [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests/python', '-p', 'test_legacy_observation.py', '-v'])
         test_count = re.search(rb'Ran (\d+) tests?', structural['stderr'])
-        if not test_count or int(test_count.group(1)) < 21:
-            raise AssertionError('Required structural test discovery did not execute all 21 tests')
+        if not test_count or int(test_count.group(1)) < 24:
+            raise AssertionError('Required structural test discovery did not execute all 24 tests')
         if not args.windows:
             summary['status'] = 'portable-only-windows-unqualified'
             return 0
@@ -199,6 +199,7 @@ def main(argv=None):
             raise RuntimeError('Windows PowerShell 5.1 unavailable; refusing substitute')
         build('pcucp-next/dotnet/PcuCp.LegacyObservation.Qualification')
         build('tests/fixtures/legacy-observation-owned-window')
+        build('tests/fixtures/legacy-observation-provider-probe')
         build('pcucp-next/dotnet/PcuCp.NativeHost')
         qualification = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyObservation.Qualification/bin/Release/net48'
         env['CUCP_LEGACY_INTEROP_DLL'] = str(qualification / 'PcuCp.LegacyInterop.dll')
@@ -216,13 +217,15 @@ def main(argv=None):
             original_source = original_scripts / 'cucp-native-helper.ps1'; original_source.write_bytes(raw)
             for name in json.loads((FIXTURES / 'cases.json').read_text()):
                 try:
-                    pair = []
+                    summary['oracle_pairs_attempted'] += 1
+                    processes = []
                     for mode in ('original', 'candidate'):
                         result = run(name + '-' + mode, [ps, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
                             str(ROOT / 'tests/fixtures/legacy-observation-oracle.ps1'), '-Mode', mode, '-Root', str(ROOT),
                             '-SourcePath', str(original_source), '-ScenarioPath', str(FIXTURES / (name + '.json')),
                             '-AssemblyPath', str(qualification / 'PcuCp.LegacyObservation.Qualification.dll')], timeout=300)
-                        pair.append(json.loads(result['stdout'].decode('utf-8-sig')))
+                        processes.append(result)
+                    pair = [json.loads(result['stdout'].decode('utf-8-sig')) for result in processes]
                     summary['acquisition_calls'] += compare_oracle(*pair)
                     summary['oracle_pairs'] += 1
                 except Exception as error:
@@ -274,7 +277,8 @@ def main(argv=None):
                         raise AssertionError('Candidate route did not fail closed: ' + probe)
                 for label, arguments in cases + wrapper_cases:
                     try:
-                        pair = []; exits = []
+                        summary['actual_entry_pairs_attempted'] += 1
+                        processes = []; exits = []
                         for mode in ('original', 'candidate'):
                             child_env = dict(env)
                             if mode == 'candidate': child_env['CUCP_LEGACY_OBSERVATION_CANDIDATE'] = '1'
@@ -285,13 +289,24 @@ def main(argv=None):
                             else:
                                 command = [ps,'-NoProfile','-ExecutionPolicy','Bypass','-File',str(scripts / 'cucp-native-helper.ps1')] + arguments
                             result = run(label+'-'+mode,command,process_env=child_env,accepted=(0,1,2,3),timeout=180)
-                            exits.append(result['exit_code']); pair.append(json.loads(result['stdout'].decode('utf-8-sig')))
+                            exits.append(result['exit_code']); processes.append(result)
+                        pair = [json.loads(result['stdout'].decode('utf-8-sig')) for result in processes]
                         if exits[0] != exits[1]: raise AssertionError('Actual entry exit mismatch')
                         compare_entry(*pair, smart_plan=label=='wrapper-smart-plan')
                         for payload, code in zip(pair, exits): require_entry_outcome(label, payload, code, ready)
                         summary['actual_entry_pairs'] += 1
                     except Exception as error:
                         failures.append({'case': label, 'error': str(error)})
+                # Read-only side diagnostics retain exact assembly/type/provider identities.
+                # They never replace, normalize, or qualify the unchanged actual entries.
+                for mode in ('original', 'candidate', 'shared-current'):
+                    try:
+                        run('provider-identity-' + mode, [ps, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+                            str(ROOT / 'tests/fixtures/legacy-observation-provider-diagnostic.ps1'), '-Mode', mode,
+                            '-Root', str(ROOT), '-SourcePath', str(original_source), '-ReadinessPath', str(ready_path),
+                            '-ProbeAssembly', str(ROOT / 'tests/fixtures/legacy-observation-provider-probe/bin/Release/net48/ObservationProviderProbe.dll')], timeout=120)
+                    except Exception as error:
+                        failures.append({'case': 'provider-identity-' + mode, 'error': str(error)})
             finally:
                 (fixture_dir / 'close.request').write_text('close owned fixture\n')
                 result = fixture.finish(logs, 'owned-window-process', timeout=10)

@@ -47,7 +47,8 @@ namespace PcuCp.LegacyObservation.Qualification {
   public static readonly List<string> Trace = new List<string>();
   public static readonly Dictionary<string,FixtureElement> Elements = new Dictionary<string,FixtureElement>();
   public static int Mutations;
-  public static void Reset(string json) { Scenario = new JavaScriptSerializer().Deserialize<Scenario>(json); Trace.Clear(); Elements.Clear(); Mutations=0; foreach(var spec in Scenario.Elements) Elements.Add(spec.Id,new FixtureElement(spec)); }
+  public static readonly Dictionary<string,int> PropertyReads = new Dictionary<string,int>();
+  public static void Reset(string json) { Scenario = new JavaScriptSerializer().Deserialize<Scenario>(json); Trace.Clear(); Elements.Clear(); PropertyReads.Clear(); Mutations=0; foreach(var spec in Scenario.Elements) Elements.Add(spec.Id,new FixtureElement(spec)); }
   public static void Record(string text) { Trace.Add(text); if (Scenario.Faults.Contains(text)) throw new InvalidOperationException("fixture:"+text); }
   public static FixtureElement Element(string id) { return id != null && Elements.ContainsKey(id) ? Elements[id] : null; }
   public static string Number(double n) { return n.ToString("R",CultureInfo.InvariantCulture); }
@@ -58,7 +59,7 @@ namespace PcuCp.LegacyObservation.Qualification {
  public sealed class FixtureCurrent {
   public readonly ElementSpec Spec;
   public FixtureCurrent(ElementSpec spec) { Spec=spec; }
-  private void Read(string name) { FixtureState.Record("property:"+Spec.Id+":"+name); if(Spec.Faults.Contains(name)) throw new InvalidOperationException("fixture:"+name); }
+  private void Read(string name) { string key=Spec.Id+":"+name; int count; FixtureState.PropertyReads.TryGetValue(key,out count); count++; FixtureState.PropertyReads[key]=count; FixtureState.Record("property:"+Spec.Id+":"+name); if(Spec.Faults.Contains(name) || Spec.Faults.Contains(name+"#"+count)) throw new InvalidOperationException("fixture:"+name); }
   public Rect BoundingRectangle { get { Read("Bounds"); return Spec.Empty ? Rect.Empty : new Rect(Spec.Rect[0],Spec.Rect[1],Spec.Rect[2],Spec.Rect[3]); } }
   public string Name {get{Read("Name");return Spec.Name;}}
   public string AutomationId {get{Read("AutomationId");return Spec.AutomationId;}}

@@ -26,21 +26,27 @@ namespace PcuCp.LegacyObservation
 
         public OrderedDictionary MatchPayload(object current, string pattern)
         {
-            var rect = provider.Bounds(current);
-            var name = ""; try { name = ObservationData.Text(provider.Property(current, ObservationProperty.Name)); } catch { }
-            var automationId = ""; try { automationId = ObservationData.Text(provider.Property(current, ObservationProperty.AutomationId)); } catch { }
-            object role = ""; try { role = provider.Property(current, ObservationProperty.LocalizedControlType); } catch { }
-            var className = ""; try { className = ObservationData.Text(provider.Property(current, ObservationProperty.ClassName)); } catch { }
-            var enabled = true; try { enabled = Convert.ToBoolean(provider.Property(current, ObservationProperty.IsEnabled)); } catch { }
-            var offscreen = false; try { offscreen = Convert.ToBoolean(provider.Property(current, ObservationProperty.IsOffscreen)); } catch { }
+            ObservationRect rect = null;
+            if (current != null) { try { rect = provider.Bounds(current); } catch { } }
+            var name = ""; try { name = ObservationData.Text((current == null ? null : provider.Property(current, ObservationProperty.Name))); } catch { }
+            var automationId = ""; try { automationId = ObservationData.Text((current == null ? null : provider.Property(current, ObservationProperty.AutomationId))); } catch { }
+            // Windows PowerShell adapts a throwing .NET property getter to null before assignment.
+            object role = null; try { role = (current == null ? null : provider.Property(current, ObservationProperty.LocalizedControlType)); } catch { }
+            var className = ""; try { className = ObservationData.Text((current == null ? null : provider.Property(current, ObservationProperty.ClassName))); } catch { }
+            object enabledValue = null; try { enabledValue = (current == null ? null : provider.Property(current, ObservationProperty.IsEnabled)); } catch { }
+            var enabled = true; try { enabled = Convert.ToBoolean(enabledValue); } catch { }
+            var offscreen = false; try { offscreen = Convert.ToBoolean((current == null ? null : provider.Property(current, ObservationProperty.IsOffscreen))); } catch { }
             var preferred = "none";
             if (!string.IsNullOrWhiteSpace(name)) preferred = "name";
             else if (!string.IsNullOrWhiteSpace(automationId)) preferred = "automation_id";
             else if (!string.IsNullOrWhiteSpace(className)) preferred = "class_name";
+            // Null rectangle members cast to integer zero in the source payload.
+            // Keep numeric conversion after all metadata reads, including real overflow failures.
+            var payloadRect = rect ?? new ObservationRect();
             return ObservationData.Map(
                 "name", name, "automation_id", automationId, "class_name", className, "role", role,
-                "rect", ObservationData.Rect(rect), "center", ObservationData.Center(rect),
-                "area", ObservationData.Integer(rect.Width * rect.Height),
+                "rect", ObservationData.Rect(payloadRect), "center", ObservationData.Center(payloadRect),
+                "area", ObservationData.Integer(payloadRect.Width * payloadRect.Height),
                 "is_enabled", enabled, "is_offscreen", offscreen,
                 // PowerShell's [string] parameter binds a null pattern as an empty string.
                 "invoke_pattern", pattern ?? "", "preferred_identifier", preferred);
@@ -103,13 +109,17 @@ namespace PcuCp.LegacyObservation
             {
                 try
                 {
-                    var current = provider.Current(element);
-                    var rect = provider.Bounds(current);
-                    if (!rect.IsEmpty && rect.Width > 1 && rect.Height > 1)
+                    // Only these property acquisitions emulate PowerShell getter adaptation.
+                    // A null Current skips BoundingRectangle; neither failure stops parent traversal.
+                    object current = null; try { current = provider.Current(element); } catch { }
+                    ObservationRect rect = null;
+                    if (current != null) { try { rect = provider.Bounds(current); } catch { } }
+                    if (rect != null && !rect.IsEmpty && rect.Width > 1 && rect.Height > 1)
                     {
                         var pattern = SupportedPattern(element);
                         var role = ""; try { role = ObservationData.Text(provider.Property(current, ObservationProperty.LocalizedControlType)); } catch { }
-                        var enabled = true; try { enabled = Convert.ToBoolean(provider.Property(current, ObservationProperty.IsEnabled)); } catch { }
+                        object enabledValue = null; try { enabledValue = provider.Property(current, ObservationProperty.IsEnabled); } catch { }
+                        var enabled = true; try { enabled = Convert.ToBoolean(enabledValue); } catch { }
                         var offscreen = false; try { offscreen = Convert.ToBoolean(provider.Property(current, ObservationProperty.IsOffscreen)); } catch { }
                         var area = rect.Width * rect.Height;
                         var bounded = rect.Width <= maxWidth && rect.Height <= maxHeight;

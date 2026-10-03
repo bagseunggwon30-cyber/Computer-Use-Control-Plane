@@ -68,6 +68,7 @@ try {
   'uia-find' {_Action-UiaFind}
   'click' {_Action-Click}
   'refine' {$returnValue=_Resolve-UiaPointRefinement -X $X -Y $Y -Inset $ClickInset}
+  'payload' {$element=[PcuCp.LegacyObservation.Qualification.FixtureState]::Element('a');$returnValue=_New-UiaMatchPayload -Cur $element.IdentityCurrent -PatternName 'InvokePattern'}
   'guard' {$returnValue=_Test-CoordsInTarget -X $X -Y $Y -ExpectedHwnd $TargetHwnd -ExpectedMatch $TargetMatch}
   'fusion' {
    $rootEl=[PcuCp.LegacyObservation.Qualification.FixtureState]::Element('root')

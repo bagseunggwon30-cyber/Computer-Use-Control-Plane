@@ -145,3 +145,63 @@ PowerShell census. Third-party provider behavior/hangs, real clicking/typing/IME
 mixed-DPI/multi-monitor, elevated/UIPI/session behavior, OCR acquisition and
 clipboard restoration remain later separate acceptance. This candidate does not
 perform or expand those effects.
+
+## First Windows run and bounded repair
+
+The first Windows run at public `bc23c4dc061d22a595ebc5d1cc1f51424280042e`
+(run 37115453026, artifact 11270329459, SHA-256
+`7a85036122b4c793a9beddc20df5bd12ef98f66f2386f9f644c8ab7732b39c83`)
+provided a usable owned desktop. Readiness and final input/invoke/value-change
+counters were all zero. This is retained real-acquisition evidence, not a passing
+compatibility result.
+
+- 85 of 95 pinned oracle pairs matched. The 23,308 acquisition count belongs only
+  to those successful pairs. All attempted raw oracle traces contain 23,493 calls
+  on the original side and 23,452 on the candidate side.
+- Ten mismatches establish Windows PowerShell 5.1 property-getter adaptation:
+  a throwing .NET property getter becomes null before assignment/casting. In
+  particular uncast roles become null, boolean casts become false, and refinement
+  continues to the parent after a Current/Bounds failure. The bounded repair
+  models these explicit property boundaries and preserves independent method and
+  arithmetic failures. It adds 25 exact value/trace contracts (220 total).
+- The next matrix retains all 95 cases and adds direct payload Bounds failure and
+  second-read Bounds failure, for 97 total. These two probes must still receive
+  Windows evidence.
+- Eleven helper pairs completed; three matched. Eight UIA-dependent pairs differ
+  materially: the original sees numeric HWND automation IDs/pane roles and no
+  Invoke pattern, while the candidate sees named IDs/button/edit roles and normal
+  patterns. Original offscreen inclusion also differs. No field/order/provider
+  normalization has been permitted.
+- Three wrapper original processes passed their entire argv as one string to the
+  wrapper because of the driver’s JSON-array shape. Their candidate processes
+  were never reached after JSON parsing failed. The driver now explicitly copies
+  decoded string elements into a typed string array. The gate collects both raw
+  process outputs before parsing, so future parse failures do not hide the other
+  side’s output.
+
+The provider implementation and original loaders remain unchanged pending exact
+runtime diagnosis. After all unchanged actual-entry pairs, three separate
+read-only diagnostic processes record original-first, candidate-first and actual
+original Current-to-compiled-boundary behavior. They capture loaded UIAutomation
+assembly identities, module IDs/locations, element/current type identities,
+provider descriptions and filtered first-chance UIA exception stacks. The probe
+assembly has no UIA/runtime project reference, does not register/change proxies,
+and does not initialize UIA on load. These diagnostics do not earn parity credit.
+
+One hypothesis is default-proxy initialization through the calling assembly’s
+stack frames; another is assembly selection. Both remain hypotheses until the
+runtime evidence distinguishes them. No newer provider was selected intentionally,
+no provider state was reset, and no original function/default was changed.
+
+Local bounded-repair validation: 220 portable C# assertions and 24 observation
+Python tests passed. Full local Python discovery ran 874 methods: 653 passed,
+221 individual skips, zero failures/errors, plus two setup skips (223 skip
+records). The net48 host/oracle assembly and dependency-free diagnostic probe
+compiled with zero warnings/errors. Windows requalification is pending. This
+repair adds 6,866 counted PowerShell bytes to the integrated 955,322-byte tree,
+for 962,188 current bytes and zero new retirement credit.
+
+A separate ProcessName boundary remains unproven: existing fixtures model a
+Get-Process acquisition failure, not a throwing ProcessName getter on its returned
+object. The provider's null/empty distinction at that latter boundary was not
+changed speculatively in this repair; it needs a focused type-seam observation.
