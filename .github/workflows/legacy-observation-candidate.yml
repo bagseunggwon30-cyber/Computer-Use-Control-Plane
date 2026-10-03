@@ -8,6 +8,7 @@ on:
       - 'pcucp-next/packaging/*legacy_observation.py'
       - 'scripts/cucp-legacy-observation-adapter.ps1'
       - 'scripts/cucp-native-helper.ps1'
+      - 'scripts/cucp.ps1'
       - 'tests/fixtures/legacy-observation*/**'
       - 'tests/fixtures/legacy-observation*.ps1'
       - 'tests/python/test_legacy_observation.py'

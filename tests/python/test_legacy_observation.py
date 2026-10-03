@@ -1,5 +1,6 @@
 """Candidate structural/protocol tests. These are never Windows/provider proof."""
 import copy
+import base64
 import hashlib
 import importlib.util
 import json
@@ -128,9 +129,20 @@ class SourceTests(unittest.TestCase):
     def test_intended_tier_does_not_replace_raw_original_or_waive_planner(self):
         source=(ROOT/'pcucp-next/packaging/qualify_legacy_observation.py').read_text()
         self.assertLess(source.index('for label, arguments in cases + wrapper_cases:'),source.index("for temperature in ('cold','warm'):"))
-        self.assertIn("'wrapper-smart-plan: raw original timeout awaits separate phase diagnosis'",source)
-        self.assertIn("'observation-passed-smart-plan-blocked'",source)
+        self.assertIn("'wrapper-smart-plan: scalar proof and actual completed cold/warm route pending'",source)
+        self.assertIn("intended.get('scalar_capture_proof') == 'passed'",source)
+        self.assertIn('intended_cases = cases + wrapper_cases + [',source)
         self.assertIn("compare_entry(*pair)",source)
+
+    def test_pre_fix_wrapper_is_exact_and_production_diff_is_two_scalar_copies(self):
+        raw, manifest = QUALIFY.wrapper_source_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),manifest['windows_sha256'])
+        current=(ROOT/'scripts/cucp.ps1').read_text(encoding='utf-8-sig').replace('\r\n','\n')
+        for name in ('raw','err'):
+            line=f'    if (${name} -is [string]) {{ ${name} = [string]::new(${name}.ToCharArray()) }}\n'
+            self.assertEqual(current.count(line),1)
+            current=current.replace(line,'',1)
+        self.assertEqual(current,raw.decode('utf-8-sig').replace('\r\n','\n'))
 
     def test_intended_identity_checks_real_button_edit_types_and_handles(self):
         source=(ROOT/'tests/fixtures/legacy-observation-provider-diagnostic.ps1').read_text(encoding='utf-8-sig')
@@ -210,6 +222,52 @@ class ComparisonTests(unittest.TestCase):
 
 
 class IntendedVerdictTests(unittest.TestCase):
+    def scalar_fixture(self):
+        rich='한글 😀 "quote" C:\\owned\r\nNUL=\x00 tail'
+        ok=json.dumps(dict(status='ok',text=rich,count=7,enabled=True,absent=None))
+        cases=[('missing-both','','',False,False),('empty-both',None,None,False,False),
+            ('missing-stdout-rich-stderr','',rich,False,True),('empty-stdout-missing-stderr',None,'',False,False),
+            ('ok-json-rich-stderr',ok,rich,True,True),('partial-json','{"status":"partial","items":[]}',None,True,False),
+            ('error-json','{"status":"error"}',rich,True,True),('nonzero-exit-preserved','{"status":"partial"}',rich,True,True),
+            ('rich-raw-invalid-json',rich,rich,True,True),('whitespace-raw',' \t\r\n','',True,False),
+            ('memory-null',None,None,False,False),('memory-empty','','',False,False),('memory-lone-surrogates','A\ud800Z','B\udc00Y',False,False)]
+        def evidence(value,decorated):
+            encoded=None if value is None else base64.b64encode(value.encode('utf-16le',errors='surrogatepass')).decode()
+            after=dict(is_null=value is None,type='null' if value is None else 'System.String',properties=[] if value is None else ['Length'],utf16_length=None if value is None else len(value.encode('utf-16le',errors='surrogatepass'))//2,utf16le_base64=encoded)
+            before=copy.deepcopy(after)
+            if decorated:before['properties']=['PSDrive','PSProvider','Length']
+            return dict(before=before,after=after,fresh_reference=True if value else None,exact_utf16=True,provider_expected=decorated)
+        rows=[]
+        for name,raw,err,raw_decorated,err_decorated in cases:
+            initial=1 if name=='missing-stdout-rich-stderr' else 17 if name=='nonzero-exit-preserved' else 9 if name=='memory-lone-surrogates' else 0
+            code={'partial-json':2,'error-json':1}.get(name,initial)
+            data=json.loads(raw) if name in ('ok-json-rich-stderr','partial-json','error-json','nonzero-exit-preserved') else None
+            lone=name=='memory-lone-surrogates'
+            encoded=None if lone else json.dumps({'args':{'captured_replies':[{'result':dict(Raw=raw,Err=err,ExitCode=code,Json=data)}]}})
+            rows.append(dict(id=name,raw=evidence(raw,raw_decorated),err=evidence(err,err_decorated),initial_exit=initial,exit_code=code,json_present=data is not None,json_status=None if data is None else data['status'],json_round_trip=not lone,surrogate_memory_only=lone,copied_capture_json=encoded))
+        nonstrings=[]
+        for name,types,values in [('int-and-bool',('System.Int32','System.Boolean'),(17,True)),('long-and-double',('System.Int64','System.Double'),(9007199254740993,2.5)),('object-and-array',('System.Management.Automation.PSCustomObject','System.Object[]'),(None,None))]:
+            nonstrings.append(dict(id=name,**{field:dict(before_type=typ,after_type=typ,value_preserved=True,same_reference=value is None,scalar_value=value) for field,typ,value in zip(('raw','err'),types,values)}))
+        return dict(schema='cucp.observation-scalar-capture/v1',status='ok',source_unchanged=True,wrapper_sha256='abc',powershell='5.1.1',source_statements=[f'if (${name} -is [string]) {{ ${name} = [string]::new(${name}.ToCharArray()) }}' for name in ('raw','err')],serialized_captures=12,decorated_fields=11,cases=rows,non_string_cases=nonstrings)
+
+    def test_scalar_capture_verdict_accepts_complete_exact_text_and_nonstrings(self):
+        QUALIFY.require_scalar_capture(self.scalar_fixture(),'abc')
+
+    def test_scalar_capture_verdict_rejects_lost_metadata_text_types_and_status(self):
+        for mutation in ('metadata','utf16','fresh-reference','exit','parsed-json','non-string','missing-case','missing-type'):
+            with self.subTest(mutation=mutation):
+                payload=self.scalar_fixture()
+                if mutation=='metadata':payload['cases'][4]['raw']['after']['properties'].append('PSDrive')
+                elif mutation=='utf16':payload['cases'][4]['raw']['after']['utf16le_base64']='QQA='
+                elif mutation=='fresh-reference':payload['cases'][4]['raw']['fresh_reference']=False
+                elif mutation=='exit':payload['cases'][5]['exit_code']=0
+                elif mutation=='parsed-json':
+                    row=payload['cases'][4];capture=json.loads(row['copied_capture_json']);capture['args']['captured_replies'][0]['result']['Json']['count']=8;row['copied_capture_json']=json.dumps(capture)
+                elif mutation=='non-string':payload['non_string_cases'][2]['raw']['same_reference']=False
+                elif mutation=='missing-type':del payload['cases'][4]['raw']['after']['type']
+                else:payload['cases'].pop()
+                with self.assertRaises(AssertionError):QUALIFY.require_scalar_capture(payload,'abc')
+
     def identity_fixture(self):
         framework=', UIAutomationClient, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35'
         ready={'pid':42,'run':dict(x=168,y=201,width=130,height=40,center_x=233,center_y=221),
@@ -255,7 +313,7 @@ class IntendedVerdictTests(unittest.TestCase):
     def trace_fixture(self, complete=False):
         phases=[('wrapper.sha.before',-1),('wrapper.sha.after.install',-1),
             ('compat.serialize.enter',0),('compat.serialize.done',0),('compat.process.start',0),('compat.process.wait.done',0),
-            ('capture.replay',1),('compat.serialize.enter',1),('compat.serialize.done',1),('compat.process.start',1),('compat.process.wait.done',1),
+            ('native.call.enter',0),('capture.replay',1),('compat.serialize.enter',1),('compat.serialize.done',1),('compat.process.start',1),('compat.process.wait.done',1),
             ('native.call.enter',1),('native.text.read.done',1),('capture.replay',2),('compat.serialize.enter',2)]
         if complete:phases += [('compat.serialize.done',2),('compat.process.start',2),('compat.process.wait.done',2),('plan.complete',2),('wrapper.sha.after.invocation',-1)]
         rows=[]
@@ -286,7 +344,7 @@ class IntendedVerdictTests(unittest.TestCase):
 
     def test_smart_plan_trace_rejects_missing_native_capture_and_raw_metadata(self):
         rows,result=self.trace_fixture()
-        for index in (6,11,12,13):
+        for index in (6,7,12,13,14):
             with self.subTest(missing_index=index):
                 altered=copy.deepcopy(rows);del altered[index]
                 with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(self.encode_trace(altered),result,'abc')
@@ -310,5 +368,22 @@ class IntendedVerdictTests(unittest.TestCase):
             with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(self.encode_trace(rows),altered,'abc')
         del rows[-1]
         with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(self.encode_trace(rows),result,'abc')
+
+    def test_exact_observed_windows_phase_sequences_are_retained_and_classified(self):
+        folder=FIXTURES/'observed-smart-plan-37120978323'
+        manifest=json.loads((folder/'manifest.json').read_text())
+        for record in manifest['records']:
+            self.assertEqual(hashlib.sha256((folder/record['file']).read_bytes()).hexdigest(),record['sha256'])
+        for mode in ('original','candidate'):
+            trace=(folder/(mode+'-phases.txt')).read_bytes()
+            result=json.loads((folder/(mode+'-process.json')).read_bytes())
+            self.assertEqual(trace,base64.b64decode(result['stderr_base64']))
+            verdict=QUALIFY.require_smart_plan_trace(trace,result,'e45d872e18d61e01027397bf72dc206c026f1fdcbe1c97d3bc8d2811a8f90729')
+            self.assertEqual(verdict['status'],'captured-expected-serialization-timeout')
+            self.assertEqual(verdict['phase_records'],16)
+            lines=trace.splitlines(keepends=True)
+            for index in range(2,len(lines)):
+                with self.subTest(mode=mode,missing_phase=index):
+                    with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(b''.join(lines[:index]+lines[index+1:]),result,'e45d872e18d61e01027397bf72dc206c026f1fdcbe1c97d3bc8d2811a8f90729')
 
 if __name__=='__main__':unittest.main()

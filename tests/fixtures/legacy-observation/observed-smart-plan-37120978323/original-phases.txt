@@ -1,0 +1,16 @@
+cucp.smart-plan-trace/v1	phase=wrapper.sha.before	elapsed_ms=11	captures=-1	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=	wrapper_sha256=e45d872e18d61e01027397bf72dc206c026f1fdcbe1c97d3bc8d2811a8f90729
+cucp.smart-plan-trace/v1	phase=wrapper.sha.after.install	elapsed_ms=71	captures=-1	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=	wrapper_sha256=e45d872e18d61e01027397bf72dc206c026f1fdcbe1c97d3bc8d2811a8f90729
+cucp.smart-plan-trace/v1	phase=compat.serialize.enter	elapsed_ms=350	captures=0	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=compat.serialize.done	elapsed_ms=356	captures=0	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=compat.process.start	elapsed_ms=369	captures=0	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=compat.process.wait.done	elapsed_ms=516	captures=0	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=native.call.enter	elapsed_ms=561	captures=0	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=capture.replay	elapsed_ms=570	captures=1	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=compat.serialize.enter	elapsed_ms=576	captures=1	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=compat.serialize.done	elapsed_ms=577	captures=1	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=compat.process.start	elapsed_ms=578	captures=1	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=compat.process.wait.done	elapsed_ms=721	captures=1	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=native.call.enter	elapsed_ms=724	captures=1	raw.type=null	raw.length=null	raw.properties=	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=native.text.read.done	elapsed_ms=1484	captures=1	raw.type=System.String	raw.length=2347	raw.properties=PSPath|PSParentPath|PSChildName|PSDrive|PSProvider|ReadCount|Length	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=capture.replay	elapsed_ms=1506	captures=2	raw.type=System.String	raw.length=2347	raw.properties=PSPath|PSParentPath|PSChildName|PSDrive|PSProvider|ReadCount|Length	err.type=null	err.length=null	err.properties=
+cucp.smart-plan-trace/v1	phase=compat.serialize.enter	elapsed_ms=1512	captures=2	raw.type=System.String	raw.length=2347	raw.properties=PSPath|PSParentPath|PSChildName|PSDrive|PSProvider|ReadCount|Length	err.type=null	err.length=null	err.properties=

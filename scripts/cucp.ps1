@@ -1301,6 +1301,8 @@ function Invoke-NativeHelper {
     $err = ""
     if (Test-Path -LiteralPath $stdoutFile) { $raw = Get-Content -LiteralPath $stdoutFile -Raw -Encoding UTF8 }
     if (Test-Path -LiteralPath $stderrFile) { $err = Get-Content -LiteralPath $stderrFile -Raw -Encoding UTF8 }
+    if ($raw -is [string]) { $raw = [string]::new($raw.ToCharArray()) }
+    if ($err -is [string]) { $err = [string]::new($err.ToCharArray()) }
     $json = $null
     if ($raw -and $raw.Trim().Length -gt 0) {
       try { $json = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }

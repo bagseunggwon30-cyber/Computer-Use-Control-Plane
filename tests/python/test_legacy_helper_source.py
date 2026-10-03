@@ -215,6 +215,16 @@ class HelperSourceTests(unittest.TestCase):
                     original = published_source(pin['path'], directory).decode('utf-8-sig').replace('\r\n', '\n').encode('utf-16-le')
                     for function in pin['functions']:
                         body = original[2 * function['start_utf16']:2 * function['end_utf16']].decode('utf-16-le')
+                        if function['name'] == 'Invoke-NativeHelper':
+                            # Explicit mapped equivalent for the reviewed scalar
+                            # acquisition correction. Every original statement,
+                            # oracle byte and surrounding body stays exact.
+                            anchor = '    if (Test-Path -LiteralPath $stderrFile) { $err = Get-Content -LiteralPath $stderrFile -Raw -Encoding UTF8 }\n'
+                            copies = ('    if ($raw -is [string]) { $raw = [string]::new($raw.ToCharArray()) }\n'
+                                      '    if ($err -is [string]) { $err = [string]::new($err.ToCharArray()) }\n')
+                            self.assertEqual(body.count(anchor), 1)
+                            self.assertEqual(current.count(copies), 1)
+                            body = body.replace(anchor, anchor + copies, 1)
                         self.assertEqual(current.count(body), 1, function['name'])
         text = (FIXTURES / 'source-manifest.json').read_text(encoding='utf-8')
         self.assertNotIn('function ', text)

@@ -188,6 +188,24 @@ provider descriptions and filtered first-chance UIA exception stacks. The probe
 assembly has no UIA/runtime project reference, does not register/change proxies,
 and does not initialize UIA on load. These diagnostics do not earn parity credit.
 
+One hypothesis is default-proxy initialization through the calling assembly’s
+stack frames; another is assembly selection. Both remain hypotheses until the
+runtime evidence distinguishes them. No newer provider was selected intentionally,
+no provider state was reset, and no original function/default was changed.
+
+Local bounded-repair validation: 220 portable C# assertions and 24 observation
+Python tests passed. Full local Python discovery ran 874 methods: 653 passed,
+221 individual skips, zero failures/errors, plus two setup skips (223 skip
+records). The net48 host/oracle assembly and dependency-free diagnostic probe
+compiled with zero warnings/errors. Windows requalification is pending. This
+repair adds 6,866 counted PowerShell bytes to the integrated 955,322-byte tree,
+for 962,188 current bytes and zero new retirement credit.
+
+A separate ProcessName boundary remains unproven: existing fixtures model a
+Get-Process acquisition failure, not a throwing ProcessName getter on its returned
+object. The provider's null/empty distinction at that latter boundary was not
+changed speculatively in this repair; it needs a focused type-seam observation.
+
 ## Second Windows observation and corrected-intent tier
 
 At public `3abd20d2`, Windows run `37117757967` passed all 97 synthetic
@@ -289,23 +307,87 @@ contract assertions; 37 focused Python checks; 887 full Python methods, with
 or errors. The initializer, exception probe and reused owned WinForms fixture
 compile for net48 with zero warnings/errors. These Linux results do not execute
 Windows PowerShell or UIA. The ordinary counted PowerShell fixtures add 12,731
-bytes over `e806bb4`; no source retirement is credited. Original helper/wrapper
-production sources and `WindowsObservationProvider.cs` remain byte-identical.
+bytes over `e806bb4`; no source retirement is credited. At that checkpoint the helper/wrapper
+production sources and `WindowsObservationProvider.cs` remained byte-identical.
 
-One hypothesis is default-proxy initialization through the calling assembly’s
-stack frames; another is assembly selection. Both remain hypotheses until the
-runtime evidence distinguishes them. No newer provider was selected intentionally,
-no provider state was reset, and no original function/default was changed.
+## Verified intended provider and scalar capture correction
 
-Local bounded-repair validation: 220 portable C# assertions and 24 observation
-Python tests passed. Full local Python discovery ran 874 methods: 653 passed,
-221 individual skips, zero failures/errors, plus two setup skips (223 skip
-records). The net48 host/oracle assembly and dependency-free diagnostic probe
-compiled with zero warnings/errors. Windows requalification is pending. This
-repair adds 6,866 counted PowerShell bytes to the integrated 955,322-byte tree,
-for 962,188 current bytes and zero new retirement credit.
+Public `bb46d12b`, run `37120978323`, passed all 32 intended observation pairs,
+both complete real Element/Current/type/geometry identity checks, and all 48
+owned initialization records. The verified 966-file artifact SHA-256 is
+`92ccf3d8f305b62fe9ab3fc1f927be668bb163afb3ecddcee2573a6ee25a74b4`.
+The raw tier remained 97/97 synthetic pairs and 3/14 actual groups. No input,
+pattern invocation or value mutation occurred. This establishes the bounded
+read-only intended provider behavior; the cold mutation caller remains a
+separate acceptance gate.
 
-A separate ProcessName boundary remains unproven: existing fixtures model a
-Get-Process acquisition failure, not a throwing ProcessName getter on its returned
-object. The provider's null/empty distinction at that latter boundary was not
-changed speculatively in this repair; it needs a focused type-seam observation.
+Both SmartPlan traces completed two compatibility calls and the actual native
+read, then stalled at `compat.serialize.enter` with two captured replies. Their
+Raw values were strings of 2,347 and 2,379 UTF-16 code units, with Get-Content's
+PSDrive/PSProvider metadata. The native reads completed at about 1.4 seconds;
+the third serialization never completed before the separate 60-second probes
+were terminated. The full original wrapper still timed out at 180 seconds.
+The earlier trace verifier omitted PS5's visit to the native switch-clause line
+at captures=0, before the history capture. That marker is a clause observation,
+not a second native acquisition. The corrected parser requires the exact
+16-record sequence. Both immutable traces and raw process records are retained
+under `observed-smart-plan-37120978323`, with per-file provenance hashes; tests
+reject omission of every required phase.
+
+The only production change in this increment is two guarded copies immediately
+after Invoke-NativeHelper's actual stdout/stderr Get-Content reads:
+
+```powershell
+if ($raw -is [string]) { $raw = [string]::new($raw.ToCharArray()) }
+if ($err -is [string]) { $err = [string]::new($err.ToCharArray()) }
+```
+
+This boundary produces fresh scalar text before JSON parsing, hot-cache storage
+and reply capture. Null and non-string values pass through; empty string stays
+empty string; UTF-16 units are copied without normalization. Native macro
+forwarders consume Raw as Console.Out text, health diagnostics consume Err as
+text, and helper-client tests assert exact Raw/Err string content. SmartPlan
+captures the reply but its kernel consumes Json and ExitCode, not Raw/Err
+filesystem metadata. No in-repository consumer of those ETS properties was
+found. Metadata removal is therefore a specific acquisition-boundary correction,
+not an output-normalization permission. Existing JSON parse/status/exit rules,
+process ownership, input authority, no-retry and request/time budgets stay exact.
+
+The PS5 scalar fixture executes the exact pinned production read/copy/parse
+fragment, without loading the wrapper. Thirteen text/null cases and three
+non-string cases cover real decorated Raw and Err, missing versus empty files,
+CRLF, embedded NUL, Korean, surrogate pairs and lone surrogate code units.
+Twelve cases round-trip the unchanged depth-24 captured-reply serialization;
+lone surrogates remain in-memory and are reported as exact UTF-16 bytes.
+Non-string values retain type/value or object identity. The gate independently
+checks complete evidence, fresh references, exact UTF-16 bytes, removed metadata,
+parsed JSON, exit/status and coverage. Linux source inspection is not PS5 proof.
+
+`wrapper-source-manifest.json` pins pre-fix blob
+`dc4d420158f490000c85e0b8a0eb483f022dcc76`. Its CRLF materialization exactly
+reproduces the observed Windows wrapper SHA-256
+`e45d872e18d61e01027397bf72dc206c026f1fdcbe1c97d3bc8d2811a8f90729`.
+The unmodified-original tier continues to run those bytes. The separate corrected
+oracle uses unchanged original helper bodies after the reviewed initialization,
+and the explicitly corrected wrapper on both sides. It now requires 34 actual
+pairs including completed cold/warm SmartPlan, 51 initialization records, the
+scalar proof and all 210 current captured SmartPlan kernel/adapter cases. The
+candidate phase diagnostic must complete a valid plan; an expected timeout can
+qualify only the separately preserved original defect observation. All raw
+evidence remains, and the overall raw-parity gate remains failed. No observation
+default activation or PowerShell source retirement is part of this correction.
+
+The helper family's retained-body guard now requires its full pinned original
+Invoke-NativeHelper body plus exactly these two lines at the existing stderr
+read boundary. The original source/AST/hash assertions and other bodies remain
+unchanged; the new scalar fixture is the mapped behavioral check. No generic
+source or output normalization was introduced.
+
+Local validation for this increment: 41 observation tests and 12 helper-source
+tests pass. Full discovery runs 1,024 methods: 770 pass, 254 individual skips,
+two additional setup skips, zero failures/errors. Independent review found no
+production-code blocker; exact PS5 scalar execution and completed actual routes
+remain unqualified until the next Windows run. The two production lines and
+ordinary 245-line fixture add 16,872 counted PowerShell bytes over `8fafca8`,
+with zero new retirement credit. The existing 180-second actual-entry and
+60-second phase-diagnostic budgets are unchanged.

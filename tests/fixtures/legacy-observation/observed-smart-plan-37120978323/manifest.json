@@ -1,0 +1,27 @@
+{
+  "schema": "cucp.observed-smart-plan-traces/v1",
+  "run": "37120978323",
+  "artifact_sha256": "92ccf3d8f305b62fe9ab3fc1f927be668bb163afb3ecddcee2573a6ee25a74b4",
+  "records": [
+    {
+      "file": "original-phases.txt",
+      "source_file": "smart-plan-original-b67a4d26fe27417083c86ee7a2de36fd-phases.log",
+      "sha256": "59f996069a9d000dcc1cfd3d27ea0c8a97a70b9e8da6cbcb7546a6612d40bf70"
+    },
+    {
+      "file": "original-process.json",
+      "source_file": "235-smart-plan-phase-original-ef61db65fb07.json",
+      "sha256": "e634d72807464d8a0654c3b04696987a8595e073286b0eb2852f0382249b1a84"
+    },
+    {
+      "file": "candidate-phases.txt",
+      "source_file": "smart-plan-candidate-6e1f59911cdf41a2bc7d8d4c65f1a35f-phases.log",
+      "sha256": "e2d938be7f2780ffdd112993fb026e77cdba4d887e4e25d42fd5d77cfb1fd016"
+    },
+    {
+      "file": "candidate-process.json",
+      "source_file": "236-smart-plan-phase-candidate-f69a5812f2f9.json",
+      "sha256": "1140eb88c27453b7c9bf0d3e9f028466ce679a18a2a1252cc87bed5f3b005e39"
+    }
+  ]
+}

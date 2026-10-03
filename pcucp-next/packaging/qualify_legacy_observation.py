@@ -8,6 +8,7 @@ fields are excluded from equality, at explicit schema paths; raw evidence stays.
 """
 from __future__ import annotations
 import argparse
+import base64
 import copy
 import hashlib
 import json
@@ -37,6 +38,17 @@ def source_bytes():
     if hashlib.sha256(normalized.encode()).hexdigest() != manifest['normalized_sha256']:
         raise AssertionError('Pinned normalized source mismatch')
     return raw, manifest
+
+
+def wrapper_source_bytes():
+    manifest = json.loads((FIXTURES / 'wrapper-source-manifest.json').read_text())
+    raw = subprocess.check_output(['git','cat-file','blob',manifest['git_blob']],cwd=ROOT)
+    if len(raw) != manifest['raw_bytes'] or hashlib.sha256(raw).hexdigest() != manifest['raw_sha256']:
+        raise AssertionError('Pinned pre-scalar-correction wrapper blob mismatch')
+    windows = raw.replace(b'\r\n',b'\n').replace(b'\n',b'\r\n')
+    if len(windows) != manifest['windows_bytes'] or hashlib.sha256(windows).hexdigest() != manifest['windows_sha256']:
+        raise AssertionError('Immutable observed Windows wrapper bytes mismatch')
+    return windows,manifest
 
 
 def strict_json(value):
@@ -193,7 +205,9 @@ def require_smart_plan_trace(trace_bytes, result, source_hash):
         raise AssertionError('SmartPlan trace lacks verified before/installed source hashes')
     expected = []
     for captures in (0,1):
-        if captures: expected.append(('capture.replay',captures))
+        # PS5 visits this switch-clause line while considering the history
+        # query too. Only native.text.read.done proves a completed native read.
+        if captures: expected.extend([('native.call.enter',0),('capture.replay',captures)])
         expected.extend((phase,captures) for phase in ('compat.serialize.enter','compat.serialize.done','compat.process.start','compat.process.wait.done'))
     expected.extend([('native.call.enter',1),('native.text.read.done',1),('capture.replay',2),('compat.serialize.enter',2)])
     meaningful = [(row['phase'],row['captures']) for row in rows[2:] if row['captures'] >= 0 and row['phase'] != 'wrapper.sha.after.invocation']
@@ -213,6 +227,83 @@ def require_smart_plan_trace(trace_bytes, result, source_hash):
     if output.get('schema') != 'cucp.smart-plan/v1' or type(output.get('safe_to_act')) is not bool or (result['exit_code'],output.get('status'),output['safe_to_act']) not in ((0,'ok',True),(2,'partial',False)):
         raise AssertionError('Completed SmartPlan trace has no valid public plan envelope')
     return {'status':'captured-completed-plan','phase_records':len(rows),'last_phase':rows[-1]['phase'],'captured_replies':2}
+
+
+def require_scalar_capture(payload, source_hash):
+    expected = ['missing-both','empty-both','missing-stdout-rich-stderr','empty-stdout-missing-stderr','ok-json-rich-stderr',
+                'partial-json','error-json','nonzero-exit-preserved','rich-raw-invalid-json','whitespace-raw','memory-null','memory-empty','memory-lone-surrogates']
+    statements = [f'if (${name} -is [string]) {{ ${name} = [string]::new(${name}.ToCharArray()) }}' for name in ('raw','err')]
+    if payload.get('schema') != 'cucp.observation-scalar-capture/v1' or payload.get('status') != 'ok' or payload.get('source_unchanged') is not True or payload.get('wrapper_sha256') != source_hash or not str(payload.get('powershell','')).startswith('5.1.') or payload.get('source_statements') != statements:
+        raise AssertionError('Scalar proof did not execute the exact production source under PS5.1')
+    rows = payload.get('cases',[])
+    if [row.get('id') for row in rows] != expected or payload.get('serialized_captures') != 12 or payload.get('decorated_fields') != 11:
+        raise AssertionError('Scalar proof coverage is incomplete')
+    decorated = 0
+    for row in rows:
+        for field in ('raw','err'):
+            evidence = row[field]; before, after = evidence['before'], evidence['after']
+            if evidence.get('exact_utf16') is not True or before.get('is_null') is not after.get('is_null') or before.get('utf16le_base64') != after.get('utf16le_base64') or before.get('utf16_length') != after.get('utf16_length'):
+                raise AssertionError('Scalar proof changed null identity or UTF-16 code units')
+            if not isinstance(before.get('properties'),list) or not isinstance(after.get('properties'),list) or any(name in after['properties'] for name in ('PSPath','PSParentPath','PSChildName','PSDrive','PSProvider','ReadCount')):
+                raise AssertionError('Copied scalar retained filesystem provider metadata')
+            if after['is_null'] is True:
+                if any(after.get(key) is not None for key in ('utf16_length','utf16le_base64')) or after.get('type') != 'null' or before.get('type') != 'null':
+                    raise AssertionError('Null scalar evidence is incomplete')
+            else:
+                if after['is_null'] is not False or before.get('type') != 'System.String' or after.get('type') != 'System.String' or type(after.get('utf16_length')) is not int or after['utf16_length'] < 0 or not isinstance(after.get('utf16le_base64'),str):
+                    raise AssertionError('String scalar evidence is incomplete')
+                units = base64.b64decode(after['utf16le_base64'],validate=True)
+                if len(units) != 2 * after['utf16_length'] or (units and evidence.get('fresh_reference') is not True):
+                    raise AssertionError('Nonempty text was not a fresh exact UTF-16 scalar')
+            if evidence.get('provider_expected') is True:
+                decorated += 1
+                if not {'PSDrive','PSProvider'}.issubset(before['properties']):
+                    raise AssertionError('Proof did not begin with a real decorated Get-Content string')
+        if row['id'] == 'memory-lone-surrogates':
+            if row.get('surrogate_memory_only') is not True or row.get('json_round_trip') is not False or row.get('copied_capture_json') is not None:
+                raise AssertionError('Lone-surrogate proof must remain exact in memory')
+            for field, expected_units in [('raw',b'A\x00\x00\xd8Z\x00'),('err',b'B\x00\x00\xdcY\x00')]:
+                if base64.b64decode(row[field]['after']['utf16le_base64']) != expected_units:
+                    raise AssertionError('Lone UTF-16 surrogate was replaced')
+            continue
+        expected_initial = 1 if row['id']=='missing-stdout-rich-stderr' else 17 if row['id']=='nonzero-exit-preserved' else 0
+        expected_exit = {'partial-json':2,'error-json':1}.get(row['id'],expected_initial)
+        expected_status = {'ok-json-rich-stderr':'ok','partial-json':'partial','error-json':'error','nonzero-exit-preserved':'partial'}.get(row['id'])
+        if type(row.get('initial_exit')) is not int or row['initial_exit'] != expected_initial or type(row.get('exit_code')) is not int or row['exit_code'] != expected_exit or row.get('json_status') != expected_status or row.get('json_present') is not (expected_status is not None):
+            raise AssertionError('Production parse/status/exit behavior changed during scalar proof')
+        if row.get('json_round_trip') is not True or row.get('surrogate_memory_only') is not False:
+            raise AssertionError('Copied scalar did not complete the actual depth-24 capture serialization')
+        capture = json.loads(row['copied_capture_json'])['args']['captured_replies'][0]['result']
+        for field in ('raw','err'):
+            value = capture[field.capitalize()]
+            expected_units = row[field]['after']['utf16le_base64']
+            if expected_units is None:
+                if value is not None: raise AssertionError('Capture JSON changed null to a scalar')
+            elif type(value) is not str or base64.b64encode(value.encode('utf-16le',errors='surrogatepass')).decode() != expected_units:
+                raise AssertionError('Capture JSON did not preserve exact Raw/Err string data')
+        if type(capture.get('ExitCode')) is not int or capture['ExitCode'] != row['exit_code'] or (capture.get('Json') is not None) != row['json_present']:
+            raise AssertionError('Scalar copy changed captured exit/JSON envelope')
+        if row['json_present'] and strict_json(capture['Json']) != strict_json(json.loads(capture['Raw'])):
+            raise AssertionError('Scalar correction changed parsed JSON data')
+    if decorated != 11:
+        raise AssertionError('Decorated Raw and Err leaf coverage is incomplete')
+    rich = next(row for row in rows if row['id']=='rich-raw-invalid-json')
+    for field in ('raw','err'):
+        units = base64.b64decode(rich[field]['after']['utf16le_base64'])
+        if any(value not in units for value in (b'\r\x00\n\x00',b'\x00\x00','한글'.encode('utf-16le'),'😀'.encode('utf-16le'))):
+            raise AssertionError('Scalar proof lost required CRLF/NUL/Unicode/surrogate-pair coverage')
+    nonstrings = payload.get('non_string_cases',[])
+    if [row.get('id') for row in nonstrings] != ['int-and-bool','long-and-double','object-and-array']:
+        raise AssertionError('Non-string identity coverage missing')
+    for row, types, values in zip(nonstrings,[('System.Int32','System.Boolean'),('System.Int64','System.Double'),('System.Management.Automation.PSCustomObject','System.Object[]')],[(17,True),(9007199254740993,2.5),(None,None)]):
+        for field, clr_type, value in zip(('raw','err'),types,values):
+            evidence = row[field]
+            if evidence.get('before_type') != clr_type or evidence.get('after_type') != clr_type or evidence.get('value_preserved') is not True:
+                raise AssertionError('Non-string value was coerced')
+            if value is None:
+                if evidence.get('same_reference') is not True: raise AssertionError('Non-string object identity changed')
+            elif type(evidence.get('scalar_value')) is not type(value) or evidence['scalar_value'] != value:
+                raise AssertionError('Non-string scalar value changed')
 
 
 def require_entry_outcome(label, payload, exit_code, ready):
@@ -298,24 +389,27 @@ def main(argv=None):
     summary = {'schema': 'cucp.observation-qualification/v1', 'status': 'running', 'retirement_credit': 0,
                'oracle_pairs': 0, 'oracle_pairs_attempted': 0, 'acquisition_calls': 0, 'actual_entry_pairs': 0, 'actual_entry_pairs_attempted': 0, 'records': records, 'failures': failures,
                'windows_required': args.windows}
-    intended = {'status': 'not-run', 'correction': 'fixed-public-compiled-FromHandle-before-unchanged-original-dispatch',
+    intended = {'status': 'not-run', 'correction': 'fixed-public-compiled-FromHandle-before-unchanged-original-helper-dispatch-plus-wrapper-Raw-Err-fresh-scalar-copy',
                 'entry_pairs': 0, 'entry_pairs_attempted': 0, 'identity_checks': 0, 'failures': [],
-                'blocked': ['wrapper-smart-plan: raw original timeout awaits separate phase diagnosis'], 'retirement_credit': 0}
+                'blocked': ['wrapper-smart-plan: scalar proof and actual completed cold/warm route pending'], 'retirement_credit': 0}
     summary['intended_initialization'] = intended
     try:
         raw, manifest = source_bytes()
+        wrapper_raw, wrapper_manifest = wrapper_source_bytes()
         (logs / 'source-manifest.json').write_text(json.dumps(manifest, indent=2))
+        (logs / 'wrapper-source-manifest.json').write_text(json.dumps(wrapper_manifest, indent=2))
         (logs / 'driver-hashes.json').write_text(json.dumps({str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
             for p in [ROOT / 'tests/fixtures/legacy-observation-oracle.ps1', ROOT / 'tests/fixtures/legacy-observation-wrapper.ps1', ROOT / 'tests/fixtures/legacy-observation-smart-plan-trace.ps1',
                       ROOT / 'tests/fixtures/legacy-observation-provider-diagnostic.ps1', ROOT / 'tests/fixtures/legacy-observation-provider-probe/ProviderLoadProbe.cs',
                       ROOT / 'tests/fixtures/legacy-observation-intended-initialization.ps1', ROOT / 'tests/fixtures/legacy-observation-intended-provider/PublicUiaInitialization.cs',
+                      ROOT / 'tests/fixtures/legacy-observation-scalar-capture.ps1',
                       ROOT / 'pcucp-next/dotnet/PcuCp.LegacyObservation.Qualification/ScriptedObservation.cs']}, indent=2))
         build('pcucp-next/dotnet/PcuCp.LegacyObservation.ContractTests')
         run('portable-contracts', [args.dotnet, str(ROOT / 'pcucp-next/dotnet/PcuCp.LegacyObservation.ContractTests/bin/Release/net8.0/PcuCp.LegacyObservation.ContractTests.dll')])
         structural = run('python-structural', [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests/python', '-p', 'test_legacy_observation.py', '-v'])
         test_count = re.search(rb'Ran (\d+) tests?', structural['stderr'])
-        if not test_count or int(test_count.group(1)) < 37:
-            raise AssertionError('Required structural test discovery did not execute all 37 tests')
+        if not test_count or int(test_count.group(1)) < 41:
+            raise AssertionError('Required structural test discovery did not execute all 41 tests')
         if not args.windows:
             summary['status'] = 'portable-only-windows-unqualified'
             return 0
@@ -339,11 +433,38 @@ def main(argv=None):
             owned_profile = temp / 'owned-profile'; owned_profile.mkdir()
             env['USERPROFILE'] = str(owned_profile)
             env.pop('CUCP_CLI_PATH', None)
+            try:
+                result = run('native-scalar-capture-proof',[ps,'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',
+                    str(ROOT / 'tests/fixtures/legacy-observation-scalar-capture.ps1'),'-WrapperPath',str(ROOT / 'scripts/cucp.ps1')],timeout=60)
+                require_scalar_capture(json.loads(result['stdout'].decode('utf-8-sig')),hashlib.sha256((ROOT / 'scripts/cucp.ps1').read_bytes()).hexdigest())
+                intended['scalar_capture_proof'] = 'passed'
+            except Exception as error:
+                intended['scalar_capture_proof'] = 'failed'
+                intended['failures'].append({'case':'scalar-capture-proof','error':str(error)})
+            try:
+                smart_env = dict(env,CUCP_SMART_PLAN_TEST_HOST=env['CUCP_NATIVE_HOST'])
+                result = run('smart-plan-captured-parity',[sys.executable,'-m','unittest','discover','-s','tests/python','-p','test_legacy_smart_plan_parity.py','-v'],process_env=smart_env,timeout=900)
+                if b'Ran 3 tests' not in result['stderr'] or b'skipped' in result['stderr']:
+                    raise AssertionError('All captured SmartPlan kernel/adapter tests must execute')
+                from test_legacy_smart_plan_parity import fixtures as smart_plan_fixtures
+                intended['captured_smart_plan_cases'] = len(smart_plan_fixtures())
+                if intended['captured_smart_plan_cases'] < 210:
+                    raise AssertionError('Captured SmartPlan corpus shrank')
+            except Exception as error:
+                intended['failures'].append({'case':'smart-plan-captured-parity','error':str(error)})
             original_scripts = temp / 'original/scripts'; shutil.copytree(ROOT / 'scripts', original_scripts)
             original_source = original_scripts / 'cucp-native-helper.ps1'; original_source.write_bytes(raw)
+            # Preserve the actually observed pre-fix wrapper timeout independently.
+            (original_scripts / 'cucp.ps1').write_bytes(wrapper_raw)
             intended_original_scripts = temp / 'intended-original/scripts'; shutil.copytree(original_scripts, intended_original_scripts)
+            # Corrected-intent oracle keeps original helper bodies, while both
+            # wrapper callers receive the explicitly recorded scalar correction.
+            (intended_original_scripts / 'cucp.ps1').write_bytes((ROOT / 'scripts/cucp.ps1').read_bytes())
             intended_candidate_scripts = temp / 'intended-candidate/scripts'; shutil.copytree(ROOT / 'scripts', intended_candidate_scripts)
             derived_sources = {}
+            derived_sources['wrapper'] = {'correction':'Raw-and-Err-fresh-UTF16-string-copy-after-Get-Content',
+                'original_sha256':hashlib.sha256(wrapper_raw).hexdigest(),
+                'corrected_sha256':hashlib.sha256((ROOT / 'scripts/cucp.ps1').read_bytes()).hexdigest()}
             for name, scripts, source in [('original', intended_original_scripts, raw), ('candidate-warm', intended_candidate_scripts, (ROOT / 'scripts/cucp-native-helper.ps1').read_bytes())]:
                 derived = with_intended_initialization(source)
                 (scripts / 'cucp-native-helper.ps1').write_bytes(derived)
@@ -467,6 +588,8 @@ def main(argv=None):
                     try:
                         if before_hash != after_hash: raise AssertionError('Phase diagnostic changed wrapper source')
                         trace_result.update(require_smart_plan_trace(trace_bytes,result,before_hash))
+                        if mode == 'candidate' and trace_result['status'] != 'captured-completed-plan':
+                            raise AssertionError('Corrected candidate did not complete the unchanged SmartPlan serialization route')
                     except Exception as error:
                         trace_result.update(status='failed-incomplete-diagnostic',error=str(error))
                         failures.append({'case':label,'error':str(error)})
@@ -477,7 +600,7 @@ def main(argv=None):
                 intended_env = dict(env, CUCP_OBSERVATION_INTENDED_DLL=str(initializer_dll),
                                     CUCP_OBSERVATION_INTENDED_READY=str(ready_path),
                                     CUCP_OBSERVATION_INTENDED_EVIDENCE=str(initialization_evidence))
-                intended_cases = cases + wrapper_cases[:2] + [
+                intended_cases = cases + wrapper_cases + [
                     ('helper-find-id', ['-Action','uia-find','-Match',title,'-Label','RunButton']),
                     ('helper-find-role', ['-Action','uia-find','-Match',title,'-Label','Run 한글','-Role','button']),
                     ('helper-find-edit', ['-Action','uia-find','-Match',title,'-Label','Fixture value']),
@@ -529,7 +652,9 @@ def main(argv=None):
                     evidence = json.loads(path.read_text(encoding='utf-8'))
                     if (evidence.get('target_pid'),evidence.get('returned_pid')) != (ready['pid'],)*2 or (evidence.get('target_hwnd'),evidence.get('returned_hwnd')) != (ready['hwnd'],)*2 or evidence.get('client_proxies_loaded') is not True:
                         intended['failures'].append({'case':'initialization-evidence', 'error':'Owned HWND/PID or normal public proxy initialization mismatch in '+path.name})
-                intended['status'] = 'failed' if intended['failures'] else 'observation-passed-smart-plan-blocked'
+                if not intended['failures'] and intended.get('scalar_capture_proof') == 'passed' and intended['entry_pairs'] == 2 * len(intended_cases) and intended['identity_checks'] == 2:
+                    intended['blocked'] = []
+                intended['status'] = 'failed' if intended['failures'] else 'passed' if not intended['blocked'] else 'incomplete'
             finally:
                 (fixture_dir / 'close.request').write_text('close owned fixture\n')
                 result = fixture.finish(logs, 'owned-window-process', timeout=10)
