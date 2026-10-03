@@ -1,10 +1,11 @@
 ﻿# Read-only diagnostic. This is separate from all unchanged actual-entry proof.
 param(
- [Parameter(Mandatory=$true)][ValidateSet('original','candidate','shared-current')][string]$Mode,
+ [Parameter(Mandatory=$true)][ValidateSet('original','candidate','shared-current','intended-current','candidate-warm')][string]$Mode,
  [Parameter(Mandatory=$true)][string]$Root,
  [Parameter(Mandatory=$true)][string]$SourcePath,
  [Parameter(Mandatory=$true)][string]$ReadinessPath,
- [Parameter(Mandatory=$true)][string]$ProbeAssembly
+ [Parameter(Mandatory=$true)][string]$ProbeAssembly,
+ [string]$InitializerAssembly
 )
 $ErrorActionPreference='Stop'
 if($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1){throw 'Provider diagnostics require Windows PowerShell 5.1.'}
@@ -44,8 +45,16 @@ Snapshot 'after-original-win32'
 $uia=_Ensure-UIA
 Snapshot 'after-original-uia'
 $originalUiaType=[System.Windows.Automation.AutomationElement]
+$primedRoot=$null
+if($Mode -in @('intended-current','candidate-warm')){
+ if(-not $InitializerAssembly){throw 'Intended diagnostic requires the fixed compiled initializer.'}
+ Add-Type -LiteralPath $InitializerAssembly
+ $primedRoot=[PcuCp.ObservationIntendedProvider.PublicUiaInitialization]::FromOwnedHandle([long]$ready.hwnd)
+ if($primedRoot.Current.NativeWindowHandle -ne $ready.hwnd -or $primedRoot.Current.ProcessId -ne $ready.pid){throw 'Compiled initialization escaped owned HWND/PID.'}
+ Snapshot 'after-fixed-public-initialization'
+}
 $originalElement=$null;$originalCurrent=$null
-if($Mode -eq 'shared-current'){
+if($Mode -in @('shared-current','intended-current')){
  $originalElement=$originalUiaType::FromHandle([IntPtr][long]$ready.hwnd)
  $originalCurrent=$originalElement.Current
  Snapshot 'after-original-cross-boundary-acquisition'
@@ -57,7 +66,7 @@ if($Mode -ne 'original'){
  _Require-LegacyObservation
  $provider=$Script:_LegacyObservationProvider
  Snapshot 'after-candidate-construction'
- if($Mode -eq 'shared-current'){
+ if($Mode -in @('shared-current','intended-current')){
  $directBounds=$null;$directBoundsError=$null
  try{$directBounds=$provider.Bounds($originalCurrent)}catch{$directBoundsError=$_.Exception.Message}
  try{
@@ -66,6 +75,23 @@ if($Mode -ne 'original'){
  }catch{$crossBoundary=[ordered]@{element_assembly=$originalElement.GetType().Assembly.FullName;current_type=$originalCurrent.GetType().AssemblyQualifiedName;direct_bounds=$directBounds;direct_bounds_error=$directBoundsError;payload=$null;error=$_.Exception.Message}}
  Snapshot 'after-shared-current-boundary'
  }
+}
+$ownedBoundaries=New-Object System.Collections.ArrayList
+if($Mode -in @('intended-current','candidate-warm')){
+ foreach($control in @(@{key='run';id='RunButton';pattern='Invoke'},@{key='edit';id='FixtureEdit';pattern='Value'})){
+  $ownedGeometry=$ready.($control.key)
+  $ownedHwnd=$provider.WindowFromPoint([int]$ownedGeometry.center_x,[int]$ownedGeometry.center_y)
+  if($ownedHwnd -le 0){throw 'Owned button/edit has no Win32 handle at its known center.'}
+  $ownedElement=$originalUiaType::FromHandle([IntPtr]$ownedHwnd)
+  $ownedCurrent=$ownedElement.Current
+  $nativeElement=$provider.FromHandle($ownedHwnd)
+  $patternKind=[Enum]::Parse([PcuCp.LegacyObservation.ObservationPattern],[string]$control.pattern)
+  $ownedPattern=$provider.Pattern($ownedElement,$patternKind)
+  $patternReadOnly=$null;if($control.pattern -eq 'Value'){$patternReadOnly=$provider.ValueReadOnly($ownedPattern)}
+  $ownedPayload=$Script:_LegacyObservationPrimitives.MatchPayload($ownedCurrent,$control.pattern+'Pattern')
+  [void]$ownedBoundaries.Add([ordered]@{control=$control.key;point_x=[int]$ownedGeometry.center_x;point_y=[int]$ownedGeometry.center_y;expected_hwnd=$ownedHwnd;original_hwnd=$ownedCurrent.NativeWindowHandle;candidate_hwnd=$nativeElement.Current.NativeWindowHandle;original_pid=$ownedCurrent.ProcessId;candidate_pid=$nativeElement.Current.ProcessId;automation_identity=[System.Windows.Automation.Automation]::Compare($ownedElement,$nativeElement);element_type=$ownedElement.GetType().AssemblyQualifiedName;current_type=$ownedCurrent.GetType().AssemblyQualifiedName;direct_bounds=$provider.Bounds($ownedCurrent);payload=$ownedPayload;pattern_type=$ownedPattern.GetType().AssemblyQualifiedName;value_readonly=$patternReadOnly})
+ }
+ Snapshot 'after-owned-button-edit-boundaries'
 }
 $records=New-Object System.Collections.ArrayList
 $errorText=$null
@@ -89,6 +115,6 @@ try{
  }
  Snapshot 'after-descendant-properties'
 }catch{$errorText=$_.Exception.Message;Snapshot 'after-diagnostic-error'}
-$result=[ordered]@{schema='cucp.observation-provider-diagnostic/v1';mode=$Mode;source_hash=$sourceHash;pid=$PID;powershell=$PSVersionTable.PSVersion.ToString();clr=[Environment]::Version.ToString();thread_apartment=[Threading.Thread]::CurrentThread.ApartmentState.ToString();target_pid=[int]$ready.pid;target_hwnd=[long]$ready.hwnd;original_resolved_uia_type=$originalUiaType.AssemblyQualifiedName;shared_current_boundary=$crossBoundary;stages=@($stages);records=@($records);first_chance_uia=@([PcuCp.ObservationProviderProbe.ProviderLoadProbe]::Snapshot());first_chance_dropped=[PcuCp.ObservationProviderProbe.ProviderLoadProbe]::Dropped;error=$errorText}
+$result=[ordered]@{schema='cucp.observation-provider-diagnostic/v1';mode=$Mode;source_hash=$sourceHash;pid=$PID;powershell=$PSVersionTable.PSVersion.ToString();clr=[Environment]::Version.ToString();thread_apartment=[Threading.Thread]::CurrentThread.ApartmentState.ToString();target_pid=[int]$ready.pid;target_hwnd=[long]$ready.hwnd;original_resolved_uia_type=$originalUiaType.AssemblyQualifiedName;shared_current_boundary=$crossBoundary;owned_object_boundaries=@($ownedBoundaries);stages=@($stages);records=@($records);first_chance_uia=@([PcuCp.ObservationProviderProbe.ProviderLoadProbe]::Snapshot());first_chance_dropped=[PcuCp.ObservationProviderProbe.ProviderLoadProbe]::Dropped;error=$errorText}
 [Console]::Out.WriteLine((ConvertTo-Json -InputObject $result -Depth 12 -Compress))
 if($errorText){exit 1}

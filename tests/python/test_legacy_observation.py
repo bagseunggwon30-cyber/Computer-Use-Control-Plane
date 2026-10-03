@@ -107,6 +107,51 @@ class SourceTests(unittest.TestCase):
         self.assertIn("for mode in ('original', 'candidate', 'shared-current'):",source)
         self.assertIn("processes.append(result)",source)
 
+    def test_intended_oracle_changes_only_one_counted_insertion(self):
+        raw, _ = QUALIFY.source_bytes()
+        hook = (ROOT/'tests/fixtures/legacy-observation-intended-initialization.ps1').read_bytes()
+        corrected = QUALIFY.with_intended_initialization(raw)
+        self.assertEqual(corrected.replace(hook,b'',1),raw)
+        self.assertEqual(corrected.count(hook),1)
+        for path in ('scripts/cucp-native-helper.ps1','scripts/cucp-legacy-observation-adapter.ps1'):
+            self.assertNotIn('CUCP_OBSERVATION_INTENDED', (ROOT/path).read_text(encoding='utf-8-sig'))
+        with self.assertRaises(AssertionError):QUALIFY.with_intended_initialization(raw+b'switch ($Action) {')
+
+    def test_intended_initializer_uses_one_public_read_without_proxy_changes(self):
+        code=(ROOT/'tests/fixtures/legacy-observation-intended-provider/PublicUiaInitialization.cs').read_text()
+        self.assertEqual(code.count('AutomationElement.FromHandle('),1)
+        for token in ('RegisterClientSide','SetProxy','GetField(', 'BindingFlags', 'DynamicMethod','SendInput(','.Invoke()', '.SetValue('):self.assertNotIn(token,code)
+        source=(ROOT/'tests/fixtures/legacy-observation-intended-initialization.ps1').read_text()
+        self.assertIn('NativeWindowHandle -ne $intendedReady.hwnd',source)
+        self.assertIn('ProcessId -ne $intendedReady.pid',source)
+
+    def test_intended_tier_does_not_replace_raw_original_or_waive_planner(self):
+        source=(ROOT/'pcucp-next/packaging/qualify_legacy_observation.py').read_text()
+        self.assertLess(source.index('for label, arguments in cases + wrapper_cases:'),source.index("for temperature in ('cold','warm'):"))
+        self.assertIn("'wrapper-smart-plan: raw original timeout awaits separate phase diagnosis'",source)
+        self.assertIn("'observation-passed-smart-plan-blocked'",source)
+        self.assertIn("compare_entry(*pair)",source)
+
+    def test_intended_identity_checks_real_button_edit_types_and_handles(self):
+        source=(ROOT/'tests/fixtures/legacy-observation-provider-diagnostic.ps1').read_text(encoding='utf-8-sig')
+        self.assertIn('[System.Windows.Automation.Automation]::Compare($ownedElement,$nativeElement)',source)
+        self.assertIn('$provider.Pattern($ownedElement,$patternKind)',source)
+        self.assertIn('$provider.Bounds($ownedCurrent)',source)
+        self.assertIn('$provider.ValueReadOnly($ownedPattern)',source)
+        self.assertNotIn('ConvertFrom-Json $owned',source)
+
+    def test_smart_plan_phase_probe_is_opt_in_and_keeps_raw_source(self):
+        driver=(ROOT/'tests/fixtures/legacy-observation-wrapper.ps1').read_text(encoding='utf-8-sig')
+        trace=(ROOT/'tests/fixtures/legacy-observation-smart-plan-trace.ps1').read_text()
+        self.assertIn('if($TraceSmartPlan)',driver)
+        self.assertIn('Set-PSBreakpoint -Script $wrapper -Line $point.Line -Action $action',trace)
+        self.assertIn('Get-ObservationTraceSourceHash',trace)
+        self.assertIn('$stream.Flush($true)',trace)
+        self.assertNotIn('Set-Content',trace)
+        self.assertNotIn('ConvertTo-Json -InputObject $value',trace)
+        gate=(ROOT/'pcucp-next/packaging/qualify_legacy_observation.py').read_text()
+        self.assertIn("'wrapper_sha256_after_process':after_hash",gate)
+
 class ComparisonTests(unittest.TestCase):
     def envelope(self):
         return dict(schema='cucp.observation-oracle/v1',scenario='plain',mode='original',captured={'exit_code':0,'payload':{'status':'ok','elapsed_ms':1}},return_value=None,error=None,acquisition=['ensure-win32'],inert_mutations=0)
@@ -162,5 +207,108 @@ class ComparisonTests(unittest.TestCase):
         if sys.platform=='win32':self.skipTest('negative platform test is non-Windows only')
         with self.assertRaises(SystemExit) as raised:QUALIFY.main(['--windows'])
         self.assertEqual(raised.exception.code,2)
+
+
+class IntendedVerdictTests(unittest.TestCase):
+    def identity_fixture(self):
+        framework=', UIAutomationClient, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35'
+        ready={'pid':42,'run':dict(x=168,y=201,width=130,height=40,center_x=233,center_y=221),
+               'edit':dict(x=328,y=281,width=270,height=20,center_x=463,center_y=291)}
+        rows=[]
+        for control,identity,role,name,pattern in [('run','RunButton','button','Run 한글','InvokePattern'),('edit','FixtureEdit','edit','Fixture value','ValuePattern')]:
+            g=ready[control]
+            rows.append(dict(control=control,point_x=g['center_x'],point_y=g['center_y'],expected_hwnd=100,original_hwnd=100,candidate_hwnd=100,
+                original_pid=42,candidate_pid=42,automation_identity=True,element_type='System.Windows.Automation.AutomationElement'+framework,
+                current_type='System.Windows.Automation.AutomationElement+AutomationElementInformation'+framework,
+                direct_bounds=dict(X=float(g['x']),Y=float(g['y']),Width=float(g['width']),Height=float(g['height']),IsEmpty=False),
+                payload=dict(automation_id=identity,role=role,name=name,rect={k:g[k] for k in ('x','y','width','height')}),
+                pattern_type='System.Windows.Automation.'+pattern+framework,value_readonly=True if control=='edit' else None))
+        return dict(error=None,first_chance_dropped=0,first_chance_uia=[],owned_object_boundaries=rows),ready
+
+    def test_intended_identity_requires_complete_independent_evidence(self):
+        payload,ready=self.identity_fixture()
+        QUALIFY.require_intended_identity(payload,ready)
+
+    def test_intended_identity_rejects_missing_types_and_geometry(self):
+        for control in (0,1):
+            for path in [('element_type',),('current_type',),('direct_bounds',),('direct_bounds','X'),('direct_bounds','IsEmpty'),('payload','rect'),('payload','rect','width')]:
+                with self.subTest(control=control,path=path):
+                    payload,ready=self.identity_fixture();node=payload['owned_object_boundaries'][control]
+                    for key in path[:-1]:node=node[key]
+                    del node[path[-1]]
+                    with self.assertRaises(AssertionError):QUALIFY.require_intended_identity(payload,ready)
+
+    def test_intended_identity_rejects_altered_types_and_geometry(self):
+        for path,value in [(('element_type',),'System.Object'),(('current_type',),'System.Management.Automation.PSCustomObject'),
+                           (('direct_bounds','X'),999), (('direct_bounds','Height'),float('nan')), (('direct_bounds','IsEmpty'),True),
+                           (('payload','rect','x'),169), (('payload','rect','width'),True)]:
+            with self.subTest(path=path,value=value):
+                payload,ready=self.identity_fixture();node=payload['owned_object_boundaries'][0]
+                for key in path[:-1]:node=node[key]
+                node[path[-1]]=value
+                with self.assertRaises(AssertionError):QUALIFY.require_intended_identity(payload,ready)
+        payload,ready=self.identity_fixture()
+        payload['owned_object_boundaries'][0]['direct_bounds']['X']=169
+        payload['owned_object_boundaries'][0]['payload']['rect']['x']=169
+        with self.assertRaises(AssertionError):QUALIFY.require_intended_identity(payload,ready)
+
+    def trace_fixture(self, complete=False):
+        phases=[('wrapper.sha.before',-1),('wrapper.sha.after.install',-1),
+            ('compat.serialize.enter',0),('compat.serialize.done',0),('compat.process.start',0),('compat.process.wait.done',0),
+            ('capture.replay',1),('compat.serialize.enter',1),('compat.serialize.done',1),('compat.process.start',1),('compat.process.wait.done',1),
+            ('native.call.enter',1),('native.text.read.done',1),('capture.replay',2),('compat.serialize.enter',2)]
+        if complete:phases += [('compat.serialize.done',2),('compat.process.start',2),('compat.process.wait.done',2),('plan.complete',2),('wrapper.sha.after.invocation',-1)]
+        rows=[]
+        for index,(phase,count) in enumerate(phases):
+            row=dict(phase=phase,elapsed_ms=str(index*10),captures=str(count),**{'raw.type':'System.String','raw.length':'123','raw.properties':'PSPath|PSDrive|PSProvider|Length','err.type':'null','err.length':'null','err.properties':''})
+            if phase.startswith('wrapper.sha.'):row['wrapper_sha256']='abc'
+            rows.append(row)
+        result=dict(timed_out=not complete,exit_code=0 if complete else 1,elapsed_ms=1200 if complete else 60050,launch_error=None,kill_error=None,drain_incomplete=False,running=False,stdin_error=None,read_errors={},truncated={'stdout':False,'stderr':False},stdout=b'{"schema":"cucp.smart-plan/v1","status":"ok","safe_to_act":true}')
+        return rows,result
+
+    def encode_trace(self,rows):
+        return ('\n'.join('cucp.smart-plan-trace/v1\t'+'\t'.join(k+'='+str(v) for k,v in row.items()) for row in rows)+'\n').encode()
+
+    def test_smart_plan_trace_classifies_only_instrumented_timeout_or_complete_plan(self):
+        for complete,status in [(False,'captured-expected-serialization-timeout'),(True,'captured-completed-plan')]:
+            rows,result=self.trace_fixture(complete)
+            self.assertEqual(QUALIFY.require_smart_plan_trace(self.encode_trace(rows),result,'abc')['status'],status)
+
+    def test_smart_plan_trace_rejects_before_only_and_early_driver_failure(self):
+        rows,result=self.trace_fixture()
+        for length in (0,1,2,5,12,14):
+            with self.subTest(length=length):
+                for timeout in (False,True):
+                    result['timed_out']=timeout
+                    with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(self.encode_trace(rows[:length]),result,'abc')
+        result['timed_out']=False
+        with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(self.encode_trace(rows),result,'abc')
+
+    def test_smart_plan_trace_rejects_missing_native_capture_and_raw_metadata(self):
+        rows,result=self.trace_fixture()
+        for index in (6,11,12,13):
+            with self.subTest(missing_index=index):
+                altered=copy.deepcopy(rows);del altered[index]
+                with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(self.encode_trace(altered),result,'abc')
+        for field,value in [('raw.type','null'),('raw.length','0'),('raw.properties','Length'),('captures','1')]:
+            altered=copy.deepcopy(rows);altered[-1][field]=value
+            with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(self.encode_trace(altered),result,'abc')
+
+    def test_smart_plan_trace_rejects_bad_hash_order_and_process_evidence(self):
+        rows,result=self.trace_fixture()
+        with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(self.encode_trace(rows),result,'changed')
+        reordered=copy.deepcopy(rows);reordered[8],reordered[9]=reordered[9],reordered[8]
+        with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(self.encode_trace(reordered),result,'abc')
+        for field,value in [('elapsed_ms',50000),('running',True),('kill_error','failed'),('drain_incomplete',True),('read_errors',{'stdout':'failed'}),('truncated',{'stderr':True})]:
+            altered=copy.deepcopy(result);altered[field]=value
+            with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(self.encode_trace(rows),altered,'abc')
+
+    def test_smart_plan_completed_trace_rejects_failure_exit_or_invalid_envelope(self):
+        rows,result=self.trace_fixture(True)
+        for field,value in [('exit_code',1),('stdout',b'{}')]:
+            altered=copy.deepcopy(result);altered[field]=value
+            with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(self.encode_trace(rows),altered,'abc')
+        del rows[-1]
+        with self.assertRaises(AssertionError):QUALIFY.require_smart_plan_trace(self.encode_trace(rows),result,'abc')
 
 if __name__=='__main__':unittest.main()

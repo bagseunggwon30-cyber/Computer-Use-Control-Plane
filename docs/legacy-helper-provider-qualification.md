@@ -1,8 +1,30 @@
 # Owned actual helper-provider qualification gate
 
-Candidate only. This gate changes no helper runtime, original PowerShell body,
+## Later rerun: current UIA qualification remains blocked
+
+The first 31-case success below is retained historical evidence. At unchanged
+provider code in public `ed659953ea358437d99f221c584e16f3704f5999`, later run
+`37120186487` validated the other 20 cases but its 11-case UIA process exceeded
+the unchanged 90-second bound. It emitted 3,357,209 stdout bytes before owned
+termination; raw drain was complete, stderr empty, and output untruncated.
+Requests 1–9 completed, including root-fallback request 9; requests 10
+(`uia-run-reused`) and 11 (`health-uia`) have no completed records. The evidence
+does not yet distinguish cumulative fixture cost from a blocked API. The group
+is incomplete and earns no current qualification credit. The historical helper
+action/transport suite completed successfully in that same job; the job failed
+because of this actual-provider group.
+
+Artifact `11273292125` has archive SHA-256
+`6482f3dcf9c38a493eb6ee04794acfc6be040f524ea02ca4b5e767681bde725b`.
+The stall boundary and difference from the prior successful group are under
+investigation. No deadline increase, automatic retry, provider/output
+normalization, activation or retirement is justified by the prior pass.
+
+Candidate only. The owned Windows provider layer passed at `baeed795`; the
+complete helper workflow still failed for a separate autostart evidence check.
+This gate changes no helper runtime, original PowerShell body,
 production route, installation, registration or default. **Retirement credit is
-zero.** It prepares the missing real-acquisition gate instead of treating inert
+zero.** It covers the owned real-acquisition layer instead of treating inert
 fixtures as proof of UIA or WinRT behavior.
 
 ## Run and verdict
@@ -148,7 +170,7 @@ input/IME/clipboard and environmental no-foreground/loader-failure branches rema
 outside the owned proof. Existing inert contracts continue to cover those reducer
 error branches without claiming they occurred on a real desktop.
 
-## Local verification
+## Initial local verification
 
 Linux compiled both net48 probe and owned WinForms fixture with zero warnings or
 errors. The locally available SDK/runtime is 10; net8-targeted portable contracts
@@ -160,6 +182,123 @@ observation structural suite passed 24 methods. Full Python discovery reported
 932 methods, `OK (skipped=163)`; that skip report includes class-setup skips and
 must not be treated as an executed-method count. Independent review found no
 remaining local/static blocker after the geometry, console, timeout and verdict
-mutation fixes. Source inventory remains 962,188 tracked PowerShell bytes at this
-base; this patch adds/removes no PowerShell bytes. Actual Windows/WinRT/UIA
-execution is pending; no native success is claimed by this commit.
+mutation fixes. The initial `51eb240` base measured 962,188 tracked PowerShell
+bytes; the provider gate patch added/removed no PowerShell bytes. Actual Windows/WinRT/UIA
+execution was still pending at that local-only checkpoint. The separately
+verified Windows result below supersedes that limit for the owned provider layer.
+
+
+## Verified Windows provider result at baeed795
+
+[Run 37119545970](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37119545970)
+executed public commit
+[`baeed79529485483428caa58eb550d32b477fcd7`](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/commit/baeed79529485483428caa58eb550d32b477fcd7),
+tree `f7bc2719aa0482340d373c0c73d7bee39a3a42d4`. The actual-provider
+subgate passed **all 31 required cases**, on Windows Server 2025 build 26100
+and Python 3.12.10. Both net48 fixture/probe builds had zero warnings/errors;
+43 expectation-regression methods reported 42 passes and the single explicitly
+allowed non-Windows refusal-control skip.
+
+The retained [artifact 11272851963](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37119545970/artifacts/11272851963)
+contains 1,152 files. Its archive SHA-256 is
+`7fa30bd6525857af43ed09e407040d02d75357348bd0a7064d7bddbd428ce522`.
+The `actual-providers` directory retains the summary, all six raw JSON-line
+streams/process records, source and binary hash manifests, generated/owned
+images, and fixture readiness/closure. Independent reinspection re-ran the exact
+expected-result checks on every raw case, without response normalization:
+
+| Group | Required cases | Recorded acquisition calls | Raw stdout bytes |
+| --- | ---: | ---: | ---: |
+| Native | 7 | 241 | 38,333 |
+| UIA | 11 | 6,530 | 3,798,087 |
+| Generated-file OCR | 7 | 76 | 22,432 |
+| Owned-region OCR | 2 | 29 | 7,953 |
+| Explicit language fallback | 2 | 31 | 8,447 |
+| Explicit initialization retry | 2 | 19 | 5,046 |
+| Total | 31 | 6,926 | 3,880,298 |
+
+The 6,926 records include 6,915 actual-provider-tagged operations, eight explicit
+generated-image records and three labeled profile/language substitution records.
+They are not 6,926 unmodified acquisition operations.
+
+All six actual-provider processes exited zero, with empty stderr, complete
+stdout/stderr drains, exact base64/raw-byte agreement, and no timeout, truncation,
+launch, read, stdin or cleanup failure. The UIA group took 45,203 ms, below its
+90-second bound; the owned form closed cleanly after 50,671 ms. No process retry
+was used. These checks apply to the actual-provider subgate, not the overall job.
+
+### What the actual observations establish
+
+- `windows` and `focused` returned the owned fixture's exact HWND 2031736 and
+  PID 7164, title, class and 620x570 outer bounds. The absent-title query returned
+  zero windows. Native health advanced from request 1/cold Win32 to request
+  7/warm Win32; unsupported action 6 retained its explicit fallback schema.
+- Actual UIA returned the named `button` and `edit` providers. The Unicode label
+  selected `Run 한글` with scores `[100,80,50]`; duplicate labels retained the
+  first acquired result at `(328,201,130,40)`. The 24 cap buttons yielded exactly
+  the first 16, stopping after 28 subtree name reads. The owned subtree contained
+  852 elements; `Beyond scan` existed at zero-based index 846. That request read
+  exactly 800 subtree names and returned the precise `partial/no_match` result.
+  Successful UIA/Win32 loads were reused, and health counted all 11 UIA-group
+  requests. Whole-desktop foreground/modal populations remained incidental data.
+- Actual screen OCR twice captured only `(148,591,560,70)` and returned exactly
+  `HELLO 2468`, one line and two words, with the same successful engine identity.
+  Both retained captures are 2,768-byte PNGs with SHA-256
+  `de43af39e3b64b28d9b17937f6052659720d617d8d9a4fab9fbd523ad9026f0f`.
+  The source-verified pre/post per-pixel owned-root checks completed on both
+  successful calls. This is the documented bounded ownership check, not a claim
+  of an atomic capture or a retained per-pixel ownership trace.
+- All ten image artifacts were independently rehashed against their recorded
+  byte counts: nine readable PNGs and one deliberately invalid PNG byte file.
+  Visual inspection of generated text and owned captures confirmed only the
+  owned black text on white; both blank images were uniformly white, at 560x70
+  and 800x600 respectively. Real WinRT recognized the generated text and blanks,
+  rejected the corrupt file with `ocr_failed`, and succeeded again using its
+  cached engine. The actual maximum dimension was 10,000; oversized capture was
+  rejected before creating a temp path. Negative bitmap width produced the
+  separate `screenshot_failed` result without decoding.
+- The fallback/retry cases were explicit seams. The real profile call actually
+  returned an engine and the machine had one available language. The harness
+  substituted null, then used that real language through `createLanguage`; both
+  recognition calls reused the newly created engine. The retry additionally
+  substituted an empty language list, emitted the exact no-language error, then
+  performed a second real initialization/profile call and recognized successfully.
+  These results do not establish a naturally missing profile or language pack.
+- Readiness and closure each retained zero input, invoke and value-change
+  counters. Every successful OCR cleanup recorded the file absent, and the final
+  dedicated TEMP inventory was empty. No input, production activation, installation,
+  registration, startup setting or production route was changed.
+
+### Source provenance and line endings
+
+The checked-out source hash manifest measures Windows CRLF bytes, whereas the
+published Git blobs use LF. Independent reconstruction of each of the eight
+recorded sources with only LF-to-CRLF checkout expansion reproduced its exact
+recorded byte count and SHA-256. No other source difference was accepted. The
+local verified source tree equals the public tree above; binary identities are
+recorded in the artifact's separate four-file manifest. The artifact does not
+include those executables for an independent binary rehash.
+
+For example, `LegacyHelperProviders.cs` is 12,041 LF Git bytes, versus 12,219
+Windows checkout bytes with SHA-256
+`52c1fbd9adcaf50554222952cc9f7f280fa787de1e3024d0df7e832a7bcaa8c4`.
+The 16,597-byte LF provider probe becomes exactly 16,839 CRLF bytes with SHA-256
+`b1a9e2f7a3926b80b3f3817d2c94ed64082b66c13b422b9af7671adede1458e8`.
+This reconciliation is exclusively source provenance: every observed response,
+diagnostic, image and raw output byte remains unchanged.
+
+### Overall result and remaining limits
+
+The complete helper workflow was **not green**. Its later 269-method helper suite
+reported one failure and 28 skips. The sole failure was
+`test_original_venv_argument_mismatch_remains_exact_hash_pinned`, whose recorded
+autostart manifest CRLF bytes did not match its LF hash pin. That independent
+failure does not erase this completed provider evidence or become an expected
+provider success; its repair/qualification is tracked separately.
+
+The result qualifies this compiled candidate's owned Windows acquisition/OCR
+layer and explicit fallback boundaries. It does not establish original-provider
+parity, amend the original failed startup/Args/OCR/ranking observations, authorize
+production activation, or retire source. The separate one-shot UIA loader
+compatibility decision and the other environmental limits listed above remain.
+This documentation update changes no executable or test expectation.

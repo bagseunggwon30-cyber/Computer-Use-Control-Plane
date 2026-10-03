@@ -11,6 +11,7 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 import os
 import re
 from pathlib import Path
@@ -106,6 +107,114 @@ def compare_entry(original, candidate, *, smart_plan=False):
         raise AssertionError('Actual entry payload mismatch (raw evidence retained)')
 
 
+def with_intended_initialization(source):
+    """One counted, fixture-only insertion; all original bytes otherwise survive."""
+    marker = b'switch ($Action) {'
+    if source.count(marker) != 1:
+        raise AssertionError('Expected exactly one original dispatch insertion point')
+    hook = (ROOT / 'tests/fixtures/legacy-observation-intended-initialization.ps1').read_bytes()
+    if not hook.endswith(b'\n'):
+        raise AssertionError('Intended initialization fixture must end in a newline')
+    derived = source.replace(marker, hook + marker, 1)
+    if derived.replace(hook + marker, marker, 1) != source:
+        raise AssertionError('Intended initialization changed original source')
+    return derived
+
+
+def require_intended_identity(payload, ready):
+    if payload.get('error') is not None or payload.get('first_chance_dropped') != 0:
+        raise AssertionError('Intended provider diagnostic did not finish completely')
+    if any('LoadDefaultProxies' in row.get('Stack', '') for row in payload['first_chance_uia']):
+        raise AssertionError('Intended initialization repeated original proxy startup failure')
+    boundaries = payload.get('owned_object_boundaries', [])
+    if [row['control'] for row in boundaries] != ['run', 'edit']:
+        raise AssertionError('Original button/edit object boundary evidence missing')
+    for row, identity, role, name, pattern in zip(boundaries, ('RunButton','FixtureEdit'), ('button','edit'), ('Run 한글','Fixture value'), ('InvokePattern','ValuePattern')):
+        framework = ', UIAutomationClient, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35'
+        if row.get('element_type') != 'System.Windows.Automation.AutomationElement' + framework or row.get('current_type') != 'System.Windows.Automation.AutomationElement+AutomationElementInformation' + framework:
+            raise AssertionError('Complete real framework AutomationElement/Current type identity is required')
+        expected_hwnd = row['expected_hwnd']
+        geometry = ready[row['control']]
+        if type(expected_hwnd) is not int or expected_hwnd <= 0 or (row['point_x'],row['point_y']) != (geometry['center_x'],geometry['center_y']):
+            raise AssertionError('Original object handle did not come from the known owned control center')
+        if (row['expected_hwnd'], row['original_hwnd'], row['candidate_hwnd']) != (expected_hwnd,) * 3 or row['automation_identity'] is not True:
+            raise AssertionError('Original AutomationElement identity/handle changed across compiled boundary')
+        if row['original_pid'] != ready['pid'] or row['candidate_pid'] != ready['pid']:
+            raise AssertionError('Original UIA object boundary escaped the owned process')
+        match = row['payload']
+        if (match['automation_id'], match['role'], match['name']) != (identity, role, name):
+            raise AssertionError('Original real Current properties changed across compiled boundary')
+        direct = row.get('direct_bounds')
+        rect = match.get('rect')
+        if not isinstance(direct, dict) or set(direct) != {'X','Y','Width','Height','IsEmpty'} or direct['IsEmpty'] is not False:
+            raise AssertionError('Complete nonempty compiled bounds evidence is required')
+        if not isinstance(rect, dict) or set(rect) != {'x','y','width','height'}:
+            raise AssertionError('Complete payload rectangle evidence is required')
+        for public, native in (('x','X'),('y','Y'),('width','Width'),('height','Height')):
+            if type(geometry.get(public)) is not int or type(direct[native]) not in (int,float) or not math.isfinite(direct[native]) or type(rect[public]) is not int:
+                raise AssertionError('Owned geometry must contain finite, correctly typed numeric evidence')
+            if direct[native] != geometry[public] or rect[public] != geometry[public]:
+                raise AssertionError('Original Current compiled bounds/payload rectangle differ from independent owned control bounds')
+        if geometry['width'] <= 0 or geometry['height'] <= 0:
+            raise AssertionError('Owned control bounds must have positive dimensions')
+        if row.get('pattern_type') != 'System.Windows.Automation.' + pattern + framework:
+            raise AssertionError('Owned control advertised an unexpected real pattern')
+        if row['control'] == 'edit' and row['value_readonly'] is not True:
+            raise AssertionError('Owned readonly edit lost its ValuePattern readonly contract')
+
+
+def require_smart_plan_trace(trace_bytes, result, source_hash):
+    """Classify only a complete plan or the specifically instrumented replay stall."""
+    if result.get('launch_error') or result.get('kill_error') or result.get('drain_incomplete') or result.get('running') or result.get('stdin_error') or result.get('read_errors') or any(result.get('truncated', {}).values()):
+        raise AssertionError('SmartPlan phase process evidence is incomplete')
+    rows = []
+    for line in trace_bytes.decode('utf-8', errors='strict').splitlines():
+        fields = line.split('\t')
+        if not fields or fields[0] != 'cucp.smart-plan-trace/v1':
+            raise AssertionError('Malformed SmartPlan phase record')
+        row = {}
+        for field in fields[1:]:
+            key, separator, value = field.partition('=')
+            if not separator or key in row: raise AssertionError('Malformed or duplicate SmartPlan phase field')
+            row[key] = value
+        required = {'phase','elapsed_ms','captures','raw.type','raw.length','raw.properties','err.type','err.length','err.properties'}
+        if not required.issubset(row) or set(row) - required - {'wrapper_sha256'}:
+            raise AssertionError('Incomplete SmartPlan phase fields')
+        if not re.fullmatch(r'\d+', row['elapsed_ms']) or not re.fullmatch(r'-?\d+', row['captures']):
+            raise AssertionError('Invalid SmartPlan phase clock/capture count')
+        row['elapsed_ms'], row['captures'] = int(row['elapsed_ms']), int(row['captures'])
+        allowed = {'wrapper.sha.before','wrapper.sha.after.install','wrapper.sha.after.invocation','compat.serialize.enter','compat.serialize.done','compat.process.start','compat.process.wait.done','native.call.enter','native.text.read.done','capture.replay','plan.complete'}
+        if row['phase'] not in allowed or row['captures'] not in (-1,0,1,2):
+            raise AssertionError('Unexpected SmartPlan phase or capture count')
+        if rows and row['elapsed_ms'] < rows[-1]['elapsed_ms']:
+            raise AssertionError('SmartPlan phase clock moved backward')
+        rows.append(row)
+    if len(rows) < 2 or [row['phase'] for row in rows[:2]] != ['wrapper.sha.before','wrapper.sha.after.install'] or any(row.get('wrapper_sha256') != source_hash for row in rows[:2]):
+        raise AssertionError('SmartPlan trace lacks verified before/installed source hashes')
+    expected = []
+    for captures in (0,1):
+        if captures: expected.append(('capture.replay',captures))
+        expected.extend((phase,captures) for phase in ('compat.serialize.enter','compat.serialize.done','compat.process.start','compat.process.wait.done'))
+    expected.extend([('native.call.enter',1),('native.text.read.done',1),('capture.replay',2),('compat.serialize.enter',2)])
+    meaningful = [(row['phase'],row['captures']) for row in rows[2:] if row['captures'] >= 0 and row['phase'] != 'wrapper.sha.after.invocation']
+    if meaningful[:len(expected)] != expected:
+        raise AssertionError('SmartPlan trace did not reach the third replay after both native capture and earlier completed compatibility calls')
+    if result.get('timed_out') is True:
+        if meaningful != expected or rows[-1]['phase'] != 'compat.serialize.enter' or rows[-1]['captures'] != 2 or result.get('exit_code') is None or type(result.get('elapsed_ms')) is not int or result['elapsed_ms'] < 60000:
+            raise AssertionError('Timeout was outside the bounded expected third-serialization boundary')
+        raw = rows[-1]
+        if raw['raw.type'] != 'System.String' or not re.fullmatch(r'\d+',raw['raw.length']) or int(raw['raw.length']) <= 0 or not {'PSDrive','PSProvider'}.issubset(raw['raw.properties'].split('|')):
+            raise AssertionError('Third-serialization timeout lacks decorated native Raw string evidence')
+        return {'status':'captured-expected-serialization-timeout','phase_records':len(rows),'last_phase':rows[-1]['phase'],'captured_replies':2}
+    tail = [('compat.serialize.done',2),('compat.process.start',2),('compat.process.wait.done',2),('plan.complete',2)]
+    if result.get('timed_out') is not False or meaningful != expected + tail or rows[-1]['phase'] != 'wrapper.sha.after.invocation' or rows[-1].get('wrapper_sha256') != source_hash or result.get('exit_code') not in (0,2):
+        raise AssertionError('SmartPlan trace ended early or failed before a complete verified plan')
+    output = json.loads(result['stdout'].decode('utf-8-sig'))
+    if output.get('schema') != 'cucp.smart-plan/v1' or type(output.get('safe_to_act')) is not bool or (result['exit_code'],output.get('status'),output['safe_to_act']) not in ((0,'ok',True),(2,'partial',False)):
+        raise AssertionError('Completed SmartPlan trace has no valid public plan envelope')
+    return {'status':'captured-completed-plan','phase_records':len(rows),'last_phase':rows[-1]['phase'],'captured_replies':2}
+
+
 def require_entry_outcome(label, payload, exit_code, ready):
     expected = {
         'helper-hit-mismatch': (2, 'partial'), 'helper-hit-missing': (1, 'error'),
@@ -147,6 +256,16 @@ def require_entry_outcome(label, payload, exit_code, ready):
         raise AssertionError('Disabled control was incorrectly filtered out')
     if label == 'helper-find-offscreen' and payload.get('reason') != 'no_match':
         raise AssertionError('Offscreen control was not excluded')
+    if label in ('helper-find-id','helper-find-role','helper-find-edit'):
+        top = payload.get('top', {})
+        expected = ('FixtureEdit','edit','Fixture value') if label == 'helper-find-edit' else ('RunButton','button','Run 한글')
+        if (top.get('automation_id'),top.get('role'),top.get('text')) != expected or payload.get('ambiguous') is not False:
+            raise AssertionError('Owned intended ID/role query did not resolve its exact control')
+        if label == 'helper-find-edit':
+            if top.get('value_pattern') is not True or top.get('value_readonly') is not True:
+                raise AssertionError('Owned readonly edit did not expose readonly ValuePattern')
+        elif top.get('invoke_pattern') != 'InvokePattern':
+            raise AssertionError('Owned button did not expose InvokePattern')
     if label == 'wrapper-smart-plan':
         if payload.get('schema') != 'cucp.smart-plan/v1' or payload.get('safe_to_act') is not True or payload.get('best_route') != 'uia_pattern':
             raise AssertionError('SmartPlan did not reach the real UIA pattern planning route')
@@ -179,18 +298,24 @@ def main(argv=None):
     summary = {'schema': 'cucp.observation-qualification/v1', 'status': 'running', 'retirement_credit': 0,
                'oracle_pairs': 0, 'oracle_pairs_attempted': 0, 'acquisition_calls': 0, 'actual_entry_pairs': 0, 'actual_entry_pairs_attempted': 0, 'records': records, 'failures': failures,
                'windows_required': args.windows}
+    intended = {'status': 'not-run', 'correction': 'fixed-public-compiled-FromHandle-before-unchanged-original-dispatch',
+                'entry_pairs': 0, 'entry_pairs_attempted': 0, 'identity_checks': 0, 'failures': [],
+                'blocked': ['wrapper-smart-plan: raw original timeout awaits separate phase diagnosis'], 'retirement_credit': 0}
+    summary['intended_initialization'] = intended
     try:
         raw, manifest = source_bytes()
         (logs / 'source-manifest.json').write_text(json.dumps(manifest, indent=2))
         (logs / 'driver-hashes.json').write_text(json.dumps({str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in [ROOT / 'tests/fixtures/legacy-observation-oracle.ps1', ROOT / 'tests/fixtures/legacy-observation-wrapper.ps1', ROOT / 'tests/fixtures/legacy-observation-provider-diagnostic.ps1',
+            for p in [ROOT / 'tests/fixtures/legacy-observation-oracle.ps1', ROOT / 'tests/fixtures/legacy-observation-wrapper.ps1', ROOT / 'tests/fixtures/legacy-observation-smart-plan-trace.ps1',
+                      ROOT / 'tests/fixtures/legacy-observation-provider-diagnostic.ps1', ROOT / 'tests/fixtures/legacy-observation-provider-probe/ProviderLoadProbe.cs',
+                      ROOT / 'tests/fixtures/legacy-observation-intended-initialization.ps1', ROOT / 'tests/fixtures/legacy-observation-intended-provider/PublicUiaInitialization.cs',
                       ROOT / 'pcucp-next/dotnet/PcuCp.LegacyObservation.Qualification/ScriptedObservation.cs']}, indent=2))
         build('pcucp-next/dotnet/PcuCp.LegacyObservation.ContractTests')
         run('portable-contracts', [args.dotnet, str(ROOT / 'pcucp-next/dotnet/PcuCp.LegacyObservation.ContractTests/bin/Release/net8.0/PcuCp.LegacyObservation.ContractTests.dll')])
         structural = run('python-structural', [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests/python', '-p', 'test_legacy_observation.py', '-v'])
         test_count = re.search(rb'Ran (\d+) tests?', structural['stderr'])
-        if not test_count or int(test_count.group(1)) < 24:
-            raise AssertionError('Required structural test discovery did not execute all 24 tests')
+        if not test_count or int(test_count.group(1)) < 37:
+            raise AssertionError('Required structural test discovery did not execute all 37 tests')
         if not args.windows:
             summary['status'] = 'portable-only-windows-unqualified'
             return 0
@@ -200,6 +325,7 @@ def main(argv=None):
         build('pcucp-next/dotnet/PcuCp.LegacyObservation.Qualification')
         build('tests/fixtures/legacy-observation-owned-window')
         build('tests/fixtures/legacy-observation-provider-probe')
+        build('tests/fixtures/legacy-observation-intended-provider')
         build('pcucp-next/dotnet/PcuCp.NativeHost')
         qualification = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyObservation.Qualification/bin/Release/net48'
         env['CUCP_LEGACY_INTEROP_DLL'] = str(qualification / 'PcuCp.LegacyInterop.dll')
@@ -215,6 +341,14 @@ def main(argv=None):
             env.pop('CUCP_CLI_PATH', None)
             original_scripts = temp / 'original/scripts'; shutil.copytree(ROOT / 'scripts', original_scripts)
             original_source = original_scripts / 'cucp-native-helper.ps1'; original_source.write_bytes(raw)
+            intended_original_scripts = temp / 'intended-original/scripts'; shutil.copytree(original_scripts, intended_original_scripts)
+            intended_candidate_scripts = temp / 'intended-candidate/scripts'; shutil.copytree(ROOT / 'scripts', intended_candidate_scripts)
+            derived_sources = {}
+            for name, scripts, source in [('original', intended_original_scripts, raw), ('candidate-warm', intended_candidate_scripts, (ROOT / 'scripts/cucp-native-helper.ps1').read_bytes())]:
+                derived = with_intended_initialization(source)
+                (scripts / 'cucp-native-helper.ps1').write_bytes(derived)
+                derived_sources[name] = {'source_sha256': hashlib.sha256(source).hexdigest(), 'derived_sha256': hashlib.sha256(derived).hexdigest(), 'insertion_sha256': hashlib.sha256((ROOT / 'tests/fixtures/legacy-observation-intended-initialization.ps1').read_bytes()).hexdigest()}
+            (logs / 'intended-source-derivation.json').write_text(json.dumps(derived_sources, indent=2))
             for name in json.loads((FIXTURES / 'cases.json').read_text()):
                 try:
                     summary['oracle_pairs_attempted'] += 1
@@ -307,6 +441,95 @@ def main(argv=None):
                             '-ProbeAssembly', str(ROOT / 'tests/fixtures/legacy-observation-provider-probe/bin/Release/net48/ObservationProviderProbe.dll')], timeout=120)
                     except Exception as error:
                         failures.append({'case': 'provider-identity-' + mode, 'error': str(error)})
+                # Bounded diagnostic only: record exact silent-block boundary,
+                # without raising the real 180-second deadline or parity credit.
+                summary['smart_plan_diagnostics'] = []
+                for mode in ('original','candidate'):
+                    scripts = original_scripts if mode == 'original' else ROOT / 'scripts'
+                    wrapper = scripts / 'cucp.ps1'
+                    before_hash = hashlib.sha256(wrapper.read_bytes()).hexdigest()
+                    trace_path = logs / ('smart-plan-' + mode + '-' + uuid.uuid4().hex + '-phases.log')
+                    child_env = dict(env)
+                    if mode == 'candidate': child_env['CUCP_LEGACY_OBSERVATION_CANDIDATE'] = '1'
+                    argfile = temp / 'wrapper-smart-plan.json'
+                    command = [ps,'-NoProfile','-ExecutionPolicy','Bypass','-File',str(ROOT / 'tests/fixtures/legacy-observation-wrapper.ps1'),
+                               '-WrapperPath',str(wrapper),'-ArgumentsPath',str(argfile),'-TraceSmartPlan','-TracePath',str(trace_path)]
+                    label = 'smart-plan-phase-' + mode
+                    result = run_evidence(command, cwd=ROOT, env=child_env, directory=logs,
+                                          label=f'{len(records)+1:03d}-'+label, timeout=60, limit=128*1024*1024)
+                    records.append({'label':label,'evidence':result['evidence_path']})
+                    after_hash = hashlib.sha256(wrapper.read_bytes()).hexdigest()
+                    trace_bytes = trace_path.read_bytes() if trace_path.is_file() else b''
+                    trace_result = {'mode':mode,'wrapper_sha256_before':before_hash,'wrapper_sha256_after_process':after_hash,
+                                    'phase_file':trace_path.name,'phase_sha256':hashlib.sha256(trace_bytes).hexdigest(),
+                                    'timed_out':result['timed_out'],'exit_code':result['exit_code'],'retirement_credit':0}
+                    summary['smart_plan_diagnostics'].append(trace_result)
+                    try:
+                        if before_hash != after_hash: raise AssertionError('Phase diagnostic changed wrapper source')
+                        trace_result.update(require_smart_plan_trace(trace_bytes,result,before_hash))
+                    except Exception as error:
+                        trace_result.update(status='failed-incomplete-diagnostic',error=str(error))
+                        failures.append({'case':label,'error':str(error)})
+                # Distinct corrected-intent tier. Cold-original exact failures above
+                # remain failed and retain all raw bytes. No raw parity is claimed.
+                initializer_dll = ROOT / 'tests/fixtures/legacy-observation-intended-provider/bin/Release/net48/ObservationIntendedProvider.dll'
+                initialization_evidence = fixture_dir / 'intended-initialization'; initialization_evidence.mkdir()
+                intended_env = dict(env, CUCP_OBSERVATION_INTENDED_DLL=str(initializer_dll),
+                                    CUCP_OBSERVATION_INTENDED_READY=str(ready_path),
+                                    CUCP_OBSERVATION_INTENDED_EVIDENCE=str(initialization_evidence))
+                intended_cases = cases + wrapper_cases[:2] + [
+                    ('helper-find-id', ['-Action','uia-find','-Match',title,'-Label','RunButton']),
+                    ('helper-find-role', ['-Action','uia-find','-Match',title,'-Label','Run 한글','-Role','button']),
+                    ('helper-find-edit', ['-Action','uia-find','-Match',title,'-Label','Fixture value']),
+                ]
+                for temperature in ('cold','warm'):
+                    for label, arguments in intended_cases:
+                        try:
+                            intended['entry_pairs_attempted'] += 1
+                            results, errors = [], []
+                            for mode in ('original','candidate'):
+                                child_env = dict(intended_env)
+                                scripts = intended_original_scripts
+                                if mode == 'candidate':
+                                    child_env['CUCP_LEGACY_OBSERVATION_CANDIDATE'] = '1'
+                                    scripts = ROOT / 'scripts' if temperature == 'cold' else intended_candidate_scripts
+                                if label.startswith('wrapper-'):
+                                    argfile = temp / ('intended-' + label + '.json'); argfile.write_text(json.dumps(arguments, ensure_ascii=False), encoding='utf-8')
+                                    command = [ps,'-NoProfile','-ExecutionPolicy','Bypass','-File',str(ROOT / 'tests/fixtures/legacy-observation-wrapper.ps1'),'-WrapperPath',str(scripts / 'cucp.ps1'),'-ArgumentsPath',str(argfile)]
+                                else:
+                                    command = [ps,'-NoProfile','-ExecutionPolicy','Bypass','-File',str(scripts / 'cucp-native-helper.ps1')] + arguments
+                                try:
+                                    results.append(run('intended-'+temperature+'-'+label+'-'+mode, command, process_env=child_env, accepted=(0,1,2,3), timeout=180))
+                                except Exception as error:
+                                    errors.append(mode + ': ' + str(error))
+                            if errors: raise AssertionError('; '.join(errors))
+                            pair = [json.loads(result['stdout'].decode('utf-8-sig')) for result in results]
+                            if results[0]['exit_code'] != results[1]['exit_code']: raise AssertionError('Intended entry exit mismatch')
+                            compare_entry(*pair)
+                            for payload, result in zip(pair, results): require_entry_outcome(label, payload, result['exit_code'], ready)
+                            intended['entry_pairs'] += 1
+                        except Exception as error:
+                            intended['failures'].append({'case': temperature+'-'+label, 'error': str(error)})
+                for mode in ('intended-current','candidate-warm'):
+                    try:
+                        result = run('provider-identity-' + mode, [ps,'-NoProfile','-ExecutionPolicy','Bypass','-File',
+                            str(ROOT / 'tests/fixtures/legacy-observation-provider-diagnostic.ps1'),'-Mode',mode,
+                            '-Root',str(ROOT),'-SourcePath',str(original_source),'-ReadinessPath',str(ready_path),
+                            '-ProbeAssembly',str(ROOT / 'tests/fixtures/legacy-observation-provider-probe/bin/Release/net48/ObservationProviderProbe.dll'),
+                            '-InitializerAssembly',str(initializer_dll)], timeout=120)
+                        require_intended_identity(json.loads(result['stdout'].decode('utf-8-sig')),ready)
+                        intended['identity_checks'] += 1
+                    except Exception as error:
+                        intended['failures'].append({'case':mode, 'error':str(error)})
+                initialization_records = list(initialization_evidence.glob('initialization-*.json'))
+                intended['initialization_records'] = len(initialization_records)
+                if len(initialization_records) != 3 * len(intended_cases):
+                    intended['failures'].append({'case':'initialization-evidence', 'error':'Expected exactly one public owned-HWND initialization per corrected original or warm candidate process'})
+                for path in initialization_records:
+                    evidence = json.loads(path.read_text(encoding='utf-8'))
+                    if (evidence.get('target_pid'),evidence.get('returned_pid')) != (ready['pid'],)*2 or (evidence.get('target_hwnd'),evidence.get('returned_hwnd')) != (ready['hwnd'],)*2 or evidence.get('client_proxies_loaded') is not True:
+                        intended['failures'].append({'case':'initialization-evidence', 'error':'Owned HWND/PID or normal public proxy initialization mismatch in '+path.name})
+                intended['status'] = 'failed' if intended['failures'] else 'observation-passed-smart-plan-blocked'
             finally:
                 (fixture_dir / 'close.request').write_text('close owned fixture\n')
                 result = fixture.finish(logs, 'owned-window-process', timeout=10)
@@ -317,8 +540,9 @@ def main(argv=None):
                 counters = json.loads(closed.read_text())
                 if any(type(v) is not int or v != 0 for v in counters.values()):
                     raise AssertionError('Owned real-provider fixture observed input/UIA mutation')
-        summary['status'] = 'passed' if not failures else 'failed'
-        return 1 if failures else 0
+        summary['raw_original_entry_status'] = 'passed' if summary['actual_entry_pairs'] == summary['actual_entry_pairs_attempted'] else 'failed'
+        summary['status'] = 'passed' if not failures and not intended['failures'] and not intended['blocked'] else 'failed'
+        return 0 if summary['status'] == 'passed' else 1
     except Exception as error:
         summary['status'] = 'failed'; failures.append({'case': 'gate', 'error': str(error)})
         print(str(error), file=sys.stderr)

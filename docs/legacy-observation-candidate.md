@@ -188,6 +188,110 @@ provider descriptions and filtered first-chance UIA exception stacks. The probe
 assembly has no UIA/runtime project reference, does not register/change proxies,
 and does not initialize UIA on load. These diagnostics do not earn parity credit.
 
+## Second Windows observation and corrected-intent tier
+
+At public `3abd20d2`, Windows run `37117757967` passed all 97 synthetic
+source/AST/type-seam pairs, with 23,528 matching acquisition calls. Its verified
+708-file artifact SHA-256 is
+`4592d6d9afce74b300c9b682f13ca216a0c232f71288b16b018bda0dd5414cbf`.
+The actual-entry tier still matched only three of 14 attempted groups. All raw
+original/candidate data, order, status and exit differences remain failures.
+
+The three isolated provider diagnostics establish the initialization difference:
+
+- Both callers resolve exactly the same framework 4.0 UIAutomationClient,
+  UIAutomationTypes and WindowsBase assemblies, locations and MVIDs. This is not
+  a framework-version or real-Current cast mismatch.
+- Original first acquisition raises a first-chance `NullReferenceException` in
+  `MS.Internal.Automation.ProxyManager.LoadDefaultProxies`. Client-side provider
+  assembly loading never occurs. Its seven raw descendants have HWND-derived
+  IDs and pane roles; the button has no Invoke pattern, and the offscreen button
+  reports `IsOffscreen=false`.
+- Candidate first acquisition loads `UIAutomationClientsideProviders` normally.
+  It sees 13 raw descendants (12 admitted tree records), named IDs, button/edit
+  roles, Invoke/Value patterns and the offscreen flag.
+- Acquiring the real original root/Current first, then passing those objects to
+  compiled Bounds/MatchPayload succeeds and preserves the old provider state.
+  This confirms both real type compatibility and process-local initialization
+  persistence. It does not qualify mutation routes.
+
+The public WPF [`ProxyManager.LoadDefaultProxies` source](https://github.com/dotnet/wpf/blob/main/src/Microsoft.DotNet.Wpf/src/UIAutomation/UIAutomationClient/MS/Internal/Automation/ProxyManager.cs) sets its one-shot flag
+before examining caller stack frames and dereferences `ReflectedType` without
+a null check. A typeless PowerShell-generated frame is the source-supported
+explanation for the observed null reference; the diagnostic now records public
+call-frame metadata for that exception to test the precise dereference. No
+framework private state is read or changed.
+
+Caller intent supports normal initialization. The original helper header
+promises UIA bounds/pattern discovery and ID-based fusion. Its unchanged find
+body reads Name/AutomationId/HelpText/AccessKey, localized role, offscreen state,
+Invoke/Toggle/SelectionItem and ValuePattern read-only state. SmartPlan's
+`LegacySmartPlanKernel.cs` selects `uia_pattern` with a score bonus and
+`mouse_moved=false` when those patterns exist; without them it proposes
+`uia_coord` with explicit mouse fallback. Thus IDs, roles, pattern support,
+offscreen admission, scan selection and subsequent planning are functional
+changes, never representation allowances.
+
+For qualification only, a separately named intended-initialization tier makes
+one fixed public `AutomationElement.FromHandle` call from a concrete compiled
+class, on the generated fixture's verified PID/HWND, before original dispatch.
+`legacy-observation-intended-initialization.ps1` is an ordinary counted source
+file. The derived oracle consists of the immutable original bytes plus exactly
+that one insertion; its original, inserted and derived SHA-256 values are saved.
+The shipping helper and provider do not load this fixture. There is no dynamic
+trampoline, proxy registration/reset, private reflection or output fabrication.
+
+The tier compares 16 actual observation groups in two fresh-process conditions:
+candidate cold startup and candidate startup after the same fixed public read.
+It retains exact later payload/status/order equality and existing positive
+functionality checks, adds ID/role/readonly-edit queries, and requires 48 owned
+initialization records. Two additional real-object diagnostics pass original
+button/edit AutomationElement and Current instances directly into compiled
+Bounds, Pattern, ValueReadOnly and MatchPayload; Win32 handles, owning PID and
+public `Automation.Compare` must agree. The shared owned fixture readiness
+changes are exactly those from `85d2c5a`; its observation-mode layout is unchanged.
+
+The raw-original tier remains failed. An intended tier pass cannot be labeled
+raw parity or retirement. The owned fixture's input/invoke/value counters must
+remain zero at cleanup, and the existing shared click/fusion tripwires remain.
+An advertised Invoke pattern also cannot yet be called a usable mutation route:
+a separate cold unchanged uia-invoke process still starts through the original
+resolver. Production activation requires an explicit startup compatibility
+decision and that specific cold mutation caller gate, under owned-fixture
+authority/identity/no-retry checks.
+
+The original wrapper SmartPlan process produced no output before its 180-second
+timeout. A separate 60-second diagnostic uses opt-in nonbreaking line breakpoints
+on the unchanged wrapper and retains flushed phase markers, shallow Raw/Err
+type/length/property names, and before/after-process source hashes. It tests the
+specific hypothesis that PS5 Get-Content string metadata recursively expands
+during compatibility serialization before the native process timeout starts.
+It does not lengthen the real deadline or change Raw/Err/Json. Intended SmartPlan
+parity stays explicitly blocked pending this diagnosis; the 32 observation pairs
+and identity checks cannot make the whole gate pass. No production scalar repair
+has been applied.
+
+Intended identity verdicts require the complete exact framework-qualified
+Element/Current/pattern types, every finite compiled bounds field, and every
+integer payload rectangle field. Both geometry representations must agree with
+the independently published owned button/edit bounds, not only with each other.
+Missing types/geometry, wrong types, empty rectangles and matching-but-shifted
+geometry fail. The phase diagnostic parses and checks the complete two successful
+compatibility calls, native read and third replay sequence. Only a complete valid
+public plan, or a bounded third-serialization timeout with captured PSDrive and
+PSProvider Raw metadata, is classified as captured evidence. Early driver exits,
+before-only traces, missing/reordered phases, source-hash changes and incomplete
+process evidence fail explicitly, while their raw logs remain available.
+
+Local validation of this diagnostic/corrected-oracle increment: 220 portable
+contract assertions; 37 focused Python checks; 887 full Python methods, with
+666 passed, 221 individual skips and two additional setup skips, zero failures
+or errors. The initializer, exception probe and reused owned WinForms fixture
+compile for net48 with zero warnings/errors. These Linux results do not execute
+Windows PowerShell or UIA. The ordinary counted PowerShell fixtures add 12,731
+bytes over `e806bb4`; no source retirement is credited. Original helper/wrapper
+production sources and `WindowsObservationProvider.cs` remain byte-identical.
+
 One hypothesis is default-proxy initialization through the calling assembly’s
 stack frames; another is assembly selection. Both remain hypotheses until the
 runtime evidence distinguishes them. No newer provider was selected intentionally,
