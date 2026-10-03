@@ -49,7 +49,7 @@ class RegistryRefreshTests(unittest.TestCase):
     def test_all_dispatch_handler_and_safety_invariants_remain_identical(self):
         # The reviewed invariant digest was computed before the two-line source
         # refresh. Only source locations are excluded, never contract content.
-        data = json.loads((ROOT / 'docs/legacy-dispatch-contract.json').read_text())
+        data = json.loads((ROOT / 'docs/legacy-dispatch-contract.json').read_text(encoding='utf-8'))
         value = {key: data[key] for key in ('semantics', 'wrapper_parameters', 'direct_safety_macros',
             'not_implemented', 'unknown_macro', 'direct_safety_order', 'confirmation_contract',
             'authority_order', 'live_request_rules', 'coordinate_observation_gate')}

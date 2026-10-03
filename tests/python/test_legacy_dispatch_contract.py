@@ -187,7 +187,7 @@ class LegacyDispatchContractTests(unittest.TestCase):
 
     def test_source_assertions_bind_every_dispatch_handler_and_inventory_location(self):
         locations = {entry["path"]: {row["name"]: row["line"] for row in entry["functions"]}
-                     for entry in json.loads((ROOT / "docs/legacy-function-inventory.json").read_text())["files"]}
+                     for entry in json.loads((ROOT / "docs/legacy-function-inventory.json").read_text(encoding="utf-8"))["files"]}
         relationships = self.contract.metadata["dispatch_relationships"]
         self.assertEqual(len(relationships), 109)
         extents = {(e["path"], e["name"]): e for e in self.contract.metadata["extents"]}
@@ -251,7 +251,7 @@ class LegacyDispatchContractTests(unittest.TestCase):
             root = self._fixture(folder)
             path = root / "scripts/cucp.ps1"
             text = path.read_text(encoding="utf-8-sig")
-            path.write_text(text.replace("Invoke-Macro -ArgList $CucpArgs", "Invoke-Macro -ArgList $OtherArgv"))
+            path.write_text(text.replace("Invoke-Macro -ArgList $CucpArgs", "Invoke-Macro -ArgList $OtherArgv"), encoding="utf-8")
             with self.assertRaisesRegex(dispatch.LegacyDispatchContractError, "source drift"):
                 dispatch.assert_frozen_sources(root)
             path.unlink()
@@ -270,7 +270,7 @@ class LegacyDispatchContractTests(unittest.TestCase):
     def test_tampered_manifest_cannot_introduce_arbitrary_handler(self):
         with tempfile.TemporaryDirectory(prefix="legacy dispatch contract ") as folder:
             path = Path(folder) / "forged.json"
-            path.write_text(dispatch.CONTRACT_PATH.read_text().replace("Invoke-MacroSafetyClassify", "Invoke-ArbitraryExecutable"))
+            path.write_text(dispatch.CONTRACT_PATH.read_text(encoding="utf-8").replace("Invoke-MacroSafetyClassify", "Invoke-ArbitraryExecutable"), encoding="utf-8")
             dispatch.load_contract.cache_clear()
             try:
                 with mock.patch.object(dispatch, "CONTRACT_PATH", path):
@@ -286,7 +286,7 @@ class LegacyDispatchContractTests(unittest.TestCase):
                 self.assertIsNotNone(dispatch.resolve_macro(record.name))
             dispatch.classify_top_level(["macro", "process"])
             dispatch.assert_frozen_sources(ROOT)
-        module_source = Path(dispatch.__file__).read_text()
+        module_source = Path(dispatch.__file__).read_text(encoding="utf-8")
         self.assertNotIn("from .registry", module_source)
         self.assertNotRegex(module_source, r"\b(?:eval|exec|Popen)\(")
         self.assertNotIn("getattr(", module_source)

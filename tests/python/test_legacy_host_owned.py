@@ -395,18 +395,21 @@ class WindowsOriginalBriefTests(unittest.TestCase):
 param([string]$Source,[string]$Changelog,[string]$ArgumentsPath)
 $ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 $t=$null;$e=$null;$ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$t,[ref]$e)
+$definitions=@()
 foreach($name in @('_Read-OptValue','_Cucp-RedactSecrets','Invoke-MacroReleaseNotes')) {
  $f=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
- if($f.Count -ne 1){throw "Expected exact original $name"};. ([scriptblock]::Create($f[0].Extent.Text))
+ if($f.Count -ne 1){throw "Expected exact original $name"};$definitions += $f[0].Extent.Text
 }
+$definitionsPath=Join-Path (Split-Path -Parent $Source) 'original-functions.ps1'
+[IO.File]::WriteAllText($definitionsPath,($definitions -join "`r`n"),(New-Object Text.UTF8Encoding($true)))
+. $definitionsPath
 $script:OwnedChangelog=$Changelog
-$script:PSScriptRoot=Split-Path -Parent $Source
 function Resolve-Path {param([string]$LiteralPath,$ErrorAction)
  if(-not $LiteralPath.EndsWith('CHANGELOG.md')){throw 'Unexpected original path'}
  Microsoft.PowerShell.Management\Resolve-Path -LiteralPath $script:OwnedChangelog -ErrorAction $ErrorAction
 }
 $Brief=$true;$Script:CucpV14Schema=@{ReleaseNotes='cucp.release-notes/v1'}
-$arguments=@(Get-Content -LiteralPath $ArgumentsPath -Raw -Encoding UTF8 | ConvertFrom-Json)
+$arguments=Get-Content -LiteralPath $ArgumentsPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $code=Invoke-MacroReleaseNotes -Rest ([string[]]$arguments)
 exit ([int]$code)
 '''
