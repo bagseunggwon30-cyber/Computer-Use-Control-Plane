@@ -433,9 +433,13 @@ class ObservationTests(unittest.TestCase):
         with server() as (state, endpoint):
             adapter = CdpAdapter(endpoint, snapshot_ttl_s=.05)
             sid = adapter.execute('cdp-observe', {'target_id':'page-0'})['snapshot_id']
-            time.sleep(.06)
-            with self.assertRaises(CdpError) as error: adapter.execute('cdp-smart-find', {'snapshot_id':sid,'text':'Save'})
+            # Exercise expiry independently of Windows timer granularity.
+            before = len(state.requests)
+            with patch('pcucp_cli.cdp.time.monotonic', return_value=adapter._snapshot['created'] + .1):
+                with self.assertRaises(CdpError) as error:
+                    adapter.execute('cdp-smart-find', {'snapshot_id':sid,'text':'Save'})
             self.assertEqual(error.exception.code,'stale_snapshot')
+            self.assertEqual(len(state.requests), before)
             sid = adapter.execute('cdp-observe', {'target_id':'page-0'})['snapshot_id']
             adapter.execute('cdp-observe', {'target_id':'page-0'})
             with self.assertRaises(CdpError): adapter.execute('cdp-smart-find', {'snapshot_id':sid,'text':'Save'})
