@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -144,9 +145,60 @@ internal static class LegacyDiagnosticJson
     {
         null => "", string text => text,
         DateTime date when errorDisplay => LegacyDiagnosticCulture.DateTimeErrorText(date, culture),
+        double number when double.IsFinite(number) => FiniteDoubleDisplay(number, culture),
         IFormattable formattable => formattable.ToString(null, culture),
         _ => value.ToString() ?? ""
     };
+
+    // Diagnostic data display only. Framework default Double formatting uses
+    // 15 significant digits, midpoint-away rounding and unsigned zero. Modern
+    // G/G15 alone changes precision, midpoint and negative-zero behavior. Round
+    // the exact binary rational with bounded BigIntegers (binary64 domain), then
+    // render the legacy general-format thresholds. This is a source-derived
+    // model; the independent Windows corpus remains the qualification oracle.
+    // https://learn.microsoft.com/dotnet/standard/base-types/standard-numeric-format-strings
+    // https://github.com/dotnet/coreclr/blob/release/2.0.0/src/classlibnative/bcltype/number.cpp
+    private static string FiniteDoubleDisplay(double value, CultureInfo culture)
+    {
+        if (value == 0) return "0";
+        ulong bits = BitConverter.DoubleToUInt64Bits(value);
+        int binaryExponent = (int)((bits >> 52) & 0x7ff);
+        ulong significand = bits & 0x000fffffffffffffUL;
+        int shift = binaryExponent == 0 ? -1074 : binaryExponent - 1075;
+        if (binaryExponent != 0) significand |= 1UL << 52;
+        BigInteger numerator = significand, denominator = BigInteger.One;
+        if (shift >= 0) numerator <<= shift;
+        else denominator <<= -shift;
+        int exponent = numerator.ToString(CultureInfo.InvariantCulture).Length -
+            denominator.ToString(CultureInfo.InvariantCulture).Length;
+        int ComparePower(int power) => power >= 0
+            ? numerator.CompareTo(denominator * BigInteger.Pow(10, power))
+            : (numerator * BigInteger.Pow(10, -power)).CompareTo(denominator);
+        if (ComparePower(exponent) < 0) exponent--;
+        int decimalShift = 14 - exponent;
+        if (decimalShift >= 0) numerator *= BigInteger.Pow(10, decimalShift);
+        else denominator *= BigInteger.Pow(10, -decimalShift);
+        BigInteger rounded = BigInteger.DivRem(numerator, denominator, out var remainder);
+        if (remainder * 2 >= denominator) rounded++;
+        if (rounded == 1_000_000_000_000_000L) { rounded /= 10; exponent++; }
+        string digits = rounded.ToString(CultureInfo.InvariantCulture).TrimEnd('0');
+        var format = culture.NumberFormat;
+        string text;
+        if (exponent is < -4 or >= 15)
+        {
+            text = digits[..1] + (digits.Length > 1 ? format.NumberDecimalSeparator + digits[1..] : "") +
+                "E" + (exponent < 0 ? format.NegativeSign : format.PositiveSign) +
+                Math.Abs(exponent).ToString("D2", CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            int position = exponent + 1;
+            text = position <= 0 ? "0" + format.NumberDecimalSeparator + new string('0', -position) + digits
+                : position >= digits.Length ? digits + new string('0', position - digits.Length)
+                : digits.Insert(position, format.NumberDecimalSeparator);
+        }
+        return (value < 0 ? format.NegativeSign : "") + text;
+    }
 
     private static bool Truth(object? value) => value switch
     {

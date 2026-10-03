@@ -316,3 +316,15 @@ been shown to differ; a bounded Windows characterization is the next review
 step for benchmark. Audit interpolation is invariant and does not enter that
 formatter fallback. Routing, production-entry assertions and complete regression
 must still be reviewed before either original body is removed.
+
+## Audit retirement preflight: finite numeric display blocker
+
+A subsequent local audit-only retirement preflight found a separate reachable
+finite-Double display gap despite invariant audit interpolation. Exponent JSON
+values reach modern shortest-roundtrip formatting; Framework interpolation uses
+15-digit general formatting, unsigned zero and legacy rounding. Audit remains
+original. The [bounded numeric-display candidate](retained-diagnostics-number-display.md)
+adds 196 exact route probes after the unchanged 472, freezes the historical
+corpus independently of production selection, and requires new Windows evidence.
+The prior passing run remains evidence only for its exact source and inputs.
+There is no PowerShell source retirement or production routing change here.

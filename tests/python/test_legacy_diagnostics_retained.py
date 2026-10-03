@@ -27,6 +27,10 @@ from test_legacy_diagnostics_adapters import (
 
 from legacy_diagnostic_evidence import CAPTURE_ENV, DiagnosticEvidence, file_identity
 from legacy_diagnostic_json_neighbors import cases as json_neighbor_cases
+from legacy_diagnostic_number_neighbors import cases as number_neighbor_cases
+
+# Historical corpus membership must never depend on future production cutovers.
+QUALIFICATION_DIAGNOSTICS = frozenset({'benchmark', 'audit-summary'})
 
 
 def adversarial_json_cases():
@@ -147,10 +151,10 @@ def subtraction_boundary_cases():
 
 
 def retained_candidate_cases():
-    retained = [copy.deepcopy(f) for f in cases() if f['operation'] in RETAINED_DIAGNOSTICS]
+    retained = [copy.deepcopy(f) for f in cases() if f['operation'] in QUALIFICATION_DIAGNOSTICS]
     for index, fixture in enumerate(retained):
         fixture['case_id'] = 'existing/' + str(index)
-    return retained + adversarial_json_cases() + subtraction_boundary_cases() + json_neighbor_cases()
+    return retained + adversarial_json_cases() + subtraction_boundary_cases() + json_neighbor_cases() + number_neighbor_cases()
 
 
 def retained_candidate_adapter_arguments(pinned_source):
@@ -201,12 +205,20 @@ class RetainedDiagnosticPortableTests(unittest.TestCase):
 
     def test_adversarial_corpus_is_closed_and_preserves_all_66_retained_cases(self):
         fixtures = retained_candidate_cases()
-        existing = [f for f in cases() if f['operation'] in RETAINED_DIAGNOSTICS]
+        existing = [f for f in cases() if f['operation'] in QUALIFICATION_DIAGNOSTICS]
         self.assertEqual(len(existing), 66)
+        self.assertEqual(QUALIFICATION_DIAGNOSTICS, frozenset({'benchmark', 'audit-summary'}))
+        self.assertEqual(hashlib.sha256(json.dumps(fixtures[:66], ensure_ascii=False,
+            sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+            '6ed498a1ad4ac56717a728f5482c86e1c6be1a0312f11ac7298182d70fc2b83a')
         self.assertEqual(len(adversarial_json_cases()), 236)
         self.assertEqual(len(subtraction_boundary_cases()), 30)
         self.assertEqual(len(json_neighbor_cases()), 140)
-        self.assertEqual(len(fixtures), 472)
+        self.assertEqual(len(number_neighbor_cases()), 196)
+        self.assertEqual(len(fixtures), 668)
+        self.assertEqual(hashlib.sha256(json.dumps(fixtures[:472], ensure_ascii=False,
+            sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+            '3ed6f4f492813a682179b5f6231aa57a805f8196aba19e93561b7ff17969b166')
         self.assertEqual(hashlib.sha256(json.dumps(fixtures[:332], ensure_ascii=False,
             sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
             '355d50fa883eb909813b939f9d26725338ef4145ab471ad22c3af2cd5e310630')
@@ -217,7 +229,7 @@ class RetainedDiagnosticPortableTests(unittest.TestCase):
             '6a3949f67bf355818b6a61b53910eca6affe1768993d7727767aa3060a20b561')
         self.assertEqual([{k: v for k, v in f.items() if k != 'case_id'} for f in fixtures[:66]], existing)
         self.assertEqual(len({f['case_id'] for f in fixtures}), len(fixtures))
-        self.assertEqual({f['operation'] for f in fixtures}, RETAINED_DIAGNOSTICS)
+        self.assertEqual({f['operation'] for f in fixtures}, QUALIFICATION_DIAGNOSTICS)
         self.assertEqual(json.loads(json.dumps(fixtures)), fixtures)
         observations = run_candidate(fixtures)
         self.assertEqual(len(observations), len(fixtures))
@@ -229,6 +241,69 @@ class RetainedDiagnosticPortableTests(unittest.TestCase):
                 self.assertEqual(observed['state'], 'complete', observed)
                 self.assertEqual(observed['consumed'], len(fixture['replies']))
                 self.assertTrue(all(effect['kind'] in {'Clock', 'Native', 'FileExists', 'ReadText', 'ListFiles', 'ReadLines'} for effect in observed['effects']))
+
+    def test_source_derived_finite_double_aggregation_and_type_controls(self):
+        selected = [f for f in number_neighbor_cases() if f['case_id'] in {
+            'number/audit/scalar/1e16', 'number/audit/scalar/-0e0',
+            'number/audit/scalar/123456789012344.5e0',
+            'number/audit/key-collision', 'number/audit/string-control',
+            'number/audit/decimal-control',
+            'number/baseline/object/de-DE/1.2345678901234567e0'}]
+        expected_maps = {
+            'number/audit/scalar/1e16': {'1E+16': 1},
+            'number/audit/scalar/-0e0': {'0': 1},
+            'number/audit/scalar/123456789012344.5e0': {'123456789012345': 1},
+            'number/audit/key-collision': {'1.23456789012346': 2},
+            'number/audit/string-control': {'1e16': 1},
+            'number/audit/decimal-control': {'1.2345678901234567': 1},
+        }
+        self.assertEqual(len(selected), 7)
+        for fixture, observed in zip(selected, run_candidate(selected)):
+            with self.subTest(case=fixture['case_id']):
+                self.assertEqual(observed['state'], 'complete')
+                if fixture['operation'] == 'audit-summary':
+                    self.assertEqual(observed['payload']['by_macro'], expected_maps[fixture['case_id']])
+                else:
+                    self.assertIn('@{value=1,23456789012346}', observed['payload']['baseline_compare']['detail'])
+
+    def test_finite_display_mathematical_model_against_independent_decimal_rounding(self):
+        # This validates the bounded arithmetic model independently, not PS5.1
+        # parsing or historical CRT behavior. Only the Windows oracle can do that.
+        import decimal
+        import math
+        import random
+        import struct
+        rng = random.Random(0xC0C0)
+        values = [0.0, -0.0, float.fromhex('0x0.0000000000001p-1022'),
+                  float.fromhex('0x1.fffffffffffffp+1023')]
+        while len(values) < 256:
+            value = struct.unpack('>d', rng.getrandbits(64).to_bytes(8, 'big'))[0]
+            if math.isfinite(value):
+                values.append(value)
+        fixtures = []
+        expected = []
+        for value in values:
+            token = format(value, '.17e')  # Force the diagnostic Double path.
+            fixtures.append(dict(operation='audit-summary', rest=[], replies=[True,
+                [dict(full_name='inert', last_write_time='2026-10-02T00:00:00Z')],
+                ['{"macro":' + token + '}']]))
+            with decimal.localcontext() as context:
+                context.prec = 15
+                context.rounding = decimal.ROUND_HALF_UP
+                rounded = +decimal.Decimal.from_float(abs(value))
+                exponent = rounded.adjusted()
+                if rounded == 0:
+                    text = '0'
+                elif -4 <= exponent < 15:
+                    text = format(rounded.normalize(), 'f')
+                else:
+                    coefficient, power = format(rounded.normalize(), 'E').split('E')
+                    text = coefficient + 'E' + ('-' if int(power) < 0 else '+') + str(abs(int(power))).zfill(2)
+                expected.append(('-' if value < 0 else '') + text)
+        for value, text, observed in zip(values, expected, run_candidate(fixtures)):
+            with self.subTest(binary=value.hex()):
+                self.assertEqual(observed['state'], 'complete')
+                self.assertEqual(observed['payload']['by_macro'], {text: 1})
 
     def test_source_derived_typed_scalar_repairs_do_not_coerce_json_strings(self):
         fixtures = adversarial_json_cases()
@@ -348,12 +423,13 @@ class RetainedDiagnosticWindowsTests(unittest.TestCase):
                 source_files={str(path.relative_to(ROOT)): file_identity(path) for path in (
                     BRIDGE, ADAPTER, Path(__file__), ROOT / 'tests/python/legacy_diagnostic_evidence.py',
                     ROOT / 'tests/python/legacy_diagnostic_json_neighbors.py',
+                    ROOT / 'tests/python/legacy_diagnostic_number_neighbors.py',
                     ROOT / 'tests/python/test_legacy_diagnostics_parity.py',
                     ROOT / 'tests/python/test_legacy_diagnostics_adapters.py',
                     ROOT / 'tests/fixtures/legacy-diagnostics-file-oracle.ps1',
                     ROOT / 'tests/fixtures/legacy-diagnostics-runtime-oracle.ps1',
                     ROOT / 'tests/fixtures/legacy-diagnostics-adapter-guards.ps1',
-                    PROJECT / 'Program.cs', PROJECT / 'PcuCp.LegacyDiagnostics.ContractTests.csproj',
+                    *sorted(PROJECT.glob('*.cs')), PROJECT / 'PcuCp.LegacyDiagnostics.ContractTests.csproj',
                     PROJECT.parent / 'PcuCp.NativeHost/LegacyDiagnosticCulture.cs',
                     PROJECT.parent / 'PcuCp.LegacyTaskForm/LegacyTaskFormKernel.cs',
                     *sorted((PROJECT.parent / 'PcuCp.LegacyDiagnostics').glob('*.cs')))},
