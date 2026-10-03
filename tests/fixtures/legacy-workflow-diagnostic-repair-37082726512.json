@@ -1,0 +1,278 @@
+{
+  "schema": "cucp.workflow-diagnostic-repair/v1",
+  "provenance": {
+    "evidence": "observed-windows-powershell-5.1-raw-diagnostics",
+    "run_id": "37082726512",
+    "run_url": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37082726512",
+    "tested_commit": "9f6a2038e21bc90c0dcb9a3dcce7053af1bbb60c",
+    "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
+    "raw_capture_file": "legacy-workflow-ps51-raw-diagnostics-37082726512.json",
+    "raw_capture_sha256": "6c5602b3839565d43b34bcd1111c09f063b8d86d2e08f6c8082fd04b7976b97c",
+    "artifact_zip_sha256": "38bc0f865489c573fea0c3b664fd8378fab4417108cf8db3b0fe8c74ab491a77",
+    "raw_case_count": 101,
+    "historical_exact_gap_count": 84,
+    "historical_normalized_gap_count": 11,
+    "historical_text_only_gap_count": 73,
+    "qualification": "The full captured bytes, all original parsed/plan fields, and historical candidate results are immutable. Target replay compares error codes/tokens; exact diagnostic wording remains separate debt."
+  },
+  "target_ids": [
+    "inferred_opaque_nested_comment",
+    "inferred_later_semicolon_keyword",
+    "inferred_later_group_keyword"
+  ],
+  "inferred_neighbors": [
+    {
+      "id": "diagnostic_context_comment_second_opener_is_text",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows <# <# #>",
+      "preflight_error": "",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_comment_close_then_extra_paren",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows <# <# #> )",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_comment_close_then_open_paren",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows <# <# #> (",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_comment_close_then_quote",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows <# <# #> \"unterminated",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_comment_quote_is_text",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows <# \" #> )",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_comment_then_line_comment",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows <# <# #> # comment (",
+      "preflight_error": "",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_comment_missing_first_close",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows <# unterminated <#",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_parenthesized_uppercase",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows (IF)",
+      "preflight_error": "",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_parenthesized_nested",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows ((if))",
+      "preflight_error": "",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_parenthesized_spaces",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows ( if )",
+      "preflight_error": "",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_parenthesized_missing_close",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows (if",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_parenthesized_extra_close",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows (if))",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_parenthesized_then_open",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows (if) (",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_parenthesized_then_quote",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows (if) -Name \"unterminated",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_parenthesized_then_statement",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows (if)\nif",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_named_block_after_statement_uppercase",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows; PROCESS",
+      "preflight_error": "",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_named_block_after_statement_begin",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows; begin",
+      "preflight_error": "",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_named_block_after_semicolon_newline",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows;\nprocess",
+      "preflight_error": "",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_named_block_after_newline",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows\nprocess",
+      "preflight_error": "",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_named_block_after_line_comment",
+      "evidence": "inferred-unqualified",
+      "step": "# comment\nprocess",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_named_block_after_block_comment",
+      "evidence": "inferred-unqualified",
+      "step": "<# comment #> process",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_ordinary_keyword_after_statement",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows; if",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "diagnostic_context_named_word_then_unclosed_group",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows; process (",
+      "preflight_error": "parse_error",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    }
+  ]
+}

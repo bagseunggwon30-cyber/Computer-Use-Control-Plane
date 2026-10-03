@@ -112,6 +112,33 @@ Local Python discovery ran 543 tests: 423 passed and 120 platform checks skipped
 No candidate grammar or production code changed. Explicit oracle growth is fully
 counted: 27 PS files now total 872,501 bytes (612,709 runtime), 140,977 below baseline.
 
+At `9f6a2038e21bc90c0dcb9a3dcce7053af1bbb60c`,
+[focused run 37082726512](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37082726512)
+passed the one/many/18-invalid input protocol probes and captured all 101 raw
+cases with exact identity and provenance. The Windows suite ran 39 tests with
+three failed inferred grammar assertions: nested-comment handling, a named-block
+word after a semicolon, and a keyword in a parenthesized pipeline. Every one
+remains rejected by the candidate; the original and candidate disagree on error
+classification. The raw capture is complete, not qualified.
+
+Within that separate 101-case corpus, 84 parsed/plan pairs differ exactly: 73
+have only diagnostic message/detail differences, and 11 still differ after
+stripping those text fields. Stripping text is an analysis aid, never a strict
+qualification rule. This corpus overlaps the literal/boundary probes, so its
+counts must not be added to their 55 normalized differences. The strict raw-
+parity flags remain intact. The next bounded repair targets the three confirmed
+grammar assumptions while retaining all recorded original outputs unchanged.
+
+The bounded diagnostic repair at local `f0de396` changes exactly those three
+normalized historical results and adds no accepted input. Replay of the same
+101-record corpus now leaves eight normalized differences; all 84 exact parsed/
+plan differences remain. The original raw capture, its candidate outputs and its
+SHA-256 remain unchanged, with a narrowly scoped no-text-conversion attribute
+preserving the artifact's CRLF. No diff or language-statistics exclusion is used.
+Local verification passed 1,372 managed checks and ran 550 Python tests (428
+passed, 122 platform skips). The next Windows capture adds 23 labelled inferred
+rejection neighbors, for 124 bounded cases; a fresh result is still required.
+
 ## Actual source replacement
 
 The baseline is commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tree

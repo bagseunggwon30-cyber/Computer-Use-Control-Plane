@@ -14,11 +14,20 @@ internal static partial class LegacyWorkflowKernel
         "begin", "process", "end", "dynamicparam", "try", "catch", "finally", "do", "trap", "data"
     };
 
+    // Named blocks are only classified at the qualified script-head position.
+    // After an ordinary statement, the same words may be command names. Other
+    // named-block contexts remain unqualified and cannot enable acceptance.
+    private static readonly HashSet<string> NamedBlockKeywords = new(Comparer)
+    {
+        "begin", "process", "end", "dynamicparam"
+    };
+
     private static ParsedStep? PreflightParseErrors(string step)
     {
         var groups = new Stack<char>();
         var atStatementStart = true;
         var atTokenStart = true;
+        var atScriptHead = true;
         var index = 0;
         while (index < step.Length)
         {
@@ -36,7 +45,7 @@ internal static partial class LegacyWorkflowKernel
                 // unqualified token boundary. Do not reinterpret its opaque
                 // suffix as quote/expression syntax. Reject it here as well
                 // as in the ordinary scanner, keeping this fix independently
-                // fail closed while the Windows oracle result remains unknown.
+                // fail closed while this boundary remains unqualified.
                 if (markerEnd < step.Length && step[markerEnd] == '\0')
                     return Reject("unsupported_token", "NUL adjacent to a stop-parsing marker is not yet qualified.");
                 index = markerEnd;
@@ -63,6 +72,7 @@ internal static partial class LegacyWorkflowKernel
                 index += index + 1 < step.Length ? 2 : 1;
                 atStatementStart = false;
                 atTokenStart = false;
+                atScriptHead = false;
                 continue;
             }
             if (atTokenStart && c == '#')
@@ -72,17 +82,15 @@ internal static partial class LegacyWorkflowKernel
             }
             if (atTokenStart && c == '<' && index + 1 < step.Length && step[index + 1] == '#')
             {
-                var depth = 1;
-                index += 2;
-                while (index < step.Length && depth > 0)
-                {
-                    if (index + 1 < step.Length && step[index] == '<' && step[index + 1] == '#') { depth++; index += 2; }
-                    else if (index + 1 < step.Length && step[index] == '#' && step[index + 1] == '>') { depth--; index += 2; }
-                    else index++;
-                }
-                if (depth != 0) return SyntaxError("A block comment is missing its terminator.");
+                // The pinned PSParser.Tokenize observation treats a second <#
+                // as comment text and resumes ordinary syntax at the first #>.
+                var close = step.IndexOf("#>", index + 2, StringComparison.Ordinal);
+                if (close < 0) return SyntaxError("A block comment is missing its terminator.");
+                index = close + 2;
                 continue;
             }
+            var keywordAtScriptHead = atScriptHead;
+            atScriptHead = false;
             if (atTokenStart && c == '@' && index + 1 < step.Length && step[index + 1] is '\'' or '"')
             {
                 var failure = PreflightHereString(step, ref index, out var qualified);
@@ -143,7 +151,13 @@ internal static partial class LegacyWorkflowKernel
                 var keyword = step[start..index];
                 var end = index;
                 while (end < step.Length && char.IsWhiteSpace(step[end]) && step[end] is not ('\r' or '\n')) end++;
-                if (IncompleteStatementKeywords.Contains(keyword) &&
+                // A parenthesized pipeline is an expression context; a bare
+                // word there is not an incomplete statement declaration. A
+                // scriptblock nested inside it has its own statement context.
+                var statementContext = groups.Count == 0 || groups.Peek() == '{';
+                var namedBlockContext = keywordAtScriptHead && groups.Count == 0;
+                if (statementContext && IncompleteStatementKeywords.Contains(keyword) &&
+                    (!NamedBlockKeywords.Contains(keyword) || namedBlockContext) &&
                     (end == step.Length || step[end] is ';' or '\r' or '\n' or ')' or '}' || step[end] == '#'))
                     return SyntaxError("The statement is missing required syntax.");
                 atStatementStart = atTokenStart = false;

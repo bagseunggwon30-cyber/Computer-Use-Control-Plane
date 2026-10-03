@@ -334,7 +334,14 @@
       "id": "inferred_opaque_nested_comment",
       "evidence": "inferred-unqualified",
       "step": "macro windows <# <# ( #> ) #>",
-      "preflight_error": ""
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error",
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1-raw-diagnostics",
+        "run_id": "37082726512",
+        "observation_id": "inferred_opaque_nested_comment",
+        "raw_capture_sha256": "6c5602b3839565d43b34bcd1111c09f063b8d86d2e08f6c8082fd04b7976b97c"
+      }
     },
     {
       "id": "inferred_later_newline_keyword",
@@ -347,15 +354,27 @@
       "id": "inferred_later_semicolon_keyword",
       "evidence": "inferred-unqualified",
       "step": "macro windows; process",
-      "preflight_error": "parse_error",
-      "candidate_error": "parse_error"
+      "preflight_error": "",
+      "candidate_error": "unsupported_token",
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1-raw-diagnostics",
+        "run_id": "37082726512",
+        "observation_id": "inferred_later_semicolon_keyword",
+        "raw_capture_sha256": "6c5602b3839565d43b34bcd1111c09f063b8d86d2e08f6c8082fd04b7976b97c"
+      }
     },
     {
       "id": "inferred_later_group_keyword",
       "evidence": "inferred-unqualified",
       "step": "macro windows (if)",
-      "preflight_error": "parse_error",
-      "candidate_error": "parse_error"
+      "preflight_error": "",
+      "candidate_error": "unsupported_token",
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1-raw-diagnostics",
+        "run_id": "37082726512",
+        "observation_id": "inferred_later_group_keyword",
+        "raw_capture_sha256": "6c5602b3839565d43b34bcd1111c09f063b8d86d2e08f6c8082fd04b7976b97c"
+      }
     },
     {
       "id": "inferred_later_comment_then_error",

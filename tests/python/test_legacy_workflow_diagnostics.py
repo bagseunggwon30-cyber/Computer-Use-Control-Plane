@@ -20,6 +20,7 @@ from test_legacy_workflow_parity import BASELINE_TREE, ROOT, PROJECT, original_s
 
 FIXTURES = ROOT / "tests/fixtures/legacy-workflow-diagnostic-candidate.json"
 PREFLIGHT = PROJECT / "LegacyWorkflowParseErrorPreflight.cs"
+CONTEXT_FIXTURES = ROOT / "tests/fixtures/legacy-workflow-diagnostic-repair-37082726512.json"
 
 
 def validate_diagnostic_inputs(cases):
@@ -79,6 +80,8 @@ def diagnostic_cases():
         {"id": "diagnostic_first_unsupported_pipeline", "step": "macro windows | other -Name value"},
         {"id": "diagnostic_two_errors", "step": "macro windows -Name ( {"},
     ])
+    cases.extend({"id": case["id"], "step": case["step"]}
+                 for case in json.loads(CONTEXT_FIXTURES.read_text(encoding="utf-8"))["inferred_neighbors"])
     return validate_diagnostic_inputs(cases)
 
 
@@ -103,7 +106,7 @@ class WorkflowDiagnosticFixtureTests(unittest.TestCase):
         for cases in (one, many):
             self.assertIs(validate_diagnostic_inputs(cases), cases)
             self.assertEqual(validate_diagnostic_inputs(json.loads(json.dumps(cases))), cases)
-        self.assertEqual(len(diagnostic_cases()), 101)
+        self.assertEqual(len(diagnostic_cases()), 124)
 
     def test_input_validation_rejects_invalid_shapes_and_duplicate_ids(self):
         for name, cases in invalid_diagnostic_inputs():
@@ -301,6 +304,8 @@ class WorkflowWindowsDiagnosticTests(unittest.TestCase):
             self.assertEqual(len(actual), len(cases) * 2)
             gaps = []
             contracts = {case["id"]: case for case in json.loads(FIXTURES.read_text(encoding="utf-8"))["cases"]}
+            for case in json.loads(CONTEXT_FIXTURES.read_text(encoding="utf-8"))["inferred_neighbors"]:
+                contracts[case["id"]] = {**case, "candidate_error": case["candidate"]["error"]}
             capture["exact_diagnostic_gap_ids"] = gaps
             for i, (requested, observed) in enumerate(zip(cases, capture["cases"])):
                 original = observed["parsed"]
