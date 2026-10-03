@@ -19,6 +19,7 @@ namespace PcuCp.LegacyHelper
         private readonly LegacyHelperActions actions;
         private readonly Func<DateTime> clock;
         private readonly Action<string> log;
+        private readonly Action<string> phase;
         private readonly string pipeName;
         private readonly string lockPath;
         private readonly int pid;
@@ -26,10 +27,11 @@ namespace PcuCp.LegacyHelper
         private readonly JavaScriptSerializer json = NewJson();
 
         public LegacyHelperService(LegacyHelperActions actions, int pid, string pipeName, string lockPath,
-            int idleMs, Func<DateTime> clock, Action<string> log)
+            int idleMs, Func<DateTime> clock, Action<string> log, Action<string> phase = null)
         {
             this.actions = actions; this.pid = pid; this.pipeName = pipeName;
             this.lockPath = lockPath; this.idleMs = idleMs; this.clock = clock; this.log = log;
+            this.phase = phase ?? (_ => { });
         }
         public static JavaScriptSerializer NewJson()
         {
@@ -101,6 +103,7 @@ namespace PcuCp.LegacyHelper
                 if (!GetFileInformationByHandle(file.SafeFileHandle, out identity)) throw new IOException("candidate lock identity unavailable");
                 file.Write(expectedLockBytes, 0, expectedLockBytes.Length);
             }
+            phase("lock.written");
             var lastActivity = clock();
             bool running = true;
             try
@@ -112,6 +115,7 @@ namespace PcuCp.LegacyHelper
                         using (var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1,
                             PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
                         {
+                            phase("pipe.created");
                             try
                             {
                                 var security = new PipeSecurity();
@@ -119,10 +123,12 @@ namespace PcuCp.LegacyHelper
                                 pipe.SetAccessControl(security);
                             }
                             catch (Exception e) { log("PipeSecurity ACL failed (continuing): " + e.Message); }
+                            phase("pipe.acl.complete");
                             using (var cancellation = new System.Threading.CancellationTokenSource())
                             {
                                 // Task owns the overlapped completion; never close an
                                 // AsyncWaitHandle while its cancellation callback can signal.
+                                phase("connection.wait.start");
                                 var wait = pipe.WaitForConnectionAsync(cancellation.Token);
                                 while (!wait.IsCompleted)
                                 {
@@ -149,20 +155,26 @@ namespace PcuCp.LegacyHelper
                                     continue;
                                 }
                                 wait.GetAwaiter().GetResult();
+                                phase("connection.wait.complete");
                             }
                             using (var reader = new StreamReader(pipe, Encoding.UTF8, true, 1024, true))
-                            using (var writer = new StreamWriter(pipe, Encoding.UTF8, 1024, true) { AutoFlush = true })
                             {
+                                var writer = new LegacyHelperResponseWriter(pipe);
+                                phase("connection.reader.ready");
                                 while (pipe.IsConnected)
                                 {
                                     string line;
+                                    phase("request.read.start");
                                     try { line = reader.ReadLine(); } catch (IOException) { break; }
+                                    phase("request.read.complete");
                                     // Legacy idle timeout is deliberately not a ReadLine deadline.
                                     if (String.IsNullOrEmpty(line)) break;
                                     lastActivity = clock();
                                     bool shutdown;
                                     var response = Respond(line, out shutdown);
+                                    phase("response.write.start");
                                     try { writer.WriteLine(json.Serialize(response)); } catch (IOException) { break; }
+                                    phase("response.write.complete");
                                     if (shutdown) { running = false; break; }
                                 }
                             }
@@ -177,7 +189,12 @@ namespace PcuCp.LegacyHelper
                     }
                 }
             }
-            finally { TryCleanupOwnedLock(lockPath, pid, identity, expectedLockBytes, json, log); }
+            finally
+            {
+                phase("lock.cleanup.start");
+                TryCleanupOwnedLock(lockPath, pid, identity, expectedLockBytes, json, log);
+                phase("lock.cleanup.complete");
+            }
         }
         // Lock contents are checked under an exclusive-write/delete native handle;
         // SetFileInformationByHandle targets that same file, not a replaced path.
@@ -230,16 +247,19 @@ namespace PcuCp.LegacyHelper
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool SetFileInformationByHandle(SafeFileHandle file, int infoClass, ref Disposition data, uint size);
 
-        public static string Exchange(string name, string request, int connectMs, int readMs)
+        public static string Exchange(string name, string request, int connectMs, int readMs, Action<string> phase = null)
         {
+            phase = phase ?? (_ => { });
             if (!System.Text.RegularExpressions.Regex.IsMatch(name ?? "", "^cucp-helper-[0-9]+$"))
                 throw new ArgumentException("candidate pipe must be cucp-helper-<pid>");
             if (connectMs <= 0 || readMs <= 0) throw new ArgumentOutOfRangeException("bounded connection and I/O timeouts required");
             byte[] frame = LegacyHelperWire.RequestBytes(request);
             using (var pipe = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous))
             {
+                phase("client.connect.start");
                 pipe.Connect(connectMs);
-                return LegacyHelperWire.ExchangeConnected(pipe, frame, readMs);
+                phase("client.connect.complete");
+                return LegacyHelperWire.ExchangeConnected(pipe, frame, readMs, phase);
             }
         }
     }

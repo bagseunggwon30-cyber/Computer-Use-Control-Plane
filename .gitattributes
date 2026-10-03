@@ -4,3 +4,5 @@ tests/fixtures/legacy-workflow-ps51-raw-diagnostics-37086299736.json -text white
 tests/fixtures/history-reducers/oracle.ps1 -text
 tests/fixtures/history-reducers/original-functions.json -text
 tests/fixtures/history-reducers/windows-ps51-host-37092069983.raw.json -text whitespace=cr-at-eol
+# Exact observed helper startup stderr retains its original CRLF bytes.
+tests/fixtures/legacy-helper/observed-startup.stderr.bin -text -diff

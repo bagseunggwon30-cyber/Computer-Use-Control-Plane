@@ -47,12 +47,15 @@ namespace PcuCp.LegacyHelper
             }
         }
 
-        public static string ExchangeConnected(Stream stream, byte[] request, int timeoutMs)
+        public static string ExchangeConnected(Stream stream, byte[] request, int timeoutMs, Action<string> phase = null)
         {
+            phase = phase ?? (_ => { });
             if (timeoutMs <= 0) throw new ArgumentOutOfRangeException(nameof(timeoutMs));
             if (request == null || request.Length > MaxFrameBytes) throw new IOException("pipe_request_too_large");
             var elapsed = Stopwatch.StartNew();
+            phase("client.write.start");
             Wait(stream.WriteAsync(request, 0, request.Length), stream, elapsed, timeoutMs, "pipe_write_timeout");
+            phase("client.write.complete");
             var chunk = new byte[4096];
             using (var frame = new MemoryStream())
             {
@@ -60,9 +63,11 @@ namespace PcuCp.LegacyHelper
                 {
                     // Read at most one overflow byte; never accumulate an unbounded line.
                     int wanted = Math.Min(chunk.Length, MaxFrameBytes + 1 - (int)frame.Length);
+                    phase("client.read.start");
                     var read = stream.ReadAsync(chunk, 0, wanted);
                     Wait(read, stream, elapsed, timeoutMs, "pipe_read_timeout");
                     int count = read.GetAwaiter().GetResult();
+                    phase("client.read.complete");
                     if (count == 0) return frame.Length == 0 ? null : Decode(frame.ToArray());
                     for (int i = 0; i < count; i++)
                     {

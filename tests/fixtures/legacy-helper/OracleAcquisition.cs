@@ -1,5 +1,7 @@
-#pragma warning disable 0436 // Deliberate inert facade shadows; oracle.ps1 verifies every resolved assembly before dispatch.
-// Synthetic namespace facades for exact PowerShell action functions. This file
+// Uniquely named synthetic acquisition facades for pinned PowerShell actions.
+// oracle.ps1 substitutes only verified AST type-name extents, then checks every
+// resolved type against this exact emitted assembly before importing actions.
+// This file
 // has no P/Invoke, input, process launch, file capture, or real desktop access.
 using System;
 using System.Collections;
@@ -7,6 +9,8 @@ using System.Collections.Generic;
 using System.Text;
 using System.Web.Script.Serialization;
 
+namespace CucpFixture
+{
 public static class HelperFixture
 {
     public static IDictionary<string, object> Data;
@@ -139,8 +143,8 @@ namespace System.Windows.Forms
 }
 public class WindowsRuntimeSystemExtensions
 {
-    public static System.Threading.Tasks.Task<T> AsTask<T>(object operation)
-    { return System.Threading.Tasks.Task.FromResult((T)operation); }
+    public static global::System.Threading.Tasks.Task<T> AsTask<T>(object operation)
+    { return global::System.Threading.Tasks.Task.FromResult((T)operation); }
 }
 namespace Windows.Storage.Streams
 {
@@ -185,3 +189,5 @@ namespace Windows.Media.Ocr
         }
     }
 }
+
+} // namespace CucpFixture

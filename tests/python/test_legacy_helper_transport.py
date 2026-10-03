@@ -41,7 +41,7 @@ class HelperTransportTests(unittest.TestCase):
             argv = [shutil.which('powershell.exe'), '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
                     '-File', str(source), '-LockFile', str(lock), '-IdleTimeoutMs', str(idle_ms)]
         else:
-            argv = [HOST, 'serve', '--lock-file', str(lock), '--idle-timeout-ms', str(idle_ms)]
+            argv = [HOST, 'serve', '--lock-file', str(lock), '--idle-timeout-ms', str(idle_ms), '--diagnostic-phases']
             if fixture is not None:
                 path = self.root / 'server-fixture.json'
                 path.write_text(json.dumps(fixture), encoding='utf-8')
@@ -70,9 +70,9 @@ class HelperTransportTests(unittest.TestCase):
         spec = self.root / 'probe.json'
         spec.write_text(json.dumps(dict(pipe=data['pipe_name'], frames=frames, **extra)), encoding='utf-8')
         evidence = run_evidence([PROBE, str(spec)], directory=self.logs, label='probe', cwd=self.root, timeout=10)
-        require_success(evidence)
         for process in self.owned:
             process.snapshot(self.logs, 'server-after-probe')
+        require_success(evidence)
         return json.loads(evidence['stdout'].decode('utf-8-sig'))
 
     def finish(self, process, label='server'):
@@ -80,20 +80,18 @@ class HelperTransportTests(unittest.TestCase):
         require_success(evidence)
         return evidence
 
-    def test_unmodified_published_original_startup_health_and_shutdown(self):
-        # A full original launch is a distinct gate. A startup failure is an
-        # infrastructure failure with retained evidence, never a fallback result.
-        owned, lock, data = self.start(original=True)
-        rows = [json.loads(x['response']) for x in self.probe(data, [
-            '{"id":1,"action":"health","args":{}}',
-            '{"id":2,"action":"not-supported","args":{}}',
-            '{"id":3,"action":"shutdown","args":{}}'])]
-        self.assertEqual([r['exit_code'] for r in rows], [0,99,0])
-        self.assertEqual(rows[0]['result']['pid'], owned.process.pid)
-        self.assertEqual(rows[0]['result']['request_count'], 1)
-        self.assertFalse(rows[0]['result']['win32_loaded'])
-        self.finish(owned, 'published-original-server')
-        self.assertFalse(lock.exists())
+    def test_unmodified_published_original_startup_baseline_defect(self):
+        from helper_baseline_observation import classify_original_startup, save_classification
+        # Under the reviewed functional criterion, this exact historical crash
+        # is a visible failed oracle observation, not a required candidate crash.
+        # Any other failure or remaining process/lock is still a gate failure.
+        owned, lock, _ = self.start(original=True, wait=False)
+        evidence = owned.finish(self.logs, 'published-original-startup-observation', timeout=5)
+        value = classify_original_startup(evidence, source=self.root / 'published-server.ps1',
+                                          lock=lock, process_returncode=owned.process.poll() if owned.process else None)
+        classification_path = save_classification(value, evidence['evidence_path'])
+        print(f'Original startup remains failed/unqualified; observed baseline defect: {classification_path}', flush=True)
+        self.assertFalse(value['original_startup_qualified'])
 
     def test_multiple_requests_count_case_unknown_health_shutdown_and_timeout_ignored(self):
         owned, lock, data = self.start()
@@ -197,7 +195,7 @@ class HelperTransportTests(unittest.TestCase):
                 path = outer.root / 'client-request.json'
                 path.write_bytes(request)
                 evidence = run_evidence([HOST, 'exchange', '--pipe', name, '--request-file', str(path),
-                    '--connect-timeout-ms', str(connect_timeout_ms), '--read-timeout-ms', str(read_timeout_ms)],
+                    '--connect-timeout-ms', str(connect_timeout_ms), '--read-timeout-ms', str(read_timeout_ms), '--diagnostic-phases'],
                     directory=outer.logs, label='python-actual-adapter', timeout=10)
                 require_success(evidence)
                 return evidence['stdout']
@@ -206,7 +204,7 @@ class HelperTransportTests(unittest.TestCase):
                     owner_user=data['owner_user'])
         def forbidden_child(plan): raise AssertionError('unplanned child acquisition')
         router = LegacyHelperRouter(client, forbidden_child)
-        response = router.invoke(['-Action', 'health'])
+        response = router.invoke(['-Action', 'health'], timeout_ms=1500)
         self.assertEqual(response['Route'], 'pipe')
         self.assertEqual(response['Json']['pid'], owned.process.pid)
         self.assertEqual(client.stop(force=True)['reason'], 'shutdown_requested')
@@ -315,9 +313,83 @@ class HelperTransportTests(unittest.TestCase):
         owned, lock, data = self.start()
         request = self.root / 'request.json'
         request.write_text('{"id":77,"action":"health","args":{}}')
-        evidence = run_evidence([HOST, 'exchange', '--pipe', data['pipe_name'], '--request-file', str(request)],
+        evidence = run_evidence([HOST, 'exchange', '--pipe', data['pipe_name'], '--request-file', str(request),
+                                '--connect-timeout-ms', '1500', '--read-timeout-ms', '1500', '--diagnostic-phases'],
                                 directory=self.logs, label='actual-client-adapter', timeout=8)
+        owned.snapshot(self.logs, 'server-after-exchange')
         require_success(evidence)
         self.assertEqual(json.loads(evidence['stdout'].decode('utf-8-sig'))['id'], 77)
         self.probe(data, ['{"action":"shutdown"}'])
-        self.finish(owned)
+        service = self.finish(owned)
+        for marker in (b'client.connect.complete', b'client.write.complete', b'client.read.complete'):
+            self.assertIn(b'helper_phase=' + marker, evidence['stderr'])
+        phases = service['stderr']
+        self.assertLess(phases.index(b'helper_phase=request.read.complete'), phases.index(b'helper_phase=response.write.start'))
+        self.assertIn(b'helper_phase=lock.cleanup.complete', phases)
+
+    def handshake_pair(self, server_mode, client_mode, buffer_size):
+        label = f'handshake-{server_mode}-{client_mode}-{buffer_size}'
+        ready = self.root / (label + '-ready.json')
+        server_spec = self.root / (label + '-server.json')
+        server_spec.write_text(json.dumps(dict(mode=server_mode, buffer_size=buffer_size,
+                                              ready=str(ready), connect_timeout_ms=2000)), encoding='utf-8')
+        server = OwnedProcess([PROBE, 'handshake-server', str(server_spec)], cwd=self.root)
+        self.owned.append(server)
+        server.snapshot(self.logs, label + '-server-started')
+        deadline = time.monotonic() + 3
+        while not ready.exists() and time.monotonic() < deadline and server.process and server.process.poll() is None:
+            time.sleep(.01)
+        server.snapshot(self.logs, label + '-server-ready')
+        self.assertTrue(ready.exists(), 'owned handshake did not publish readiness')
+        metadata = json.loads(ready.read_text(encoding='utf-8'))
+        self.assertEqual(metadata['pipe_name'], f'cucp-helper-{server.process.pid}')
+        self.assertEqual(metadata['pid'], server.process.pid)
+        client_spec = self.root / (label + '-client.json')
+        client_spec.write_text(json.dumps(dict(mode=client_mode, pipe=metadata['pipe_name'],
+                                              server_pid=server.process.pid, connect_timeout_ms=2000)), encoding='utf-8')
+        client = OwnedProcess([PROBE, 'handshake-client', str(client_spec)], cwd=self.root)
+        self.owned.append(client)
+        client.snapshot(self.logs, label + '-client-started')
+        client_result = client.finish(self.logs, label + '-client', timeout=5)
+        server_result = server.finish(self.logs, label + '-server', timeout=2)
+        # Both terminal raw records exist first. A killed/timed-out process,
+        # launch error or incomplete drain can never prove a reproduced stall.
+        require_success(client_result)
+        require_success(server_result)
+        values = []
+        for result, process, peer in ((server_result, server, client), (client_result, client, server)):
+            value = json.loads(result['stdout'].decode('utf-8-sig'))
+            self.assertEqual(value['pid'], process.process.pid)
+            states = [json.loads(line.split('=', 1)[1]) for line in result['stderr'].decode('utf-8').splitlines()
+                      if line.startswith('helper_handshake_state=')]
+            connected = [state for state in states if state['peer_pid']]
+            self.assertEqual(len(connected), 1)
+            self.assertEqual(connected[0]['peer_pid'], peer.process.pid)
+            self.assertTrue(connected[0]['is_async'])
+            self.assertGreaterEqual(connected[0]['actual_in_buffer_bytes'], 0)
+            self.assertGreaterEqual(connected[0]['actual_out_buffer_bytes'], 0)
+            self.assertIn(b'helper_handshake_phase=connect_complete', result['stderr'])
+            values.append(value)
+        return values
+
+    def test_owned_eager_and_deferred_preamble_handshake_controls(self):
+        for server_mode, client_mode, buffers in [('eager','legacy',0), ('eager','bytes',0),
+                                                  ('eager','legacy',512), ('lazy','legacy',0),
+                                                  ('lazy','bytes',0), ('eager','drain-bom',0)]:
+            with self.subTest(server=server_mode, client=client_mode, buffers=buffers):
+                server, client = self.handshake_pair(server_mode, client_mode, buffers)
+                if server_mode == 'lazy' or buffers == 512 or client_mode == 'drain-bom':
+                    self.assertEqual([server['status'], client['status']], ['complete', 'complete'])
+                    self.assertEqual([server['verified_frames'], client['verified_frames']], [1,1])
+                elif server['status'] == client['status'] == 'complete':
+                    # Default kernel buffers can differ. Record a working old
+                    # handshake rather than manufacturing a deadlock verdict.
+                    self.assertEqual([server['verified_frames'], client['verified_frames']], [1,1])
+                else:
+                    allowed = {'fixture_cancelled_pending_io', 'fixture_peer_closed_pending_io'}
+                    self.assertIn(server['status'], allowed)
+                    self.assertIn(client['status'], allowed)
+                    self.assertTrue(server['deadline_expired'] or client['deadline_expired'])
+                    self.assertEqual(server['pending_phase'], 'autoflush_begin')
+                    self.assertIn(client['pending_phase'], {'autoflush_begin', 'request_write_begin', 'request_write_async_returned'})
+                    self.assertEqual([server['verified_frames'], client['verified_frames']], [0,0])

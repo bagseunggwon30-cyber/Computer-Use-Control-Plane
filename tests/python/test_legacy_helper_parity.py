@@ -1,4 +1,4 @@
-"""Exact published PS5 action bodies over inert acquisition namespace facades.
+"""Pinned PS5 action bodies with an explicit, verified type-name-only seam.
 
 Provider results are synthesized only from case data, never candidate output.
 Query order comes from the original executed function and is checked by the
@@ -13,7 +13,7 @@ import sys
 import tempfile
 import unittest
 from helper_process_evidence import run_evidence, require_success
-from test_legacy_helper_source import ROOT, FIXTURES, published_source
+from test_legacy_helper_source import ROOT, FIXTURES, published_source, expected_type_seam
 
 HOST = os.environ.get('CUCP_LEGACY_HELPER_TEST_HOST', '')
 ENABLED = sys.platform == 'win32' and HOST
@@ -138,19 +138,61 @@ class HelperParityCorpusTests(unittest.TestCase):
 @unittest.skipUnless(ENABLED, 'Requires Windows net48 helper and published PS5 oracle')
 class HelperActionsWindowsParityTests(unittest.TestCase):
     maxDiff=None
+
+    def oracle(self, root, logs, label, *, source, stubs=None, wrong_binding=False):
+        command = [shutil.which('powershell.exe'), '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+                   '-File', str(FIXTURES / 'oracle.ps1'), '-Source', str(source),
+                   '-Manifest', str(FIXTURES / 'source-manifest.json'), '-CasePath', str(root / 'case.json')]
+        if stubs is not False:
+            command += ['-Stubs', str(stubs or FIXTURES / 'OracleAcquisition.cs')]
+        if wrong_binding:
+            command += ['-TestWrongBinding']
+        return run_evidence(command, directory=logs, label=label, cwd=root, timeout=40, limit=2 * 1024 * 1024)
+
+    def test_oracle_rejects_source_facade_and_type_binding_changes_before_dispatch(self):
+        with tempfile.TemporaryDirectory(prefix='CUCP guarded oracle ') as directory:
+            root = Path(directory)
+            logs = Path(os.environ.get('CUCP_HELPER_EVIDENCE_DIR', root / 'evidence'))
+            original_source = published_source('scripts/cucp-helper-server.ps1', logs)
+            source = root / 'published.ps1'
+            source.write_bytes(original_source)
+            (root / 'case.json').write_text(json.dumps(dict(win32=True, ocr=True, requests=[dict(action='ocr-screen-fast', args={})])), encoding='utf-8')
+
+            def expect_failure(label, message, **kwargs):
+                result = self.oracle(root, logs, label, source=source, **kwargs)
+                # Timeout, launch error, truncated output, etc. never count as a
+                # successful refusal. All raw evidence already exists on disk.
+                require_success(result, expected_exit=1)
+                self.assertIn(message, result['stderr'].decode('utf-8-sig', errors='replace'))
+                self.assertEqual(result['stdout'], b'')
+
+            expect_failure('oracle-missing-facade', 'An inert acquisition facade is required', stubs=False)
+            source.write_bytes(original_source.replace(b'[Windows.Storage.StorageFile]', b'[System.String]', 1))
+            expect_failure('oracle-mutated-source', 'Published server source hash mismatch')
+            source.write_bytes(original_source)
+            facade = root / 'mutated-facade.cs'
+            facade.write_text((FIXTURES / 'OracleAcquisition.cs').read_text(encoding='utf-8') + '\n// changed facade\n', encoding='utf-8')
+            expect_failure('oracle-mutated-facade', 'Inert oracle facade hash mismatch', stubs=facade)
+            # The counted driver contains this negative path; Python supplies
+            # only a switch. No executable PowerShell string is manufactured.
+            expect_failure('oracle-wrong-assembly-binding', 'Unsafe oracle type resolution: CucpFixture.HelperWin32', wrong_binding=True)
+
     def test_published_actions_inert_providers_and_exact_query_order(self):
         with tempfile.TemporaryDirectory(prefix='CUCP helper oracle 한글 ') as directory:
             root=Path(directory)
             logs=Path(os.environ.get('CUCP_HELPER_EVIDENCE_DIR', root/'evidence'))
             source=root/'published.ps1';source.write_bytes(published_source('scripts/cucp-helper-server.ps1',logs))
+            expected_seam=expected_type_seam(source.read_bytes())
             for case in cases():
                 with self.subTest(case=case['id']):
                     path=root/'case.json';path.write_text(json.dumps(case,ensure_ascii=True),encoding='utf-8')
-                    original=run_evidence([shutil.which('powershell.exe'),'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(FIXTURES/'oracle.ps1'),
-                       '-Source',str(source),'-Manifest',str(FIXTURES/'source-manifest.json'),'-CasePath',str(path),'-Stubs',str(FIXTURES/'OracleAcquisition.cs')],
-                       directory=logs,label=case['id']+'-oracle',cwd=root,timeout=40,limit=2*1024*1024)
+                    original=self.oracle(root,logs,case['id']+'-oracle',source=source)
                     require_success(original)
                     before=json.loads(original['stdout'].decode('utf-8-sig'))
+                    seam=before['oracle_seam']
+                    seam['guarded_types'].sort()
+                    seam['type_substitutions'].sort(key=lambda s:s['start_utf16'])
+                    self.assertEqual(seam,expected_seam)
                     calls=captured_calls(case,before['calls'])
                     fixture=dict(pid=123,pipe_name='fixture',culture=case.get('culture','en-US'),clock=['2020-01-01T00:00:00Z']*(sum(r['action'].lower()=='health' for r in case['requests'])+1),calls=calls,requests=case['requests'])
                     path.write_text(json.dumps(fixture,ensure_ascii=True),encoding='utf-8')

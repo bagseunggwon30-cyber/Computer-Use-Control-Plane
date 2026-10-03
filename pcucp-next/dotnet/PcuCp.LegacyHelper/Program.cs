@@ -17,6 +17,7 @@ namespace PcuCp.LegacyHelper
             {
                 if (args.Length == 0) throw new ArgumentException("candidate mode required: serve or exchange");
                 var options = Options(args);
+                var phase = LegacyHelperDiagnostics.Create(options.ContainsKey("diagnostic-phases"), Console.Error.WriteLine);
                 if (args[0] == "fixture")
                 {
                     Only(options, "input-file");
@@ -28,16 +29,16 @@ namespace PcuCp.LegacyHelper
                 }
                 if (args[0] == "exchange")
                 {
-                    Only(options, "pipe", "request-file", "connect-timeout-ms", "read-timeout-ms");
+                    Only(options, "pipe", "request-file", "connect-timeout-ms", "read-timeout-ms", "diagnostic-phases");
                     string request = LegacyHelperWire.ReadRequestFile(Required(options, "request-file"));
                     var response = LegacyHelperService.Exchange(Required(options, "pipe"), request,
-                        Integer(options, "connect-timeout-ms", 2000), Integer(options, "read-timeout-ms", 30000));
+                        Integer(options, "connect-timeout-ms", 2000), Integer(options, "read-timeout-ms", 30000), phase);
                     if (response == null) throw new IOException("pipe_empty_response");
                     Console.Out.Write(response + "\n");
                     return 0;
                 }
                 if (args[0] != "serve") throw new ArgumentException("unknown candidate mode");
-                Only(options, "lock-file", "idle-timeout-ms", "allow-readonly-desktop", "fixture");
+                Only(options, "lock-file", "idle-timeout-ms", "allow-readonly-desktop", "fixture", "diagnostic-phases");
                 string lockFile = Path.GetFullPath(Required(options, "lock-file"));
                 if (!Directory.Exists(Path.GetDirectoryName(lockFile))) throw new DirectoryNotFoundException("candidate lock directory must exist");
                 int pid = Process.GetCurrentProcess().Id;
@@ -56,7 +57,7 @@ namespace PcuCp.LegacyHelper
                 Func<DateTime> clock = () => DateTime.UtcNow;
                 var actions = new LegacyHelperActions(provider, pid, pipe, clock);
                 var service = new LegacyHelperService(actions, pid, pipe, lockFile,
-                    Integer(options, "idle-timeout-ms", 60000), clock, message => Console.Error.WriteLine(message));
+                    Integer(options, "idle-timeout-ms", 60000), clock, message => Console.Error.WriteLine(message), phase);
                 service.Run();
                 if (scripted != null) scripted.AssertExhausted();
                 return 0;
@@ -74,7 +75,7 @@ namespace PcuCp.LegacyHelper
             {
                 if (!args[i].StartsWith("--", StringComparison.Ordinal)) throw new ArgumentException("named candidate options required");
                 string key = args[i].Substring(2);
-                string value = key == "allow-readonly-desktop" ? "true" : ++i < args.Length ? args[i] : null;
+                string value = key == "allow-readonly-desktop" || key == "diagnostic-phases" ? "true" : ++i < args.Length ? args[i] : null;
                 if (value == null || result.ContainsKey(key)) throw new ArgumentException("missing or repeated candidate option");
                 result.Add(key, value);
             }

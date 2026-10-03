@@ -109,7 +109,8 @@ reviewed before production cutover.
 | Boundary | Original behavior | Candidate behavior and consequence | Independent guard |
 | --- | --- | --- | --- |
 | Candidate launch surface | Original script accepts custom `PipeName`, optional default lock path, debug-log switch and signed integer idle timeout | Candidate requires explicit isolated lock path, fixes pipe name to its PID, rejects negative timeouts, logs failures to stderr, and requires explicit desktop-provider opt-in; these launcher options are not a drop-in replacement | closed CLI parsing and owned fixture setup; production launcher remains untouched |
-| Framework connection wait | Original creates a synchronous pipe, then invokes `BeginWaitForConnection`; Framework requires an async handle for that API | Candidate uses `PipeOptions.Asynchronous` and task-owned `WaitForConnectionAsync` cancellation, observes cancellation without closing its completion event, and does not retry unexpected setup/logic exceptions | owned service health/idle tests; unmodified original startup remains a separate mandatory gate |
+| Framework connection wait | Original creates a synchronous pipe, then invokes `BeginWaitForConnection`; Framework requires an async handle for that API | Candidate uses `PipeOptions.Asynchronous` and task-owned `WaitForConnectionAsync` cancellation, observes cancellation without closing its completion event, and does not retry unexpected setup/logic exceptions | owned service health/idle tests; unmodified original startup remains a separate mandatory observation |
+| First response timing | Original and initial candidate enable `StreamWriter.AutoFlush` before reading any request, which synchronously writes a UTF-8 BOM | Candidate reads a complete nonblank request before writing the same BOM plus response and CRLF; blank/disconnected clients receive no unsolicited BOM. Response bytes and request counting stay unchanged. This is an explicit timing/blank-connection correction, pending Windows qualification | portable no-write-before-request and exact two-response byte checks; owned eager/deferred handshake controls and actual service phases |
 | Server startup lock | `Set-Content` overwrites the path, with write errors logged fail-soft | `CreateNew` requires an absent explicit candidate lock; existing or unwritable locks stop startup | `test_existing_lock_is_never_overwritten` |
 | Server cleanup | Read matching PID, then delete pathname; a replacement can race | Check original file identity, exact bounded byte length and all originally written bytes (including UTF-8 BOM) under a write/delete-exclusive native handle, then delete that handle; replacement, BOM removal and encoding rewrites remain | `test_replacement_lock_survives_cleanup_even_if_pid_reused_in_content` and same-file BOM/encoding rewrite tests |
 | Client pipe contact | `Invoke-HelperPipe` re-reads only lock existence/name, relying on callers | Revalidate owner/PID/time/name/version and expected lock identity before contact; a changed lock rejects the request | client framing/replacement and foreign-owner tests |
@@ -118,7 +119,7 @@ reviewed before production cutover.
 | Client JSON framing | PowerShell conversion/coercion and permissive IDs/types | 1 MiB frames, unique JSON members, finite values (including exponent-overflow rejection at every nesting depth), integer correlated IDs/exit codes, positive timeouts; incompatible inputs fail closed | client bounds, framing, ID and duplicate-member tests |
 | Request ID allocation | Original increments after a successful connect, without an explicit 32-bit reset | Candidate allocates before the combined transport exchange and wraps to 1 after Int32 max; a failed connect can therefore consume an ID | client failed-frame/connection and rollover contract |
 | Concrete C# exchange I/O | Original client uses synchronous `WriteLine` and unbounded `ReadLine`, with a timeout only around the read task | Candidate checks a 1 MiB UTF-8 byte bound before connecting, incrementally bounds incoming bytes, and applies one absolute budget to write plus read after bounded connect; it closes only that connection on timeout and never retries | portable async-stream contracts and owned oversized/stalled/slow-drip Windows peers |
-| Wire encoding | Original StreamReader detects BOM encodings and can replace malformed bytes; writer emits a UTF-8 BOM | Candidate sends UTF-8 without BOM plus LF, accepts optional UTF-8 BOM and CR/LF/CRLF or EOF, rejects malformed UTF-8/other encodings, and bounds the first response line including space for its terminator | split multibyte/BOM, exact-byte boundary, EOF and malformed-encoding tests |
+| Exchange client wire encoding | Original StreamReader detects BOM encodings and can replace malformed bytes; writer emits a UTF-8 BOM | Candidate exchange client sends UTF-8 without BOM plus LF, accepts optional UTF-8 BOM and CR/LF/CRLF or EOF, rejects malformed UTF-8/other encodings, and bounds the first response line including space for its terminator. Service responses retain their BOM and CRLF | split multibyte/BOM, exact-byte boundary, EOF and malformed-encoding tests |
 | Server JSON parsing | PowerShell member access/coercion for some non-object values | Require object envelope and object-or-null args; Framework serializer diagnostics differ; 16 MiB JSON parser limit | direct invalid-envelope test |
 | Lock types/dates | PowerShell casts, culture-dependent `DateTime.Parse`, regex `\d` | Integer positive PID, explicit-offset ISO date, ASCII version digits; some formerly accepted locks are rejected | client strict PID/date/version tests |
 | Action replay | Existing wrapper can eventually dispatch arbitrary child actions | Candidate router executes only six read acquisitions; lifecycle shutdown is never replayed and unknown/mutation actions are rejected | client closed-action and no-replay tests |
@@ -178,9 +179,9 @@ functions are verified but replaced by explicit acquisition seams, so this is no
 proof of real assembly-load or WinRT initialization equivalence. Positive OCR
 oracle data is synthetic; no real screenshot or OCR engine is used. Full
 unmodified original server startup/health/shutdown has its own Windows test;
-function-extracted oracle success does not qualify startup. A failure of the
-original startup expression is retained as a failure, not reclassified as an
-expected action rejection.
+function-extracted oracle success does not qualify startup. The original startup result is retained as a failed, unqualified oracle
+observation. Only the precisely recorded baseline defect below has a separate
+classification; it is never an expected action rejection.
 
 Every subprocess fixture saves bounded raw stdout and stderr, exit code,
 timeout, launch error, truncation, and incomplete-drain evidence before parsing
@@ -236,8 +237,9 @@ The Framework service wait now uses an asynchronous pipe and task-owned
 cancellation. No manual AsyncWaitHandle is closed while a completion callback can
 signal it. IOException retries check the idle deadline and back off; unexpected
 setup/logic failures terminate with retained evidence rather than spinning.
-The unmodified original startup test stays mandatory and unnormalized, and
-unittest continues collecting independent cases after it fails.
+The unmodified original startup observation stays mandatory, with raw failure
+status preserved. Unittest continues collecting independent cases after any
+unexpected observation failure.
 
 A separate review regression rejects JSON floating-point exponent overflow such
 as nested `1e309` before the router attempts strict JSON serialization. This is
@@ -270,3 +272,97 @@ marker selects the history Windows gate, while this helper's changed paths
 independently select its dedicated Linux/Windows workflow. This is an intentional
 parallel qualification batch, not an unknown focused-family name or a bypass of
 foundation/full regression. All relevant current production sources remain.
+
+## First Windows observation and bounded repair
+
+The first Windows run was GitHub Actions
+[37096050336](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37096050336),
+at published commit `df200f07`. Ubuntu passed. Windows executed 66 test methods
+and reported 30 failed assertions: 18 action-oracle cases stopped before
+execution at the `Windows.Storage.StorageFile` assembly guard, 11 candidate
+service probes timed out, and one unmodified original startup failed before
+publishing a lock. The downloaded 510-file evidence archive has SHA-256
+`984be0a34f835404c8a045d4c13b756cb0260a893b5b80419a5694c0a569d965`.
+These are failed or blocked coverage, not passed action parity.
+
+The original startup evidence `startup-failure-d1f9dc5b0fcb.json` records exit 1,
+no timeout, zero stdout, complete 499-byte stderr, and no matching lock.
+The stderr SHA-256 is
+`e1de6715702675a2c502e1341d79d97c09b0a7db02f0e58d93f066d99e8978cb`.
+It reports `CommandNotFoundException` for the command `try`. The pinned source
+uses a parenthesized `try` statement for `owner_sid` at line 534, before writing
+the lock. This is now an observed baseline startup defect; it does not establish
+any later original pipe-loop behavior. The original bytes, source pin and
+unmodified launch observation remain separate from synthetic action evidence.
+
+The oracle guard correctly failed closed. The old diagnostic does not identify
+whether `StorageFile` resolved to another assembly or did not resolve; no real
+WinRT operation was invoked to investigate it. The repaired fixture uses the
+unique `CucpFixture` namespace. After verifying the unchanged whole-source hash
+and every original function extent/hash, it substitutes exactly 52 type-name
+AST sites across eight functions, covering 23 inert types. It verifies every
+resolved type against the emitted, source-hash-pinned fixture assembly before
+importing any action. Native loader functions are verified but not imported.
+Every non-type code unit is preserved. Per-site extents and original/substituted
+function hashes are emitted and independently checked before output/query-order
+parity. This explicitly bounded acquisition seam does not qualify native type
+loading, real UIA or real OCR.
+
+The service stall cause is not yet proven by the first run: its logs show the
+legacy fail-soft ACL warning and a broken pipe after the probe was terminated;
+the scripted provider consumed no captures. Framework `StreamWriter.AutoFlush`
+synchronously emits its encoding preamble before user text. `PipeStream.Flush`
+is a no-op, and requested pipe buffer sizes are advisory, so neither a
+FlushFileBuffers wait nor a literal zero-byte kernel buffer is claimed.
+The [Framework StreamWriter source](https://github.com/microsoft/referencesource/blob/main/mscorlib/system/io/streamwriter.cs)
+and [Windows pipe buffer documentation](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea#remarks)
+support those distinctions. The repaired service defers its original BOM until a request has been read.
+Owned counterfactual handshake fixtures record actual buffers and operation
+phases on Windows to test the suspected pre-read write stall.
+
+Opt-in `--diagnostic-phases` emits at most 128 fixed operation markers plus one
+limit marker to stderr. It records no request content. Service, probe and actual
+exchange evidence can now locate connection/read/write/cleanup stalls; failed
+probes snapshot the server before asserting. Actual-adapter fixtures explicitly
+request a 1.5-second inner I/O budget within the existing process budget, rather
+than letting a 30-second inner budget outlive a 10-second process envelope.
+No production timeout or caller has changed. Portable checks include exact
+response BOM/CRLF, multiple responses, failed-write no replay, no unsolicited
+initial bytes, and the diagnostic event cap. New Windows observations are still
+required before calling the IPC repair or action parity qualified.
+
+The explicit type seam and its refusal path add 6,547 temporary, fully counted
+PowerShell test-driver bytes: the action oracle is now 12,343 bytes and both
+helper oracle drivers total 20,324 bytes. Canonical tracked PowerShell is 902,990
+bytes across 30 files, with 610,258 runtime bytes unchanged. This repair earns
+zero retirement credit; executable fixture behavior is not moved into Python,
+C# strings or metadata to reduce the count.
+
+The reviewed functional criterion separately classifies only this pinned
+original startup crash as `baseline-startup-defect`. Its raw oracle status stays
+`failed` and `original_startup_qualified` stays false in a retained classification
+artifact. The exact first-run stderr is committed as a 499-byte binary fixture.
+A new unmodified launch must exit 1 with the same complete diagnostic for
+`CommandNotFoundException` / `try`, identify the same owned source file, preserve
+both published source hashes, and leave no owned process or lock. Only path and
+formatting whitespace vary; any other text, stdout, side effect, source change,
+process timeout, truncation, byte-count mismatch or incomplete drain fails.
+Portable negative tests independently exercise those exclusions.
+
+This is an intentional user-visible compatibility correction: the candidate
+makes the documented service reachable where the original aborts before
+publishing its lock. Reproducing that abort is not the functional release goal.
+Candidate positive startup, health, unsupported action, request counts, multiple
+clients, detached lifetime, shutdown and cleanup remain mandatory. The original
+ACL warning remains visible and no authenticated-IPC claim is added. Deadline,
+owner and lock protections remain the separately reviewed compatibility
+decisions above. This classification grants no production cutover or retirement.
+
+Local repair verification (Linux, SDK 10.0.401/runtime 10.0.12 with Major
+roll-forward): 117 action and 45 wire contracts, 52 helper Python checks, five
+raw-evidence checks, and the full 707-test Python run passed (560 executed,
+147 platform/opt-in skips). The helper-only suite has 21 unrun Windows methods.
+Net48 service/transport and inert C#5 facade builds passed with zero warnings.
+Canonical inventory and diff checks passed. These results do not substitute for
+a new Windows run; neither the repaired oracle execution nor the IPC diagnosis
+has been observed on Windows yet.
