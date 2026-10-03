@@ -2,7 +2,16 @@
 $ErrorActionPreference='Stop'
 if ($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1) { throw 'Expected Windows PowerShell 5.1' }
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
-if ((Get-FileHash -LiteralPath $SourcePath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $SourceHash) { throw 'Pinned source hash mismatch' }
+# Hash the exact on-disk bytes without relying on module autoloading. The
+# Python caller validates these hashes against hashlib.sha256 on the same files.
+function _Get-WorkflowDiagnosticFileSha256 {
+  param([string]$Path)
+  [byte[]]$fileBytes=[IO.File]::ReadAllBytes($Path)
+  $fileSha=[Security.Cryptography.SHA256]::Create()
+  try { return ([BitConverter]::ToString($fileSha.ComputeHash($fileBytes))).Replace('-','').ToLowerInvariant() }
+  finally { $fileSha.Dispose() }
+}
+if ((_Get-WorkflowDiagnosticFileSha256 -Path $SourcePath) -ne $SourceHash) { throw 'Pinned source hash mismatch' }
 $tokens=$null; $errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($SourcePath,[ref]$tokens,[ref]$errors)
 if ($errors.Count) { throw 'Pinned source did not parse' }
@@ -49,5 +58,5 @@ $provenance=@{evidence='observed-windows-powershell-5.1-raw-diagnostics'; baseli
   ui_culture=[Globalization.CultureInfo]::CurrentUICulture.Name; ps_culture=[string]$PSCulture; ps_ui_culture=[string]$PSUICulture;
   clr_version=[string]$PSVersionTable.CLRVersion; os_version=[Environment]::OSVersion.VersionString;
   captured_at_utc=[DateTime]::UtcNow.ToString('o'); oracle='PSParser.Tokenize plus unchanged pinned private workflow functions';
-  input_sha256=(Get-FileHash -LiteralPath $InputPath -Algorithm SHA256).Hash.ToLowerInvariant()}
+  input_sha256=(_Get-WorkflowDiagnosticFileSha256 -Path $InputPath)}
 [Console]::Out.WriteLine((ConvertTo-Json -InputObject @{schema='cucp.workflow-raw-diagnostics/v1';provenance=$provenance;cases=@($results)} -Depth 40 -Compress))

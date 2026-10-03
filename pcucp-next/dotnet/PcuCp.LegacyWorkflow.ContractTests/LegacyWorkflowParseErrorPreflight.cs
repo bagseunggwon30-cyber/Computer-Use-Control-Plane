@@ -102,7 +102,8 @@ internal static partial class LegacyWorkflowKernel
             if (c == '$')
             {
                 index++;
-                var failure = ReadDollarText(step, ref index, new StringBuilder());
+                var failure = ReadDollarText(step, ref index, new StringBuilder(), context:
+                    atTokenStart ? DollarScanContext.Expression : DollarScanContext.ExpandableString);
                 if (failure is not null) return failure.Error == "parse_error" ? failure : null;
                 atStatementStart = false;
                 atTokenStart = false;
@@ -154,12 +155,14 @@ internal static partial class LegacyWorkflowKernel
         return groups.Count == 0 ? null : SyntaxError("An opening delimiter is missing its closing delimiter.");
     }
 
-    // PS5 stop-parsing is triggered by the cooked marker token. The raw scan
-    // tracks double-quote state only for pipeline boundaries; unmatched quotes
-    // and backticks in its payload never become ordinary parser syntax.
+    // PS5 stop-parsing requires an unquoted generic marker token. Leading
+    // quoted strings do not activate it, even when their cooked value is --%.
+    // The raw scan tracks double-quote state only for pipeline boundaries;
+    // unmatched quotes and backticks in its payload never become parser syntax.
     private static bool PreflightStopParsingMarker(string step, int start, out int end)
     {
         end = start;
+        if (IsSingle(step[start]) || IsDouble(step[start])) return false;
         var cooked = new StringBuilder();
         while (end < step.Length && !char.IsWhiteSpace(step[end]) && !(end != start && step[end] == '\0'))
         {
@@ -245,7 +248,7 @@ internal static partial class LegacyWorkflowKernel
             }
             if (!single && c == '$')
             {
-                var failure = ReadDollarText(step, ref index, new StringBuilder());
+                var failure = ReadDollarText(step, ref index, new StringBuilder(), context: DollarScanContext.HereString);
                 if (failure is null) continue;
                 qualified = failure.Error == "parse_error";
                 return qualified ? failure : null;

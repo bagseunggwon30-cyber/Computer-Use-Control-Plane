@@ -1,5 +1,8 @@
 # Qualification-only embedded string scanner
 
+Historical staged implementation. The mode-aware continuation and later observed
+qualification are documented in [workflow-mode-aware-37079778520.md](workflow-mode-aware-37079778520.md).
+
 This batch changes the managed candidate only. `LegacyWorkflowLiteralParser.cs`
 remains excluded from NativeHost, and the PowerShell parser oracle is retained.
 Nothing in this batch executes, expands, interpolates, or evaluates input text.

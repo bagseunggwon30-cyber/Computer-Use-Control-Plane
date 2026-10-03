@@ -1,0 +1,1622 @@
+{
+  "schema": "cucp.workflow-ps51-mode-observations/v1",
+  "provenance": {
+    "evidence": "observed-windows-powershell-5.1",
+    "run_id": "37079778520",
+    "run_url": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37079778520",
+    "tested_commit": "0e6e6748f475ee1526b82f3751f11da8ba42e64a",
+    "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
+    "log_file": "tokenizer-parallel-ci-37079778520-foundation.log",
+    "log_sha256": "1c43ee04c706b02e83d7c4363c80a06c22fdb1f37945f0220ee1d5353da1a61c",
+    "log_line": 273,
+    "normalization": "Exact literal inferred-gap rows from the Windows log. before is original PS5.1; after is the historical managed candidate. Local replay is not a fresh Windows qualification."
+  },
+  "batch_resolved_ids": [
+    "strings_batch_quoted_quoted_open_boundary_remains_gap",
+    "strings_batch_here_quoted_open_boundary_remains_gap",
+    "strings_followup_quoted_special_question_word_operand",
+    "strings_followup_quoted_special_question_word_arithmetic",
+    "strings_followup_quoted_special_question_digit_operand",
+    "strings_followup_quoted_special_question_question_operand",
+    "strings_followup_quoted_special_question_nested_operand",
+    "strings_followup_quoted_scoped_double_colon_operand",
+    "strings_followup_quoted_escaped_close_in_string",
+    "strings_followup_quoted_escaped_open_in_string",
+    "strings_followup_quoted_escaped_close_in_argument",
+    "strings_followup_quoted_escaped_open_in_argument",
+    "strings_followup_quoted_other_special_dollar_operand",
+    "strings_followup_quoted_other_special_caret_operand",
+    "strings_followup_here_special_question_word_operand",
+    "strings_followup_here_special_question_word_arithmetic",
+    "strings_followup_here_special_question_digit_operand",
+    "strings_followup_here_special_question_question_operand",
+    "strings_followup_here_special_question_nested_operand",
+    "strings_followup_here_scoped_double_colon_operand",
+    "strings_followup_here_escaped_close_in_string",
+    "strings_followup_here_escaped_open_in_string",
+    "strings_followup_here_escaped_close_in_argument",
+    "strings_followup_here_escaped_open_in_argument",
+    "strings_followup_here_other_special_dollar_operand",
+    "strings_followup_here_other_special_caret_operand",
+    "strings_quote_boundary_quoted_escaped_inner_double_quote",
+    "strings_quote_boundary_quoted_escaped_argument_double_quote",
+    "strings_quote_boundary_quoted_escaped_double_in_single_quote",
+    "strings_quote_boundary_quoted_doubled_inner_double_quote",
+    "strings_quote_boundary_quoted_doubled_argument_double_quote",
+    "strings_quote_boundary_quoted_escaped_smart_inner_double_quote",
+    "strings_quote_boundary_quoted_doubled_smart_inner_double_quote",
+    "strings_quote_boundary_quoted_multiple_backtick_quote",
+    "strings_quote_boundary_here_escaped_inner_double_quote",
+    "strings_quote_boundary_here_escaped_argument_double_quote",
+    "strings_quote_boundary_here_escaped_double_in_single_quote",
+    "strings_quote_boundary_here_doubled_inner_double_quote",
+    "strings_quote_boundary_here_doubled_argument_double_quote",
+    "strings_quote_boundary_here_escaped_smart_inner_double_quote",
+    "strings_quote_boundary_here_doubled_smart_inner_double_quote",
+    "strings_quote_boundary_here_multiple_backtick_quote",
+    "strings_raw_quote_boundary_quoted_empty_inner_double_quote",
+    "strings_raw_quote_boundary_quoted_empty_inner_smart_double_quote",
+    "strings_raw_quote_boundary_quoted_empty_argument_double_quote",
+    "strings_raw_quote_boundary_quoted_backtick_run_1_before_quote",
+    "strings_raw_quote_boundary_quoted_backtick_run_2_before_quote",
+    "strings_raw_quote_boundary_quoted_backtick_run_3_before_quote",
+    "strings_raw_quote_boundary_quoted_backtick_run_4_before_quote",
+    "strings_raw_quote_boundary_quoted_backtick_run_5_before_quote",
+    "strings_raw_quote_boundary_quoted_backtick_run_6_before_quote",
+    "strings_raw_quote_boundary_quoted_backtick_run_7_before_quote",
+    "strings_raw_quote_boundary_quoted_backtick_run_8_before_quote",
+    "strings_raw_quote_boundary_quoted_argument_backtick_run_2_before_quote",
+    "strings_raw_quote_boundary_quoted_argument_backtick_run_4_before_quote",
+    "strings_raw_quote_boundary_quoted_backtick_run_2_before_smart_quote",
+    "strings_raw_quote_boundary_quoted_backtick_run_4_before_smart_quote",
+    "strings_raw_quote_boundary_here_empty_inner_double_quote",
+    "strings_raw_quote_boundary_here_empty_inner_smart_double_quote",
+    "strings_raw_quote_boundary_here_empty_argument_double_quote",
+    "strings_raw_quote_boundary_here_backtick_run_1_before_quote",
+    "strings_raw_quote_boundary_here_backtick_run_2_before_quote",
+    "strings_raw_quote_boundary_here_backtick_run_3_before_quote",
+    "strings_raw_quote_boundary_here_backtick_run_4_before_quote",
+    "strings_raw_quote_boundary_here_backtick_run_5_before_quote",
+    "strings_raw_quote_boundary_here_backtick_run_6_before_quote",
+    "strings_raw_quote_boundary_here_backtick_run_7_before_quote",
+    "strings_raw_quote_boundary_here_backtick_run_8_before_quote",
+    "strings_raw_quote_boundary_here_argument_backtick_run_2_before_quote",
+    "strings_raw_quote_boundary_here_argument_backtick_run_4_before_quote",
+    "strings_raw_quote_boundary_here_backtick_run_2_before_smart_quote",
+    "strings_raw_quote_boundary_here_backtick_run_4_before_smart_quote"
+  ],
+  "remaining_gap_ids": [
+    "strings_batch_quoted_increment_remains_gap",
+    "strings_batch_here_increment_remains_gap",
+    "strings_batch_quoted_large_number_remains_gap",
+    "strings_batch_here_large_number_remains_gap",
+    "strings_batch_quoted_statement_remains_gap",
+    "strings_batch_here_statement_remains_gap",
+    "strings_batch_quoted_pipeline_remains_gap",
+    "strings_batch_here_pipeline_remains_gap",
+    "strings_batch_quoted_multiple_statements_remain_gap",
+    "strings_batch_here_multiple_statements_remain_gap",
+    "strings_batch_quoted_braced_escape_remains_gap",
+    "strings_batch_here_braced_escape_remains_gap",
+    "strings_batch_quoted_depth_limit",
+    "strings_batch_here_depth_limit",
+    "strings_batch_quoted_inner_physical_nul",
+    "strings_batch_quoted_inner_escaped_physical_nul",
+    "strings_batch_here_inner_physical_nul",
+    "strings_batch_here_inner_escaped_physical_nul",
+    "strings_followup_quoted_scoped_double_colon_arithmetic",
+    "strings_followup_quoted_scoped_double_colon_name_operand",
+    "strings_followup_here_scoped_double_colon_arithmetic",
+    "strings_followup_here_scoped_double_colon_name_operand"
+  ],
+  "observed_gaps": [
+    {
+      "id": "strings_batch_quoted_increment_remains_gap",
+      "step": "macro type-native --text \"$(1++2)\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_increment_remains_gap",
+      "step": "macro type-native --text @\"\n$(1++2)\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_large_number_remains_gap",
+      "step": "macro type-native --text \"$(9999999999999999999999999999999999999999)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(9999999999999999999999999999999999999999)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_large_number_remains_gap",
+      "step": "macro type-native --text @\"\n$(9999999999999999999999999999999999999999)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(9999999999999999999999999999999999999999)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_statement_remains_gap",
+      "step": "macro type-native --text \"$(if (1) { x })\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(if (1) { x })"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_statement_remains_gap",
+      "step": "macro type-native --text @\"\n$(if (1) { x })\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(if (1) { x })"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_pipeline_remains_gap",
+      "step": "macro type-native --text \"$(inspect | item)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect | item)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_pipeline_remains_gap",
+      "step": "macro type-native --text @\"\n$(inspect | item)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect | item)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_multiple_statements_remain_gap",
+      "step": "macro type-native --text \"$(inspect\nother)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect\nother)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_multiple_statements_remain_gap",
+      "step": "macro type-native --text @\"\n$(inspect\nother)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect\nother)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_braced_escape_remains_gap",
+      "step": "macro type-native --text \"${a`}b}\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${a`}b}"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_braced_escape_remains_gap",
+      "step": "macro type-native --text @\"\n${a`}b}\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "${a`}b}"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_quoted_open_boundary_remains_gap",
+      "step": "macro type-native --text \"$(\"x(\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_quoted_open_boundary_remains_gap",
+      "step": "macro type-native --text @\"\n$(\"x(\")\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_depth_limit",
+      "step": "macro type-native --text \"$($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($(inspect))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($(inspect))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_depth_limit",
+      "step": "macro type-native --text @\"\n$($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($(inspect))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($($(inspect))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_inner_physical_nul",
+      "step": "macro type-native --text \"$(\"x\u0000y\")\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(\"x\u0000y\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_quoted_inner_escaped_physical_nul",
+      "step": "macro type-native --text \"$(\"x`\u0000y\")\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(\"x`\u0000y\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_inner_physical_nul",
+      "step": "macro type-native --text @\"\n$(\"x\u0000y\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(\"x\u0000y\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_batch_here_inner_escaped_physical_nul",
+      "step": "macro type-native --text @\"\n$(\"x`\u0000y\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(\"x`\u0000y\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_special_question_word_operand",
+      "step": "macro windows \"$( $?foo )\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_special_question_word_arithmetic",
+      "step": "macro windows \"$( $?foo + 1 )\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_special_question_digit_operand",
+      "step": "macro windows \"$( $?1 )\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_special_question_question_operand",
+      "step": "macro windows \"$( $?? )\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_special_question_nested_operand",
+      "step": "macro windows \"$($( $?foo ))\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_scoped_double_colon_operand",
+      "step": "macro windows \"$( $a:b:: )\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_scoped_double_colon_arithmetic",
+      "step": "macro windows \"$( $a:b:: + 1 )\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$( $a:b:: + 1 )"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_scoped_double_colon_name_operand",
+      "step": "macro windows \"$( $a:b::name )\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$( $a:b::name )"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_escaped_close_in_string",
+      "step": "macro windows \"$(\"a`)b\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_escaped_open_in_string",
+      "step": "macro windows \"$(\"a`(b\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_escaped_close_in_argument",
+      "step": "macro windows \"$(inspect \"a`)b\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_escaped_open_in_argument",
+      "step": "macro windows \"$(inspect \"a`(b\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_other_special_dollar_operand",
+      "step": "macro windows \"$( $$foo )\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_quoted_other_special_caret_operand",
+      "step": "macro windows \"$( $^foo )\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_special_question_word_operand",
+      "step": "macro windows @\"\n$( $?foo )\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_special_question_word_arithmetic",
+      "step": "macro windows @\"\n$( $?foo + 1 )\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_special_question_digit_operand",
+      "step": "macro windows @\"\n$( $?1 )\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_special_question_question_operand",
+      "step": "macro windows @\"\n$( $?? )\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_special_question_nested_operand",
+      "step": "macro windows @\"\n$($( $?foo ))\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_scoped_double_colon_operand",
+      "step": "macro windows @\"\n$( $a:b:: )\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_scoped_double_colon_arithmetic",
+      "step": "macro windows @\"\n$( $a:b:: + 1 )\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$( $a:b:: + 1 )"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_scoped_double_colon_name_operand",
+      "step": "macro windows @\"\n$( $a:b::name )\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$( $a:b::name )"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_escaped_close_in_string",
+      "step": "macro windows @\"\n$(\"a`)b\")\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_escaped_open_in_string",
+      "step": "macro windows @\"\n$(\"a`(b\")\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_escaped_close_in_argument",
+      "step": "macro windows @\"\n$(inspect \"a`)b\")\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_escaped_open_in_argument",
+      "step": "macro windows @\"\n$(inspect \"a`(b\")\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_other_special_dollar_operand",
+      "step": "macro windows @\"\n$( $$foo )\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_followup_here_other_special_caret_operand",
+      "step": "macro windows @\"\n$( $^foo )\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_escaped_inner_double_quote",
+      "step": "macro windows \"$(\"a`\"b\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_escaped_argument_double_quote",
+      "step": "macro windows \"$(inspect \"a`\"b\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_escaped_double_in_single_quote",
+      "step": "macro windows \"$('a`\"b')\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$('a`\"b')"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_doubled_inner_double_quote",
+      "step": "macro windows \"$(\"a\"\"b\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_doubled_argument_double_quote",
+      "step": "macro windows \"$(inspect \"a\"\"b\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_escaped_smart_inner_double_quote",
+      "step": "macro windows \"$(\"a`”b\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_doubled_smart_inner_double_quote",
+      "step": "macro windows \"$(\"a“”b\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_quoted_multiple_backtick_quote",
+      "step": "macro windows \"$(\"a```\"b\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_escaped_inner_double_quote",
+      "step": "macro windows @\"\n$(\"a`\"b\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a`\"b\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_escaped_argument_double_quote",
+      "step": "macro windows @\"\n$(inspect \"a`\"b\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(inspect \"a`\"b\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_escaped_double_in_single_quote",
+      "step": "macro windows @\"\n$('a`\"b')\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$('a`\"b')"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_doubled_inner_double_quote",
+      "step": "macro windows @\"\n$(\"a\"\"b\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a\"\"b\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_doubled_argument_double_quote",
+      "step": "macro windows @\"\n$(inspect \"a\"\"b\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(inspect \"a\"\"b\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_escaped_smart_inner_double_quote",
+      "step": "macro windows @\"\n$(\"a`”b\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a`”b\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_doubled_smart_inner_double_quote",
+      "step": "macro windows @\"\n$(\"a“”b\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a“”b\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_quote_boundary_here_multiple_backtick_quote",
+      "step": "macro windows @\"\n$(\"a```\"b\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a```\"b\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_empty_inner_double_quote",
+      "step": "macro windows \"$(\"\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_empty_inner_smart_double_quote",
+      "step": "macro windows \"$(“”)\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_empty_argument_double_quote",
+      "step": "macro windows \"$(inspect \"\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_1_before_quote",
+      "step": "macro windows \"$(\"a`\")\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a`\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_2_before_quote",
+      "step": "macro windows \"$(\"a``\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_3_before_quote",
+      "step": "macro windows \"$(\"a```\")\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a```\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_4_before_quote",
+      "step": "macro windows \"$(\"a````\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_5_before_quote",
+      "step": "macro windows \"$(\"a`````\")\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a`````\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_6_before_quote",
+      "step": "macro windows \"$(\"a``````\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_7_before_quote",
+      "step": "macro windows \"$(\"a```````\")\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a```````\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_8_before_quote",
+      "step": "macro windows \"$(\"a````````\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_argument_backtick_run_2_before_quote",
+      "step": "macro windows \"$(inspect \"a``\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_argument_backtick_run_4_before_quote",
+      "step": "macro windows \"$(inspect \"a````\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_2_before_smart_quote",
+      "step": "macro windows \"$(\"a``”)\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_quoted_backtick_run_4_before_smart_quote",
+      "step": "macro windows \"$(\"a````”)\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_empty_inner_double_quote",
+      "step": "macro windows @\"\n$(\"\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_empty_inner_smart_double_quote",
+      "step": "macro windows @\"\n$(“”)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(“”)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_empty_argument_double_quote",
+      "step": "macro windows @\"\n$(inspect \"\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(inspect \"\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_1_before_quote",
+      "step": "macro windows @\"\n$(\"a`\")\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_2_before_quote",
+      "step": "macro windows @\"\n$(\"a``\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a``\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_3_before_quote",
+      "step": "macro windows @\"\n$(\"a```\")\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_4_before_quote",
+      "step": "macro windows @\"\n$(\"a````\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a````\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_5_before_quote",
+      "step": "macro windows @\"\n$(\"a`````\")\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_6_before_quote",
+      "step": "macro windows @\"\n$(\"a``````\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a``````\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_7_before_quote",
+      "step": "macro windows @\"\n$(\"a```````\")\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_8_before_quote",
+      "step": "macro windows @\"\n$(\"a````````\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a````````\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_argument_backtick_run_2_before_quote",
+      "step": "macro windows @\"\n$(inspect \"a``\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(inspect \"a``\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_argument_backtick_run_4_before_quote",
+      "step": "macro windows @\"\n$(inspect \"a````\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(inspect \"a````\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_2_before_smart_quote",
+      "step": "macro windows @\"\n$(\"a``”)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a``”)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "strings_raw_quote_boundary_here_backtick_run_4_before_smart_quote",
+      "step": "macro windows @\"\n$(\"a````”)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "$(\"a````”)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    }
+  ]
+}

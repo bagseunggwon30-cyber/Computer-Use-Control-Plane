@@ -16,5 +16,7 @@
     <Content Include="../../../tests/fixtures/legacy-workflow-ps51-embedded-observed-37074340659.json" Link="workflow-ps51-embedded-observed.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../../tests/fixtures/legacy-workflow-diagnostic-candidate.json" Link="workflow-diagnostic-candidate.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../../tests/fixtures/legacy-workflow-boundary-candidate.json" Link="workflow-boundary-candidate.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-ps51-boundary-observed-37079778520.json" Link="workflow-ps51-boundary-observed.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-ps51-mode-observed-37079778520.json" Link="workflow-ps51-mode-observed.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

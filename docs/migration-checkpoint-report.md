@@ -40,23 +40,52 @@ still open, and found 100 differences in its 202 inferred probes (70 valid-input
 rejections and 30 error-code differences). It established no newly accepted
 invalid syntax within those cases, not full parser parity.
 
-The next combined candidate covers embedded literal scanning, generic-token
+The first combined candidate covered embedded literal scanning, generic-token
 boundaries and syntax-error precedence. Local replay now matches all 25 original
 historical gaps and all 100 later observed results. At local source `fbba0fa`,
 972 managed checks passed; Python discovery ran 531 tests, with 413 passing and
-118 explicit platform skips. The 652 separately labelled inferred contracts
-(388 literal, 213 boundary and 51 diagnostic) still require fresh Windows
-comparison. Exact raw diagnostic text and plan-message equality are separately
+118 explicit platform skips. Before its Windows run, 652 separately labelled inferred contracts
+(388 literal, 213 boundary and 51 diagnostic) awaited fresh comparison. Exact raw diagnostic text and plan-message equality are separately
 captured and remain unqualified. Mode-sensitive or unknown syntax fails closed.
 The focused foundation gate now requires every workflow test suite and retains
 raw diagnostic evidence even if comparisons fail.
 
 This candidate does not replace production callers or retire any PSParser code.
 The NativeHost project still excludes it. Its explicitly tracked diagnostic
-oracle adds 3,818 PowerShell bytes: the candidate index has 27 `.ps1` files,
+oracle adds 3,818 PowerShell bytes: the initial combined candidate index had 27 `.ps1` files,
 870,980 total bytes (612,709 runtime and 258,271 other), a reduction of 142,498
 bytes from baseline. Temporary oracle source remains counted and must later be
 retired with equivalent provenance-backed coverage.
+
+The combined candidate `0e6e6748f475ee1526b82f3751f11da8ba42e64a` was tested in
+[focused run 37079778520](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37079778520).
+Fast contracts passed; the Windows foundation gate failed six assertions across
+27 tests. Five failures identified token-content mismatches for quoted stop-
+parsing markers and standalone physical-NUL boundaries. The diagnostic oracle
+failed at unavailable `Get-FileHash` lookup before any raw diagnostic capture;
+its module-discovery cause was not established. The full preserved comparison
+contains 33 boundary gaps (five accepted-token mismatches) and 94 embedded gaps
+(44 valid-input rejections and 50 rejection-code differences). No unsupported
+production parser was substituted. Follow-up fixes require a fresh Windows run.
+
+The staged follow-up at local source `05a1601` repairs all five token-content
+failures and the related quoted-marker preflight rule, yielding six exact
+recoveries among the 33 boundary rows. Exact-byte .NET hashing replaces the
+module-dependent fixture calls while preserving the source guard and hashes.
+The mode-aware embedded scanner recovers 72/94 recorded rows (24 valid spellings
+and 48 error-code corrections), preserving original source spelling as data.
+All original before/after observations remain unchanged and checksum-pinned.
+
+Integrated local verification passed 1,289 managed checks and ran 539 Python
+tests (420 passed, 119 platform skips). Candidate contracts now include 442
+literal, 234 boundary and 58 diagnostic rows, including 82 new inferred neighbors.
+The remaining 49 normalized historical differences are 35 valid-input rejections
+and 14 rejection-code differences; exact raw diagnostics remain separately open.
+This is historical replay plus local testing, not the next Windows result.
+
+The staged repair's explicit oracle totals 4,237 PowerShell bytes. All 27 tracked
+PS files total 871,399 bytes: 612,709 runtime and 258,690 other source/test bytes,
+a net reduction of 142,079 from baseline. No new production retirement is claimed.
 
 ## Actual source replacement
 

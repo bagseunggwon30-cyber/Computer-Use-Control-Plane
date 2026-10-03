@@ -74,8 +74,34 @@ class WorkflowDiagnosticFixtureTests(unittest.TestCase):
         for case in unknown:
             self.assertEqual(case["evidence"], "inferred-unqualified")
             self.assertIn("\0", case["step"])
-            self.assertEqual(case["candidate_error"], "unsupported_token")
+            self.assertIn(case["candidate_error"], {"unsupported_token", "parse_error"})
             self.assertNotIn("observed", case)
+        self.assertEqual(sum(case["candidate_error"] == "unsupported_token" for case in unknown), 5)
+        self.assertEqual(sum(case["candidate_error"] == "parse_error" for case in unknown), 1)
+
+    def test_leading_quoted_marker_neighbors_remain_inferred(self):
+        fixtures = json.loads(FIXTURES.read_text(encoding="utf-8"))["cases"]
+        neighbors = [case for case in fixtures if case["id"].startswith("inferred_marker_neighbor_")]
+        self.assertEqual(len(neighbors), 7)
+        self.assertEqual(sum(case["preflight_error"] == "parse_error" for case in neighbors), 4)
+        self.assertEqual(sum(case["preflight_error"] == "" for case in neighbors), 3)
+        for case in neighbors:
+            self.assertEqual(case["evidence"], "inferred-unqualified")
+            self.assertNotIn("observed", case)
+        preflight = PREFLIGHT.read_text(encoding="utf-8")
+        self.assertIn("if (IsSingle(step[start]) || IsDouble(step[start])) return false;", preflight)
+
+    def test_quoted_marker_nul_acceptance_matches_recorded_oracle_exactly(self):
+        boundary = json.loads(FIXTURES.with_name("legacy-workflow-boundary-candidate.json").read_text(encoding="utf-8"))
+        observations = json.loads(FIXTURES.with_name("legacy-workflow-ps51-boundary-observed-37079778520.json").read_text(encoding="utf-8"))
+        case_id = "stop_quoted_marker_adjacent_nul"
+        candidate = next(case for case in boundary["inferred"] if case["id"] == case_id)
+        observed = next(case for case in observations["observed_gaps"] if case["id"] == case_id)
+        self.assertEqual(candidate["step"], observed["step"])
+        self.assertEqual(candidate["candidate"], observed["before"])
+        self.assertEqual(candidate["candidate_basis"], {"evidence": "observed-windows-powershell-5.1", "run_id": "37079778520", "observation_id": case_id})
+        self.assertTrue(candidate["candidate"]["ok"])
+        self.assertEqual(candidate["candidate"]["tokens"], ["macro", "windows", "--%", "\0raw"])
 
     def test_preflight_is_qualification_only_and_cannot_accept_tokens(self):
         source = PREFLIGHT.read_text(encoding="utf-8")
@@ -101,6 +127,26 @@ class WorkflowDiagnosticFixtureTests(unittest.TestCase):
             self.assertEqual(len(result.failures), 1)
             self.assertEqual(result.errors, [])
             self.assertEqual(json.loads(destination.read_text()), capture)
+
+    def test_file_hash_helper_uses_exact_bytes_without_module_commands(self):
+        helper = ORACLE_RUNNER.split("function _Get-WorkflowDiagnosticFileSha256 {", 1)[1].split("\n}", 1)[0]
+        self.assertIn("[byte[]]$fileBytes=[IO.File]::ReadAllBytes($Path)", helper)
+        self.assertIn("$fileSha=[Security.Cryptography.SHA256]::Create()", helper)
+        self.assertIn("$fileSha.ComputeHash($fileBytes)", helper)
+        self.assertIn("([BitConverter]::ToString(", helper)
+        self.assertIn(".Replace('-','').ToLowerInvariant()", helper)
+        self.assertIn("finally { $fileSha.Dispose() }", helper)
+        for forbidden in ("Get-FileHash", "Get-Content", "ReadAllText", "Text.Encoding", "Import-Module"):
+            self.assertNotIn(forbidden, helper)
+        self.assertNotIn("Get-FileHash", ORACLE_RUNNER)
+
+    def test_both_file_hashes_keep_source_guard_and_provenance(self):
+        source_check = "if ((_Get-WorkflowDiagnosticFileSha256 -Path $SourcePath) -ne $SourceHash) { throw 'Pinned source hash mismatch' }"
+        self.assertIn(source_check, ORACLE_RUNNER)
+        self.assertLess(ORACLE_RUNNER.index(source_check), ORACLE_RUNNER.index("::ParseFile($SourcePath"))
+        self.assertIn("input_sha256=(_Get-WorkflowDiagnosticFileSha256 -Path $InputPath)", ORACLE_RUNNER)
+        self.assertEqual(ORACLE_RUNNER.count("_Get-WorkflowDiagnosticFileSha256"), 3)
+        self.assertIn("source_sha256=$SourceHash; helper_sha256=$helperHashes", ORACLE_RUNNER)
 
     def test_capture_imports_only_pinned_pure_definitions_and_does_not_run_input(self):
         self.assertIn("PSParser]::Tokenize($step", ORACLE_RUNNER)

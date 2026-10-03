@@ -36,16 +36,26 @@ bound. The overall candidate input-length bound still applies first.
 
 `legacy-workflow-diagnostic-candidate.json` contains nine normalized top-level
 PS5.1 observations from run `37074340659`, commit
-`48bb1651499d0857b4886b3f5cd8b2ed04d5e8a0`, log line 223, plus 51 explicitly inferred
+`48bb1651499d0857b4886b3f5cd8b2ed04d5e8a0`, log line 223, plus 58 explicitly inferred
 precedence/opaque-region contracts. The original log SHA256 is
 `d7090be7d8bcb52fd4d2a2b156f862c40a5dc66a66a507374916ca009dabb53e`.
-Six of those inferred probes cover a physical NUL immediately after a cooked
-stop-parsing marker. That boundary remains explicitly unsupported. Preflight
-rejects it as unsupported without classifying the opaque suffix, with a matching
-guard in the ordinary candidate; this does not establish whether the original parser accepts it. These new
-Windows probes are capture-only for the unknown oracle result while still
-asserting candidate rejection. Existing observed/qualified assertions are not
-weakened.
+Six of those inferred probes contain a physical NUL adjacent to marker-like
+text. Five use actual generic stop-parsing markers and remain explicitly
+unsupported, with matching preflight and ordinary-scanner guards. The leading
+quoted variant does not activate stop parsing; its later unterminated string is
+now an inferred parse error. All six remain capture-only for the unknown exact
+Windows result, while still asserting candidate rejection.
+
+Run `37079778520` confirmed that leading single/double-quoted `--%` strings do not
+activate stop parsing, while backtick-cooked generic markers do. Preflight now
+uses that same distinction. The existing malformed quoted-marker fixture and
+seven additional quoted/raw/escaped neighbors remain explicitly inferred; their
+exact payloads are not relabeled as observations. No historical oracle row or
+existing observed assertion is changed. The existing
+`stop_quoted_marker_adjacent_nul` candidate now returns the exact recorded
+`["macro", "windows", "--%", "\0raw"]` tokens; its expectation explicitly links
+back to the unchanged `37079778520` observation rather than relying on inferred
+acceptance.
 
 Thirty observed malformed embedded cases are covered by the separately developed
 embedded-string scanner and its observed replay fixture.

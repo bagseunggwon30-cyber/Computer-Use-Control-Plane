@@ -836,8 +836,14 @@
           "macro",
           "windows",
           "--%",
-          "a b"
+          "a",
+          "b"
         ]
+      },
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1",
+        "run_id": "37079778520",
+        "observation_id": "stop_cooked_marker_64"
       }
     },
     {
@@ -850,8 +856,14 @@
           "macro",
           "windows",
           "--%",
-          "a b"
+          "a",
+          "b"
         ]
+      },
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1",
+        "run_id": "37079778520",
+        "observation_id": "stop_cooked_marker_65"
       }
     },
     {
@@ -2388,9 +2400,13 @@
         "tokens": [
           "macro",
           "windows",
-          "a",
-          "\u0000"
+          "a"
         ]
+      },
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1",
+        "run_id": "37079778520",
+        "observation_id": "nul_198"
       }
     },
     {
@@ -2403,9 +2419,13 @@
           "macro",
           "windows",
           "a",
-          "\u0000",
           "\u0000b"
         ]
+      },
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1",
+        "run_id": "37079778520",
+        "observation_id": "nul_199"
       }
     },
     {
@@ -2458,9 +2478,13 @@
           "macro",
           "windows",
           "a",
-          "\u0000",
           "b"
         ]
+      },
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1",
+        "run_id": "37079778520",
+        "observation_id": "nul_203"
       }
     },
     {
@@ -2523,8 +2547,19 @@
       "id": "stop_quoted_marker_adjacent_nul",
       "step": "macro windows '--%'\u0000raw",
       "candidate": {
-        "ok": false,
-        "tokens": []
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "\u0000raw"
+        ]
+      },
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1",
+        "run_id": "37079778520",
+        "observation_id": "stop_quoted_marker_adjacent_nul"
       }
     },
     {
@@ -2533,6 +2568,280 @@
       "candidate": {
         "ok": false,
         "tokens": []
+      }
+    },
+    {
+      "id": "repair_quoted_marker_single_quoted_payload",
+      "step": "macro windows '--%' \"a b\" c",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b",
+          "c"
+        ]
+      }
+    },
+    {
+      "id": "repair_quoted_marker_single_unicode_space",
+      "step": "macro windows '--%' a\u2003b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "repair_quoted_marker_single_variable",
+      "step": "macro windows '--%' $env:PATH",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "repair_quoted_marker_single_unterminated",
+      "step": "macro windows '--%' \"unterminated",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "repair_quoted_marker_single_then_raw_marker",
+      "step": "macro windows '--%' --% a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "repair_quoted_marker_double_quoted_payload",
+      "step": "macro windows \"--%\" \"a b\" c",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b",
+          "c"
+        ]
+      }
+    },
+    {
+      "id": "repair_quoted_marker_double_unicode_space",
+      "step": "macro windows \"--%\" a\u2003b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "repair_quoted_marker_double_variable",
+      "step": "macro windows \"--%\" $env:PATH",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "repair_quoted_marker_double_unterminated",
+      "step": "macro windows \"--%\" \"unterminated",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "repair_quoted_marker_double_then_raw_marker",
+      "step": "macro windows \"--%\" --% a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "repair_generic_marker_raw",
+      "step": "macro windows --% a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "repair_generic_marker_backtick_prefix",
+      "step": "macro windows `--% a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "repair_generic_marker_backtick_percent",
+      "step": "macro windows --`% a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_double_end",
+      "step": "macro windows a\u0000\u0000",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_triple_word",
+      "step": "macro windows a\u0000\u0000\u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_tab",
+      "step": "macro windows a\u0000\tb",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_newline",
+      "step": "macro windows a\u0000\nmacro windows",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "macro",
+          "windows"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_retained_word",
+      "step": "macro windows a\u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_raw_head",
+      "step": "macro windows \u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_cooked_with_letters",
+      "step": "macro windows a`0b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_backtick_nul_word",
+      "step": "macro windows a`\u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a`",
+          "\u0000b"
+        ]
       }
     }
   ]

@@ -163,6 +163,25 @@ foreach (var fixture in embeddedObserved.GetProperty("observed_gaps").EnumerateA
 Check(embeddedObservedCount == 100, "Immutable observed embedded gap count");
 Console.WriteLine($"Embedded PS5.1 replay: {embeddedObservedCount}/{embeddedObservedCount} observed results match. This is not a new Windows qualification run.");
 
+using var modeObservations = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "workflow-ps51-mode-observed.json")));
+var modeObserved = modeObservations.RootElement;
+Check(modeObserved.GetProperty("provenance").GetProperty("evidence").GetString() == "observed-windows-powershell-5.1", "Mode-aware observed evidence label");
+var modeTargets = modeObserved.GetProperty("batch_resolved_ids").EnumerateArray().Select(row => row.GetString()!).ToHashSet(StringComparer.Ordinal);
+var modeDebt = modeObserved.GetProperty("remaining_gap_ids").EnumerateArray().Select(row => row.GetString()!).ToHashSet(StringComparer.Ordinal);
+var modeCount = 0;
+foreach (var fixture in modeObserved.GetProperty("observed_gaps").EnumerateArray())
+{
+    modeCount++;
+    var id = fixture.GetProperty("id").GetString()!;
+    var actual = LegacyWorkflowKernel.ParseStep(fixture.GetProperty("step").GetString()!);
+    var matches = Matches(actual, fixture.GetProperty("before"));
+    Check(!actual.Ok || matches, "Mode-aware observed non-relaxation: " + id);
+    if (modeTargets.Contains(id)) Check(matches, "Mode-aware observed exact recovery: " + id);
+    else Check(modeDebt.Contains(id) && !actual.Ok && !matches, "Explicit bounded mode-aware debt: " + id);
+}
+Check(modeCount == 94 && modeTargets.Count == 72 && modeDebt.Count == 22, "Immutable mode-aware batch accounting");
+Console.WriteLine("Mode-aware PS5.1 replay: 72/94 observed gaps match; 22 explicit gaps remain. Historical replay only, not fresh Windows qualification.");
+
 using var inferences = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "workflow-literal-inferred.json")));
 Check(inferences.RootElement.GetProperty("evidence").GetString() == "inferred-unqualified", "Inferred evidence remains distinct");
 var inferredCount = 0;

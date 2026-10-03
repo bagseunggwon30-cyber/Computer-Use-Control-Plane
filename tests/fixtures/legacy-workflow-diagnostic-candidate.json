@@ -302,7 +302,9 @@
       "id": "inferred_opaque_stop_quoted_marker",
       "evidence": "inferred-unqualified",
       "step": "macro windows '--%' ${} ( { < file ; &",
-      "preflight_error": ""
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error",
+      "qualification": "Leading quoted markers do not activate stop parsing, as confirmed by run37079778520. This malformed payload remains an inferred, unobserved combination."
     },
     {
       "id": "inferred_opaque_stop_escaped_marker",
@@ -432,10 +434,10 @@
       "id": "inferred_unqualified_nul_marker_quoted_marker",
       "evidence": "inferred-unqualified",
       "step": "macro windows '--%'\u0000\"unterminated",
-      "preflight_error": "unsupported_token",
-      "candidate_error": "unsupported_token",
+      "preflight_error": "parse_error",
+      "candidate_error": "parse_error",
       "oracle_expectation": "capture-only",
-      "qualification": "Physical NUL adjacent to a cooked stop-parsing marker has no fresh Windows observation. Keep the boundary unsupported; do not claim the suffix has a parse error."
+      "qualification": "The leading quoted string is not a stop-parsing marker. The later unterminated string is an inferred parse error; this NUL-containing combination still requires raw Windows capture."
     },
     {
       "id": "inferred_unqualified_nul_marker_escaped_marker",
@@ -463,6 +465,59 @@
       "candidate_error": "unsupported_token",
       "oracle_expectation": "capture-only",
       "qualification": "Physical NUL adjacent to a cooked stop-parsing marker has no fresh Windows observation. Keep the boundary unsupported; do not claim the suffix has a parse error."
+    },
+    {
+      "id": "inferred_marker_neighbor_single",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows '--%' ${} (",
+      "preflight_error": "parse_error",
+      "qualification": "Neighbor inferred from the newly observed leading-quote marker distinction; this exact malformed payload has not yet been observed on Windows.",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_marker_neighbor_double",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows \"--%\" ${} (",
+      "preflight_error": "parse_error",
+      "qualification": "Neighbor inferred from the newly observed leading-quote marker distinction; this exact malformed payload has not yet been observed on Windows.",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_marker_neighbor_smart_single",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows ‘--%’ ${} (",
+      "preflight_error": "parse_error",
+      "qualification": "Neighbor inferred from the newly observed leading-quote marker distinction; this exact malformed payload has not yet been observed on Windows.",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_marker_neighbor_smart_double",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows “--%” ${} (",
+      "preflight_error": "parse_error",
+      "qualification": "Neighbor inferred from the newly observed leading-quote marker distinction; this exact malformed payload has not yet been observed on Windows.",
+      "candidate_error": "parse_error"
+    },
+    {
+      "id": "inferred_marker_neighbor_raw",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows --% ${} (",
+      "preflight_error": "",
+      "qualification": "Neighbor inferred from the newly observed leading-quote marker distinction; this exact malformed payload has not yet been observed on Windows."
+    },
+    {
+      "id": "inferred_marker_neighbor_backtick",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows `--% ${} (",
+      "preflight_error": "",
+      "qualification": "Neighbor inferred from the newly observed leading-quote marker distinction; this exact malformed payload has not yet been observed on Windows."
+    },
+    {
+      "id": "inferred_marker_neighbor_generic_quote",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows --\"%\" ${} (",
+      "preflight_error": "",
+      "qualification": "Neighbor inferred from the newly observed leading-quote marker distinction; this exact malformed payload has not yet been observed on Windows."
     }
   ]
 }

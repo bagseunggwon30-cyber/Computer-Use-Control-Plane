@@ -15,6 +15,7 @@ internal static partial class LegacyWorkflowKernel
     // in a subexpression (observed PS5.1 run 37074340659). Actual statement
     // keywords still need their own grammar and are never admitted as names.
     private const int MaximumEmbeddedDepth = 64;
+    private enum DollarScanContext { ExpandableString, HereString, Expression }
 
     internal static object Plan(JsonElement args)
     {
@@ -166,12 +167,17 @@ internal static partial class LegacyWorkflowKernel
                 }
                 commandStart = false;
             }
-            if (content.Length > 0) items.Add(content); // Original drops empty literal strings.
-            if (!wasCommandStart && content == "--%")
+            // PS5.1 omits a generic token consisting only of a physical NUL
+            // boundary. Retain NUL-prefixed words and cooked escape payloads.
+            var physicalNulBoundary = step.AsSpan(tokenStart, index - tokenStart).SequenceEqual("\0");
+            if (content.Length > 0 && !physicalNulBoundary) items.Add(content);
+            // Quoted strings keep their value as an ordinary argument; only
+            // generic words (including backtick-cooked words) enter raw mode.
+            if (!wasCommandStart && !startsQuoted && content == "--%")
             {
-                // A marker immediately followed by a physical NUL has no
-                // observed PS5.1 qualification. Keep this boundary closed;
-                // NUL inside an already-delimited raw argument is separate.
+                // Marker-adjacent physical NUL remains outside this repair's
+                // candidate subset. Keep this boundary closed; NUL inside an
+                // already-delimited raw argument is a separate boundary.
                 if (index < step.Length && step[index] == '\0')
                     return Reject("unsupported_token", "NUL adjacent to a stop-parsing marker is not yet qualified.");
                 // Stop-parsing retains the rest of this physical line as one
@@ -225,7 +231,7 @@ internal static partial class LegacyWorkflowKernel
     // a delimiter balancer. The depth bound also protects adversarial input.
     // API: caller consumed '$'; null means success, other results are explicit
     // syntax/qualification failures. A failed scan may have advanced index.
-    private static ParsedStep? ReadDollarText(string step, ref int index, StringBuilder value, int depth = 0)
+    private static ParsedStep? ReadDollarText(string step, ref int index, StringBuilder value, int depth = 0, DollarScanContext context = DollarScanContext.ExpandableString)
     {
         if (depth >= MaximumEmbeddedDepth)
             return EmbeddedUnsupported("The embedded nesting limit was exceeded.");
@@ -237,7 +243,7 @@ internal static partial class LegacyWorkflowKernel
         }
         ParsedStep? failure;
         if (step[index] == '(')
-            failure = ReadEmbeddedSubexpression(step, ref index, depth + 1);
+            failure = ReadEmbeddedSubexpression(step, ref index, depth + 1, context);
         else if (step[index] == '{')
             failure = ReadBracedVariable(step, ref index);
         else
@@ -251,12 +257,11 @@ internal static partial class LegacyWorkflowKernel
 
     private static ParsedStep? ReadUnbracedVariable(string step, ref int index)
     {
+        // Special variables end after one character; suffix text is parsed by
+        // the caller's string or expression context, never folded into the name.
+        if (step[index] is '$' or '^' or '?') { index++; return null; }
         if (!IsVariablePart(step[index]))
             return EmbeddedUnsupported("This variable spelling is not yet qualified.");
-        // A leading '?' names the one-character special variable. Any suffix
-        // belongs to outer string text or the next embedded expression token;
-        // it must not silently become part of an expression operand's name.
-        if (step[index] == '?') { index++; return null; }
         while (index < step.Length && IsVariablePart(step[index])) index++;
         if (index < step.Length && step[index] == ':')
         {
@@ -300,10 +305,48 @@ internal static partial class LegacyWorkflowKernel
         return null;
     }
 
+    // The outer string pass is deliberately separate from expression grammar.
+    // PS5.1 counts raw parentheses even inside quotes. Ordinary expandable
+    // strings also collapse a backtick/double-quote followed by a double quote;
+    // here-strings do not. Parse the resulting bounded body, then retain the
+    // original source slice in the caller. Never execute or evaluate the body.
+    private static ParsedStep? ReadEmbeddedSubexpression(string step, ref int index, int depth, DollarScanContext context)
+    {
+        if (depth >= MaximumEmbeddedDepth)
+            return EmbeddedUnsupported("The embedded nesting limit was exceeded.");
+        if (context == DollarScanContext.Expression)
+            return ReadEmbeddedBody(step, ref index, depth);
+
+        var body = new StringBuilder();
+        var parentheses = 0;
+        while (index < step.Length)
+        {
+            var c = step[index++];
+            if (c == '(')
+            {
+                parentheses++;
+                if (depth + parentheses > MaximumEmbeddedDepth)
+                    return EmbeddedUnsupported("The embedded nesting limit was exceeded.");
+            }
+            else if (c == ')') parentheses--;
+            if (context == DollarScanContext.ExpandableString && (c == '`' || IsDouble(c)) &&
+                index < step.Length && IsDouble(step[index]))
+                c = step[index++];
+            body.Append(c);
+            if (parentheses != 0) continue;
+            var nestedIndex = 0;
+            var text = body.ToString();
+            var failure = ReadEmbeddedBody(text, ref nestedIndex, depth);
+            if (failure is not null) return failure;
+            return nestedIndex == text.Length ? null : EmbeddedMalformed("Unexpected text follows the embedded expression.");
+        }
+        return EmbeddedMalformed("The subexpression is missing its raw closing ')'.");
+    }
+
     // Supported bodies: an empty body, one command plus literal arguments, or
     // an expression made from integer/string/variable/subexpression operands
     // separated by arithmetic operators. Other statements/operators stay gaps.
-    private static ParsedStep? ReadEmbeddedSubexpression(string step, ref int index, int depth)
+    private static ParsedStep? ReadEmbeddedBody(string step, ref int index, int depth)
     {
         if (depth >= MaximumEmbeddedDepth)
             return EmbeddedUnsupported("The embedded nesting limit was exceeded.");
@@ -337,7 +380,18 @@ internal static partial class LegacyWorkflowKernel
             if (step[index] == ')') { index++; return null; }
             if (IsDouble(step[index])) return EmbeddedMalformed("The subexpression is missing ')'.");
             if (step[index] is not ('+' or '-' or '*' or '/' or '%'))
+            {
+                if (IsVariablePart(step[index]) || step[index] is '$' or '^')
+                    return EmbeddedMalformed("An expression operand cannot be followed by an adjacent bare token.");
+                if (step[index] == ':' && index + 1 < step.Length && step[index + 1] == ':')
+                {
+                    var member = index + 2;
+                    SkipEmbeddedWhitespace(step, ref member);
+                    if (member == step.Length || step[member] == ')')
+                        return EmbeddedMalformed("Static member access requires a member expression.");
+                }
                 return EmbeddedUnsupported("This embedded expression operator is not yet qualified.");
+            }
             var operation = step[index++];
             if (operation is '+' or '-' && index < step.Length && step[index] == operation)
                 return EmbeddedUnsupported("Increment and decrement expressions are not yet qualified.");
@@ -377,15 +431,28 @@ internal static partial class LegacyWorkflowKernel
                 return EmbeddedMalformed("The here-string footer precedes the subexpression closing ')'.");
             if (sawNewline)
                 return EmbeddedUnsupported("Multiple embedded statements are not yet qualified.");
+            var failure = ReadEmbeddedCommandArgument(step, ref index, depth);
+            if (failure is not null) return failure;
+        }
+    }
+
+    // A command argument can join bare, variable and quoted fragments. Scanning
+    // the complete bounded argument is necessary to diagnose an unclosed quote
+    // after a mode-dependent outer transform; stopping at its first fragment
+    // would hide that parse error behind an unsupported-boundary result.
+    private static ParsedStep? ReadEmbeddedCommandArgument(string step, ref int index, int depth)
+    {
+        while (index < step.Length && !IsEmbeddedWhitespace(step[index]) && step[index] != ')')
+        {
             ParsedStep? failure;
             if (IsSingle(step[index]) || IsDouble(step[index]))
                 failure = ReadEmbeddedQuotedOperand(step, ref index, depth);
             else if (step[index] == '$')
             {
                 index++;
-                failure = ReadDollarText(step, ref index, new StringBuilder(), depth);
+                failure = ReadDollarText(step, ref index, new StringBuilder(), depth, DollarScanContext.Expression);
             }
-            else if (IsVariablePart(step[index]) || step[index] == '-')
+            else if (IsVariablePart(step[index]) || step[index] is '-' or '.')
             {
                 while (index < step.Length && (IsVariablePart(step[index]) || step[index] is '-' or '.')) index++;
                 failure = null;
@@ -393,6 +460,7 @@ internal static partial class LegacyWorkflowKernel
             else return EmbeddedUnsupported("This embedded command argument is not yet qualified.");
             if (failure is not null) return failure;
         }
+        return null;
     }
 
     private static ParsedStep? ReadEmbeddedOperand(string step, ref int index, int depth)
@@ -404,7 +472,7 @@ internal static partial class LegacyWorkflowKernel
         if (step[index] == '$')
         {
             index++;
-            return ReadDollarText(step, ref index, new StringBuilder(), depth);
+            return ReadDollarText(step, ref index, new StringBuilder(), depth, DollarScanContext.Expression);
         }
         if (step[index] is '+' or '-') index++;
         if (index == step.Length || !char.IsAsciiDigit(step[index]))
@@ -422,40 +490,15 @@ internal static partial class LegacyWorkflowKernel
         while (index < step.Length)
         {
             var c = step[index++];
-            // Ordinary expandable strings remove a backtick/first double
-            // quote before another double quote during their outer boundary
-            // pass; here-strings do not. Until both passes are modeled, neither
-            // spelling can be validated using inner-string escape rules alone.
-            // Inspect raw neighbors, not just characters visited after escape
-            // skipping. This includes the already-consumed opening quote and
-            // the final backtick of an even-length run before a double quote.
-            var previousRaw = step[index - 2];
-            if (IsDouble(c) && (previousRaw == '`' || IsDouble(previousRaw)) ||
-                (c == '`' || IsDouble(c)) && index < step.Length && IsDouble(step[index]))
-                return EmbeddedUnsupported("Escaped or doubled quotes inside embedded strings are not yet qualified.");
             if (single ? IsSingle(c) : IsDouble(c))
             {
                 if (index < step.Length && (single ? IsSingle(step[index]) : IsDouble(step[index])))
                 { index++; continue; }
                 return null;
             }
-            // PS5.1's expandable-string/subexpression boundary scan does not
-            // protect this closing parenthesis just because it is quoted.
-            // Both quoted and here-string forms are observed parse errors.
-            // Opening parentheses in inner strings remain an explicit gap.
-            if (c == ')') return EmbeddedMalformed("The embedded string crosses a subexpression closing boundary.");
-            if (c == '(') return EmbeddedUnsupported("Parentheses inside embedded strings are not yet qualified.");
-            if (!single && c == '`' && index < step.Length)
-            {
-                // The outer ScanSubExpression boundary pass still counts
-                // parentheses preceded by backticks. Do not hide them using
-                // ordinary inner-string escape rules; this interaction has
-                // source evidence only and remains explicitly unqualified.
-                if (step[index] is '(' or ')')
-                    return EmbeddedUnsupported("Escaped parentheses inside embedded strings are not yet qualified.");
-                index++;
-                continue;
-            }
+            // The enclosing extraction pass already validated raw parenthesis
+            // boundaries and applied its context-dependent quote transform.
+            if (!single && c == '`' && index < step.Length) { index++; continue; }
             if (!single && c == '$')
             {
                 var failure = ReadDollarText(step, ref index, new StringBuilder(), depth);
@@ -505,7 +548,7 @@ internal static partial class LegacyWorkflowKernel
             }
             if (!single && c == '$')
             {
-                var failure = ReadDollarText(step, ref index, value);
+                var failure = ReadDollarText(step, ref index, value, context: DollarScanContext.HereString);
                 if (failure is not null) return failure;
                 continue;
             }
