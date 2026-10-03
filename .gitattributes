@@ -8,3 +8,5 @@ tests/fixtures/history-reducers/windows-ps51-host-37092069983.raw.json -text whi
 tests/fixtures/legacy-helper/observed-startup.stderr.bin -text -diff
 # Exact diagnostic data, never imported as executable PowerShell.
 tests/fixtures/legacy-helper/observed-binding.stdout.bin -text -diff
+# Exact observed benchmark route records retain their captured byte digest.
+tests/fixtures/legacy-benchmark-brief-observed-37103413852.json -text

@@ -1,8 +1,9 @@
 """Opt-in candidate for the *legacy*, detached shared helper service.
 
-No production caller imports this module. Acquisition is explicit: a caller must
+The explicit unqualified production stage supplies concrete adapters; default
+shipping routing remains unchanged. Acquisition stays explicit: a caller must
 supply a lock store, process-existence probe, clock, pipe transport, and (only for
-an explicit start) an owned detached launcher. There is no executable resolver,
+an explicit start) an owned detached launcher. This pure client has no executable resolver,
 PowerShell evaluator, autostart, input surface, or modern NativeSession coupling.
 
 The published reference is commit 3e892ab02395bdc916a5814e39d4154efd1f6249,

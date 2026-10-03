@@ -140,6 +140,8 @@ class HelperSourceTests(unittest.TestCase):
                     # Other migration families may legitimately edit unrelated
                     # wrapper functions. Protect this family's exact retained
                     # bodies without freezing the whole monolithic wrapper.
+                    from helper_staged_source_retention import retained_original_view
+                    current = retained_original_view(current)
                     original = published_source(pin['path'], directory).decode('utf-8-sig').replace('\r\n', '\n').encode('utf-16-le')
                     for function in pin['functions']:
                         body = original[2 * function['start_utf16']:2 * function['end_utf16']].decode('utf-16-le')

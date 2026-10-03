@@ -2,6 +2,10 @@
 import copy
 import hashlib
 import json
+import os
+from pathlib import Path
+import subprocess
+import tempfile
 import unittest
 
 from test_legacy_diagnostics_parity import ROOT
@@ -40,6 +44,38 @@ class BenchmarkBriefObservedTests(unittest.TestCase):
             self.assertFalse(summary[1]['public_payload_observed'])
             self.assertFalse(summary[1]['pure_kernel_contract_exact'])
             self.assertTrue(summary[1]['actual_adapter_record_exact'])
+
+    def test_windows_checkout_preserves_observed_bytes_with_a_converting_control(self):
+        canonical = OBSERVED.read_bytes()
+        self.assertEqual(canonical.count(b'\r\n'), 0)
+        self.assertEqual(canonical.count(b'\n'), 1)
+        crlf = canonical.replace(b'\n', b'\r\n')
+        self.assertEqual(hashlib.sha256(crlf).hexdigest(),
+                         '3940f85cf648260e2b0b7fe030987e18cbc0cd3a9f15bd624941640b565a68e0')
+        relative = OBSERVED.relative_to(ROOT)
+        with tempfile.TemporaryDirectory(prefix='benchmark-observed-checkout-') as temporary:
+            root = Path(temporary)
+            protected = root / relative
+            protected.parent.mkdir(parents=True)
+            protected.write_bytes(canonical)
+            control = root / 'unprotected-observed.json'
+            control.write_bytes(canonical)
+            (root / '.gitattributes').write_bytes((ROOT / '.gitattributes').read_bytes())
+
+            def git(*arguments):
+                return subprocess.run([
+                    'git', '-c', 'core.autocrlf=true', '-c', 'core.eol=crlf',
+                    '-c', 'core.safecrlf=false', '-c', f'core.attributesFile={os.devnull}',
+                    *arguments,
+                ], cwd=root, capture_output=True, check=True, timeout=30)
+
+            git('init', '--quiet')
+            git('add', '--force', '--', '.gitattributes', relative.as_posix(), control.name)
+            protected.unlink()
+            control.unlink()
+            git('checkout-index', '--force', '--all')
+            self.assertEqual(protected.read_bytes(), canonical)
+            self.assertEqual(control.read_bytes(), crlf)
 
     def test_none_or_missing_payload_on_nonbrief_cannot_become_success(self):
         for original in self.observed['pairs']:

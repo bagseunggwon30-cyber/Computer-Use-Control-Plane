@@ -77,3 +77,34 @@ execution and 110 startup checks. Inventory and diff checks passed. Independent
 review found and corrected a stale selector exclusion, then found no remaining
 code blocker. These local results do not replace the required fresh Windows
 production-entry run or the accepted full-regression decision.
+
+## First fresh production observation, not full qualification
+
+At public `bb98df41d120cde6c6a2a18628e385d7ad432709`,
+[full run 37107497220](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37107497220)
+finished with 12 of 14 active jobs passing. The production comparison itself
+completed: all 668 cases met the closed contract, partitioned as 660 exact
+original agreements, eight explicitly pinned owned failures, and no terminal
+failures. All 410 benchmark and 258 audit production/direct pairs were exact.
+The additional 16 calendar and 72 Decimal production cases passed their stated
+functional criteria. All three raw manifests retain `finished`,
+`comparison_completed`, and `qualification_passed` as true for those comparisons.
+The verified diagnostics artifact is 11269040974, SHA-256
+`256eea20d2fc9cb9ba37d4294766fe67d29d6a25e997bdddd30e4b203ff4ee50`.
+
+Two independent harness problems kept the full gate red:
+
+- Pester retained 19 passing and two failing tests. Anonymous extraction had
+  erased the diagnostic context function's file provenance, making its
+  changelog `Join-Path` fail before the managed host started. The repair imports
+  the real definition-only support file, retaining both measurement assertions
+  and adding context, row-count, sample-count and native-call-count checks.
+- The diagnostics lane retained 61 passing and one failing test. Windows checkout
+  changed the observed JSON fixture's sole LF to CRLF. This transformation exactly
+  reproduces the observed failed digest. The repair preserves the original bytes
+  through an explicit Git attribute; it does not change the fixture or expected
+  SHA-256 assertion.
+
+The production observations are retained, but accepted body retirement still
+requires the repaired fresh full gate. The separate helper action candidate
+remains unqualified and does not change these diagnostic results.

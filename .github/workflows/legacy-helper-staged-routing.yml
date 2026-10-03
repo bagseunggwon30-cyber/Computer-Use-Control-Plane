@@ -1,0 +1,50 @@
+name: Legacy helper staged routing only
+on:
+  workflow_dispatch:
+  push:
+    branches: [migration/python-csharp-runtime]
+    paths:
+      - 'pcucp-next/python/legacy_helper_bridge.py'
+      - 'pcucp-next/python/pcucp_cli/legacy_helper_runtime.py'
+      - 'pcucp-next/python/pcucp_cli/legacy_helper_client.py'
+      - 'pcucp-next/dotnet/PcuCp.LegacyHelper/**'
+      - 'pcucp-next/packaging/publish_legacy_helper.py'
+      - 'pcucp-next/packaging/qualify_staged_legacy_helper.py'
+      - 'scripts/cucp-staged-helper-adapter.ps1'
+      - 'scripts/cucp.ps1'
+      - 'tests/python/test_legacy_helper_runtime.py'
+      - 'tests/python/test_legacy_helper_package.py'
+      - 'tests/fixtures/legacy-helper-staged-*.ps1'
+      - '.github/workflows/legacy-helper-staged-routing.yml'
+permissions:
+  contents: read
+jobs:
+  staged-routing:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Portable staged contracts
+        if: runner.os != 'Windows'
+        run: python pcucp-next/packaging/qualify_staged_legacy_helper.py
+      - name: Owned Windows adapters and production wrapper (desktop disabled)
+        if: runner.os == 'Windows'
+        run: python pcucp-next/packaging/qualify_staged_legacy_helper.py --windows
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legacy-helper-staged-routing-${{ runner.os }}
+          path: .migration-logs/staged-helper
+          include-hidden-files: true
+          retention-days: 7

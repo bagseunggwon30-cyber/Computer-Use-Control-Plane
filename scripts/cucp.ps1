@@ -248,10 +248,12 @@ if (-not $Script:NativeHelperPath) {
 $Script:HelperLockPath = Join-Path $Script:AuditDir "helper.pid"
 $Script:HelperServerScript = Join-Path $PSScriptRoot "cucp-helper-server.ps1"
 $Script:_HelperPipeReqId = 0
+. (Join-Path $PSScriptRoot 'cucp-staged-helper-adapter.ps1')
 # server 가 직접 처리 가능한 action 화이트리스트 (cucp-helper-server.ps1 v1.7.0 의 _Dispatch 와 일치)
 $Script:HelperServerSupported = @("windows", "health", "focused", "modal-detect", "ocr-screen-fast", "uia-find-fast")
 
 function _Read-LockSafely {
+  if ($Script:StagedCompiledHelper) { try { return (_Invoke-StagedHelper -Operation 'read') } catch { return $null } }
   # 결과: hashtable {pid, pipe_name, started_at, helper_version} 또는 $null
   if (-not (Test-Path -LiteralPath $Script:HelperLockPath)) { return $null }
   try {
@@ -266,6 +268,7 @@ function _Read-LockSafely {
 
 function _Is-StaleLock {
   param($Lock)
+  if ($Script:StagedCompiledHelper) { try { return [bool](_Invoke-StagedHelper -Operation 'stale' -Arguments @{snapshot=$Lock._cucp_staged_snapshot}) } catch { return $true } }
   if (-not $Lock) { return $true }
   # v2.0.0 — multi-user 격리: 다른 user 의 lock 은 stale 처리하지 않고 무시.
   # wrapper 가 자기 user 의 lock 만 정리하도록. owner_user 가 없으면 (legacy) 검사 skip.
@@ -296,6 +299,8 @@ function _Is-StaleLock {
 }
 
 function _Try-Delete-Lock {
+  param($ExpectedLock)
+  if ($Script:StagedCompiledHelper) { try { $null=_Invoke-StagedHelper -Operation 'delete' -Arguments @{snapshot=$ExpectedLock._cucp_staged_snapshot} } catch { }; return }
   # v2.0.0 — 자기 user 의 lock 만 삭제. 남의 lock 은 절대 삭제 안 함.
   if (-not (Test-Path -LiteralPath $Script:HelperLockPath)) { return }
   try {
@@ -309,6 +314,7 @@ function _Try-Delete-Lock {
 }
 
 function Get-HelperServerStatus {
+  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'status') }
   # macro session helper-status 용. server up/down 둘 다 일관 envelope 반환.
   $lock = _Read-LockSafely
   if (-not $lock -or (_Is-StaleLock -Lock $lock)) {
@@ -354,8 +360,14 @@ function Invoke-HelperPipe {
   param(
     [Parameter(Mandatory=$true)][string]$Action,
     [hashtable]$ArgsHash = @{},
-    [int]$TimeoutMs = 30000
+    [int]$TimeoutMs = 30000,
+    $ExpectedLock = $null
   )
+  if ($Script:StagedCompiledHelper) {
+    if ($Script:_HelperPipeReqId -eq [int]::MaxValue) { $Script:_HelperPipeReqId = 0 }
+    $Script:_HelperPipeReqId++
+    return (_Invoke-StagedHelper -Operation 'invoke' -Arguments @{action=$Action; args=$ArgsHash; timeout_ms=$TimeoutMs; request_id=$Script:_HelperPipeReqId; snapshot=$ExpectedLock._cucp_staged_snapshot})
+  }
   $lock = _Read-LockSafely
   if (-not $lock) { throw "helper_lock_missing" }
   $pipeName = "$($lock.pipe_name)"
@@ -406,6 +418,7 @@ function Start-HelperServer {
   param(
     [int]$IdleTimeoutMs = 60000
   )
+  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'start' -Arguments @{idle_timeout_ms=$IdleTimeoutMs}) }
   $lock = _Read-LockSafely
   if ($lock -and -not (_Is-StaleLock -Lock $lock)) {
     return [pscustomobject]@{
@@ -458,6 +471,7 @@ function Start-HelperServer {
 
 function Stop-HelperServer {
   param([switch]$Force)
+  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'stop' -Arguments @{force=[bool]$Force}) }
   $lock = _Read-LockSafely
   if (-not $lock) {
     return [pscustomobject]@{ status = "ok"; reason = "no_helper_running" }
@@ -506,6 +520,7 @@ function _Get-AutostartShimPath {
 function Install-HelperAutostart {
   # Startup 폴더에 helper-server 를 hidden 으로 기동하는 .cmd shim 생성 (idempotent).
   param([int]$IdleTimeoutMs = 28800000)  # 기본 8시간
+  if ($Script:StagedCompiledHelper) { return [pscustomobject]@{status='error'; reason='staged_helper_autostart_unqualified'} }
   if (-not $Script:HelperServerScript -or -not (Test-Path -LiteralPath $Script:HelperServerScript)) {
     return [pscustomobject]@{ status = "error"; reason = "helper_server_script_missing"; path = $Script:HelperServerScript }
   }
@@ -648,6 +663,7 @@ function _Read-CliVersion {
 }
 
 function _Read-HelperServerVersion {
+  if ($Script:StagedCompiledHelper) { try { return (_Invoke-StagedHelper -Operation 'version') } catch { return @{version=$null; error='helper_compiled_runtime_unavailable'} } }
   # cucp-helper-server.ps1 헤더 주석 또는 helper_version 라인에서 SemVer 추출.
   if (-not $Script:HelperServerScript -or -not (Test-Path -LiteralPath $Script:HelperServerScript)) {
     return @{ version = $null; error = "helper_server_script_missing" }
@@ -711,7 +727,7 @@ function Get-CucpVersionReport {
     sources = @{
       skill = "scripts/cucp.ps1::Script:SkillVersion"
       cli = $cli.package_path
-      helper_server = $Script:HelperServerScript
+      helper_server = if ($Script:StagedCompiledHelper) { 'pcucp-next/bin/legacy-helper/manifest.json' } else { $Script:HelperServerScript }
     }
     recoverable_errors = @($errs)
     generated_at = (_Now-Iso)
@@ -1160,7 +1176,7 @@ function Invoke-NativeHelper {
         $tm = $TimeoutMs
         if ($tm -le 0) { $tm = $Script:InvokeTimeoutMs }
         try {
-          $resp = Invoke-HelperPipe -Action $hAction -ArgsHash $hArgs -TimeoutMs $tm
+          $resp = Invoke-HelperPipe -Action $hAction -ArgsHash $hArgs -TimeoutMs $tm -ExpectedLock $lock
           $ipcSw.Stop()
           if ($resp -and $resp.exit_code -ne 99) {
             # 정상 응답 — pipe 경로로 envelope 구성
@@ -1182,7 +1198,7 @@ function Invoke-NativeHelper {
           # pipe broken / timeout / id mismatch → child fallback
           # stale 검사 한 번 더 (server 가 죽었을 수 있음)
           $lock2 = _Read-LockSafely
-          if ($lock2 -and (_Is-StaleLock -Lock $lock2)) { _Try-Delete-Lock }
+          if ($lock2 -and (_Is-StaleLock -Lock $lock2)) { _Try-Delete-Lock -ExpectedLock $lock }
           Write-WrapperLog -Message "PIPE FAILED ($($_.Exception.Message)) → child fallback for action=$hAction"
         }
       }

@@ -44,8 +44,7 @@ foreach ($name in @("_Invoke-LegacyCdpBridge", "_Invoke-LegacyCdpMacro", "Invoke
   . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $cdpAst -Name $name)))
 }
 # Load real transport and family support for both retained bodies and promoted
-# delegates. Public macros above always come from the main production wrapper;
-# importing the support file's draft Invoke-Macro* definitions would bypass it.
+# delegates. Public macros above always come from the main production wrapper.
 foreach ($name in @('_Read-StandaloneConfirmation', '_Execution-Require', '_Execution-Fields',
     '_Execution-EncodeWire', '_Execution-DecodeWire', '_Execution-WriteChunks', '_Execution-WriteDiagnostic',
     '_Execution-ValidateEffect', '_Execution-Dispatch', '_Execution-EffectMayChangeState',
@@ -57,7 +56,7 @@ $familySupport = @(
     '_Interaction-Integer', '_Interaction-Number', '_Interaction-Text', '_Interaction-Point',
     '_Interaction-Arguments', '_Interaction-Record', '_Interaction-ValidateEffect', '_Interaction-Dispatch',
     '_Invoke-LegacyInteractionFamily') },
-  @{ Path = 'scripts/cucp-legacy-diagnostic-adapter.ps1'; Names = @(
+  @{ Path = 'scripts/cucp-legacy-diagnostic-adapter.ps1'; SourceFile = $true; Names = @(
     '_Diagnostic-Require', '_Diagnostic-Fields', '_Diagnostic-ArgvEquals', '_Diagnostic-Value',
     '_Diagnostic-IntOption', '_Diagnostic-NewState', '_Diagnostic-Limit', '_Diagnostic-ValidateEffect',
     '_Diagnostic-Clock', '_Diagnostic-NodeVersion', '_Diagnostic-TailBytes', '_Diagnostic-AssertOwnedRoot',
@@ -71,7 +70,22 @@ foreach ($support in $familySupport) {
   $supportAst = [System.Management.Automation.Language.Parser]::ParseFile($supportPath, [ref]$tokens, [ref]$parseErrors)
   if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
   foreach ($name in $support.Names) {
-    . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $supportAst -Name $name)))
+    $functionText = Get-LegacyFunctionText -Ast $supportAst -Name $name
+    if (-not $support.SourceFile) { . ([scriptblock]::Create($functionText)) }
+  }
+  if ($support.SourceFile) {
+    # Preserve the real file's PSScriptRoot used by _Diagnostic-GetContext.
+    # Only the listed support definitions may execute; public macros stay above.
+    $statements = @($supportAst.EndBlock.Statements)
+    if ($supportAst.UsingStatements.Count -or $supportAst.ParamBlock -or
+        $supportAst.BeginBlock -or $supportAst.ProcessBlock -or
+        ($supportAst.PSObject.Properties['CleanBlock'] -and $supportAst.CleanBlock) -or
+        $supportAst.DynamicParamBlock -or $supportAst.EndBlock.Traps.Count -or
+        $statements.Count -ne $support.Names.Count -or @($statements | Where-Object {
+          $_ -isnot [System.Management.Automation.Language.FunctionDefinitionAst] -or
+          $_.Name -cnotin $support.Names
+        }).Count) { throw 'File-backed support must contain only the selected function definitions.' }
+    . $supportPath
   }
 }
 function Invoke-NativeHelper { param([string[]]$ArgList) throw "Live helper must be mocked" }
@@ -233,11 +247,24 @@ Describe "legacy measurement evidence" {
     $script:Brief = $false
     $script:CucpV14Schema = @{ Benchmark="cucp.benchmark/v1"; PrecisionValidate="cucp.precision-validate/v1" }
   }
+  It "loads diagnostic context from the production support file" {
+    $path = Join-Path $repoRoot 'scripts/cucp-legacy-diagnostic-adapter.ps1'
+    (Get-Command _Diagnostic-GetContext).ScriptBlock.File | Should -Be $path
+    $context = _Diagnostic-GetContext
+    [IO.Path]::GetFullPath($context.changelog_path) | Should -Be (Join-Path $repoRoot 'CHANGELOG.md')
+    $context.audit_directory | Should -Be $Script:AuditDir
+    $context.benchmark_schema | Should -Be 'cucp.benchmark/v1'
+  }
   It "does not pass a timing SLO with zero successful samples" {
     Mock Invoke-NativeHelper { return @{ExitCode=5; Json=@{status="ok"}} }
     $r = Invoke-CapturedLegacy { Invoke-MacroBenchmark -Rest @("--iters", "2") }
+    $r.ExitCode | Should -Be 0
+    $r.Json.schema | Should -Be 'cucp.benchmark/v1'
+    @($r.Json.results).Count | Should -Be 4
+    Assert-MockCalled Invoke-NativeHelper -Times 8 -Exactly
     $r.Json.slo_pass_count | Should -Be 0
     foreach ($row in $r.Json.results) {
+      @($row.samples).Count | Should -Be 2
       $row.ok_count | Should -Be 0
       $row.slo_ok | Should -Be $false
       ($null -eq $row.p95_ms) | Should -Be $true
@@ -251,7 +278,13 @@ Describe "legacy measurement evidence" {
       return @{ExitCode=0; Json=@{status="ok"}}
     }
     $r = Invoke-CapturedLegacy { Invoke-MacroBenchmark -Rest @("--iters", "3") }
+    $r.ExitCode | Should -Be 0
+    $r.Json.schema | Should -Be 'cucp.benchmark/v1'
+    @($r.Json.results).Count | Should -Be 4
+    Assert-MockCalled Invoke-NativeHelper -Times 12 -Exactly
     foreach ($row in $r.Json.results) {
+      @($row.samples).Count | Should -Be 3
+      $row.ok_count | Should -Be 3
       $row.p95_ms | Should -Be (($row.samples.ms | Measure-Object -Maximum).Maximum)
     }
   }

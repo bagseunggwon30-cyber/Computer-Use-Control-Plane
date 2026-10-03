@@ -1,9 +1,10 @@
 # Detached legacy helper candidate (not promoted)
 
-This is an isolated Python/C# replacement candidate. No original PowerShell
-function is removed, no production caller imports the new client, and no
-launcher, autostart registration, user computer, or modern `NativeSession` is
-changed. **Retirement credit: zero.** A passing portable contract test is not
+This is a Python/C# replacement candidate. The later [conditional production
+stage](legacy-helper-production-staging.md) adds opt-in concrete adapters and
+wrapper delegates; the default route and all original PowerShell bodies remain.
+No autostart registration, user computer or modern `NativeSession` is changed.
+**Retirement credit: zero.** A passing portable contract test is not
 Windows runtime qualification or permission to switch callers.
 
 ## Published provenance and measured scope
@@ -560,3 +561,8 @@ independent semantic fixtures passed the portable candidate host, and the net48
 facade compiled with zero warnings. The counted oracle grows by 7,406 bytes;
 canonical PowerShell is 915,094 bytes across 31 files, with runtime PowerShell
 unchanged at 607,665 bytes. This patch earns no retirement credit.
+
+The production-staging document supersedes the earlier no-production-caller
+description for the opt-in staged route. Existing candidate idle-timeout
+admission boundaries remain unchanged. Historical
+candidate evidence above remains evidence for its recorded implementation.
