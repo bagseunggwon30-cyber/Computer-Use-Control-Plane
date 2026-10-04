@@ -5,8 +5,9 @@ Python, which owns the .NET Framework 4.8 desktop worker. It no longer starts
 `powershell.exe -File cucp-native-helper.ps1`, writes stdout/stderr scratch files,
 or guesses the exit code after losing its process handle. The compiled worker's
 payload and exit code are returned directly. Windows/UIA/OCR/image and input
-operations use the existing C# implementations. The old PowerShell helper is
-retained temporarily as a qualification source, not used by this cold route.
+operations use the existing C# implementations. The old PowerShell helper has
+been deleted. Qualification reads its hash-pinned public Git history only in
+owned temporary oracle folders; it is never installed or used by production.
 
 The existing server-first and hot-cache ordering is retained. CDP continues to
 use its already migrated Python transport. The 24 desktop actions and 10 CDP
@@ -34,5 +35,8 @@ checks that all 109 ordered clauses, 108 distinct names, handler relationships
 and safety metadata remain identical. Other macro bodies remain hash pinned.
 
 Installation and Pi/bootstrap publishing use Python; four previous PowerShell
-entrypoints have been deleted. The remaining wrapper, helper server, qualification
-source and tests are still being migrated. Main has not reached 0% PowerShell.
+entrypoints and the 2,796-line native helper have been deleted. All 34 original
+helper actions map to Python CDP or the C# desktop worker. Historical adapter
+regressions are explicitly distinguished from current runtime qualification.
+The remaining wrapper, helper server and tests are still being migrated. Main
+has not reached 0% PowerShell.

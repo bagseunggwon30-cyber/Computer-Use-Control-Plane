@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Candidate-only geometry/UIA qualification; never activates defaults or sends input.
+"""Historical adapter / C# geometry-UIA regression; never activates defaults or sends input.
+
+The retired PowerShell entry comes from pinned Git history in owned temporary
+folders. This report does not qualify the current Python native entrypoint; its
+actual Windows checks are test_legacy_native_entry and test_legacy_native_desktop.
 
 Windows mode requires an owned WinForms desktop fixture and real provider entry.
 A missing desktop is a failure, never a synthetic substitute or passing skip.
@@ -27,6 +31,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / 'tests/fixtures/legacy-observation'
 sys.path.insert(0, str(ROOT / 'tests/python'))
 from helper_process_evidence import OwnedProcess, run_evidence, require_success
+from legacy_historical_native import helper as historical_native_helper, wrapper as historical_native_wrapper, scripts as historical_native_scripts
 
 
 def source_bytes():
@@ -386,7 +391,7 @@ def main(argv=None):
     def build(project):
         return run('build-' + Path(project).name, [args.dotnet, 'build', str(ROOT / project), '-c', 'Release',
                    '-warnaserror', '-m:1', '-p:UseSharedCompilation=false'], timeout=300)
-    summary = {'schema': 'cucp.observation-qualification/v1', 'status': 'running', 'retirement_credit': 0,
+    summary = {'qualification_scope': 'historical-PowerShell-adapter-and-current-CSharp-library-regression', 'current_native_runtime_qualified_by_this_report': False, 'schema': 'cucp.observation-qualification/v1', 'status': 'running', 'retirement_credit': 0,
                'oracle_pairs': 0, 'oracle_pairs_attempted': 0, 'acquisition_calls': 0, 'actual_entry_pairs': 0, 'actual_entry_pairs_attempted': 0, 'records': records, 'failures': failures,
                'windows_required': args.windows}
     intended = {'status': 'not-run', 'correction': 'fixed-public-compiled-FromHandle-before-unchanged-original-helper-dispatch-plus-wrapper-Raw-Err-fresh-scalar-copy',
@@ -435,8 +440,8 @@ def main(argv=None):
             env.pop('CUCP_CLI_PATH', None)
             try:
                 result = run('native-scalar-capture-proof',[ps,'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',
-                    str(ROOT / 'tests/fixtures/legacy-observation-scalar-capture.ps1'),'-WrapperPath',str(ROOT / 'scripts/cucp.ps1')],timeout=60)
-                require_scalar_capture(json.loads(result['stdout'].decode('utf-8-sig')),hashlib.sha256((ROOT / 'scripts/cucp.ps1').read_bytes()).hexdigest())
+                    str(ROOT / 'tests/fixtures/legacy-observation-scalar-capture.ps1'),'-WrapperPath',str(historical_native_wrapper())],timeout=60)
+                require_scalar_capture(json.loads(result['stdout'].decode('utf-8-sig')),hashlib.sha256((historical_native_wrapper()).read_bytes()).hexdigest())
                 intended['scalar_capture_proof'] = 'passed'
             except Exception as error:
                 intended['scalar_capture_proof'] = 'failed'
@@ -452,20 +457,20 @@ def main(argv=None):
                     raise AssertionError('Captured SmartPlan corpus shrank')
             except Exception as error:
                 intended['failures'].append({'case':'smart-plan-captured-parity','error':str(error)})
-            original_scripts = temp / 'original/scripts'; shutil.copytree(ROOT / 'scripts', original_scripts)
+            original_scripts = temp / 'original/scripts'; shutil.copytree(historical_native_scripts(), original_scripts)
             original_source = original_scripts / 'cucp-native-helper.ps1'; original_source.write_bytes(raw)
             # Preserve the actually observed pre-fix wrapper timeout independently.
             (original_scripts / 'cucp.ps1').write_bytes(wrapper_raw)
             intended_original_scripts = temp / 'intended-original/scripts'; shutil.copytree(original_scripts, intended_original_scripts)
             # Corrected-intent oracle keeps original helper bodies, while both
             # wrapper callers receive the explicitly recorded scalar correction.
-            (intended_original_scripts / 'cucp.ps1').write_bytes((ROOT / 'scripts/cucp.ps1').read_bytes())
-            intended_candidate_scripts = temp / 'intended-candidate/scripts'; shutil.copytree(ROOT / 'scripts', intended_candidate_scripts)
+            (intended_original_scripts / 'cucp.ps1').write_bytes((historical_native_wrapper()).read_bytes())
+            intended_candidate_scripts = temp / 'intended-candidate/scripts'; shutil.copytree(historical_native_scripts(), intended_candidate_scripts)
             derived_sources = {}
             derived_sources['wrapper'] = {'correction':'Raw-and-Err-fresh-UTF16-string-copy-after-Get-Content',
                 'original_sha256':hashlib.sha256(wrapper_raw).hexdigest(),
-                'corrected_sha256':hashlib.sha256((ROOT / 'scripts/cucp.ps1').read_bytes()).hexdigest()}
-            for name, scripts, source in [('original', intended_original_scripts, raw), ('candidate-warm', intended_candidate_scripts, (ROOT / 'scripts/cucp-native-helper.ps1').read_bytes())]:
+                'corrected_sha256':hashlib.sha256((historical_native_wrapper()).read_bytes()).hexdigest()}
+            for name, scripts, source in [('original', intended_original_scripts, raw), ('candidate-warm', intended_candidate_scripts, (historical_native_helper()).read_bytes())]:
                 derived = with_intended_initialization(source)
                 (scripts / 'cucp-native-helper.ps1').write_bytes(derived)
                 derived_sources[name] = {'source_sha256': hashlib.sha256(source).hexdigest(), 'derived_sha256': hashlib.sha256(derived).hexdigest(), 'insertion_sha256': hashlib.sha256((ROOT / 'tests/fixtures/legacy-observation-intended-initialization.ps1').read_bytes()).hexdigest()}
@@ -525,7 +530,7 @@ def main(argv=None):
                 ]
                 for probe, selector, dll in [('missing-dll', '1', temp / 'missing.dll'), ('invalid-selector', 'invalid', qualification / 'PcuCp.LegacyObservation.dll')]:
                     probe_env = dict(env, CUCP_LEGACY_OBSERVATION_CANDIDATE=selector, CUCP_LEGACY_OBSERVATION_DLL=str(dll))
-                    result = run('candidate-route-' + probe, [ps, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(ROOT / 'scripts/cucp-native-helper.ps1'), '-Action', 'hit-test', '-X', x, '-Y', y, '-SkipUia'], process_env=probe_env, accepted=(1,))
+                    result = run('candidate-route-' + probe, [ps, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(historical_native_helper()), '-Action', 'hit-test', '-X', x, '-Y', y, '-SkipUia'], process_env=probe_env, accepted=(1,))
                     failure = json.loads(result['stdout'].decode('utf-8-sig'))
                     expected_detail = 'Candidate observation DLL missing' if probe == 'missing-dll' else 'Invalid observation candidate selector'
                     if failure.get('reason') != 'native_action_failed' or failure.get('status') != 'error' or expected_detail not in failure.get('detail', ''):
@@ -537,7 +542,7 @@ def main(argv=None):
                         for mode in ('original', 'candidate'):
                             child_env = dict(env)
                             if mode == 'candidate': child_env['CUCP_LEGACY_OBSERVATION_CANDIDATE'] = '1'
-                            scripts = original_scripts if mode == 'original' else ROOT / 'scripts'
+                            scripts = original_scripts if mode == 'original' else historical_native_scripts()
                             if label.startswith('wrapper-'):
                                 argfile = temp / (label + '.json'); argfile.write_text(json.dumps(arguments, ensure_ascii=False), encoding='utf-8')
                                 command = [ps,'-NoProfile','-ExecutionPolicy','Bypass','-File',str(ROOT / 'tests/fixtures/legacy-observation-wrapper.ps1'),'-WrapperPath',str(scripts / 'cucp.ps1'),'-ArgumentsPath',str(argfile)]
@@ -566,7 +571,7 @@ def main(argv=None):
                 # without raising the real 180-second deadline or parity credit.
                 summary['smart_plan_diagnostics'] = []
                 for mode in ('original','candidate'):
-                    scripts = original_scripts if mode == 'original' else ROOT / 'scripts'
+                    scripts = original_scripts if mode == 'original' else historical_native_scripts()
                     wrapper = scripts / 'cucp.ps1'
                     before_hash = hashlib.sha256(wrapper.read_bytes()).hexdigest()
                     trace_path = logs / ('smart-plan-' + mode + '-' + uuid.uuid4().hex + '-phases.log')
@@ -615,7 +620,7 @@ def main(argv=None):
                                 scripts = intended_original_scripts
                                 if mode == 'candidate':
                                     child_env['CUCP_LEGACY_OBSERVATION_CANDIDATE'] = '1'
-                                    scripts = ROOT / 'scripts' if temperature == 'cold' else intended_candidate_scripts
+                                    scripts = historical_native_scripts() if temperature == 'cold' else intended_candidate_scripts
                                 if label.startswith('wrapper-'):
                                     argfile = temp / ('intended-' + label + '.json'); argfile.write_text(json.dumps(arguments, ensure_ascii=False), encoding='utf-8')
                                     command = [ps,'-NoProfile','-ExecutionPolicy','Bypass','-File',str(ROOT / 'tests/fixtures/legacy-observation-wrapper.ps1'),'-WrapperPath',str(scripts / 'cucp.ps1'),'-ArgumentsPath',str(argfile)]

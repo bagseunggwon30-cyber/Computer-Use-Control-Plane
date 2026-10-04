@@ -1279,7 +1279,7 @@ function Invoke-NativeHelper {
   } catch {
     $sw.Stop()
     return [pscustomobject]@{
-      ExitCode = if ($_.Exception.Message -match 'timed out|timeout') { 124 } else { 1 }
+      ExitCode = if ($_.Exception.Message -match '^(mutation_may_have_occurred=true; automatic_retry=false; )?(Desktop owner timed out;|Native bridge timed out;|Dependency timed out;)') { 124 } else { 1 }
       Json = $null
       Raw = ""
       Err = $_.Exception.Message

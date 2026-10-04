@@ -35,10 +35,8 @@ Describe "cucp fast smoke - syntax" {
   It "parses core PowerShell entry points" {
     $files = @(
       "scripts\cucp.ps1",
-      "scripts\cucp-native-helper.ps1",
       "scripts\cucp-helper-server.ps1",
-      "references\live-cassette-runner.ps1",
-      "references\live-verify-summary.ps1"
+      "references\live-cassette-runner.ps1"
     )
     foreach ($file in $files) {
       $path = Join-Path $skillRoot $file

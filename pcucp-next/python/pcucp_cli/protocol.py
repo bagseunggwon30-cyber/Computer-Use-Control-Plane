@@ -13,7 +13,7 @@ LANGUAGE_ROLES: dict[str, str] = {
     "python": "session, protocol, orchestration, diagnostics, packaging",
     "dotnet": "Windows capture, UIA, OCR, input, privilege diagnostics",
     "typescript": "optional Pi host adapter",
-    "powershell": "source-only legacy compatibility and optional developer launchers",
+    "powershell": "remaining source legacy wrapper/service and historical qualification",
 }
 
 

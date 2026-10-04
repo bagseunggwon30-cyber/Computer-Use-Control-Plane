@@ -53,192 +53,6 @@
       ]
     },
     {
-      "path": "scripts/cucp-native-helper.ps1",
-      "lines": 2796,
-      "functions": [
-        {
-          "name": "_Ensure-Win32Native",
-          "line": 200
-        },
-        {
-          "name": "_Ensure-UIA",
-          "line": 226
-        },
-        {
-          "name": "_Require-LegacyImages",
-          "line": 251
-        },
-        {
-          "name": "_Ensure-OCR",
-          "line": 259
-        },
-        {
-          "name": "_Wait-AsyncOp",
-          "line": 276
-        },
-        {
-          "name": "_Load-SoftwareBitmapFromFile",
-          "line": 285
-        },
-        {
-          "name": "_Convert-OcrResult",
-          "line": 294
-        },
-        {
-          "name": "_Capture-ScreenRegionToTempPng",
-          "line": 302
-        },
-        {
-          "name": "_Match-OcrCandidates",
-          "line": 355
-        },
-        {
-          "name": "_Get-UiaSupportedPatternName",
-          "line": 409
-        },
-        {
-          "name": "_New-UiaMatchPayload",
-          "line": 427
-        },
-        {
-          "name": "_Get-RoleWeight",
-          "line": 455
-        },
-        {
-          "name": "_Clamp-UiaPointToRect",
-          "line": 465
-        },
-        {
-          "name": "_Get-UiaPreferredClickPoint",
-          "line": 494
-        },
-        {
-          "name": "_Resolve-UiaPointRefinement",
-          "line": 515
-        },
-        {
-          "name": "_Find-SmallestUiaElementAtPoint",
-          "line": 584
-        },
-        {
-          "name": "_Resolve-OcrUiaFusionCandidate",
-          "line": 608
-        },
-        {
-          "name": "_Emit",
-          "line": 704
-        },
-        {
-          "name": "_Action-Health",
-          "line": 726
-        },
-        {
-          "name": "_Action-Windows",
-          "line": 757
-        },
-        {
-          "name": "_Action-Focused",
-          "line": 791
-        },
-        {
-          "name": "_Action-Focus",
-          "line": 812
-        },
-        {
-          "name": "_Action-Screenshot",
-          "line": 847
-        },
-        {
-          "name": "_Test-CoordsInTarget",
-          "line": 917
-        },
-        {
-          "name": "_Action-HitTest",
-          "line": 970
-        },
-        {
-          "name": "_Action-HitScan",
-          "line": 1050
-        },
-        {
-          "name": "_Action-Click",
-          "line": 1274
-        },
-        {
-          "name": "_Assert-ForegroundTarget",
-          "line": 1374
-        },
-        {
-          "name": "_Action-Type",
-          "line": 1406
-        },
-        {
-          "name": "_Action-Shortcut",
-          "line": 1437
-        },
-        {
-          "name": "_Action-UiaTree",
-          "line": 1486
-        },
-        {
-          "name": "_Action-UiaFind",
-          "line": 1568
-        },
-        {
-          "name": "_Action-UiaClick",
-          "line": 1687
-        },
-        {
-          "name": "_Resolve-UiaElement",
-          "line": 1720
-        },
-        {
-          "name": "_Action-UiaInvoke",
-          "line": 1820
-        },
-        {
-          "name": "_Action-UiaSetValue",
-          "line": 1911
-        },
-        {
-          "name": "_Action-UiaToggle",
-          "line": 1943
-        },
-        {
-          "name": "_Action-OcrImage",
-          "line": 1975
-        },
-        {
-          "name": "_Action-OcrScreen",
-          "line": 1994
-        },
-        {
-          "name": "_Action-OcrFindText",
-          "line": 2059
-        },
-        {
-          "name": "_Action-OcrUiaFuse",
-          "line": 2184
-        },
-        {
-          "name": "_Action-OcrUiaInvoke",
-          "line": 2325
-        },
-        {
-          "name": "_Action-ScreenshotDiff",
-          "line": 2513
-        },
-        {
-          "name": "_Action-ImePaste",
-          "line": 2551
-        },
-        {
-          "name": "_Action-ModalDetect",
-          "line": 2656
-        }
-      ]
-    },
-    {
       "path": "scripts/cucp.ps1",
       "lines": 8272,
       "functions": [
@@ -1705,8 +1519,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 988716,
-    "removed": 24762,
+    "current": 863613,
+    "removed": 149865,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
@@ -2303,5 +2117,63 @@
     "originals_retained": true,
     "route": "CUCP_STAGED_COMPILED_HELPER=1",
     "activation_blockers": "docs/legacy-helper-production-staging.md"
-  }
+  },
+  "retired_files": [
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "replacement": "scripts/cucp-native-helper.py",
+      "original_commit": "8d41b3456f538ae3984f969cb26a882a792d2b8f",
+      "original_blob": "bb9288a6788a1c8b6b0f3e585c62d4b520dbe0b9",
+      "original_sha256": "a1dfc5abd17a1cbea3f126117790df24b9894d808dfa5868713144503ad0dab8",
+      "original_bytes": 114231,
+      "functions": [
+        "_Ensure-Win32Native",
+        "_Ensure-UIA",
+        "_Require-LegacyImages",
+        "_Ensure-OCR",
+        "_Wait-AsyncOp",
+        "_Load-SoftwareBitmapFromFile",
+        "_Convert-OcrResult",
+        "_Capture-ScreenRegionToTempPng",
+        "_Match-OcrCandidates",
+        "_Get-UiaSupportedPatternName",
+        "_New-UiaMatchPayload",
+        "_Get-RoleWeight",
+        "_Clamp-UiaPointToRect",
+        "_Get-UiaPreferredClickPoint",
+        "_Resolve-UiaPointRefinement",
+        "_Find-SmallestUiaElementAtPoint",
+        "_Resolve-OcrUiaFusionCandidate",
+        "_Emit",
+        "_Action-Health",
+        "_Action-Windows",
+        "_Action-Focused",
+        "_Action-Focus",
+        "_Action-Screenshot",
+        "_Test-CoordsInTarget",
+        "_Action-HitTest",
+        "_Action-HitScan",
+        "_Action-Click",
+        "_Assert-ForegroundTarget",
+        "_Action-Type",
+        "_Action-Shortcut",
+        "_Action-UiaTree",
+        "_Action-UiaFind",
+        "_Action-UiaClick",
+        "_Resolve-UiaElement",
+        "_Action-UiaInvoke",
+        "_Action-UiaSetValue",
+        "_Action-UiaToggle",
+        "_Action-OcrImage",
+        "_Action-OcrScreen",
+        "_Action-OcrFindText",
+        "_Action-OcrUiaFuse",
+        "_Action-OcrUiaInvoke",
+        "_Action-ScreenshotDiff",
+        "_Action-ImePaste",
+        "_Action-ModalDetect"
+      ],
+      "evidence": "24 C# desktop and 10 Python CDP actions; actual Windows public native/cold production and owned desktop provider tests. Historical adapters remain hash-pinned Git oracles only; no runtime script fallback."
+    }
+  ]
 }

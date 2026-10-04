@@ -741,7 +741,7 @@ UIA가 못 보는 element 인데 OCR 텍스트가 보일 때, 또는 그 반대�
 ### PS5 함정 진단 (v1.1.0, read-only)
 
 ```powershell
-& <wrapper-dir>\references\audit-ps5-pitfalls.ps1 -ScriptRoot <wrapper-dir>
+python <wrapper-dir>\references\audit_ps5_pitfalls.py --script-root <wrapper-dir>
 ```
 
 CUCP 스크립트들의 inline-if numeric / `$args` 자동변수 / Get-Content 단일라인 /

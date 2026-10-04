@@ -68,6 +68,7 @@ class ActualNativeEntryTests(unittest.TestCase):
             for argv, timeout, code in ((['-Action', 'health'], 30000, 0),
                     (['-Action', 'windows', '-Match', 'CUCP-owned-fixture-absent'], 30000, 0),
                     (['-Action', 'ocr-image', '-OcrPath', str(folder / 'missing.png')], 30000, 1),
+                    (['-Action', 'health', '-UnknownTimeoutOption', 'value'], 30000, 1),
                     (['-Action', 'health'], 1, 124)):
                 request.write_text(json.dumps(dict(argv=argv, timeout_ms=timeout)), encoding='utf-8')
                 result = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(runner),
@@ -76,7 +77,7 @@ class ActualNativeEntryTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 reply = json.loads(result.stdout)
                 self.assertEqual(reply['ExitCode'], code, reply.get('Err'))
-                if timeout > 1:
+                if timeout > 1 and '-UnknownTimeoutOption' not in argv:
                     self.assertEqual(reply['Route'], 'child')
                     self.assertEqual(reply['Json']['action'], argv[1])
                     self.assertEqual(json.loads(reply['Raw']), reply['Json'])

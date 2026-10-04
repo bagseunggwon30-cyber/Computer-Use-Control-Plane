@@ -216,6 +216,11 @@ class HelperSourceTests(unittest.TestCase):
                     for function in pin['functions']:
                         body = original[2 * function['start_utf16']:2 * function['end_utf16']].decode('utf-16-le')
                         if function['name'] == 'Invoke-NativeHelper':
+                            # The cold native route has now been replaced by
+                            # Python/C#. Preserve this scalar-oracle check only
+                            # against its hash-pinned historical wrapper.
+                            from legacy_historical_native import wrapper
+                            function_source = retained_original_view(wrapper().read_text(encoding='utf-8-sig'))
                             # Explicit mapped equivalent for the reviewed scalar
                             # acquisition correction. Every original statement,
                             # oracle byte and surrounding body stays exact.
@@ -223,9 +228,11 @@ class HelperSourceTests(unittest.TestCase):
                             copies = ('    if ($raw -is [string]) { $raw = [string]::new($raw.ToCharArray()) }\n'
                                       '    if ($err -is [string]) { $err = [string]::new($err.ToCharArray()) }\n')
                             self.assertEqual(body.count(anchor), 1)
-                            self.assertEqual(current.count(copies), 1)
+                            self.assertEqual(function_source.count(copies), 1)
                             body = body.replace(anchor, anchor + copies, 1)
-                        self.assertEqual(current.count(body), 1, function['name'])
+                        else:
+                            function_source = current
+                        self.assertEqual(function_source.count(body), 1, function['name'])
         text = (FIXTURES / 'source-manifest.json').read_text(encoding='utf-8')
         self.assertNotIn('function ', text)
         self.assertNotIn('scriptblock', text.lower())

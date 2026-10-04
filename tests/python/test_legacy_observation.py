@@ -1,4 +1,8 @@
-"""Candidate structural/protocol tests. These are never Windows/provider proof."""
+"""Historical adapter/library regression. Current Python native runtime is tested separately.
+
+The old PowerShell helper is read from a pinned Git oracle, never production.
+These structural checks are never Windows/provider proof.
+"""
 import copy
 import base64
 import hashlib
@@ -7,6 +11,7 @@ import json
 from pathlib import Path
 import re
 import unittest
+from legacy_historical_native import helper as historical_native_helper, wrapper as historical_native_wrapper
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location('qualify_legacy_observation', ROOT / 'pcucp-next/packaging/qualify_legacy_observation.py')
@@ -23,7 +28,7 @@ class SourceTests(unittest.TestCase):
     def test_all_original_function_bodies_remain_exact(self):
         raw, manifest = QUALIFY.source_bytes()
         source = raw.decode('utf-8-sig').replace('\r\n','\n')
-        current = (ROOT / 'scripts/cucp-native-helper.ps1').read_text(encoding='utf-8-sig')
+        current = historical_native_helper().read_text(encoding='utf-8-sig')
         encoded = source.encode('utf-16le')
         for record in manifest['functions']:
             body = encoded[2*record['start_utf16']:2*record['end_utf16']].decode('utf-16le')
@@ -35,7 +40,7 @@ class SourceTests(unittest.TestCase):
     def test_entire_original_entry_is_preserved_except_candidate_hook(self):
         raw, _ = QUALIFY.source_bytes()
         source = raw.decode('utf-8-sig').replace('\r\n','\n')
-        current = (ROOT / 'scripts/cucp-native-helper.ps1').read_text(encoding='utf-8-sig')
+        current = historical_native_helper().read_text(encoding='utf-8-sig')
         hook = "if ($env:CUCP_LEGACY_OBSERVATION_CANDIDATE) {\n  if ($env:CUCP_LEGACY_OBSERVATION_CANDIDATE -ne '1') { throw 'Invalid observation candidate selector; expected 1 or unset.' }\n  . (Join-Path $PSScriptRoot 'cucp-legacy-observation-adapter.ps1')\n}\n"
         self.assertEqual(current.count(hook), 1)
         self.assertEqual(current.replace(hook,''), source)
@@ -50,7 +55,7 @@ class SourceTests(unittest.TestCase):
                 self.assertTrue(new.startswith('PcuCp.LegacyObservation.Qualification.Fixture'))
 
     def test_provider_owns_reads_and_has_no_mutations(self):
-        source = (ROOT / 'pcucp-next/dotnet/PcuCp.LegacyObservation/WindowsObservationProvider.cs').read_text()
+        source = (ROOT / 'pcucp-next/dotnet/PcuCp.LegacyObservation/WindowsObservationProvider.cs').read_text(encoding='utf-8')
         for token in ('CucpNative.WindowFromPoint','CucpNative.EnumerateTopLevel','AutomationElement.FromPoint',
                       'AutomationElement.FromHandle','TreeScope.Descendants','TryGetClickablePoint','GetCurrentPattern'):
             self.assertIn(token, source)
@@ -58,24 +63,24 @@ class SourceTests(unittest.TestCase):
             self.assertNotIn(token, source)
 
     def test_candidate_is_opt_in_only(self):
-        helper = (ROOT / 'scripts/cucp-native-helper.ps1').read_text(encoding='utf-8-sig')
+        helper = historical_native_helper().read_text(encoding='utf-8-sig')
         self.assertIn("if ($env:CUCP_LEGACY_OBSERVATION_CANDIDATE) {",helper)
         self.assertIn("$env:CUCP_LEGACY_OBSERVATION_CANDIDATE -ne '1'",helper)
         self.assertEqual(helper.count(". (Join-Path $PSScriptRoot 'cucp-legacy-observation-adapter.ps1')"),1)
         library = ROOT / 'pcucp-next/dotnet/PcuCp.LegacyObservation'
-        self.assertFalse(any('FixtureState' in p.read_text() for p in library.glob('*.cs')))
+        self.assertFalse(any('FixtureState' in p.read_text(encoding='utf-8') for p in library.glob('*.cs')))
 
     def test_fixture_cases_are_ordinary_counted_files(self):
-        names=json.loads((FIXTURES/'cases.json').read_text())
+        names=json.loads((FIXTURES/'cases.json').read_text(encoding='utf-8'))
         self.assertGreaterEqual(len(names),85)
         self.assertEqual(len(names),len(set(names)))
         for name in names:
-            case=json.loads((FIXTURES/(name+'.json')).read_text())
+            case=json.loads((FIXTURES/(name+'.json')).read_text(encoding='utf-8'))
             self.assertEqual(name,case['Name'])
             self.assertIn(case['Operation'],('hit-test','hit-scan','uia-tree','uia-find','guard','refine','click','fusion','payload'))
 
     def test_mutation_tripwires_record_before_throw(self):
-        source=(ROOT/'pcucp-next/dotnet/PcuCp.LegacyObservation.Qualification/ScriptedObservation.cs').read_text()
+        source=(ROOT/'pcucp-next/dotnet/PcuCp.LegacyObservation.Qualification/ScriptedObservation.cs').read_text(encoding='utf-8')
         for name in ('Invoke','Toggle','Select'):
             self.assertRegex(source,r'public void '+name+r'\(\) \{FixtureState.Mutations\+\+;FixtureState.Record\("mutation-attempt:'+name+r'"\);throw')
 
@@ -94,8 +99,8 @@ class SourceTests(unittest.TestCase):
         self.assertNotIn('$argv=@(',source)
 
     def test_provider_probe_cannot_initialize_or_change_uia(self):
-        project=(ROOT/'tests/fixtures/legacy-observation-provider-probe/ObservationProviderProbe.csproj').read_text()
-        code=(ROOT/'tests/fixtures/legacy-observation-provider-probe/ProviderLoadProbe.cs').read_text()
+        project=(ROOT/'tests/fixtures/legacy-observation-provider-probe/ObservationProviderProbe.csproj').read_text(encoding='utf-8')
+        code=(ROOT/'tests/fixtures/legacy-observation-provider-probe/ProviderLoadProbe.cs').read_text(encoding='utf-8')
         self.assertNotIn('<Reference ',project)
         self.assertNotIn('ProjectReference',project)
         self.assertIn('FirstChanceException+=Capture',code)
@@ -103,7 +108,7 @@ class SourceTests(unittest.TestCase):
         for token in ('AutomationElement.', 'RegisterClientSide', 'SetProxyDescription', 'SendInput(', 'SendMouseClick('):self.assertNotIn(token,code)
 
     def test_side_diagnostics_follow_unchanged_entry_pairs(self):
-        source=(ROOT/'pcucp-next/packaging/qualify_legacy_observation.py').read_text()
+        source=(ROOT/'pcucp-next/packaging/qualify_legacy_observation.py').read_text(encoding='utf-8')
         self.assertLess(source.index('for label, arguments in cases + wrapper_cases:'),source.index("run('provider-identity-'"))
         self.assertIn("for mode in ('original', 'candidate', 'shared-current'):",source)
         self.assertIn("processes.append(result)",source)
@@ -115,19 +120,19 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(corrected.replace(hook,b'',1),raw)
         self.assertEqual(corrected.count(hook),1)
         for path in ('scripts/cucp-native-helper.ps1','scripts/cucp-legacy-observation-adapter.ps1'):
-            self.assertNotIn('CUCP_OBSERVATION_INTENDED', (ROOT/path).read_text(encoding='utf-8-sig'))
+            self.assertNotIn('CUCP_OBSERVATION_INTENDED', (historical_native_helper() if path.endswith('cucp-native-helper.ps1') else ROOT/path).read_text(encoding='utf-8-sig'))
         with self.assertRaises(AssertionError):QUALIFY.with_intended_initialization(raw+b'switch ($Action) {')
 
     def test_intended_initializer_uses_one_public_read_without_proxy_changes(self):
-        code=(ROOT/'tests/fixtures/legacy-observation-intended-provider/PublicUiaInitialization.cs').read_text()
+        code=(ROOT/'tests/fixtures/legacy-observation-intended-provider/PublicUiaInitialization.cs').read_text(encoding='utf-8')
         self.assertEqual(code.count('AutomationElement.FromHandle('),1)
         for token in ('RegisterClientSide','SetProxy','GetField(', 'BindingFlags', 'DynamicMethod','SendInput(','.Invoke()', '.SetValue('):self.assertNotIn(token,code)
-        source=(ROOT/'tests/fixtures/legacy-observation-intended-initialization.ps1').read_text()
+        source=(ROOT/'tests/fixtures/legacy-observation-intended-initialization.ps1').read_text(encoding='utf-8')
         self.assertIn('NativeWindowHandle -ne $intendedReady.hwnd',source)
         self.assertIn('ProcessId -ne $intendedReady.pid',source)
 
     def test_intended_tier_does_not_replace_raw_original_or_waive_planner(self):
-        source=(ROOT/'pcucp-next/packaging/qualify_legacy_observation.py').read_text()
+        source=(ROOT/'pcucp-next/packaging/qualify_legacy_observation.py').read_text(encoding='utf-8')
         self.assertLess(source.index('for label, arguments in cases + wrapper_cases:'),source.index("for temperature in ('cold','warm'):"))
         self.assertIn("'wrapper-smart-plan: scalar proof and actual completed cold/warm route pending'",source)
         self.assertIn("intended.get('scalar_capture_proof') == 'passed'",source)
@@ -137,7 +142,7 @@ class SourceTests(unittest.TestCase):
     def test_pre_fix_wrapper_is_exact_and_production_diff_is_two_scalar_copies(self):
         raw, manifest = QUALIFY.wrapper_source_bytes()
         self.assertEqual(hashlib.sha256(raw).hexdigest(),manifest['windows_sha256'])
-        current=(ROOT/'scripts/cucp.ps1').read_text(encoding='utf-8-sig').replace('\r\n','\n')
+        current=historical_native_wrapper().read_text(encoding='utf-8-sig').replace('\r\n','\n')
         for name in ('raw','err'):
             line=f'    if (${name} -is [string]) {{ ${name} = [string]::new(${name}.ToCharArray()) }}\n'
             self.assertEqual(current.count(line),1)
@@ -154,14 +159,14 @@ class SourceTests(unittest.TestCase):
 
     def test_smart_plan_phase_probe_is_opt_in_and_keeps_raw_source(self):
         driver=(ROOT/'tests/fixtures/legacy-observation-wrapper.ps1').read_text(encoding='utf-8-sig')
-        trace=(ROOT/'tests/fixtures/legacy-observation-smart-plan-trace.ps1').read_text()
+        trace=(ROOT/'tests/fixtures/legacy-observation-smart-plan-trace.ps1').read_text(encoding='utf-8')
         self.assertIn('if($TraceSmartPlan)',driver)
         self.assertIn('Set-PSBreakpoint -Script $wrapper -Line $point.Line -Action $action',trace)
         self.assertIn('Get-ObservationTraceSourceHash',trace)
         self.assertIn('$stream.Flush($true)',trace)
         self.assertNotIn('Set-Content',trace)
         self.assertNotIn('ConvertTo-Json -InputObject $value',trace)
-        gate=(ROOT/'pcucp-next/packaging/qualify_legacy_observation.py').read_text()
+        gate=(ROOT/'pcucp-next/packaging/qualify_legacy_observation.py').read_text(encoding='utf-8')
         self.assertIn("'wrapper_sha256_after_process':after_hash",gate)
 
 class ComparisonTests(unittest.TestCase):
@@ -371,7 +376,7 @@ class IntendedVerdictTests(unittest.TestCase):
 
     def test_exact_observed_windows_phase_sequences_are_retained_and_classified(self):
         folder=FIXTURES/'observed-smart-plan-37120978323'
-        manifest=json.loads((folder/'manifest.json').read_text())
+        manifest=json.loads((folder/'manifest.json').read_text(encoding='utf-8'))
         for record in manifest['records']:
             self.assertEqual(hashlib.sha256((folder/record['file']).read_bytes()).hexdigest(),record['sha256'])
         for mode in ('original','candidate'):

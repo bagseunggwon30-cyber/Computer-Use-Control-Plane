@@ -61,6 +61,14 @@ def expected(root: Path, inventory: dict) -> dict:
         seen.add(identity)
         if not (root / retired["replacement"]).is_file() or not retired.get("evidence"):
             raise ValueError(f"Retirement requires an existing replacement and evidence: {identity}")
+    seen_files = set()
+    for retired in result.get('retired_files', []):
+        path = retired['path']
+        if path in seen_files or (root / path).exists():
+            raise ValueError('Retired file is duplicate or still present: ' + path)
+        seen_files.add(path)
+        if not (root / retired['replacement']).is_file() or not retired.get('evidence') or not retired.get('original_sha256'):
+            raise ValueError('File retirement requires a replacement, provenance and evidence: ' + path)
     return result
 
 

@@ -296,7 +296,7 @@ class QualificationSelectionTests(unittest.TestCase):
             # Promotion must exercise the installed body. A stale caller
             # override cannot keep a deleted draft passing in its place.
             (root / 'scripts').mkdir()
-            production = root / 'scripts/cucp-native-helper.ps1'
+            production = root / 'scripts/cucp-native-helper.py'
             production.write_text('# production adapter')
             (root / '.github/migration-adapters.json').write_text('{"test_adapters":["file-images"]}')
             (root / 'tests/fixtures/legacy-file-images-adapter.ps1').unlink()
@@ -309,9 +309,10 @@ class QualificationSelectionTests(unittest.TestCase):
                 suites = [(args, env) for args, env in calls if '-m' in args and 'unittest' in args]
                 self.assertEqual(len(suites), 2)
                 for _, env in suites:
-                    self.assertEqual(env['CUCP_LEGACY_IMAGES_ADAPTER_SOURCE'], str(production))
+                    from legacy_historical_native import helper
+                    self.assertEqual(env['CUCP_LEGACY_IMAGES_ADAPTER_SOURCE'], str(helper()))
                 production.unlink()
-                with self.assertRaisesRegex(ValueError, 'Missing promoted file-images adapter source'):
+                with self.assertRaisesRegex(ValueError, 'Missing migrated file-images Python entrypoint'):
                     qualification.run_family('file-images')
 
     def test_candidate_kernel_gate_cannot_claim_adapter_retirement(self):

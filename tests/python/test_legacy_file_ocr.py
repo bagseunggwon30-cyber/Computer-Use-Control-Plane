@@ -8,6 +8,7 @@ import tempfile
 import unittest
 
 from test_legacy_images import ROOT, BASELINE_TREE, PROJECT, adapter_source
+from legacy_historical_native import helper as historical_native_helper
 
 FUNCTIONS = ['_Ensure-OCR', '_Wait-AsyncOp', '_Load-SoftwareBitmapFromFile', '_Convert-OcrResult', '_Action-OcrImage']
 
@@ -151,7 +152,7 @@ class FileOcrWindowsParityTests(unittest.TestCase):
         self.runner = self.root / 'runner.ps1'
         self.runner.write_text(RUNNER, encoding='utf-8-sig')
         self.command = ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(self.runner),
-                        '-Root', str(self.root), '-Source', str(source), '-Adapter', str(adapter_source()), '-NativeSource', str(ROOT / 'scripts/cucp-native-helper.ps1'), '-Dll', os.environ['CUCP_LEGACY_IMAGES_TEST_DLL']]
+                        '-Root', str(self.root), '-Source', str(source), '-Adapter', str(adapter_source()), '-NativeSource', str(historical_native_helper()), '-Dll', os.environ['CUCP_LEGACY_IMAGES_TEST_DLL']]
 
     def compare(self, operation, case):
         path = self.root / 'case.json'

@@ -3,7 +3,9 @@ BeforeAll {
 # Run: Invoke-Pester tests/cucp.LegacyRegression.Tests.ps1
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $wrapperPath = Join-Path $repoRoot "scripts/cucp.ps1"
-$helperPath = Join-Path $repoRoot "scripts/cucp-native-helper.ps1"
+$historicalDirectory = Join-Path $TestDrive 'historical-native'
+$helperPath = & python (Join-Path $repoRoot 'tests/python/legacy_historical_native.py') --directory $historicalDirectory
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $helperPath -PathType Leaf)) { throw 'Pinned historical native oracle unavailable.' }
 $tokens = $null
 $parseErrors = $null
 $wrapperAst = [System.Management.Automation.Language.Parser]::ParseFile($wrapperPath, [ref]$tokens, [ref]$parseErrors)

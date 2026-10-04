@@ -22,7 +22,7 @@
       "native_python_transport": {
         "previous_commit": "8d41b3456f538ae3984f969cb26a882a792d2b8f",
         "previous_wrapper_blob": "8e996169535fb4c6ffa57207711ead9cf85b30df",
-        "current_wrapper_blob": "df95519996a1866d424815dfb585619091ff342c",
+        "current_wrapper_blob": "c3f125a60b57c8e5af408e60f07602824333d39e",
         "changed_functions": [
           "Invoke-NativeHelper",
           "_Invoke-LegacyCdpBridge"
@@ -1323,7 +1323,7 @@
   "sources": [
     {
       "path": "scripts/cucp.ps1",
-      "sha256": "0200d3144eb32f9f6dba45b40a64390087f3c4a463a02e8fcb28d4beb5121f8b",
+      "sha256": "b13b8149bd461bdd08dda5ee9f7f548af1f5c7d9a5a2e464496e28407be95f12",
       "lines": 8272
     },
     {
@@ -1352,11 +1352,6 @@
       "lines": 92
     },
     {
-      "path": "scripts/cucp-native-helper.ps1",
-      "sha256": "1f71b68de141c645e9c604d79f1189096cb79aef4917b345300c8fca7c0af9f9",
-      "lines": 2796
-    },
-    {
       "path": "scripts/cucp-helper-server.ps1",
       "sha256": "173c5cde4c9ef282835d5add1e3e11fbf9f0756a7aed359750b00030f32ab7a8",
       "lines": 688
@@ -1380,6 +1375,66 @@
       "path": "pcucp-next/python/pcucp_cli/legacy_cdp_contract.py",
       "sha256": "28ad7305fbe62c9056d5cf921bad55e0a64ef15381c2387f2a306b9b052f4ce9",
       "lines": 341
+    },
+    {
+      "path": "scripts/cucp-native-helper.py",
+      "sha256": "906bde39b06c68cec620d9d1acb7e6dc903f7e49ea95412656b09e328c06c78f",
+      "lines": 9
+    },
+    {
+      "path": "pcucp-next/python/pcucp_cli/legacy_native_entry.py",
+      "sha256": "e59b7c8a912b70704ddbf1c81dabe7ceefb476674c91dd8bdebb67c484b5c594",
+      "lines": 69
+    },
+    {
+      "path": "pcucp-next/python/pcucp_cli/legacy_native_desktop.py",
+      "sha256": "e7ae8fe090efd397cffc35b0e3535e511436e73eb65d95f355732a109ef843b5",
+      "lines": 218
+    },
+    {
+      "path": "pcucp-next/python/pcucp_cli/legacy_cdp_bridge.py",
+      "sha256": "a558157cec18cf3825b787c8764cf95fdd17642835446152861ae2e135e3518c",
+      "lines": 118
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyDesktop/DesktopActions.cs",
+      "sha256": "588879d51f27dd5719a320fbd0bab8bb64d5e4a407cb917af92b81d006aef84d",
+      "lines": 189
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyDesktop/DesktopInput.cs",
+      "sha256": "76eda653e0607e0fd296043819a5b55ac6bf73c2ba525b29a45545c96a39ea7b",
+      "lines": 158
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyDesktop/DesktopOcr.cs",
+      "sha256": "7818528daac0d96953d9bd37cc00b02490ebafc9f30c0e04fea9cd005752d9f4",
+      "lines": 175
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyDesktop/DesktopOptions.cs",
+      "sha256": "d89e32a24dbf074882c6927f7da264e112d74d1c4654097b292f42e609d6b122",
+      "lines": 60
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyDesktop/DesktopUia.cs",
+      "sha256": "61412e9559c905813a7e4020fb55d0051206408fcfd1dec76331dcdbea444d8c",
+      "lines": 166
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyDesktop/Program.cs",
+      "sha256": "368315e8ff2a7055b8db5d99ed426f0a22a979eec1d3cd0100cf55dc5b867940",
+      "lines": 134
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyDesktop/PcuCp.LegacyDesktop.csproj",
+      "sha256": "811f10e2be3283037f911f74b92adc43285a41d6703842298e052ee32f5eaabb",
+      "lines": 17
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyDesktop/app.manifest",
+      "sha256": "116d6408a5670cc952ef6bd51d036c50845b906983346c69898552f4d26976db",
+      "lines": 12
     }
   ],
   "extents": [
@@ -2397,7 +2452,7 @@
       "name": "Invoke-NativeHelper",
       "start_line": 1113,
       "end_line": 1290,
-      "sha256": "b4fdadeedfe8de87383f32caf9ce875868c09cbe2cc3a345250699fd1fdcdcbc"
+      "sha256": "2a9a13028ddb5a43a2a0ce153cf6cc2a60328d06ea85b06c57897f4e29321d47"
     }
   ],
   "dispatch_relationships": [
@@ -3299,5 +3354,15 @@
     "json_status_error_zero_exit_promoted_to": 1,
     "timeout_exit": 124,
     "streaming": "node CliPath with unchanged bound argv; no modern registry fallback"
-  }
+  },
+  "retired_sources": [
+    {
+      "path": "scripts/cucp-native-helper.ps1",
+      "sha256": "1f71b68de141c645e9c604d79f1189096cb79aef4917b345300c8fca7c0af9f9",
+      "lines": 2796,
+      "replacement": "scripts/cucp-native-helper.py",
+      "historical_oracle_commit": "8d41b3456f538ae3984f969cb26a882a792d2b8f",
+      "scope": "All 34 helper actions replaced by Python/C#; historical PS is test-only Git oracle."
+    }
+  ]
 }

@@ -387,7 +387,7 @@ Describe "cucp vision-click-precise safety gate" {
 # ============================================================================
 # Sprint v6: Native helper 직통 매크로 (외부 helper 의존 없음)
 # ============================================================================
-# 이 그룹은 cucp-native-helper.ps1 (Win32 + UIA + Screenshot) 만으로
+# 이 그룹은 cucp-native-helper.py (Win32 + UIA + Screenshot) 만으로
 # 동작해야 함. windows-mcp / Codex helper / cli.mjs 모두 없어도 OK.
 
 Describe "cucp native helper - read-only" {
@@ -446,12 +446,12 @@ Describe "cucp native helper - safety gates" {
 }
 
 Describe "cucp native helper - direct invocation" {
-  $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.ps1"
+  $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.py"
   It "helper 자체가 health JSON 반환" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP: native helper missing"; return }
     $tmp = Join-Path $env:TEMP ("native-out-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,"-Action","health"
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,"-Action","health"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $proc.ExitCode | Should Be 0
     $raw = Get-Content -LiteralPath $tmp -Raw -Encoding UTF8
@@ -463,8 +463,8 @@ Describe "cucp native helper - direct invocation" {
   It "helper 의 windows action은 EnumWindows 결과 반환" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP: native helper missing"; return }
     $tmp = Join-Path $env:TEMP ("native-out-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,"-Action","windows"
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,"-Action","windows"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $proc.ExitCode | Should Be 0
     $raw = Get-Content -LiteralPath $tmp -Raw -Encoding UTF8
@@ -534,14 +534,14 @@ Describe "cucp watch - 연속 관찰" {
 }
 
 Describe "cucp native-helper UIA Pattern actions" {
-  $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.ps1"
+  $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.py"
   It "uia-find 가 어떤 라벨이든 valid envelope 반환 (Electron app 환경 의존 완화)" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     # 환경 의존 테스트 — Electron app 윈도우가 떠있고 "최소화" 단추가 있어야 ok.
     # 그렇지 않은 경우 partial(2) 또는 error(1) 반환. 우리는 envelope 형식만 검증.
     $tmp = Join-Path $env:TEMP ("uia-find-test-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,
       "-Action","uia-find","-Match","electron","-Label","최소화"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
@@ -598,15 +598,15 @@ Describe "cucp OCR - safety gates" {
 }
 
 Describe "cucp OCR - native-helper actions" {
-  $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.ps1"
+  $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.py"
   $fixture = Join-Path $env:TEMP ("cucp-ocr-fix-" + [guid]::NewGuid().ToString("N") + ".png")
 
   It "ocr-image 가 synthetic PNG에서 영어/한국어 라인 추출" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     _New-OcrFixturePng -Path $fixture
     $tmp = Join-Path $env:TEMP ("ocr-img-test-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,
       "-Action","ocr-image","-OcrPath",$fixture
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
@@ -628,8 +628,8 @@ Describe "cucp OCR - native-helper actions" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     _New-OcrFixturePng -Path $fixture
     $tmp = Join-Path $env:TEMP ("ocr-find-test-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,
       "-Action","ocr-find-text","-OcrPath",$fixture,"-OcrText","Send","-OcrMatch","contains"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
@@ -650,8 +650,8 @@ Describe "cucp OCR - native-helper actions" {
   It "ocr-find-text 는 연속 단어 n-gram 후보를 반환" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     _New-OcrFixturePng -Path $fixture
-    $raw = & powershell @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $raw = & python @(
+      "-X","utf8",$nativeHelper,
       "-Action","ocr-find-text","-OcrPath",$fixture,"-OcrText","Send Message","-OcrMatch","contains","-OcrMaxCandidates","8"
     ) | Out-String
     $exitCode = $LASTEXITCODE
@@ -667,8 +667,8 @@ Describe "cucp OCR - native-helper actions" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     _New-OcrFixturePng -Path $fixture
     $tmp = Join-Path $env:TEMP ("ocr-fuzzy-test-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,
       "-Action","ocr-find-text","-OcrPath",$fixture,"-OcrText","5end","-OcrMatch","fuzzy","-OcrMaxCandidates","8"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
@@ -686,8 +686,8 @@ Describe "cucp OCR - native-helper actions" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     _New-OcrFixturePng -Path $fixture
     $tmp = Join-Path $env:TEMP ("ocr-nomatch-test-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,
       "-Action","ocr-find-text","-OcrPath",$fixture,"-OcrText","__cucp_unlikely_ocr_xyz__","-OcrMatch","contains"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
@@ -819,15 +819,15 @@ Describe "cucp v0.9.0 - ocr-uia-fuse" {
 }
 
 Describe "cucp v0.9.0 - native-helper screenshot-diff direct" {
-  $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.ps1"
+  $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.py"
 
   It "screenshot-diff direct 는 동일 PNG 에 changed=false 반환" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     $pngA = Join-Path $env:TEMP ("cucp-v090-direct-" + [guid]::NewGuid().ToString("N") + ".png")
     _New-SolidColorPng -Path $pngA -ColorName "Blue"
     $tmp = Join-Path $env:TEMP ("v090-direct-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,
       "-Action","screenshot-diff","-DiffBefore",$pngA,"-DiffAfter",$pngA
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
@@ -915,13 +915,13 @@ Describe "cucp v1.0.0 - screenshot-diff ignore-region" {
 }
 
 Describe "cucp v1.0.0 - native-helper ocr-uia-invoke direct" {
-  $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.ps1"
+  $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.py"
 
   It "ocr-uia-invoke direct 매칭 없을 때 partial(2) + reason=no_ocr_match" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     $tmp = Join-Path $env:TEMP ("v100-direct-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,"--allow-live-control",
       "-Action","ocr-uia-invoke","-OcrText","__cucp_unlikely_direct_xyz__"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
@@ -937,8 +937,8 @@ Describe "cucp v1.0.0 - native-helper ocr-uia-invoke direct" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     # foreground 의 흔한 텍스트로 매칭이 잡힐 수 있음
     $tmp = Join-Path $env:TEMP ("v100-fuse-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,
       "-Action","ocr-uia-fuse","-OcrText","File","-OcrMatch","contains"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
@@ -1317,11 +1317,11 @@ Describe "cucp v1.2.0 - click hit-test guard" {
   }
 
   It "native helper click 의 -TargetMatch 가드가 unmatched 시 status=blocked + exit 3" {
-    $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.ps1"
+    $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.py"
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     $tmp = Join-Path $env:TEMP ("v120-click-guard-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,"--allow-live-control",
       "-Action","click","-X","1","-Y","1","-TargetMatch","__cucp_unlikely_window_xyz__"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
@@ -1886,13 +1886,13 @@ Describe "cucp v1.3.10 - workflow planner/runner" {
 }
 
 Describe "cucp v1.3.0 - native-helper CDP direct" {
-  $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.ps1"
+  $nativeHelper = Join-Path $skillRoot "scripts\cucp-native-helper.py"
 
   It "cdp-detect direct on closed port returns partial(2) + envelope" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     $tmp = Join-Path $env:TEMP ("v130-cdp-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,
       "-Action","cdp-detect","-CdpPort","9999"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
@@ -1911,8 +1911,8 @@ Describe "cucp v1.3.0 - native-helper CDP direct" {
     # 닫힌 포트에서는 partial 반환해야 함.
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     $tmp = Join-Path $env:TEMP ("v130-cdp-type-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,
       "-Action","cdp-type","-CdpSelector","textarea","-Text","x","-CdpPort","9999"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
@@ -1927,8 +1927,8 @@ Describe "cucp v1.3.0 - native-helper CDP direct" {
   It "cdp-smart-click direct on closed port returns partial(2) + envelope" {
     if (-not (Test-Path -LiteralPath $nativeHelper)) { Write-Host "SKIP"; return }
     $tmp = Join-Path $env:TEMP ("v130-cdp-smart-" + [guid]::NewGuid().ToString("N") + ".json")
-    $proc = Start-Process -FilePath "powershell" -ArgumentList @(
-      "-NoProfile","-ExecutionPolicy","Bypass","-File",$nativeHelper,
+    $proc = Start-Process -FilePath "python" -ArgumentList @(
+      "-X","utf8",$nativeHelper,
       "-Action","cdp-smart-click","-CdpText","Send","-CdpPort","9999"
     ) -RedirectStandardOutput $tmp -NoNewWindow -PassThru -Wait
     $raw = ""
@@ -2059,7 +2059,7 @@ Describe "cucp v1.4.0 - release-notes (read-only) + secret redaction" {
     $tmp = Join-Path $env:TEMP ("cucp-redact-" + [guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Path "$tmp\scripts" -Force | Out-Null
     Copy-Item "$skillRoot\scripts\cucp.ps1" "$tmp\scripts\cucp.ps1"
-    Copy-Item "$skillRoot\scripts\cucp-native-helper.ps1" "$tmp\scripts\cucp-native-helper.ps1"
+    Copy-Item "$skillRoot\scripts\cucp-native-helper.py" "$tmp\scripts\cucp-native-helper.py"
     $cl = @(
       "# Test Changelog",
       "",

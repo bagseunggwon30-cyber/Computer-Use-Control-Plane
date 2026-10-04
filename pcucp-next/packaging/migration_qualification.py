@@ -207,10 +207,14 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
                     if family == "cdp":
                         env["CUCP_LEGACY_CDP_ADAPTER_MODE"] = "production"
                     elif family == "file-images":
-                        source = ROOT / "scripts/cucp-native-helper.ps1"
-                        if not source.is_file():
-                            raise ValueError("Missing promoted file-images adapter source.")
-                        env["CUCP_LEGACY_IMAGES_ADAPTER_SOURCE"] = str(source)
+                        entry = ROOT / "scripts/cucp-native-helper.py"
+                        if not entry.is_file():
+                            raise ValueError("Missing migrated file-images Python entrypoint.")
+                        # Historical PS adapters remain library differential
+                        # oracles. The public native route is Python/C# now.
+                        sys.path.insert(0, str(ROOT / 'tests/python'))
+                        from legacy_historical_native import helper
+                        env["CUCP_LEGACY_IMAGES_ADAPTER_SOURCE"] = str(helper())
                     print(f"Running candidate and promoted {family} adapter gates", flush=True)
                 else:
                     draft = ROOT / DRAFT_ADAPTERS.get(family, f"tests/fixtures/legacy-{family}-adapter.ps1")

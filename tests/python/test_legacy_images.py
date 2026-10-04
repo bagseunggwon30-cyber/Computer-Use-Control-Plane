@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+from legacy_historical_native import helper as historical_native_helper
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE_TREE = 'bf895d3120dd5e145f360cb1c41e1d79a061d048'
@@ -23,7 +24,7 @@ def adapter_source():
             source = ROOT / source
     else:
         manifest = json.loads((ROOT / '.github/migration-adapters.json').read_text())
-        source = ROOT / 'scripts/cucp-native-helper.ps1' if 'file-images' in manifest['test_adapters'] else DRAFT
+        source = historical_native_helper() if 'file-images' in manifest['test_adapters'] else DRAFT
     if not source.is_file():
         raise FileNotFoundError(f'Configured file-images adapter source is missing: {source}')
     return source
@@ -175,7 +176,7 @@ if ($Boundary) {
 }
 _Action-ScreenshotDiff
 ''', encoding='utf-8-sig')
-            command = ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(runner), '-Root', str(folder), '-Source', str(source), '-Dll', os.environ['CUCP_LEGACY_IMAGES_TEST_DLL'], '-Adapter', str(adapter_source()), '-NativeSource', str(ROOT / 'scripts/cucp-native-helper.ps1')]
+            command = ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(runner), '-Root', str(folder), '-Source', str(source), '-Dll', os.environ['CUCP_LEGACY_IMAGES_TEST_DLL'], '-Adapter', str(adapter_source()), '-NativeSource', str(historical_native_helper())]
             if boundary:
                 command.append('-Boundary')
             generation = subprocess.run([*command, '-Mode', 'generate'], capture_output=True, timeout=30)

@@ -29,12 +29,15 @@ def startup(argv):
 
 
 def main(argv=None):
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
     started = time.monotonic()
     runtime = None
     action = ''
     try:
         arguments, authority, timeout = startup(sys.argv[1:] if argv is None else argv)
         require(len(arguments) >= 2 and arguments[0].casefold() == '-action', 'Native helper requires -Action first.')
+        arguments[0], arguments[1] = '-Action', arguments[1].casefold()
         action = arguments[1]
         deadline, cancelled = time.monotonic() + timeout, threading.Event()
         class Scope:

@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from legacy_historical_native import helper as historical_native_helper
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = '9ffa354b9904235835a7bc6eb78ed8d3d76317c8'
@@ -96,7 +97,7 @@ foreach ($case in $cases) {
                 "@('_Normalize-OcrText','_Levenshtein-Distance','_Similarity-Percent','_Score-OcrText','_Match-OcrCandidates')",
                 "@('_Match-OcrCandidates')"), encoding='utf-8-sig')
             bridged = subprocess.run([powershell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(bridge_runner),
-                '-SourcePath', str(ROOT/'scripts/cucp-native-helper.ps1'), '-InputPath', str(inputs)],
+                '-SourcePath', str(historical_native_helper()), '-InputPath', str(inputs)],
                 env={**os.environ, 'CUCP_NATIVE_HOST': str(host)}, capture_output=True, timeout=90)
             self.assertEqual(bridged.returncode, 0, bridged.stderr.decode('utf-8', errors='replace'))
             self.assertEqual(json.loads(bridged.stdout.decode('utf-8-sig')), expected)
