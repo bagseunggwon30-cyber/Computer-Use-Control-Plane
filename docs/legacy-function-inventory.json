@@ -1519,8 +1519,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 855608,
-    "removed": 157870,
+    "current": 857221,
+    "removed": 156257,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
