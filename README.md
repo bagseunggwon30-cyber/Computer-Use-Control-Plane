@@ -76,14 +76,14 @@ Windows 빌드, 실제 실행 파일을 다른 한글/공백 경로로 옮긴 �
 
 관리자 앱 입력은 사람이 호스트를 관리자 권한으로 시작하고 UAC를 승인하는 방식입니다.
 CUCP는 시작한 부모 프로세스의 권한을 이어받으며 분리된 권한 브로커는 없습니다.
-호스트 전체를 승격하면 그 호스트의 다른 도구도 함께 승격될 수 있습니다. 선택적 `start-pi.ps1 -Elevated`를 쓰는 경우에는 Pi 전체가 이 범위에 해당합니다.
+호스트 전체를 승격하면 그 호스트의 다른 도구도 함께 승격될 수 있습니다. 선택적 `python pcucp-next/packaging/start_pi.py --elevated`를 쓰는 경우에는 Pi 전체가 이 범위에 해당합니다.
 SYSTEM/PPL·UAC 보안 데스크톱·로그인 화면 제어는 지원하지 않습니다.
 같은 창의 제한된 드래그와 관찰에 묶인 UIA 패턴 실행은 구현되어 있습니다. 실제 IME 조합·클립보드 워크플로·이벤트 기반 관찰·CDP의 나머지 앱별 호환성·선택적 비전 통합의 전체 이전은 아직 진행 중입니다.
 현재 배포는 Windows x64 미리보기이며 코드 서명·설치기·자동 업데이트가 없습니다.
 
 ## 기존 PowerShell 코드
 
-`scripts/`, 기존 `install.ps1`, Codex 플러그인/스킬 및 앱별 매크로는 **레거시 호환 소스**입니다.
+`scripts/`, Codex 플러그인/스킬 및 앱별 매크로는 **레거시 호환 소스**입니다. 설치는 `python install.py`를 사용합니다. 기본 설치 대상은 기존 매크로를 제공하는 레거시 백엔드이며, 아직 PowerShell 래퍼가 필요합니다.
 새 배포본에 포함하지 않으며, MCP/JSONL 코어와 Pi 어댑터는 이를 자동으로 호출하지 않습니다.
 기존 설치기는 레거시를 설치합니다. 새 MCP 변경은 위 소스 안내를, 기존 배포 버전은 0.4.0 포터블 안내를 사용하세요.
 소스 개발자가 필요할 때만 `python -m pcucp_cli legacy -- ...`로 명시적으로 호출할 수 있습니다. 레거시 Win32 경로는 `python pcucp-next/packaging/publish_legacy_interop.py`로 사전 빌드한 호환 DLL도 필요합니다. 레거시 OCR·이미지 비교 경로에는 같은 커밋에서 `python pcucp-next/packaging/publish_legacy_images.py`로 빌드한 `PcuCp.LegacyImages.dll`이 필요합니다. 실행 중 C# 코드를 컴파일하거나 누락 DLL을 내려받는 대체 경로는 없습니다.

@@ -52,7 +52,7 @@ def component_paths() -> dict[str, str]:
     return {
         "python_cli": rel(nxt / "python" / "pcucp_cli"),
         "native_host_project": rel(nxt / "dotnet" / "PcuCp.NativeHost" / "PcuCp.NativeHost.csproj"),
-        "thin_launcher": rel(nxt / "powershell" / "cucp-next.ps1"),
+        "thin_launcher": rel(nxt / "python" / "run_source.py"),
         "legacy_wrapper": rel(root / "scripts" / "cucp.ps1"),
         "runtime_profile": rel(nxt / "config" / "runtime-profile.json"),
     }

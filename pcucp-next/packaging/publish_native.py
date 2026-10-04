@@ -16,8 +16,8 @@ def publish_command(dotnet, runtime, output):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--runtime', choices=['win-x64', 'win-arm64'], default='win-x64')
-    parser.add_argument('--output', type=Path, default=ROOT / 'pcucp-next/bin/native')
+    parser.add_argument('--runtime', '-Runtime', choices=['win-x64', 'win-arm64'], default='win-x64')
+    parser.add_argument('--output', '-OutputDirectory', type=Path, default=ROOT / 'pcucp-next/bin/native')
     parser.add_argument('--dotnet', default='dotnet', help='SDK executable name or path')
     args = parser.parse_args(argv)
     dotnet = shutil.which(args.dotnet)

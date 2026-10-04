@@ -25,7 +25,18 @@ class RegistryRefreshTests(unittest.TestCase):
                     b'    if ($err -is [string]) { $err = [string]::new($err.ToCharArray()) }\n')
         self.assertEqual(base.count(marker), 1)
         self.assertEqual(base.replace(marker, marker + addition, 1), current)
-        self.assertEqual(dispatch._canonical_text((ROOT / 'scripts/cucp.ps1').read_bytes()), dispatch._canonical_text(current))
+        # Preserve the historical two-line correction proof. The subsequently
+        # reviewed Python transport changes only this one function and its path.
+        actual = dispatch._canonical_text((ROOT / 'scripts/cucp.ps1').read_bytes())
+        old_body = dispatch._function_extent(dispatch._canonical_text(current), 'Invoke-NativeHelper')[2]
+        new_body = dispatch._function_extent(actual, 'Invoke-NativeHelper')[2]
+        expected = dispatch._canonical_text(current).replace(old_body, new_body, 1).replace(
+            '$Script:NativeHelperPath = Join-Path $PSScriptRoot "cucp-native-helper.ps1"',
+            '$Script:NativeHelperPath = Join-Path $PSScriptRoot "cucp-native-helper.py"', 1)
+        self.assertEqual(actual, expected)
+        self.assertIn("-Operation 'desktop-native'", new_body)
+        self.assertNotIn('Start-Process', new_body)
+        self.assertNotIn('$stdoutFile', new_body)
         revision = dispatch.load_contract().metadata['checkpoint']['source_revision']
         self.assertEqual(revision['base_public_commit'], '968379e6eca731ff849fd554339601261c291584')
         self.assertEqual(revision['base_tree'], '5fb9191301f91e585efe40c8c86c0f74b296f92c')
@@ -41,8 +52,10 @@ class RegistryRefreshTests(unittest.TestCase):
             first, last, body = dispatch._function_extent(base, row['name'])
             if dispatch._digest(body) != row['sha256']:
                 changed.append(row['name'])
-            self.assertEqual(row['start_line'], first + (2 if first > 1304 else 0))
-            self.assertEqual(row['end_line'], last + (2 if last > 1304 else 0))
+            actual = dispatch._canonical_text((ROOT / row['path']).read_bytes())
+            current_first, current_last, current_body = dispatch._function_extent(actual, row['name'])
+            self.assertEqual((row['start_line'], row['end_line'], row['sha256']),
+                (current_first, current_last, dispatch._digest(current_body)))
         self.assertEqual(changed, ['Invoke-NativeHelper'])
         dispatch.assert_frozen_sources(ROOT)
 

@@ -4,10 +4,10 @@
 
 # region cdp-process-bridge
 function _Invoke-LegacyCdpBridge {
-  param([ValidateSet('native','native-prepare','macro-prepare','macro-complete')][string]$Operation,
-        [hashtable]$Request, [switch]$LiveAuthority, [int]$Port = 9222)
+  param([ValidateSet('native','desktop-native','native-prepare','macro-prepare','macro-complete')][string]$Operation,
+        [hashtable]$Request, [switch]$LiveAuthority, [int]$Port = 9222, [int]$TimeoutMs = 15000)
   $hostExe = $env:CUCP_LEGACY_CDP_HOST
-  if ($hostExe) {
+  if ($hostExe -and $Operation -ne 'desktop-native') {
     $executable = [IO.Path]::GetFullPath($hostExe)
     $prefix = 'legacy-cdp-bridge'
     $directory = [IO.Path]::GetDirectoryName($executable)
@@ -27,6 +27,10 @@ function _Invoke-LegacyCdpBridge {
   $psi.FileName = $executable
   $psi.WorkingDirectory = $directory
   $psi.Arguments = $prefix + ' --operation ' + $Operation
+  if ($Operation -eq 'desktop-native') {
+    if ($TimeoutMs -le 0) { throw 'Native bridge timeout must be positive.' }
+    $psi.Arguments += ' --timeout-s ' + ([double]$TimeoutMs / 1000).ToString([Globalization.CultureInfo]::InvariantCulture)
+  }
   if ($Operation -eq 'native') {
     if ($Port -lt 1 -or $Port -gt 65535) { throw 'CDP endpoint port is outside 1..65535.' }
     $psi.Arguments += ' --endpoint http://127.0.0.1:' + $Port + ' --timeout-s 8'
@@ -55,7 +59,7 @@ function _Invoke-LegacyCdpBridge {
     $inputClosed = $false
     while (-not ($process.HasExited -and $null -eq $outRead -and $null -eq $errRead)) {
       $progressed = $false
-      if ($watch.ElapsedMilliseconds -ge 15000) { throw 'CDP bridge timed out; no retry was attempted.' }
+      if ($watch.ElapsedMilliseconds -ge $TimeoutMs) { throw 'Native bridge timed out; no retry was attempted.' }
       if (-not $inputClosed -and $write.IsCompleted) {
         [void]$write.GetAwaiter().GetResult(); $process.StandardInput.Close(); $inputClosed = $true
         $progressed = $true
@@ -63,7 +67,8 @@ function _Invoke-LegacyCdpBridge {
       if ($null -ne $outRead -and $outRead.IsCompleted) {
         $progressed = $true
         $n = $outRead.GetAwaiter().GetResult()
-        if ($out.Length + $n -gt 4194304) { throw 'CDP bridge stdout exceeds 4 MiB; no retry was attempted.' }
+        $outputLimit = if ($Operation -eq 'desktop-native') { 33554432 } else { 4194304 }
+        if ($out.Length + $n -gt $outputLimit) { throw 'Native bridge stdout exceeds its byte limit; no retry was attempted.' }
         if ($n -gt 0) { [void]$out.Append($outBuffer, 0, $n); $outRead = $process.StandardOutput.ReadAsync($outBuffer, 0, $outBuffer.Length) }
         else { $outRead = $null }
       }

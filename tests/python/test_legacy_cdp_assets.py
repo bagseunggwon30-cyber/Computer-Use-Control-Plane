@@ -116,10 +116,13 @@ class LegacyCdpAssetParityTests(unittest.TestCase):
         program=r'''
 const fs=require('node:fs');const data=JSON.parse(fs.readFileSync(0,'utf8'));
 const session=new (require('node:inspector').Session)();session.connect();
+const watchdog=setTimeout(()=>{session.disconnect();process.exitCode=2;},5000);
 session.post('Runtime.evaluate',{expression:data.expression,throwOnSideEffect:true,
   awaitPromise:false,returnByValue:true,timeout:1000},(error,result)=>{
+    clearTimeout(watchdog);
+    session.disconnect();
     process.stdout.write(JSON.stringify({error:error||null,response:result}));
-});session.disconnect();
+});
 '''
         expression='('+css_identifier_source()+')'
         expression='['+','.join(expression+'('+json.dumps(value,ensure_ascii=True)+')' for value,_ in rows)+']'

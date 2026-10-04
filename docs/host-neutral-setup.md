@@ -24,7 +24,7 @@ cucp doctor --json
 cucp mcp
 ```
 
-Publishing is an explicit developer build, never an action-time rebuild. For ARM64, add `--runtime win-arm64` (not verified in this change). `--dotnet` selects an SDK executable; `--output` selects a publish folder. The old `publish-native.ps1` is a compatibility shim delegating to this Python command. A future newly built portable bundle can use `CUCP.exe mcp`; existing 0.4.0 published downloads do **not** contain these uncommitted changes.
+Publishing is an explicit developer build, never an action-time rebuild. For ARM64, add `--runtime win-arm64` (not verified in this change). `--dotnet` selects an SDK executable; `--output` selects a publish folder. The old `publish-native.ps1` shim has been retired; use this Python command directly. A future newly built portable bundle can use `CUCP.exe mcp`; existing 0.4.0 published downloads do **not** contain these changes.
 
 ## Generic local MCP configuration
 

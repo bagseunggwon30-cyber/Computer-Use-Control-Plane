@@ -1,6 +1,7 @@
 """Bounded process operations for thin retained native-helper and macro adapters.
 
-Only ``native`` opens a connection. Pure macro stages return acquisition/effect
+``native`` opens CDP; ``desktop-native`` owns the compiled Windows worker.
+Pure macro stages return acquisition/effect
 plans; they do not launch helpers, write logs, or render legacy Console output.
 All authority comes from CLI/host startup, never the JSON request.
 """
@@ -16,6 +17,7 @@ from .cdp import CdpError, _json
 from .legacy_cdp import LegacyCdpAdapter
 from .legacy_cdp_contract import LegacyCdpResult, native_arguments, prepare_macro, prepare_native
 from .legacy_cdp_macro import macro_output, port_closed_output
+from .legacy_host_protocol import Authority, LegacyHostError
 
 SCHEMA = 'cucp.legacy-cdp-bridge/v1'
 MAX_FRAME = 1024 * 1024
@@ -43,6 +45,10 @@ def _helper_reply(reply: Any) -> tuple[LegacyCdpResult, str | None, bool]:
 def handle(operation: str, request: dict, *, allow_live_control=False, endpoint=None, timeout_s=8) -> dict:
     if type(allow_live_control) is not bool:
         raise ValueError('startup live authority must be boolean')
+    if operation == 'desktop-native':
+        _fields(request, {'argv'})
+        from .legacy_native_desktop import DesktopSession
+        return DesktopSession(authority=Authority(allow_live_control), timeout_s=timeout_s).run(request['argv'])
     if operation == 'native-prepare':
         _fields(request, {'argv'})
         native = prepare_native(request['argv'])
@@ -80,7 +86,7 @@ def handle(operation: str, request: dict, *, allow_live_control=False, endpoint=
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--operation', choices=('native', 'native-prepare', 'macro-prepare', 'macro-complete'), required=True)
+    parser.add_argument('--operation', choices=('native', 'desktop-native', 'native-prepare', 'macro-prepare', 'macro-complete'), required=True)
     parser.add_argument('--endpoint')
     parser.add_argument('--allow-live-control', action='store_true')
     parser.add_argument('--timeout-s', type=float, default=8)
@@ -96,12 +102,13 @@ def main(argv=None):
         result = handle(options.operation, request, allow_live_control=options.allow_live_control,
                         endpoint=options.endpoint, timeout_s=options.timeout_s)
         response, exit_code = dict(schema=SCHEMA, status='ok', data=result), 0
-    except (ValueError, CdpError, PermissionError, OverflowError) as exc:
+    except (ValueError, CdpError, LegacyHostError, OSError, OverflowError) as exc:
         response, exit_code = dict(schema=SCHEMA, status='error', error=dict(
             code=getattr(exc, 'code', 'invalid_arguments'), message=str(exc)[:2048])), 1
     encoded = json.dumps(response, ensure_ascii=True, allow_nan=False, separators=(',', ':')).encode('ascii') + b'\n'
-    if len(encoded) > MAX_RESPONSE:
-        encoded = b'{"schema":"cucp.legacy-cdp-bridge/v1","status":"error","error":{"code":"response_limit","message":"Bridge response exceeds 4 MiB"}}\n'
+    maximum = 32 * 1024 * 1024 if options.operation == 'desktop-native' else MAX_RESPONSE
+    if len(encoded) > maximum:
+        encoded = b'{"schema":"cucp.legacy-cdp-bridge/v1","status":"error","error":{"code":"response_limit","message":"Bridge response exceeds its byte limit"}}\n'
         exit_code = 1
     sys.stdout.buffer.write(encoded)
     return exit_code

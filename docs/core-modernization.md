@@ -118,7 +118,7 @@ C# 입력 직전에는 창 존재·PID·예상 창 위치와 크기·전경 상�
 
 목표는 일반 사용자 앱과 허용된 관리자 앱의 조작 가능성을 명확히 진단하는 것이다. 모든 프로세스보다 위에서 실행해 보안 경계를 없애는 구조는 채택하지 않는다.
 
-현재는 사람이 `start-pi.ps1 -Elevated`를 선택하면 Windows의 정상 UAC 승인을 거쳐 **Pi 전체**를 관리자 권한으로 시작한다. Python과 네이티브 자식도 이 실행 권한을 이어받는다. CUCP의 조작 모드는 여전히 기본 꺼짐이며, 별도로 `/computer on`이 필요하다.
+현재는 사람이 `python pcucp-next/packaging/start_pi.py --elevated`를 선택하면 Windows의 정상 UAC 승인을 거쳐 **Pi 전체**를 관리자 권한으로 시작한다. Python과 네이티브 자식도 이 실행 권한을 이어받는다. CUCP의 조작 모드는 여전히 기본 꺼짐이며, 별도로 `/computer on`이 필요하다.
 
 - 일반 실행에서 더 높은 무결성의 대상에 접근하면 `elevation_required`를 반환한다.
 - 권한 조회에 실패하면 가능하다고 추정하지 않고 오류를 반환한다.
@@ -187,7 +187,7 @@ C# 프로세스 재사용은 구현했다. 2단계에서 확인한 호출 비용
 - [Python 세션](../pcucp-next/python/pcucp_cli/engine.py)
 - [공통 명령 레지스트리](../pcucp-next/python/pcucp_cli/registry.py)
 - [네이티브 입력](../pcucp-next/dotnet/PcuCp.NativeHost/DesktopActions.cs)
-- [네이티브 게시](../pcucp-next/dotnet/publish-native.ps1)
+- [네이티브 게시](../pcucp-next/packaging/publish_native.py)
 
 이 방향은 구현과 검증을 위한 설계 결정이다. 특정 최신 모델이나 논문의 점수를 CUCP 자체의 성공률로 제시하지 않는다.
 

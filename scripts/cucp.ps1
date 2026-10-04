@@ -208,7 +208,7 @@ function Write-WrapperLog {
 # CUCP 전용 PowerShell helper 위치. Win32 + UIA + Screenshot을 직접 호출해서
 # 외부 windows-mcp 서버나 Codex 공식 helper에 의존하지 않습니다. 이 helper는
 # 스킬 폴더 안에 항상 같이 배포되므로 절대 경로 탐색 불필요.
-$Script:NativeHelperPath = Join-Path $PSScriptRoot "cucp-native-helper.ps1"
+$Script:NativeHelperPath = Join-Path $PSScriptRoot "cucp-native-helper.py"
 if (-not (Test-Path -LiteralPath $Script:NativeHelperPath)) {
   $Script:NativeHelperPath = ""
 }
@@ -1111,22 +1111,7 @@ $Script:LegacyCdpSourceRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '.
 . (Join-Path $PSScriptRoot 'cucp-legacy-diagnostic-adapter.ps1')
 
 function Invoke-NativeHelper {
-  # ==========================================================================
-  # cucp-native-helper.ps1 을 child PowerShell 프로세스로 띄우고 결과 파싱.
-  # ==========================================================================
-  # 책임:
-  #   1. -File 모드로 helper 호출 (NoProfile / ExecutionPolicy Bypass)
-  #   2. 시간 초과 시 child kill + envelope ExitCode=124 반환
-  #   3. stdout/stderr 임시 파일 → 읽기 → JSON 파싱 → 반환
-  #   4. exit code 정확히 추정 (PS5 의 Start-Process bug 우회)
-  #
-  # exit code 추정 흐름 (v1.0.0 fix):
-  #   a. proc.Refresh() + [int]proc.ExitCode  ← 가장 정확
-  #   b. by-PID 재조회 ([Process]::GetProcessById)  ← (a) 가 InvalidOpEx 던질 때
-  #   c. JSON status 기반 보정 (partial → 2, error → 1) ← (b) 도 실패 시
-  # 이 3-tier fallback 이 없으면 partial(2) / error(1) 가 wrapper exit 0 으로
-  # 흘러 들어가는 잠재 버그 발생 (v0.6.0~0.8.0 까지 있던 버그).
-  # ==========================================================================
+  # Python owns cold native requests; C# performs Win32/UIA/OCR/input.
   param(
     [string[]]$ArgList,
     [int]$TimeoutMs = 0,
@@ -1256,64 +1241,13 @@ function Invoke-NativeHelper {
   if ($hotEligible) { $Script:HotCacheStats.misses++ }
   if ($TimeoutMs -le 0) { $TimeoutMs = $Script:InvokeTimeoutMs }
   $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $stdoutFile = Join-Path $Script:CacheDir ("native-" + [guid]::NewGuid().ToString("N") + ".json")
-  $stderrFile = $stdoutFile + ".err"
   try {
-    $allArgs = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$Script:NativeHelperPath) + $ArgList
-    $procArgs = ConvertTo-ProcessArgumentString -ArgList $allArgs
-    $proc = Start-Process -FilePath "powershell" -ArgumentList $procArgs `
-      -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile `
-      -NoNewWindow -PassThru
-    $exited = $proc.WaitForExit($TimeoutMs)
-    if (-not $exited) {
-      try { $proc.Kill() } catch { }
-      try { [void]$proc.WaitForExit(3000) } catch { }
-      $sw.Stop()
-      Write-WrapperLog -Message "NATIVE TIMEOUT $($ArgList -join ' ')"
-      return [pscustomobject]@{
-        ExitCode = 124
-        Json = $null
-        Raw = ""
-        Err = "TIMEOUT after ${TimeoutMs}ms"
-        ElapsedMs = [int]$sw.Elapsed.TotalMilliseconds
-      }
-    }
+    $reply = _Invoke-LegacyCdpBridge -Operation 'desktop-native' -Request @{argv=@($ArgList)} -LiveAuthority:([bool]$AllowLiveControl) -TimeoutMs $TimeoutMs
     $sw.Stop()
-    # Start-Process -PassThru 로 만든 Process 객체는 timeout-overload WaitForExit
-    # 후 ExitCode 속성이 InvalidOperationException 을 던질 수 있음 (Process.HasExited 이슈).
-    # 핸들 리프레시 후 [System.Diagnostics.Process]::GetProcessById 로 재조회.
-    $exitCode = 0
-    try {
-      $proc.Refresh()
-      $exitCode = [int]$proc.ExitCode
-    } catch {
-      # Process.ExitCode 가 throw 면 by-pid 로 다시 시도
-      try {
-        $pid2 = $proc.Id
-        $p2 = [System.Diagnostics.Process]::GetProcessById($pid2)
-        $exitCode = [int]$p2.ExitCode
-      } catch {
-        # 그래도 실패하면 stdout JSON 의 status 로 추정
-        $exitCode = 0
-      }
-    }
-    $raw = ""
-    $err = ""
-    if (Test-Path -LiteralPath $stdoutFile) { $raw = Get-Content -LiteralPath $stdoutFile -Raw -Encoding UTF8 }
-    if (Test-Path -LiteralPath $stderrFile) { $err = Get-Content -LiteralPath $stderrFile -Raw -Encoding UTF8 }
-    if ($raw -is [string]) { $raw = [string]::new($raw.ToCharArray()) }
-    if ($err -is [string]) { $err = [string]::new($err.ToCharArray()) }
-    $json = $null
-    if ($raw -and $raw.Trim().Length -gt 0) {
-      try { $json = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
-    }
-    # ExitCode 추정 실패 시 JSON status 기반으로 보정
-    if ($exitCode -eq 0 -and $json) {
-      switch ("$($json.status)") {
-        "partial" { $exitCode = 2 }
-        "error"   { $exitCode = 1 }
-      }
-    }
+    $exitCode = [int]$reply.ExitCode
+    $json = $reply.Json
+    $raw = [string]$reply.Raw
+    $err = [string]$reply.Err
     # v1.5.0 Phase 1: hot cache write (정상 응답만, ok+JSON 있을 때, eligible action 만)
     if ($hotEligible -and $hotKey -and $exitCode -eq 0 -and $json) {
       try {
@@ -1345,16 +1279,13 @@ function Invoke-NativeHelper {
   } catch {
     $sw.Stop()
     return [pscustomobject]@{
-      ExitCode = 1
+      ExitCode = if ($_.Exception.Message -match 'timed out|timeout') { 124 } else { 1 }
       Json = $null
       Raw = ""
       Err = $_.Exception.Message
       ElapsedMs = [int]$sw.Elapsed.TotalMilliseconds
       Route = "child-error"
     }
-  } finally {
-    Remove-Item -LiteralPath $stdoutFile -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $stderrFile -Force -ErrorAction SilentlyContinue
   }
 }
 

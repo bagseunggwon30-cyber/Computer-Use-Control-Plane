@@ -1,8 +1,9 @@
 # User-scope Python installer migration
 
-The original installer logic is now implemented in Python. `install.ps1` is a small
-compatibility entrypoint preserving `-BinDir`, `-NoPathShim`, `-Quiet` and the default
-legacy backend; `-Backend`/`-PortableRoot` explicitly select alternatives.
+The original installer logic and source entrypoint are implemented in Python.
+`python install.py` preserves `-BinDir`, `-NoPathShim`, `-Quiet`, `-Backend`,
+`-PortableRoot` and `-PythonExe`, and applies installation as the old entrypoint did.
+Use `python install.py --plan` to inspect without writes. `install.ps1` has been deleted.
 Nothing here installs software, requests elevation, starts a model or modifies a
 user's real launcher directory during tests.
 
@@ -74,10 +75,21 @@ health argv and unchanged unrelated files. Windows-only tests execute disposable
 fixture scripts through cmd and PowerShell to verify Unicode paths, argument forwarding
 and exit codes; they do not call a real CUCP action or install to WindowsApps.
 
-`start-pi.ps1` retains its existing explicit UAC consent branch. Moving its elevation
-semantics would require additional real Windows parity tests. `cucp-next.ps1` is
-already a small compatibility launcher, so no feature is removed just to change
-language counts.
+`python pcucp-next/packaging/start_pi.py` replaces `start-pi.ps1`; `--elevated`
+uses ShellExecuteExW with the normal UAC consent and waits for the selected Python
+session's exit code. It does not construct or execute a PowerShell command.
+The entire Pi session is elevated, as before; live control still starts off.
+`--python-exe`/`-PythonExe` and `--pi-executable`/`-PiExecutable` select executables.
+The ordinary Windows npm batch-shim route has been tested with owned recorders
+under Korean, space, percent, exclamation and ampersand paths, preserving the
+extension argument, environment and exit code. Actual UAC approval and Pi startup
+have not been exercised by these tests.
+
+`cucp-next.ps1` and `publish-native.ps1` have also been deleted. Their replacements
+are `python pcucp-next/python/run_source.py` and
+`python pcucp-next/packaging/publish_native.py`. Publishing accepts the original
+`-Runtime` and `-OutputDirectory` spellings as well as the Python options.
+The native runtime is built explicitly, never during an action.
 
 The legacy/core Unicode launcher and argv fixtures passed on a real Windows runner
 for commit `fc05aa01a0632b36af930a522efe8c623037300b`, Actions run `36886830685`,
@@ -86,8 +98,9 @@ original installer body. A separate Windows test now copies the compatibility sh
 into a disposable fixture with an argument-recording Python installer to check all
 preserved switches, explicit backends and exit-code propagation.
 
-The PowerShell entrypoint now requires Python 3.10+ for source installation and uses
-`-X utf8`; this is a disclosed new setup dependency, not a change of default backend.
-Its code does not perform installation policy, write files, alter settings or elevate.
+The Python entrypoint requires Python 3.10+ for source installation; the default
+backend remains legacy, with its PowerShell root wrapper still present.
 
-Measured installer entrypoint reduction: 5,376 → 1,519 UTF-8 bytes (3,857 bytes removed), 124 → 31 lines. The removed environment/path/shim/health policy now lives in the tested Python module; no legacy backend feature was silently redirected.
+The four retired PowerShell launcher/build files are no longer tracked source.
+This is partial migration: the legacy wrapper and other PowerShell source/tests
+still prevent a 0% repository result. No Linguist exclusions are used.

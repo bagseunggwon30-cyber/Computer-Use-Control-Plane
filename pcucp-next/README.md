@@ -47,7 +47,7 @@ Pi는 기존 호스트를 사용하며 `pi --extension .\integrations\pi\src\ind
 
 ```powershell
 $cucpRoot = (Get-Location).Path
-powershell -NoProfile -File .\pcucp-next\dotnet\publish-native.ps1
+python .\pcucp-next\packaging\publish_native.py
 $env:CUCP_NATIVE_HOST = Join-Path $cucpRoot 'pcucp-next\bin\native\PcuCp.NativeHost.exe'
 $env:PYTHONPATH = Join-Path $cucpRoot 'pcucp-next\python'
 python -m pcucp_cli windows --json
@@ -62,7 +62,7 @@ python -m pcucp_cli windows --json
 가장 간단한 실행은 저장소 루트에서 다음과 같습니다.
 
 ```powershell
-powershell -NoProfile -File .\pcucp-next\powershell\start-pi.ps1
+python .\pcucp-next\packaging\start_pi.py
 ```
 
 Python 경로를 별도로 지정하려면 `-PythonExe 'C:\path\to\python.exe'`를 사용합니다. Pi 실행 파일을 선택하려면 `-PiExecutable`을 사용합니다. 첫 실행기는 임의 Pi 인자를 전달하지 않습니다.
@@ -96,7 +96,7 @@ Pi 세션에서 조작은 기본적으로 꺼져 있습니다.
 관리자 권한으로 실행된 일반 앱을 다룰 때는 사람이 선택적으로 다음 실행 방식을 사용할 수 있습니다.
 
 ```powershell
-powershell -NoProfile -File .\pcucp-next\powershell\start-pi.ps1 -Elevated
+python .\pcucp-next\packaging\start_pi.py --elevated
 ```
 
 Windows UAC 승인은 사람이 처리합니다. 현재 방식은 **Pi와 로드된 확장·도구 전체를 관리자 권한으로 시작**합니다. 좁은 권한의 CUCP 브로커만 승격하는 구조는 아직 구현하지 않았습니다. 관리자 모드에서도 `/computer on`은 별도로 필요합니다.

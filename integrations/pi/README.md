@@ -70,7 +70,7 @@ This switch governs CUCP tools; it is not an OS sandbox for Pi's separate bash
 tool or other extensions.
 
 For elevated target applications, start the host from a human-approved elevated
-terminal (source checkout also provides `pcucp-next/powershell/start-pi.ps1 -Elevated`) and inspect `cucp_privileges` with
+terminal (source checkout also provides `python pcucp-next/packaging/start_pi.py --elevated`) and inspect `cucp_privileges` with
 the target `pid`. The Windows UAC consent is human-operated. This launcher
 elevates **Pi and all of its loaded extensions/tools**, not only a narrow CUCP
 broker. Use that mode only for trusted sessions. This extension does not silently
