@@ -211,7 +211,11 @@ class HelperSourceTests(unittest.TestCase):
                     # wrapper functions. Protect this family's exact retained
                     # bodies without freezing the whole monolithic wrapper.
                     from helper_staged_source_retention import retained_original_view
-                    current = retained_original_view(current)
+                    # The seven lifecycle/client bodies now delegate to Python.
+                    # Retain their original byte checks against the pinned oracle;
+                    # the current production route has separate actual tests.
+                    from legacy_historical_native import wrapper
+                    current = retained_original_view(wrapper().read_text(encoding='utf-8-sig'))
                     original = published_source(pin['path'], directory).decode('utf-8-sig').replace('\r\n', '\n').encode('utf-16-le')
                     for function in pin['functions']:
                         body = original[2 * function['start_utf16']:2 * function['end_utf16']].decode('utf-16-le')

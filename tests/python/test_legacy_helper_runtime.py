@@ -171,13 +171,13 @@ class StagedDispatchTests(unittest.TestCase):
 
 
 class StagedWrapperStructureTests(unittest.TestCase):
-    def test_seven_delegates_and_unchanged_default_routing(self):
+    def test_seven_default_python_delegates_and_native_route_order(self):
         text=(ROOT/'scripts/cucp.ps1').read_text(encoding='utf-8-sig')
         for name, op in [('_Read-LockSafely','read'),('_Is-StaleLock','stale'),('_Try-Delete-Lock','delete'),
                          ('Get-HelperServerStatus','status'),('Invoke-HelperPipe','invoke'),('Start-HelperServer','start'),('Stop-HelperServer','stop')]:
             body=text.split('function '+name+' {',1)[1].split('\nfunction ',1)[0]
             self.assertIn("-Operation '"+op+"'",body)
-            self.assertIn('$Script:StagedCompiledHelper',body)
+            self.assertNotIn('Start-Process powershell.exe',body)
         native=text.split('function Invoke-NativeHelper {',1)[1].split('\nfunction ',1)[0]
         self.assertLess(native.index('Invoke-HelperPipe'),native.index('$hotKey = $null'))
         self.assertIn('$resp.exit_code -ne 99',native)

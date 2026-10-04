@@ -1,4 +1,4 @@
-# Explicit unqualified cutover only. No defaults change and no PS-service fallback.
+﻿# Python/C# helper transport. The staged selector retains an isolated qualification lock.
 # Authority is copied once at wrapper startup, never read from pipe/JSON requests.
 $Script:StagedCompiledHelper = $env:CUCP_STAGED_COMPILED_HELPER -ceq '1'
 if ($env:CUCP_STAGED_COMPILED_HELPER -and -not $Script:StagedCompiledHelper) {
@@ -7,8 +7,8 @@ if ($env:CUCP_STAGED_COMPILED_HELPER -and -not $Script:StagedCompiledHelper) {
 # Isolated staged lock prevents reusing the retained PowerShell service.
 if ($Script:StagedCompiledHelper) { $Script:HelperLockPath = Join-Path $Script:AuditDir 'helper-staged.pid' }
 # This is launch authority for this shared service, not a global wrapper policy.
-$Script:StagedHelperDesktop = $env:CUCP_STAGED_HELPER_READONLY_DESKTOP -ceq '1'
-if ($env:CUCP_STAGED_HELPER_READONLY_DESKTOP -and -not $Script:StagedHelperDesktop) {
+$Script:StagedHelperDesktop = if ($Script:StagedCompiledHelper) { $env:CUCP_STAGED_HELPER_READONLY_DESKTOP -ceq '1' } else { $true }
+if ($env:CUCP_STAGED_HELPER_READONLY_DESKTOP -and $env:CUCP_STAGED_HELPER_READONLY_DESKTOP -cne '1') {
   throw 'CUCP_STAGED_HELPER_READONLY_DESKTOP accepts only 1 or an unset value.'
 }
 
@@ -21,7 +21,6 @@ function _Get-StagedAutostartMetadataDirectory {
 
 function _Invoke-StagedHelper {
   param([string]$Operation, [hashtable]$Arguments = @{})
-  if (-not $Script:StagedCompiledHelper) { throw 'Staged helper was not selected at startup.' }
   $bridge = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\pcucp-next\python\legacy_helper_bridge.py'))
   if (-not (Test-Path -LiteralPath $bridge -PathType Leaf)) { throw 'Staged helper bridge missing; no fallback.' }
   # Same first-Application selection already qualified in the CDP/execution adapters.

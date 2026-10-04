@@ -253,245 +253,38 @@ $Script:_HelperPipeReqId = 0
 $Script:HelperServerSupported = @("windows", "health", "focused", "modal-detect", "ocr-screen-fast", "uia-find-fast")
 
 function _Read-LockSafely {
-  if ($Script:StagedCompiledHelper) { try { return (_Invoke-StagedHelper -Operation 'read') } catch { return $null } }
-  # 결과: hashtable {pid, pipe_name, started_at, helper_version} 또는 $null
-  if (-not (Test-Path -LiteralPath $Script:HelperLockPath)) { return $null }
-  try {
-    $raw = Get-Content -LiteralPath $Script:HelperLockPath -Raw -Encoding UTF8
-    if (-not $raw) { return $null }
-    $obj = $raw | ConvertFrom-Json -ErrorAction Stop
-    return $obj
-  } catch {
-    return $null
-  }
+  try { return (_Invoke-StagedHelper -Operation 'read') } catch { return $null }
 }
 
 function _Is-StaleLock {
   param($Lock)
-  if ($Script:StagedCompiledHelper) { try { return [bool](_Invoke-StagedHelper -Operation 'stale' -Arguments @{snapshot=$Lock._cucp_staged_snapshot}) } catch { return $true } }
-  if (-not $Lock) { return $true }
-  # v2.0.0 — multi-user 격리: 다른 user 의 lock 은 stale 처리하지 않고 무시.
-  # wrapper 가 자기 user 의 lock 만 정리하도록. owner_user 가 없으면 (legacy) 검사 skip.
-  try {
-    $myUser = [Environment]::UserName
-    if ($Lock.owner_user -and "$($Lock.owner_user)" -ne $myUser) {
-      # 남의 user 의 lock — stale 아니지만 우리는 사용 안 함. 호출자가 lock 을 무시할 수 있도록 stale 로 처리 (delete 안 함).
-      return $true
-    }
-  } catch { }
-  # 1. PID alive 검증
-  try {
-    $proc = Get-Process -Id ([int]$Lock.pid) -ErrorAction SilentlyContinue
-    if (-not $proc) { return $true }
-  } catch { return $true }
-  # 2. mtime 검증 (24h margin)
-  try {
-    $started = [DateTime]::Parse("$($Lock.started_at)")
-    $age = (Get-Date).ToUniversalTime() - $started.ToUniversalTime()
-    if ($age.TotalHours -gt 24) { return $true }
-  } catch { return $true }
-  # 3. pipe_name 형식 검증
-  $expectedPipe = "cucp-helper-$($Lock.pid)"
-  if ("$($Lock.pipe_name)" -ne $expectedPipe) { return $true }
-  # 4. helper_version SemVer 검증
-  if ("$($Lock.helper_version)" -notmatch '^\d+\.\d+\.\d+$') { return $true }
-  return $false
+  try { return [bool](_Invoke-StagedHelper -Operation 'stale' -Arguments @{snapshot=$Lock._cucp_staged_snapshot}) } catch { return $true }
 }
 
 function _Try-Delete-Lock {
   param($ExpectedLock)
-  if ($Script:StagedCompiledHelper) { try { $null=_Invoke-StagedHelper -Operation 'delete' -Arguments @{snapshot=$ExpectedLock._cucp_staged_snapshot} } catch { }; return }
-  # v2.0.0 — 자기 user 의 lock 만 삭제. 남의 lock 은 절대 삭제 안 함.
-  if (-not (Test-Path -LiteralPath $Script:HelperLockPath)) { return }
-  try {
-    $lock = _Read-LockSafely
-    if ($lock -and $lock.owner_user) {
-      $myUser = [Environment]::UserName
-      if ("$($lock.owner_user)" -ne $myUser) { return }
-    }
-    Remove-Item -LiteralPath $Script:HelperLockPath -Force -ErrorAction SilentlyContinue
-  } catch { }
+  try { $null=_Invoke-StagedHelper -Operation 'delete' -Arguments @{snapshot=$ExpectedLock._cucp_staged_snapshot} } catch { }
 }
 
 function Get-HelperServerStatus {
-  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'status') }
-  # macro session helper-status 용. server up/down 둘 다 일관 envelope 반환.
-  $lock = _Read-LockSafely
-  if (-not $lock -or (_Is-StaleLock -Lock $lock)) {
-    return [pscustomobject]@{
-      schema = "cucp.helper-status/v1"
-      alive = $false
-      pid = $null
-      pipe_name = $null
-      started_at = $null
-      uptime_s = 0
-      request_count = 0
-      helper_version = $null
-    }
-  }
-  # server 살아있으면 health action 으로 추가 정보 가져옴
-  $extra = $null
-  try {
-    $resp = Invoke-HelperPipe -Action "health" -ArgsHash @{} -TimeoutMs 1500
-    if ($resp -and $resp.exit_code -eq 0) { $extra = $resp.result }
-  } catch { $extra = $null }
-  $upS = 0; $reqC = 0
-  if ($extra) {
-    if ($extra.uptime_s) { $upS = [int]$extra.uptime_s }
-    if ($extra.request_count) { $reqC = [int]$extra.request_count }
-  }
-  return [pscustomobject]@{
-    schema = "cucp.helper-status/v1"
-    alive = $true
-    pid = [int]$lock.pid
-    pipe_name = "$($lock.pipe_name)"
-    started_at = "$($lock.started_at)"
-    uptime_s = $upS
-    request_count = $reqC
-    helper_version = "$($lock.helper_version)"
-  }
+  return (_Invoke-StagedHelper -Operation 'status')
 }
 
 function Invoke-HelperPipe {
-  # JSON-line client. server 가 살아있다고 가정 (호출자가 lock 검증 후 사용).
-  # request: {id, action, args, timeout_ms?, trace_id?}
-  # response: {id, exit_code, result, error, ...}
-  # 실패 시 throw — 호출자가 catch 후 child fallback 으로 처리.
-  param(
-    [Parameter(Mandatory=$true)][string]$Action,
-    [hashtable]$ArgsHash = @{},
-    [int]$TimeoutMs = 30000,
-    $ExpectedLock = $null
-  )
-  if ($Script:StagedCompiledHelper) {
-    if ($Script:_HelperPipeReqId -eq [int]::MaxValue) { $Script:_HelperPipeReqId = 0 }
-    $Script:_HelperPipeReqId++
-    return (_Invoke-StagedHelper -Operation 'invoke' -Arguments @{action=$Action; args=$ArgsHash; timeout_ms=$TimeoutMs; request_id=$Script:_HelperPipeReqId; snapshot=$ExpectedLock._cucp_staged_snapshot})
-  }
-  $lock = _Read-LockSafely
-  if (-not $lock) { throw "helper_lock_missing" }
-  $pipeName = "$($lock.pipe_name)"
-  if (-not $pipeName) { throw "helper_pipe_name_missing" }
-  $client = New-Object System.IO.Pipes.NamedPipeClientStream(
-    ".", $pipeName,
-    [System.IO.Pipes.PipeDirection]::InOut,
-    [System.IO.Pipes.PipeOptions]::Asynchronous
-  )
-  $reader = $null
-  $writer = $null
-  try {
-    $connectTimeout = [Math]::Min(2000, $TimeoutMs)
-    $client.Connect($connectTimeout)
-    if (-not $client.IsConnected) { throw "pipe_connect_failed" }
-    $reader = New-Object System.IO.StreamReader($client, [System.Text.Encoding]::UTF8)
-    $writer = New-Object System.IO.StreamWriter($client, [System.Text.Encoding]::UTF8)
-    $writer.AutoFlush = $true
-    $Script:_HelperPipeReqId++
-    $reqId = $Script:_HelperPipeReqId
-    $req = [ordered]@{
-      id = $reqId
-      action = $Action
-      args = $ArgsHash
-      timeout_ms = $TimeoutMs
-    }
-    $line = $req | ConvertTo-Json -Compress -Depth 8
-    $writer.WriteLine($line)
-    # async ReadLine 으로 timeout 통제
-    $task = [System.Threading.Tasks.Task]::Run([System.Func[string]] { $reader.ReadLine() })
-    $waited = $task.Wait($TimeoutMs)
-    if (-not $waited) { throw "pipe_read_timeout" }
-    $respLine = $task.Result
-    if (-not $respLine) { throw "pipe_empty_response" }
-    $resp = $respLine | ConvertFrom-Json -ErrorAction Stop
-    if ($resp.id -ne $reqId) { throw "pipe_id_mismatch (req=$reqId, resp=$($resp.id))" }
-    return $resp
-  } finally {
-    try { if ($reader) { $reader.Close() } } catch { }
-    try { if ($writer) { $writer.Close() } } catch { }
-    try { $client.Close() } catch { }
-    try { $client.Dispose() } catch { }
-  }
+  param([Parameter(Mandatory=$true)][string]$Action, [hashtable]$ArgsHash=@{}, [int]$TimeoutMs=30000, $ExpectedLock=$null)
+  if ($Script:_HelperPipeReqId -eq [int]::MaxValue) { $Script:_HelperPipeReqId=0 }
+  $Script:_HelperPipeReqId++
+  return (_Invoke-StagedHelper -Operation 'invoke' -Arguments @{action=$Action;args=$ArgsHash;timeout_ms=$TimeoutMs;request_id=$Script:_HelperPipeReqId;snapshot=$ExpectedLock._cucp_staged_snapshot})
 }
 
 function Start-HelperServer {
-  # idempotent — 이미 살아있는 server 가 있으면 그대로 reuse
-  param(
-    [int]$IdleTimeoutMs = 60000
-  )
-  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'start' -Arguments @{idle_timeout_ms=$IdleTimeoutMs}) }
-  $lock = _Read-LockSafely
-  if ($lock -and -not (_Is-StaleLock -Lock $lock)) {
-    return [pscustomobject]@{
-      status = "ok"
-      reused = $true
-      pid = [int]$lock.pid
-      pipe_name = "$($lock.pipe_name)"
-      started_at = "$($lock.started_at)"
-    }
-  }
-  if ($lock) { _Try-Delete-Lock }  # stale 정리
-  if (-not (Test-Path -LiteralPath $Script:HelperServerScript)) {
-    return [pscustomobject]@{
-      status = "error"
-      reason = "helper_server_script_missing"
-      path = $Script:HelperServerScript
-    }
-  }
-  $argList = @(
-    "-NoProfile", "-NoLogo", "-NonInteractive",
-    "-ExecutionPolicy", "Bypass",
-    "-File", $Script:HelperServerScript,
-    "-IdleTimeoutMs", "$IdleTimeoutMs"
-  )
-  $proc = Start-Process powershell.exe -ArgumentList $argList `
-    -WindowStyle Hidden -PassThru -ErrorAction Stop
-  # lock 등장 대기 (3s deadline, 50ms tick)
-  $deadline = (Get-Date).AddMilliseconds(3000)
-  while ((Get-Date) -lt $deadline) {
-    Start-Sleep -Milliseconds 50
-    $lock = _Read-LockSafely
-    if ($lock -and [int]$lock.pid -eq [int]$proc.Id -and -not (_Is-StaleLock -Lock $lock)) {
-      return [pscustomobject]@{
-        status = "ok"
-        reused = $false
-        pid = [int]$lock.pid
-        pipe_name = "$($lock.pipe_name)"
-        started_at = "$($lock.started_at)"
-      }
-    }
-  }
-  # 실패 → spawn 된 proc 정리
-  try { $proc.Kill() } catch { }
-  _Try-Delete-Lock
-  return [pscustomobject]@{
-    status = "error"
-    reason = "server_start_timeout"
-  }
+  param([int]$IdleTimeoutMs=60000)
+  return (_Invoke-StagedHelper -Operation 'start' -Arguments @{idle_timeout_ms=$IdleTimeoutMs})
 }
 
 function Stop-HelperServer {
   param([switch]$Force)
-  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'stop' -Arguments @{force=[bool]$Force}) }
-  $lock = _Read-LockSafely
-  if (-not $lock) {
-    return [pscustomobject]@{ status = "ok"; reason = "no_helper_running" }
-  }
-  $oldPid = [int]$lock.pid
-  # A lock PID is not a process identity. Never terminate by an untrusted or
-  # stale PID: it may now belong to an unrelated application.
-  if (_Is-StaleLock -Lock $lock) {
-    _Try-Delete-Lock
-    return [pscustomobject]@{ status = "ok"; reason = "stale_lock_removed"; stopped_pid = $null; forced = $false }
-  }
-  try {
-    $resp = Invoke-HelperPipe -Action "shutdown" -ArgsHash @{} -TimeoutMs 1500
-    if (-not $resp -or $resp.exit_code -ne 0) { throw "shutdown_not_acknowledged" }
-  } catch {
-    return [pscustomobject]@{ status = "error"; reason = "shutdown_not_acknowledged_no_pid_kill"; stopped_pid = $null; forced = $false }
-  }
-  _Try-Delete-Lock
-  return [pscustomobject]@{ status = "ok"; reason = "shutdown_requested"; stopped_pid = $oldPid; forced = $false }
-
+  return (_Invoke-StagedHelper -Operation 'stop' -Arguments @{force=[bool]$Force})
 }
 
 # ============================================================================

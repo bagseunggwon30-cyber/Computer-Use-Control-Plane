@@ -48,7 +48,7 @@ namespace PcuCp.LegacyHelper
                 bool direct = args[0] == "serve-direct";
                 if (args[0] != "serve" && !direct) throw new ArgumentException("unknown candidate mode");
                 if (direct) Only(options, "pipe-name", "lock-file", "idle-timeout-ms", "allow-readonly-desktop", "fixture", "diagnostic-phases", "diagnostic-acl", "debug-log");
-                else Only(options, "lock-file", "idle-timeout-ms", "allow-readonly-desktop", "fixture", "diagnostic-phases", "diagnostic-acl");
+                else Only(options, "lock-file", "idle-timeout-ms", "allow-readonly-desktop", "fixture", "diagnostic-phases", "diagnostic-acl", "debug-log");
                 string directName = direct ? LegacyHelperDirect.WindowsPipeName(Required(options, "pipe-name")) : null;
                 string lockFile = direct ? Required(options, "lock-file") : Path.GetFullPath(Required(options, "lock-file"));
                 if (!direct && !Directory.Exists(Path.GetDirectoryName(lockFile))) throw new DirectoryNotFoundException("candidate lock directory must exist");
@@ -73,9 +73,9 @@ namespace PcuCp.LegacyHelper
                     if (++aclRecords <= 16) Console.Error.WriteLine("helper_acl_evidence=" + LegacyHelperService.NewJson().Serialize(value));
                     else if (aclRecords == 17) Console.Error.WriteLine("helper_acl_evidence_limit=16");
                 };
-                var debug = direct && options.ContainsKey("debug-log") ? new LegacyHelperDebugLog(Console.Error.WriteLine) : null;
+                var debug = options.ContainsKey("debug-log") ? new LegacyHelperDebugLog(Console.Error.WriteLine) : null;
                 Action<string> log = message => Console.Error.WriteLine(message);
-                if (direct) log = message => { if (debug != null) debug.Event("pipe.error"); };
+                if (direct || debug != null) log = message => { if (debug != null) debug.Event("pipe.error"); };
                 int idle = Integer(options, "idle-timeout-ms", 60000);
                 Func<string, LegacyHelperService> service = retainedPath => new LegacyHelperService(actions, pid, pipe, retainedPath,
                     idle, clock, log, phase, aclEvidence, debug);
@@ -101,7 +101,7 @@ namespace PcuCp.LegacyHelper
             {
                 if (!args[i].StartsWith("--", StringComparison.Ordinal)) throw new ArgumentException("named candidate options required");
                 string key = args[i].Substring(2);
-                string value = key == "allow-readonly-desktop" || key == "diagnostic-phases" || (key == "debug-log" && args[0] == "serve-direct") || key == "diagnostic-acl" ? "true" : ++i < args.Length ? args[i] : null;
+                string value = key == "allow-readonly-desktop" || key == "diagnostic-phases" || key == "debug-log" || key == "diagnostic-acl" ? "true" : ++i < args.Length ? args[i] : null;
                 if (value == null || result.ContainsKey(key)) throw new ArgumentException("missing or repeated candidate option");
                 result.Add(key, value);
             }

@@ -22,12 +22,26 @@
       "native_python_transport": {
         "previous_commit": "8d41b3456f538ae3984f969cb26a882a792d2b8f",
         "previous_wrapper_blob": "8e996169535fb4c6ffa57207711ead9cf85b30df",
-        "current_wrapper_blob": "c3f125a60b57c8e5af408e60f07602824333d39e",
+        "current_wrapper_blob": "e2f2457482b84ccd58ec9449bddbf51b61b0abb3",
         "changed_functions": [
           "Invoke-NativeHelper",
           "_Invoke-LegacyCdpBridge"
         ],
         "scope": "Cold native execution uses Python/C#; existing pipe and hot-cache ordering retained; all 109 clauses and safety gates unchanged."
+      },
+      "helper_python_transport": {
+        "previous_commit": "66525bccf7176eb8e51a20dcb3b5fe389c4384f6",
+        "changed_function_extents": [
+          "Get-HelperServerStatus",
+          "Invoke-HelperPipe",
+          "Start-HelperServer",
+          "Stop-HelperServer",
+          "_Invoke-StagedHelper",
+          "_Is-StaleLock",
+          "_Read-LockSafely",
+          "_Try-Delete-Lock"
+        ],
+        "scope": "Default read-only service lifecycle/client delegates to Python/C#; staged lock and authority remain isolated; legacy login shims remain for later migration."
       }
     }
   },
@@ -97,7 +111,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2106
+      "source_line": 1899
     },
     {
       "clause_index": 1,
@@ -106,7 +120,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2107
+      "source_line": 1900
     },
     {
       "clause_index": 2,
@@ -115,7 +129,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2108
+      "source_line": 1901
     },
     {
       "clause_index": 3,
@@ -124,7 +138,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2109
+      "source_line": 1902
     },
     {
       "clause_index": 4,
@@ -133,7 +147,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2110
+      "source_line": 1903
     },
     {
       "clause_index": 5,
@@ -142,7 +156,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2111
+      "source_line": 1904
     },
     {
       "clause_index": 6,
@@ -151,7 +165,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2112
+      "source_line": 1905
     },
     {
       "clause_index": 7,
@@ -160,7 +174,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2113
+      "source_line": 1906
     },
     {
       "clause_index": 8,
@@ -171,7 +185,7 @@
       ],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2114
+      "source_line": 1907
     },
     {
       "clause_index": 9,
@@ -182,7 +196,7 @@
       ],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2115
+      "source_line": 1908
     },
     {
       "clause_index": 10,
@@ -191,7 +205,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2116
+      "source_line": 1909
     },
     {
       "clause_index": 11,
@@ -200,7 +214,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2117
+      "source_line": 1910
     },
     {
       "clause_index": 12,
@@ -209,7 +223,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2118
+      "source_line": 1911
     },
     {
       "clause_index": 13,
@@ -218,7 +232,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2119
+      "source_line": 1912
     },
     {
       "clause_index": 14,
@@ -227,7 +241,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2120
+      "source_line": 1913
     },
     {
       "clause_index": 15,
@@ -236,7 +250,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2121
+      "source_line": 1914
     },
     {
       "clause_index": 16,
@@ -245,7 +259,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2122
+      "source_line": 1915
     },
     {
       "clause_index": 17,
@@ -254,7 +268,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2123
+      "source_line": 1916
     },
     {
       "clause_index": 18,
@@ -263,7 +277,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2124
+      "source_line": 1917
     },
     {
       "clause_index": 19,
@@ -272,7 +286,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2125
+      "source_line": 1918
     },
     {
       "clause_index": 20,
@@ -281,7 +295,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2126
+      "source_line": 1919
     },
     {
       "clause_index": 21,
@@ -290,7 +304,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2127
+      "source_line": 1920
     },
     {
       "clause_index": 22,
@@ -299,7 +313,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2128
+      "source_line": 1921
     },
     {
       "clause_index": 23,
@@ -308,7 +322,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2129
+      "source_line": 1922
     },
     {
       "clause_index": 24,
@@ -317,7 +331,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2130
+      "source_line": 1923
     },
     {
       "clause_index": 25,
@@ -326,7 +340,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2131
+      "source_line": 1924
     },
     {
       "clause_index": 26,
@@ -335,7 +349,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2132
+      "source_line": 1925
     },
     {
       "clause_index": 27,
@@ -344,7 +358,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2133
+      "source_line": 1926
     },
     {
       "clause_index": 28,
@@ -353,7 +367,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2134
+      "source_line": 1927
     },
     {
       "clause_index": 29,
@@ -362,7 +376,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2135
+      "source_line": 1928
     },
     {
       "clause_index": 30,
@@ -371,7 +385,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2136
+      "source_line": 1929
     },
     {
       "clause_index": 31,
@@ -380,7 +394,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2137
+      "source_line": 1930
     },
     {
       "clause_index": 32,
@@ -389,7 +403,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2138
+      "source_line": 1931
     },
     {
       "clause_index": 33,
@@ -398,7 +412,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2139
+      "source_line": 1932
     },
     {
       "clause_index": 34,
@@ -407,7 +421,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2140
+      "source_line": 1933
     },
     {
       "clause_index": 35,
@@ -416,7 +430,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2141
+      "source_line": 1934
     },
     {
       "clause_index": 36,
@@ -425,7 +439,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2142
+      "source_line": 1935
     },
     {
       "clause_index": 37,
@@ -434,7 +448,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2143
+      "source_line": 1936
     },
     {
       "clause_index": 38,
@@ -443,7 +457,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2144
+      "source_line": 1937
     },
     {
       "clause_index": 39,
@@ -452,7 +466,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2146
+      "source_line": 1939
     },
     {
       "clause_index": 40,
@@ -461,7 +475,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2147
+      "source_line": 1940
     },
     {
       "clause_index": 41,
@@ -470,7 +484,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2148
+      "source_line": 1941
     },
     {
       "clause_index": 42,
@@ -479,7 +493,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2149
+      "source_line": 1942
     },
     {
       "clause_index": 43,
@@ -488,7 +502,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2150
+      "source_line": 1943
     },
     {
       "clause_index": 44,
@@ -497,7 +511,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2151
+      "source_line": 1944
     },
     {
       "clause_index": 45,
@@ -506,7 +520,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2152
+      "source_line": 1945
     },
     {
       "clause_index": 46,
@@ -515,7 +529,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2154
+      "source_line": 1947
     },
     {
       "clause_index": 47,
@@ -524,7 +538,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2155
+      "source_line": 1948
     },
     {
       "clause_index": 48,
@@ -533,7 +547,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2156
+      "source_line": 1949
     },
     {
       "clause_index": 49,
@@ -542,7 +556,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2157
+      "source_line": 1950
     },
     {
       "clause_index": 50,
@@ -551,7 +565,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2158
+      "source_line": 1951
     },
     {
       "clause_index": 51,
@@ -560,7 +574,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2159
+      "source_line": 1952
     },
     {
       "clause_index": 52,
@@ -569,7 +583,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2160
+      "source_line": 1953
     },
     {
       "clause_index": 53,
@@ -578,7 +592,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2161
+      "source_line": 1954
     },
     {
       "clause_index": 54,
@@ -587,7 +601,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2162
+      "source_line": 1955
     },
     {
       "clause_index": 55,
@@ -596,7 +610,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2163
+      "source_line": 1956
     },
     {
       "clause_index": 56,
@@ -605,7 +619,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2164
+      "source_line": 1957
     },
     {
       "clause_index": 57,
@@ -614,7 +628,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2165
+      "source_line": 1958
     },
     {
       "clause_index": 58,
@@ -623,7 +637,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2166
+      "source_line": 1959
     },
     {
       "clause_index": 59,
@@ -632,7 +646,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2167
+      "source_line": 1960
     },
     {
       "clause_index": 60,
@@ -641,7 +655,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2169
+      "source_line": 1962
     },
     {
       "clause_index": 61,
@@ -650,7 +664,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2170
+      "source_line": 1963
     },
     {
       "clause_index": 62,
@@ -659,7 +673,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2171
+      "source_line": 1964
     },
     {
       "clause_index": 63,
@@ -668,7 +682,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2172
+      "source_line": 1965
     },
     {
       "clause_index": 64,
@@ -677,7 +691,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2174
+      "source_line": 1967
     },
     {
       "clause_index": 65,
@@ -686,7 +700,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2175
+      "source_line": 1968
     },
     {
       "clause_index": 66,
@@ -695,7 +709,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2176
+      "source_line": 1969
     },
     {
       "clause_index": 67,
@@ -704,7 +718,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2178
+      "source_line": 1971
     },
     {
       "clause_index": 68,
@@ -713,7 +727,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2180
+      "source_line": 1973
     },
     {
       "clause_index": 69,
@@ -722,7 +736,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2182
+      "source_line": 1975
     },
     {
       "clause_index": 70,
@@ -731,7 +745,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2183
+      "source_line": 1976
     },
     {
       "clause_index": 71,
@@ -740,7 +754,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2184
+      "source_line": 1977
     },
     {
       "clause_index": 72,
@@ -749,7 +763,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2185
+      "source_line": 1978
     },
     {
       "clause_index": 73,
@@ -758,7 +772,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2186
+      "source_line": 1979
     },
     {
       "clause_index": 74,
@@ -767,7 +781,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2187
+      "source_line": 1980
     },
     {
       "clause_index": 75,
@@ -776,7 +790,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2188
+      "source_line": 1981
     },
     {
       "clause_index": 76,
@@ -785,7 +799,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2189
+      "source_line": 1982
     },
     {
       "clause_index": 77,
@@ -794,7 +808,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2190
+      "source_line": 1983
     },
     {
       "clause_index": 78,
@@ -803,7 +817,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2192
+      "source_line": 1985
     },
     {
       "clause_index": 79,
@@ -812,7 +826,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2193
+      "source_line": 1986
     },
     {
       "clause_index": 80,
@@ -821,7 +835,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2194
+      "source_line": 1987
     },
     {
       "clause_index": 81,
@@ -830,7 +844,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2195
+      "source_line": 1988
     },
     {
       "clause_index": 82,
@@ -839,7 +853,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2196
+      "source_line": 1989
     },
     {
       "clause_index": 83,
@@ -848,7 +862,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2197
+      "source_line": 1990
     },
     {
       "clause_index": 84,
@@ -857,7 +871,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2198
+      "source_line": 1991
     },
     {
       "clause_index": 85,
@@ -866,7 +880,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2199
+      "source_line": 1992
     },
     {
       "clause_index": 86,
@@ -875,7 +889,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2201
+      "source_line": 1994
     },
     {
       "clause_index": 87,
@@ -884,7 +898,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2202
+      "source_line": 1995
     },
     {
       "clause_index": 88,
@@ -893,7 +907,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2203
+      "source_line": 1996
     },
     {
       "clause_index": 89,
@@ -902,7 +916,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2204
+      "source_line": 1997
     },
     {
       "clause_index": 90,
@@ -911,7 +925,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2205
+      "source_line": 1998
     },
     {
       "clause_index": 91,
@@ -920,7 +934,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2206
+      "source_line": 1999
     },
     {
       "clause_index": 92,
@@ -929,7 +943,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2207
+      "source_line": 2000
     },
     {
       "clause_index": 93,
@@ -938,7 +952,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2208
+      "source_line": 2001
     },
     {
       "clause_index": 94,
@@ -947,7 +961,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2209
+      "source_line": 2002
     },
     {
       "clause_index": 95,
@@ -956,7 +970,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2210
+      "source_line": 2003
     },
     {
       "clause_index": 96,
@@ -965,7 +979,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2212
+      "source_line": 2005
     },
     {
       "clause_index": 97,
@@ -974,7 +988,7 @@
       "options": [],
       "implementation": "not_implemented",
       "hint": "프로세스 조회/종료는 미구현. 위험 작업이라 게이트 설계 후 별도 구현 필요.",
-      "source_line": 2215
+      "source_line": 2008
     },
     {
       "clause_index": 98,
@@ -983,7 +997,7 @@
       "options": [],
       "implementation": "not_implemented",
       "hint": "레지스트리 읽기/쓰기는 미구현. 쓰기는 고위험이라 신중한 게이트 필요.",
-      "source_line": 2216
+      "source_line": 2009
     },
     {
       "clause_index": 99,
@@ -992,7 +1006,7 @@
       "options": [],
       "implementation": "not_implemented",
       "hint": "토스트 알림은 미구현.",
-      "source_line": 2217
+      "source_line": 2010
     },
     {
       "clause_index": 100,
@@ -1001,7 +1015,7 @@
       "options": [],
       "implementation": "not_implemented",
       "hint": "다중 선택은 미구현.",
-      "source_line": 2218
+      "source_line": 2011
     },
     {
       "clause_index": 101,
@@ -1010,7 +1024,7 @@
       "options": [],
       "implementation": "not_implemented",
       "hint": "다중 편집은 미구현.",
-      "source_line": 2219
+      "source_line": 2012
     },
     {
       "clause_index": 102,
@@ -1019,7 +1033,7 @@
       "options": [],
       "implementation": "not_implemented",
       "hint": "스크레이프는 미구현. CDP/OCR 매크로로 대체 가능.",
-      "source_line": 2220
+      "source_line": 2013
     },
     {
       "clause_index": 103,
@@ -1028,7 +1042,7 @@
       "options": [],
       "implementation": "not_implemented",
       "hint": "DOM 스냅샷은 미구현. cdp-deep-find / cdp-eval 로 대체 가능.",
-      "source_line": 2221
+      "source_line": 2014
     },
     {
       "clause_index": 104,
@@ -1037,7 +1051,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2222
+      "source_line": 2015
     },
     {
       "clause_index": 105,
@@ -1046,7 +1060,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2223
+      "source_line": 2016
     },
     {
       "clause_index": 106,
@@ -1055,7 +1069,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2224
+      "source_line": 2017
     },
     {
       "clause_index": 107,
@@ -1064,7 +1078,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2225
+      "source_line": 2018
     },
     {
       "clause_index": 108,
@@ -1073,7 +1087,7 @@
       "options": [],
       "implementation": "retained",
       "hint": null,
-      "source_line": 2226
+      "source_line": 2019
     }
   ],
   "direct_safety_macros": [
@@ -1323,8 +1337,8 @@
   "sources": [
     {
       "path": "scripts/cucp.ps1",
-      "sha256": "b13b8149bd461bdd08dda5ee9f7f548af1f5c7d9a5a2e464496e28407be95f12",
-      "lines": 8272
+      "sha256": "f5cc588cc7f0e46e24483ecf5308d9b3c8d142e04812cf5b569090091292d4f4",
+      "lines": 8065
     },
     {
       "path": "scripts/cucp-legacy-cdp-adapter.ps1",
@@ -1343,8 +1357,8 @@
     },
     {
       "path": "scripts/cucp-staged-helper-adapter.ps1",
-      "sha256": "f65466b54dffec0cb7f9d89c3405d79ceaea8d65cb2ee75e6843f1b361f8a550",
-      "lines": 138
+      "sha256": "aed55660900448192fa8a2dfb660f635678c74162fb860a48e4662f4e39c3d70",
+      "lines": 137
     },
     {
       "path": "scripts/cucp-legacy-observation-adapter.ps1",
@@ -1435,6 +1449,71 @@
       "path": "pcucp-next/dotnet/PcuCp.LegacyDesktop/app.manifest",
       "sha256": "116d6408a5670cc952ef6bd51d036c50845b906983346c69898552f4d26976db",
       "lines": 12
+    },
+    {
+      "path": "scripts/cucp-helper-server.py",
+      "sha256": "a3960ff7d0601c99ee6d90636a9f9f3e8462648dc4102078f68ca832910cb264",
+      "lines": 50
+    },
+    {
+      "path": "pcucp-next/python/legacy_helper_bridge.py",
+      "sha256": "2832189aa3e0d22730bac475f6486e78d3d014e6399eb9421261f25a2d997383",
+      "lines": 55
+    },
+    {
+      "path": "pcucp-next/python/pcucp_cli/legacy_helper_runtime.py",
+      "sha256": "1f7834be54bc6bdc8439c12212cfbbc88282afb292fa6ba849ac78e7e8783c47",
+      "lines": 269
+    },
+    {
+      "path": "pcucp-next/python/pcucp_cli/legacy_helper_client.py",
+      "sha256": "fa81a343e90dec48bceb9901625470b865f7a7e56e23192e771b244e462eeb9d",
+      "lines": 566
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyHelper/LegacyHelperActions.cs",
+      "sha256": "473629d5404a528713a1cd589082c9dfb298bddeb0c4e5fa86048c4eb4abbd97",
+      "lines": 367
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyHelper/LegacyHelperConnection.cs",
+      "sha256": "6995c9b621202f300609f6f1798d8fd00a8169b684c71e81c08945f87e30851f",
+      "lines": 47
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyHelper/LegacyHelperDirect.cs",
+      "sha256": "ae11891a614e3135b47fc316828d05a240675b04447e55d7f2f25240aadde956",
+      "lines": 115
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyHelper/LegacyHelperDirectLockDirectory.cs",
+      "sha256": "2a6160636bca2cb70594993b46785a3e1ea3f3ceee7cadbf8b5f27e6356adb5a",
+      "lines": 78
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyHelper/LegacyHelperPipeSecurity.cs",
+      "sha256": "17e5e1274dd6a280802a4cea5f764d8bf78767e1b032354c89a02b88056ef4fb",
+      "lines": 118
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyHelper/LegacyHelperProviders.cs",
+      "sha256": "70f7eeb403bb81f19a85159dc0710badd493d62cfab3b5e56d4f8afa58051cf9",
+      "lines": 178
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyHelper/LegacyHelperService.cs",
+      "sha256": "2ed08793b6c443c0292b6d9d26400a80bdb051944d79f24abba4df689c0d51b4",
+      "lines": 277
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyHelper/LegacyHelperWire.cs",
+      "sha256": "1102f418f68b7dd3123f8c9b6ee55b027cc21aee42b83766a92723f40118db5b",
+      "lines": 108
+    },
+    {
+      "path": "pcucp-next/dotnet/PcuCp.LegacyHelper/Program.cs",
+      "sha256": "144ba60614236af330d2be57c513ec25f556689077a9fedd85a50e4d918971e2",
+      "lines": 138
     }
   ],
   "extents": [
@@ -1442,600 +1521,600 @@
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroSafetyClassify",
-      "start_line": 2376,
-      "end_line": 2407,
+      "start_line": 2169,
+      "end_line": 2200,
       "sha256": "e8eb75e823db8386276ffa55f125555509949a7e35fd45e6c73f69d1f6975554"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroVersion",
-      "start_line": 740,
-      "end_line": 757,
+      "start_line": 533,
+      "end_line": 550,
       "sha256": "3f786a5b97c775e74fee04ea0c81b88fb6b89359bd13405a53eecbd2d1dbce07"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroRecorder",
-      "start_line": 874,
-      "end_line": 962,
+      "start_line": 667,
+      "end_line": 755,
       "sha256": "3c2acba089a85c2e980d5696d150567b33e75b1ee5172f34e7038eac60070f3c"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroAuditSummary",
-      "start_line": 972,
-      "end_line": 972,
+      "start_line": 765,
+      "end_line": 765,
       "sha256": "752661100756660ec332af82e4c3f440300c80199c6b222d67f206fc66ffe79c"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroPolicyCheck",
-      "start_line": 974,
-      "end_line": 1029,
+      "start_line": 767,
+      "end_line": 822,
       "sha256": "f43a9add247d244a966ba8e500dc3a7332cb452065bdb382e84eac1b3f0a6bfb"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroDaemon",
-      "start_line": 7893,
-      "end_line": 7979,
+      "start_line": 7686,
+      "end_line": 7772,
       "sha256": "512b1c1f509acc18ffd12393a8b2eecce9bf914f389ac639444aa5a21e76250b"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroMouseVerify",
-      "start_line": 8104,
-      "end_line": 8169,
+      "start_line": 7897,
+      "end_line": 7962,
       "sha256": "5f275d885456e24cad0ac4702ffc556506dab840a38cabfe560a487afcedc910"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroClickLabel",
-      "start_line": 3393,
-      "end_line": 3393,
+      "start_line": 3186,
+      "end_line": 3186,
       "sha256": "25e553ea07959ddab041eeaaef42f0e6a72c6c86e5c5489f1ae38b1903184986"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroClickId",
-      "start_line": 3331,
-      "end_line": 3356,
+      "start_line": 3124,
+      "end_line": 3149,
       "sha256": "920d20b7900341826759ce3e841df1a3d14c8b4eef76529fd291e1eb36d03501"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroClickPoint",
-      "start_line": 5215,
-      "end_line": 5215,
+      "start_line": 5008,
+      "end_line": 5008,
       "sha256": "d3aa65480d8218a5934746605f9edcdf8ba6d2297a1c1e4827af1385179b014b"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroFillLabel",
-      "start_line": 3395,
-      "end_line": 3426,
+      "start_line": 3188,
+      "end_line": 3219,
       "sha256": "007d0f487fbf39e04a0a219fd37b55a2cb57373b89ea914cdc57078f791d6623"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroFocusWindow",
-      "start_line": 3428,
-      "end_line": 3452,
+      "start_line": 3221,
+      "end_line": 3245,
       "sha256": "1c0c39d51d4b713bd8012a710d66eb207c9cc591c21cde7425b5983d155f7fec"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroWaitWindow",
-      "start_line": 3454,
-      "end_line": 3501,
+      "start_line": 3247,
+      "end_line": 3294,
       "sha256": "377df421e136582e796cdb55caaff1e33e61dd3b527fe7133a233c4a892dcd5c"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroWaitLabel",
-      "start_line": 3358,
-      "end_line": 3389,
+      "start_line": 3151,
+      "end_line": 3182,
       "sha256": "27be0551f8ac85edc25d0478e6481591ffef4eca5ad3b87b90a532ad46c602ae"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroFindLabel",
-      "start_line": 3391,
-      "end_line": 3391,
+      "start_line": 3184,
+      "end_line": 3184,
       "sha256": "98a6ac896330cb5236f89ea36a9d6327b4863453f727030cdff56eabc01c0b75"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroListAffordances",
-      "start_line": 3223,
-      "end_line": 3329,
+      "start_line": 3016,
+      "end_line": 3122,
       "sha256": "21f881579809262f689d2eb21c231f923de64c8bfd9d653396d2c363ae517a3c"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroShortcut",
-      "start_line": 3503,
-      "end_line": 3519,
+      "start_line": 3296,
+      "end_line": 3312,
       "sha256": "313e729b55e3f24f765664a1425c48cc8eae0027bc5c901729429933b6e9b7d9"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroGoal",
-      "start_line": 3545,
-      "end_line": 3597,
+      "start_line": 3338,
+      "end_line": 3390,
       "sha256": "623ad21a5fc2a4cbaed43765e471d7fa9d9147e8e6da292a3673da89912fdf95"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroSession",
-      "start_line": 7430,
-      "end_line": 7539,
+      "start_line": 7223,
+      "end_line": 7332,
       "sha256": "7c44dbba24edbcd06098cf2cf0caed4b69aa40d064cb3437ccccd88e6f5c1dfd"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroSelfTest",
-      "start_line": 3599,
-      "end_line": 3599,
+      "start_line": 3392,
+      "end_line": 3392,
       "sha256": "92e8892916a3e596de226461693ed73529986ee85b78d29c258f63832c88a7f5"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroTrajectory",
-      "start_line": 3603,
-      "end_line": 3645,
+      "start_line": 3396,
+      "end_line": 3438,
       "sha256": "a08f4b2bda8427a8d4bfba4bf9d28bbdf01cef8670972adbd82e69bc07135fc0"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroEnsureHelper",
-      "start_line": 3647,
-      "end_line": 3662,
+      "start_line": 3440,
+      "end_line": 3455,
       "sha256": "6ff97ee388ceba8ef2ad108a64d74bff2df1d0c8612669c9f3c5acc93b7f092b"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroVisionFind",
-      "start_line": 3836,
-      "end_line": 3891,
+      "start_line": 3629,
+      "end_line": 3684,
       "sha256": "3303a85a1aff993836fddbe9d43da3db42dd12f0ff8c5ed69b7034944e8ceef7"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroVisionClick",
-      "start_line": 3893,
-      "end_line": 3967,
+      "start_line": 3686,
+      "end_line": 3760,
       "sha256": "1cabe9aedde142ff0334322c36bc18b58fdd6a2f9e1f4fea2ed0a5fa682835c9"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroMetrics",
-      "start_line": 3977,
-      "end_line": 4036,
+      "start_line": 3770,
+      "end_line": 3829,
       "sha256": "cac32dff659b848891f72fc60b3452df9b96ce371e7816be01ceda9b72b70842"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroPerf",
-      "start_line": 4729,
-      "end_line": 4729,
+      "start_line": 4522,
+      "end_line": 4522,
       "sha256": "935f689ca74460e7109b38959cdd254ad4a161913fa14cdc6ba77162052691de"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroHealthDetail",
-      "start_line": 4731,
-      "end_line": 4731,
+      "start_line": 4524,
+      "end_line": 4524,
       "sha256": "fbddeefeaf4495bd2d97e45243edeca31ead6342382735525f10786c822921a5"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroHealthQuick",
-      "start_line": 4378,
-      "end_line": 4378,
+      "start_line": 4171,
+      "end_line": 4171,
       "sha256": "1f086fd144947f61190476c209b2ceb576de85b689df6401a7d40fb2c9462698"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroWindows",
-      "start_line": 4130,
-      "end_line": 4295,
+      "start_line": 3923,
+      "end_line": 4088,
       "sha256": "0cdf95f54d6df592962dd36a6dbc3c49efb1463e04340995a6c47cc58a1a2451"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroFocusVerify",
-      "start_line": 4297,
-      "end_line": 4376,
+      "start_line": 4090,
+      "end_line": 4169,
       "sha256": "778f0eb831b176e1662ac6b143dbea7d02eec59dfc08410cc2783c1aa1ff64d2"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroLogTail",
-      "start_line": 4380,
-      "end_line": 4380,
+      "start_line": 4173,
+      "end_line": 4173,
       "sha256": "4d4adc686cd0fa04c8ba3791c8619a4137344a265b5302d42d28de5ea4e0cb10"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroDiagnoseLag",
-      "start_line": 4382,
-      "end_line": 4382,
+      "start_line": 4175,
+      "end_line": 4175,
       "sha256": "080f47c2abcb8bcd05bda9926eba0ce1aa41fcda0f270fe5bdf8fa2861f47834"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroCleanup",
-      "start_line": 4384,
-      "end_line": 4584,
+      "start_line": 4177,
+      "end_line": 4377,
       "sha256": "6c7228a54d9bb8e2564113f003996ec6255862df2685557465dc3d452b0faffc"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroIconFind",
-      "start_line": 4586,
-      "end_line": 4586,
+      "start_line": 4379,
+      "end_line": 4379,
       "sha256": "a98566e6eb623029382b3244a0690f3e332f8da9b433cf61af88ecf149711d86"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroIconClick",
-      "start_line": 4588,
-      "end_line": 4588,
+      "start_line": 4381,
+      "end_line": 4381,
       "sha256": "935be4238722c4c91e462bd384a6e59ffc503116d32c81cac3cbe5c5d42581f5"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroVisionClickPrecise",
-      "start_line": 4623,
-      "end_line": 4727,
+      "start_line": 4416,
+      "end_line": 4520,
       "sha256": "ea7ed798a97436b464087f5a9f92525ac4be6968af89fe1446bd326bfb6be8cb"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroScreenshot",
-      "start_line": 3211,
-      "end_line": 3221,
+      "start_line": 3004,
+      "end_line": 3014,
       "sha256": "906a4e333092ca6e71f4b1e1211157129820857aa1b3a2f56cb6e2198ddb4926"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroNativeHealth",
-      "start_line": 5149,
-      "end_line": 5165,
+      "start_line": 4942,
+      "end_line": 4958,
       "sha256": "a728f1624a48d2392c765430cba6a5687f30e27fdc5b6e661287da71fdd85daa"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroNativeWindows",
-      "start_line": 5167,
-      "end_line": 5183,
+      "start_line": 4960,
+      "end_line": 4976,
       "sha256": "e44143193ca0da6800b84c4bfc6a8e749de07315c841263d3731f6988facdfe9"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroNativeScreenshot",
-      "start_line": 5185,
-      "end_line": 5213,
+      "start_line": 4978,
+      "end_line": 5006,
       "sha256": "523e0ef2adff3aedb4ffa26a14a5122a2925b7c1aac01ae542edd04b7977abe6"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroTypeNative",
-      "start_line": 5217,
-      "end_line": 5241,
+      "start_line": 5010,
+      "end_line": 5034,
       "sha256": "fa5ed34863a6f0dee52cb5651948dbc4c03e42b808afc412d58ab07f262badb0"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroShortcutNative",
-      "start_line": 5243,
-      "end_line": 5261,
+      "start_line": 5036,
+      "end_line": 5054,
       "sha256": "82586eb976dbd1d3682926ba15a6717442f9234af21b1a2f732d423fb0f97e28"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroUiaClickLabel",
-      "start_line": 5263,
-      "end_line": 5297,
+      "start_line": 5056,
+      "end_line": 5090,
       "sha256": "645bb290c049796ee41f74e543244c89154479d08627b00247746d114b68dccf"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroUiaInvoke",
-      "start_line": 5310,
-      "end_line": 5340,
+      "start_line": 5103,
+      "end_line": 5133,
       "sha256": "aa0dbf527b23b59639848efbefe0a24a53c53ec609a841f4395d2de105b5b2e5"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroUiaSetValue",
-      "start_line": 5342,
-      "end_line": 5367,
+      "start_line": 5135,
+      "end_line": 5160,
       "sha256": "32f6d8db5944a6b0dba3fafea18c9d52022e92ea30c4cc51c499e1c824dc2301"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroUiaToggle",
-      "start_line": 5369,
-      "end_line": 5392,
+      "start_line": 5162,
+      "end_line": 5185,
       "sha256": "0c9a761501d736a1242f618c37ebabbd09aff7f9bd4ce0c66edf64b9d9f9a5d5"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroWorkflowPlan",
-      "start_line": 5989,
-      "end_line": 6000,
+      "start_line": 5782,
+      "end_line": 5793,
       "sha256": "76755aace5b08f01da5c2c751d12bb1d80e8162ed35b1138e45bb0d3b1840ea6"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroWorkflowRun",
-      "start_line": 6385,
-      "end_line": 6385,
+      "start_line": 6178,
+      "end_line": 6178,
       "sha256": "1722b9626b898b1ffd8498767c5e9f6f2346853ec3b4ab649870b6d6f45c6844"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroSmartClick",
-      "start_line": 6750,
-      "end_line": 6750,
+      "start_line": 6543,
+      "end_line": 6543,
       "sha256": "8d8b9da6e9919e8a3a245bd54f2b57308bbf909afec40c0865b33dfa67f9ffaf"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroSmartPlan",
-      "start_line": 5822,
-      "end_line": 5917,
+      "start_line": 5615,
+      "end_line": 5710,
       "sha256": "0220d3b58a4d4c4e25bc0b4683958a6ff0e3c5584de65ceabca3b750b5ddc6a4"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroAppProfile",
-      "start_line": 6480,
-      "end_line": 6579,
+      "start_line": 6273,
+      "end_line": 6372,
       "sha256": "fa74cf0709e1b7b75c031a33a873f81bba4e0c898d83861f6f2af01aac32c32a"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroTaskPreset",
-      "start_line": 6634,
-      "end_line": 6682,
+      "start_line": 6427,
+      "end_line": 6475,
       "sha256": "b1fa31162cdb4c247cd9f1dec4f45f7b2d254c05e3d05dbef49dfa7013528af1"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroTaskPlan",
-      "start_line": 6684,
-      "end_line": 6715,
+      "start_line": 6477,
+      "end_line": 6508,
       "sha256": "165cd225710de73eb623a1b021c83d6984056a9221ce3be2ab12257fb83135e8"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroTaskRun",
-      "start_line": 6717,
-      "end_line": 6717,
+      "start_line": 6510,
+      "end_line": 6510,
       "sha256": "413d870bf5c61151da8b8a9ce25a729df9370d7a8947d8d1380c6f4812b0c2f3"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroFormPlan",
-      "start_line": 6719,
-      "end_line": 6746,
+      "start_line": 6512,
+      "end_line": 6539,
       "sha256": "48dfd383793e5bb3b30bc4ffba9b065763916317b0201e3b9e76af4de872a7fc"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroFormRun",
-      "start_line": 6748,
-      "end_line": 6748,
+      "start_line": 6541,
+      "end_line": 6541,
       "sha256": "fb597b953571a97ab5e05a270f1a7b03ca82366352f1ee98895c748a33c6828b"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroWatch",
-      "start_line": 6765,
-      "end_line": 6765,
+      "start_line": 6558,
+      "end_line": 6558,
       "sha256": "f5a76361aa733e32229a6d185c15465160533a2bf0c6787a8c3909b0ebef9c4b"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroOcrScreen",
-      "start_line": 6779,
-      "end_line": 6804,
+      "start_line": 6572,
+      "end_line": 6597,
       "sha256": "e2715f77e72337f541f4a98ddcab40c8a4023defab7838dc47732d1c44641511"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroOcrImage",
-      "start_line": 6808,
-      "end_line": 6826,
+      "start_line": 6601,
+      "end_line": 6619,
       "sha256": "66aad998594399418d563321483d40b699dbb3318210075f874d4c519b431fe6"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroOcrFindText",
-      "start_line": 6832,
-      "end_line": 6867,
+      "start_line": 6625,
+      "end_line": 6660,
       "sha256": "fc33983e263576995a02d6afb6767e5e787b8793e9a163fb7da917724337382b"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroOcrClick",
-      "start_line": 6875,
-      "end_line": 6875,
+      "start_line": 6668,
+      "end_line": 6668,
       "sha256": "37c0a185df9eabfc49aeed1a7a25a405299a43d9632411f182c75c8f0d4f1240"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroOcrUiaFuse",
-      "start_line": 6889,
-      "end_line": 6925,
+      "start_line": 6682,
+      "end_line": 6718,
       "sha256": "e40ee80607b5622bfffddeee73a48c50974d68c00044b74a5ff493cd39e89873"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroScreenshotDiff",
-      "start_line": 6974,
-      "end_line": 7006,
+      "start_line": 6767,
+      "end_line": 6799,
       "sha256": "487ca660c66e0b602e510dc4e5ae7b060d186d0f4a3cc76a8b9d513c9f288d73"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroClickAndVerifyScreen",
-      "start_line": 7013,
-      "end_line": 7104,
+      "start_line": 6806,
+      "end_line": 6897,
       "sha256": "6e5b5b75ef9d8de3f507becbfc253e4916d57e4772629cf0e7e617324b2efe14"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroOcrUiaInvoke",
-      "start_line": 6932,
-      "end_line": 6968,
+      "start_line": 6725,
+      "end_line": 6761,
       "sha256": "9c3cea2c361bdc43505312a70e0f76a9eb05119446939c615aa34be5cd42f6fb"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroHistory",
-      "start_line": 5716,
-      "end_line": 5780,
+      "start_line": 5509,
+      "end_line": 5573,
       "sha256": "2b34d24432ce22ebd76a4b70de8d99a1df50f873366fa5c6d97b0805dd746e77"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroCoordProfile",
-      "start_line": 2783,
-      "end_line": 2804,
+      "start_line": 2576,
+      "end_line": 2597,
       "sha256": "873c72de2b353facfce15fc75546ff9b76bf2d77b40603649a9ec74c337ae5d9"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroCoordMap",
-      "start_line": 2874,
-      "end_line": 2903,
+      "start_line": 2667,
+      "end_line": 2696,
       "sha256": "9ba01144b5e7ae0814055be104a473a561720601452f05c5ff0a6e931f9b2a1e"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroCoordAnchor",
-      "start_line": 3178,
-      "end_line": 3178,
+      "start_line": 2971,
+      "end_line": 2971,
       "sha256": "99d2d6dd167822b94e816b3ba8b393c3e46be8b6b5dc9e651f89e13c7093c701"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroHitTest",
-      "start_line": 5405,
-      "end_line": 5460,
+      "start_line": 5198,
+      "end_line": 5253,
       "sha256": "b59d8efe0bd21a77a307bddca2e069abc25cd6d7a3b65afe67c95f23abe0ff8a"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroHitTestBatch",
-      "start_line": 5462,
-      "end_line": 5542,
+      "start_line": 5255,
+      "end_line": 5335,
       "sha256": "a54e1ce380c2c1db09fac427d8836616b1304028620a4d7ca14c3e9ff517e7eb"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroHitScan",
-      "start_line": 5544,
-      "end_line": 5583,
+      "start_line": 5337,
+      "end_line": 5376,
       "sha256": "39f4111e495eb906f7c32a1df07c730a185d5f68d40abeb4f5435158fd673615"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroPointPlan",
-      "start_line": 5598,
-      "end_line": 5598,
+      "start_line": 5391,
+      "end_line": 5391,
       "sha256": "3c05e471f1214159d0f1b3f077ca269dcad6db0ceeb134b1891a1ab9189c576e"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroTargetValidate",
-      "start_line": 5618,
-      "end_line": 5618,
+      "start_line": 5411,
+      "end_line": 5411,
       "sha256": "56984db604eb4252dae1ddc8490846a734e80c123810f374fd2e5486586abb3d"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroSafeType",
-      "start_line": 5624,
-      "end_line": 5624,
+      "start_line": 5417,
+      "end_line": 5417,
       "sha256": "6ae2637b7bc468867949d39390b7823801479c1c546eddd57b15c518b4586510"
     },
     {
@@ -2122,240 +2201,240 @@
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroImePaste",
-      "start_line": 7665,
-      "end_line": 7708,
+      "start_line": 7458,
+      "end_line": 7501,
       "sha256": "f21292d341a69769c46b018c5f8ca087abb029ad6d8ba4951a619068eddd1575"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroSafeTypeIme",
-      "start_line": 7717,
-      "end_line": 7790,
+      "start_line": 7510,
+      "end_line": 7583,
       "sha256": "51f2d111e9af73dc95fa8835461d5696c8b3fbebf5fcdc2f24f2f947c4379999"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroModalDetect",
-      "start_line": 7797,
-      "end_line": 7823,
+      "start_line": 7590,
+      "end_line": 7616,
       "sha256": "82ad46dc9199019d72bec43584b2e78d5d579decc381d8ae6ad28ff2145cc84c"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroRecoveryPlan",
-      "start_line": 7830,
-      "end_line": 7830,
+      "start_line": 7623,
+      "end_line": 7623,
       "sha256": "199aebd4c9da13d3597c25dfbbb684d1c645aee01c737640436c588175e75fcd"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroRecoveryRun",
-      "start_line": 7838,
-      "end_line": 7838,
+      "start_line": 7631,
+      "end_line": 7631,
       "sha256": "1a30cc30162c56322920cf8411fa728d5793914ea0ce2d233c4188b339f751c7"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroPrecisionValidate",
-      "start_line": 7845,
-      "end_line": 7845,
+      "start_line": 7638,
+      "end_line": 7638,
       "sha256": "a8c904f1ce96bddc71ae64e49122d3c257b5c81d2a0f0d172965ed0139083bf5"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroBenchmark",
-      "start_line": 7853,
-      "end_line": 7853,
+      "start_line": 7646,
+      "end_line": 7646,
       "sha256": "a19c0690237a12e02824080770153baa48957612af8a90fa5f2aeefd5354fb63"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroReleaseNotes",
-      "start_line": 7861,
-      "end_line": 7861,
+      "start_line": 7654,
+      "end_line": 7654,
       "sha256": "c87872554b045f217294cfed81f3076d37766ddc36ba60016de47462220f59ed"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroClipboard",
-      "start_line": 3521,
-      "end_line": 3543,
+      "start_line": 3314,
+      "end_line": 3336,
       "sha256": "02bec8d755ce3c585c598895c6f97f6c82d4971e36875dfe6f6384020d2f8d97"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "_Macro-NotImplemented",
-      "start_line": 2274,
-      "end_line": 2290,
+      "start_line": 2067,
+      "end_line": 2083,
       "sha256": "1cf301bba651002b623ad541216789da5248311f45c5d3a72e24332804da5c84"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroAppLaunch",
-      "start_line": 4799,
-      "end_line": 4870,
+      "start_line": 4592,
+      "end_line": 4663,
       "sha256": "0833e689445e207da7652be637aa031bc42c69952968f0de779a6133937ebd70"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroAppClose",
-      "start_line": 4872,
-      "end_line": 4923,
+      "start_line": 4665,
+      "end_line": 4716,
       "sha256": "e427d932a6e6654b2bbcd79edf69b79b2a24f6a98dc1625b358951bcc0d63146"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroWithApp",
-      "start_line": 4925,
-      "end_line": 5047,
+      "start_line": 4718,
+      "end_line": 4840,
       "sha256": "f875652e36c6d56ed25b6d98d3ff0e891f0c34bf0fe5cb39b3f30bec8f343fca"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroClickAndVerify",
-      "start_line": 5064,
-      "end_line": 5129,
+      "start_line": 4857,
+      "end_line": 4922,
       "sha256": "2cd7fb43f14a99cc517fc559cc677428f13deb60e0944531a97dbea343e68b19"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroAutoDo",
-      "start_line": 7110,
-      "end_line": 7189,
+      "start_line": 6903,
+      "end_line": 6982,
       "sha256": "eac671259ce573d3b9cc04d94db4544f14b3fb696c84b874a567e897fc44530b"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-Macro",
-      "start_line": 2066,
-      "end_line": 2232,
+      "start_line": 1859,
+      "end_line": 2025,
       "sha256": "843de48be292a476af2df5540145550e0315f199d011ee8874d1337ad303ef63"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Test-LiveControlRequest",
-      "start_line": 1477,
-      "end_line": 1509,
+      "start_line": 1270,
+      "end_line": 1302,
       "sha256": "2cae50248a57f39f5da87fd0b3b04597ffcec2b01898dca271aef7edcfec4553"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Test-CoordinateMissingObservation",
-      "start_line": 1511,
-      "end_line": 1521,
+      "start_line": 1304,
+      "end_line": 1314,
       "sha256": "e3c437107415c9d90927f337eb9440e0978997a795a47ce86ca3e42b354d4e31"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Assert-Authorized",
-      "start_line": 1523,
-      "end_line": 1541,
+      "start_line": 1316,
+      "end_line": 1334,
       "sha256": "d7b9276648ecd2384a6e5a81baad2186f85f900b5bdb8219d866fd42cd0035f9"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "_Read-Switch",
-      "start_line": 2252,
-      "end_line": 2262,
+      "start_line": 2045,
+      "end_line": 2055,
       "sha256": "71cc96eaa32708562750141c88168ac21cabbc6d24a39a14e3830abc89c3455a"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "_Read-StandaloneConfirmation",
-      "start_line": 2292,
-      "end_line": 2302,
+      "start_line": 2085,
+      "end_line": 2095,
       "sha256": "5cd656575089764782a8456f37b98c90a475a9d386d67795f83112a687f19530"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "_Classify-SafetyFromText",
-      "start_line": 2367,
-      "end_line": 2374,
+      "start_line": 2160,
+      "end_line": 2167,
       "sha256": "64354b6e887aea093b2860b59e723839021d40814ccdc18713f2f1c5c759146d"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "_Invoke-LegacyCompatibility",
-      "start_line": 2304,
-      "end_line": 2365,
+      "start_line": 2097,
+      "end_line": 2158,
       "sha256": "2301bbfc6b2cc4eb5475c62a0b6d522cf995d62522272f026c52b0c3b0b97240"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "_Invoke-LegacyExecutionChild",
-      "start_line": 6002,
-      "end_line": 6053,
+      "start_line": 5795,
+      "end_line": 5846,
       "sha256": "52a57a73a8c9bfb9040f6aa2baf1f4c1bc591cdc826fe5cff7f9c8565d128509"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "_Execution-ValidateEffect",
-      "start_line": 6133,
-      "end_line": 6192,
+      "start_line": 5926,
+      "end_line": 5985,
       "sha256": "f6f31508ea1d8a4f73146307d563f5870d5c34c5f873139729faa6c0e3d5f57f"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "_Execution-Dispatch",
-      "start_line": 6199,
-      "end_line": 6236,
+      "start_line": 5992,
+      "end_line": 6029,
       "sha256": "7fbfa31a7fee05d2d1ea7792cb82a3b2bf2ee0e6f4a796ff20bec58570302413"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "_Invoke-LegacyExecutionEffectLoop",
-      "start_line": 6253,
-      "end_line": 6313,
+      "start_line": 6046,
+      "end_line": 6106,
       "sha256": "6f3bb9c859ebd424adebed4235c8b0344b69f1ee31e5ee5a76d588f745614833"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "_Invoke-LegacyExecutionFamily",
-      "start_line": 6315,
-      "end_line": 6328,
+      "start_line": 6108,
+      "end_line": 6121,
       "sha256": "9679441100141aa5116899347f69a67d827ea1800d4417dd8663b0d44a50daea"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "_Invoke-LegacyExecutionHost",
-      "start_line": 6330,
-      "end_line": 6383,
+      "start_line": 6123,
+      "end_line": 6176,
       "sha256": "ea9103f22bdc81d83d0f72522306736a1d1d65238d7bf27a01e10138a432027e"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-MacroDaemonServe",
-      "start_line": 8008,
-      "end_line": 8094,
+      "start_line": 7801,
+      "end_line": 7887,
       "sha256": "207b231ee28493efc896c5b238312cedecbe27dabccc72b879fb3752063e14cf"
     },
     {
@@ -2426,32 +2505,32 @@
       "kind": "lines",
       "path": "scripts/cucp.ps1",
       "name": "wrapper-adapter-imports",
-      "start_line": 1108,
-      "end_line": 1111,
+      "start_line": 901,
+      "end_line": 904,
       "sha256": "098057adf2e32b7aafcc5617c7e882d18494d47613ed20f6820482cb3edc172d"
     },
     {
       "kind": "lines",
       "path": "scripts/cucp.ps1",
       "name": "top-level-help",
-      "start_line": 7545,
-      "end_line": 7614,
+      "start_line": 7338,
+      "end_line": 7407,
       "sha256": "f18ae290c78bd3d68ab7d16031f9f7fc3261495e5a00e9c6c9ff694c2b57baa6"
     },
     {
       "kind": "lines",
       "path": "scripts/cucp.ps1",
       "name": "top-level-version-macro-and-cli-routing",
-      "start_line": 8174,
-      "end_line": 8272,
+      "start_line": 7967,
+      "end_line": 8065,
       "sha256": "765695add121c3dabd357549a987d15581268bb86f58ff3745a04c8b8fe97c4d"
     },
     {
       "kind": "function",
       "path": "scripts/cucp.ps1",
       "name": "Invoke-NativeHelper",
-      "start_line": 1113,
-      "end_line": 1290,
+      "start_line": 906,
+      "end_line": 1083,
       "sha256": "2a9a13028ddb5a43a2a0ce153cf6cc2a60328d06ea85b06c57897f4e29321d47"
     }
   ],
@@ -2461,546 +2540,546 @@
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroSafetyClassify",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 2376
+      "callee_start_line": 2169
     },
     {
       "clause_index": 1,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroVersion",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 740
+      "callee_start_line": 533
     },
     {
       "clause_index": 2,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroRecorder",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 874
+      "callee_start_line": 667
     },
     {
       "clause_index": 3,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroAuditSummary",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 972
+      "callee_start_line": 765
     },
     {
       "clause_index": 4,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroPolicyCheck",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 974
+      "callee_start_line": 767
     },
     {
       "clause_index": 5,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroDaemon",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 7893
+      "callee_start_line": 7686
     },
     {
       "clause_index": 6,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroMouseVerify",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 8104
+      "callee_start_line": 7897
     },
     {
       "clause_index": 7,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroClickLabel",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3393
+      "callee_start_line": 3186
     },
     {
       "clause_index": 8,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroClickLabel",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3393
+      "callee_start_line": 3186
     },
     {
       "clause_index": 9,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroClickLabel",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3393
+      "callee_start_line": 3186
     },
     {
       "clause_index": 10,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroClickId",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3331
+      "callee_start_line": 3124
     },
     {
       "clause_index": 11,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroClickPoint",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5215
+      "callee_start_line": 5008
     },
     {
       "clause_index": 12,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroFillLabel",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3395
+      "callee_start_line": 3188
     },
     {
       "clause_index": 13,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroFocusWindow",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3428
+      "callee_start_line": 3221
     },
     {
       "clause_index": 14,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroWaitWindow",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3454
+      "callee_start_line": 3247
     },
     {
       "clause_index": 15,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroWaitLabel",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3358
+      "callee_start_line": 3151
     },
     {
       "clause_index": 16,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroFindLabel",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3391
+      "callee_start_line": 3184
     },
     {
       "clause_index": 17,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroListAffordances",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3223
+      "callee_start_line": 3016
     },
     {
       "clause_index": 18,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroShortcut",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3503
+      "callee_start_line": 3296
     },
     {
       "clause_index": 19,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroGoal",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3545
+      "callee_start_line": 3338
     },
     {
       "clause_index": 20,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroSession",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 7430
+      "callee_start_line": 7223
     },
     {
       "clause_index": 21,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroSelfTest",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3599
+      "callee_start_line": 3392
     },
     {
       "clause_index": 22,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroTrajectory",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3603
+      "callee_start_line": 3396
     },
     {
       "clause_index": 23,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroEnsureHelper",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3647
+      "callee_start_line": 3440
     },
     {
       "clause_index": 24,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroVisionFind",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3836
+      "callee_start_line": 3629
     },
     {
       "clause_index": 25,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroVisionClick",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3893
+      "callee_start_line": 3686
     },
     {
       "clause_index": 26,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroMetrics",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3977
+      "callee_start_line": 3770
     },
     {
       "clause_index": 27,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroPerf",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4729
+      "callee_start_line": 4522
     },
     {
       "clause_index": 28,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroHealthDetail",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4731
+      "callee_start_line": 4524
     },
     {
       "clause_index": 29,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroHealthQuick",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4378
+      "callee_start_line": 4171
     },
     {
       "clause_index": 30,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroWindows",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4130
+      "callee_start_line": 3923
     },
     {
       "clause_index": 31,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroFocusVerify",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4297
+      "callee_start_line": 4090
     },
     {
       "clause_index": 32,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroLogTail",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4380
+      "callee_start_line": 4173
     },
     {
       "clause_index": 33,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroDiagnoseLag",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4382
+      "callee_start_line": 4175
     },
     {
       "clause_index": 34,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroCleanup",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4384
+      "callee_start_line": 4177
     },
     {
       "clause_index": 35,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroIconFind",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4586
+      "callee_start_line": 4379
     },
     {
       "clause_index": 36,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroIconClick",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4588
+      "callee_start_line": 4381
     },
     {
       "clause_index": 37,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroVisionClickPrecise",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4623
+      "callee_start_line": 4416
     },
     {
       "clause_index": 38,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroScreenshot",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3211
+      "callee_start_line": 3004
     },
     {
       "clause_index": 39,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroNativeHealth",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5149
+      "callee_start_line": 4942
     },
     {
       "clause_index": 40,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroNativeWindows",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5167
+      "callee_start_line": 4960
     },
     {
       "clause_index": 41,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroNativeScreenshot",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5185
+      "callee_start_line": 4978
     },
     {
       "clause_index": 42,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroClickPoint",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5215
+      "callee_start_line": 5008
     },
     {
       "clause_index": 43,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroTypeNative",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5217
+      "callee_start_line": 5010
     },
     {
       "clause_index": 44,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroShortcutNative",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5243
+      "callee_start_line": 5036
     },
     {
       "clause_index": 45,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroUiaClickLabel",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5263
+      "callee_start_line": 5056
     },
     {
       "clause_index": 46,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroUiaInvoke",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5310
+      "callee_start_line": 5103
     },
     {
       "clause_index": 47,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroUiaSetValue",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5342
+      "callee_start_line": 5135
     },
     {
       "clause_index": 48,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroUiaToggle",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5369
+      "callee_start_line": 5162
     },
     {
       "clause_index": 49,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroWorkflowPlan",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5989
+      "callee_start_line": 5782
     },
     {
       "clause_index": 50,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroWorkflowRun",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6385
+      "callee_start_line": 6178
     },
     {
       "clause_index": 51,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroSmartClick",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6750
+      "callee_start_line": 6543
     },
     {
       "clause_index": 52,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroSmartPlan",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5822
+      "callee_start_line": 5615
     },
     {
       "clause_index": 53,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroAppProfile",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6480
+      "callee_start_line": 6273
     },
     {
       "clause_index": 54,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroTaskPreset",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6634
+      "callee_start_line": 6427
     },
     {
       "clause_index": 55,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroTaskPlan",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6684
+      "callee_start_line": 6477
     },
     {
       "clause_index": 56,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroTaskRun",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6717
+      "callee_start_line": 6510
     },
     {
       "clause_index": 57,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroFormPlan",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6719
+      "callee_start_line": 6512
     },
     {
       "clause_index": 58,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroFormRun",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6748
+      "callee_start_line": 6541
     },
     {
       "clause_index": 59,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroWatch",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6765
+      "callee_start_line": 6558
     },
     {
       "clause_index": 60,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroOcrScreen",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6779
+      "callee_start_line": 6572
     },
     {
       "clause_index": 61,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroOcrImage",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6808
+      "callee_start_line": 6601
     },
     {
       "clause_index": 62,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroOcrFindText",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6832
+      "callee_start_line": 6625
     },
     {
       "clause_index": 63,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroOcrClick",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6875
+      "callee_start_line": 6668
     },
     {
       "clause_index": 64,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroOcrUiaFuse",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6889
+      "callee_start_line": 6682
     },
     {
       "clause_index": 65,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroScreenshotDiff",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6974
+      "callee_start_line": 6767
     },
     {
       "clause_index": 66,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroClickAndVerifyScreen",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 7013
+      "callee_start_line": 6806
     },
     {
       "clause_index": 67,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroOcrUiaInvoke",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 6932
+      "callee_start_line": 6725
     },
     {
       "clause_index": 68,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroHistory",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5716
+      "callee_start_line": 5509
     },
     {
       "clause_index": 69,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroCoordProfile",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 2783
+      "callee_start_line": 2576
     },
     {
       "clause_index": 70,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroCoordMap",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 2874
+      "callee_start_line": 2667
     },
     {
       "clause_index": 71,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroCoordAnchor",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3178
+      "callee_start_line": 2971
     },
     {
       "clause_index": 72,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroHitTest",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5405
+      "callee_start_line": 5198
     },
     {
       "clause_index": 73,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroHitTestBatch",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5462
+      "callee_start_line": 5255
     },
     {
       "clause_index": 74,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroHitScan",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5544
+      "callee_start_line": 5337
     },
     {
       "clause_index": 75,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroPointPlan",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5598
+      "callee_start_line": 5391
     },
     {
       "clause_index": 76,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroTargetValidate",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5618
+      "callee_start_line": 5411
     },
     {
       "clause_index": 77,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroSafeType",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5624
+      "callee_start_line": 5417
     },
     {
       "clause_index": 78,
@@ -3077,181 +3156,181 @@
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroImePaste",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 7665
+      "callee_start_line": 7458
     },
     {
       "clause_index": 89,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroSafeTypeIme",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 7717
+      "callee_start_line": 7510
     },
     {
       "clause_index": 90,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroModalDetect",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 7797
+      "callee_start_line": 7590
     },
     {
       "clause_index": 91,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroRecoveryPlan",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 7830
+      "callee_start_line": 7623
     },
     {
       "clause_index": 92,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroRecoveryRun",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 7838
+      "callee_start_line": 7631
     },
     {
       "clause_index": 93,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroPrecisionValidate",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 7845
+      "callee_start_line": 7638
     },
     {
       "clause_index": 94,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroBenchmark",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 7853
+      "callee_start_line": 7646
     },
     {
       "clause_index": 95,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroReleaseNotes",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 7861
+      "callee_start_line": 7654
     },
     {
       "clause_index": 96,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroClipboard",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 3521
+      "callee_start_line": 3314
     },
     {
       "clause_index": 97,
       "caller": "Invoke-Macro",
       "callee": "_Macro-NotImplemented",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 2274
+      "callee_start_line": 2067
     },
     {
       "clause_index": 98,
       "caller": "Invoke-Macro",
       "callee": "_Macro-NotImplemented",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 2274
+      "callee_start_line": 2067
     },
     {
       "clause_index": 99,
       "caller": "Invoke-Macro",
       "callee": "_Macro-NotImplemented",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 2274
+      "callee_start_line": 2067
     },
     {
       "clause_index": 100,
       "caller": "Invoke-Macro",
       "callee": "_Macro-NotImplemented",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 2274
+      "callee_start_line": 2067
     },
     {
       "clause_index": 101,
       "caller": "Invoke-Macro",
       "callee": "_Macro-NotImplemented",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 2274
+      "callee_start_line": 2067
     },
     {
       "clause_index": 102,
       "caller": "Invoke-Macro",
       "callee": "_Macro-NotImplemented",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 2274
+      "callee_start_line": 2067
     },
     {
       "clause_index": 103,
       "caller": "Invoke-Macro",
       "callee": "_Macro-NotImplemented",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 2274
+      "callee_start_line": 2067
     },
     {
       "clause_index": 104,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroAppLaunch",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4799
+      "callee_start_line": 4592
     },
     {
       "clause_index": 105,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroAppClose",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4872
+      "callee_start_line": 4665
     },
     {
       "clause_index": 106,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroWithApp",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 4925
+      "callee_start_line": 4718
     },
     {
       "clause_index": 107,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroClickAndVerify",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 5064
+      "callee_start_line": 4857
     },
     {
       "clause_index": 108,
       "caller": "Invoke-Macro",
       "callee": "Invoke-MacroAutoDo",
       "callee_path": "scripts/cucp.ps1",
-      "callee_start_line": 7110
+      "callee_start_line": 6903
     }
   ],
   "call_sites": [
     {
       "path": "scripts/cucp.ps1",
-      "line": 934,
+      "line": 727,
       "caller": "Invoke-MacroRecorder",
       "callee": "Invoke-Macro",
       "line_sha256": "59943190bd620c822af99b8abc5d71c47e8ecd6a13d0fc1f42b19a77340bf60f"
     },
     {
       "path": "scripts/cucp.ps1",
-      "line": 7933,
+      "line": 7726,
       "caller": "Invoke-MacroDaemon",
       "callee": "Invoke-Macro",
       "line_sha256": "59943190bd620c822af99b8abc5d71c47e8ecd6a13d0fc1f42b19a77340bf60f"
     },
     {
       "path": "scripts/cucp.ps1",
-      "line": 8078,
+      "line": 7871,
       "caller": "Invoke-MacroDaemonServe",
       "callee": "Invoke-Macro",
       "line_sha256": "3de1360504c69700da62626378d8eaa629942a7f39b35d8be339ee93e546ad42"
     },
     {
       "path": "scripts/cucp.ps1",
-      "line": 8191,
+      "line": 7984,
       "caller": "<top-level>",
       "callee": "Invoke-Macro",
       "line_sha256": "99571344b324928ef083665530e459dcbc2943060d5e125d972d5a7d3d346684"
     },
     {
       "path": "scripts/cucp.ps1",
-      "line": 8222,
+      "line": 8015,
       "caller": "<top-level>",
       "callee": "Assert-Authorized",
       "line_sha256": "f783234c87e1156d8b51160589f63f77e22a9c1ee17abb3774d2ea8d90bf07f8"
@@ -3265,14 +3344,14 @@
     },
     {
       "path": "scripts/cucp.ps1",
-      "line": 2087,
+      "line": 1880,
       "caller": "Invoke-Macro",
       "callee": "_Read-StandaloneConfirmation",
       "line_sha256": "92e5db14aa4fc359d9c107b3b0b13be2817bd0cb09a5056dfff3c064b71cbff3"
     },
     {
       "path": "scripts/cucp.ps1",
-      "line": 6319,
+      "line": 6112,
       "caller": "_Invoke-LegacyExecutionFamily",
       "callee": "_Read-StandaloneConfirmation",
       "line_sha256": "b75eb2fde2466bafe4e44793e1407752f1cadfc009d99480f7ed71969e53df5d"
@@ -3286,21 +3365,21 @@
     },
     {
       "path": "scripts/cucp.ps1",
-      "line": 2088,
+      "line": 1881,
       "caller": "Invoke-Macro",
       "callee": "_Classify-SafetyFromText",
       "line_sha256": "260712f802f33eba64609ea99dda76eaf450772e58178bd4dae576581dcf2da1"
     },
     {
       "path": "scripts/cucp.ps1",
-      "line": 2400,
+      "line": 2193,
       "caller": "Invoke-MacroSafetyClassify",
       "callee": "_Classify-SafetyFromText",
       "line_sha256": "e65abcde8f74fc8692d1398aee3bc3977ea1493f96add839e1697ff0e4b58920"
     },
     {
       "path": "scripts/cucp.ps1",
-      "line": 6327,
+      "line": 6120,
       "caller": "_Invoke-LegacyExecutionFamily",
       "callee": "_Invoke-LegacyExecutionHost",
       "line_sha256": "66f06afb48c36b46b0879cf05d03c3989807d6fed93163db22bbe8c03b1fdeb2"

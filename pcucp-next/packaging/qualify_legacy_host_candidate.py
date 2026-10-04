@@ -161,7 +161,7 @@ def validate_source_map(path):
                    if item['name'] == row['name'] and item['parent_function'] is None]
         if len(matches) != 1 or matches[0]['sha256'] != row['sha256']:
             raise ValueError('Production AST function extent drift: ' + row['name'])
-    if len(required) != 8 or len(extents) != 123:
+    if len(required) != 7 or len(extents) != 123:
         raise ValueError('Unexpected production AST coverage count')
     return dict(required_sources=len(required), required_function_extents=len(extents), sha256=sha(path))
 

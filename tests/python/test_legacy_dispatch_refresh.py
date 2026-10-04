@@ -33,6 +33,8 @@ class RegistryRefreshTests(unittest.TestCase):
         expected = dispatch._canonical_text(current).replace(old_body, new_body, 1).replace(
             '$Script:NativeHelperPath = Join-Path $PSScriptRoot "cucp-native-helper.ps1"',
             '$Script:NativeHelperPath = Join-Path $PSScriptRoot "cucp-native-helper.py"', 1)
+        for name in ('_Read-LockSafely','_Is-StaleLock','_Try-Delete-Lock','Get-HelperServerStatus','Invoke-HelperPipe','Start-HelperServer','Stop-HelperServer'):
+            expected = expected.replace(dispatch._function_extent(expected,name)[2], dispatch._function_extent(actual,name)[2],1)
         self.assertEqual(actual, expected)
         self.assertIn("-Operation 'desktop-native'", new_body)
         self.assertNotIn('Start-Process', new_body)

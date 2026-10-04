@@ -40,3 +40,16 @@ helper actions map to Python CDP or the C# desktop worker. Historical adapter
 regressions are explicitly distinguished from current runtime qualification.
 The remaining wrapper, helper server and tests are still being migrated. Main
 has not reached 0% PowerShell.
+
+The default wrapper's seven helper lifecycle/client functions now delegate to
+the Python controller and compiled named-pipe service: lock read/validation/CAS
+deletion, status, exchange, start/reuse and acknowledged shutdown. An actual
+Windows test drives the unchanged `macro session` commands in an owned TEMP
+tree, verifies reuse/status and the server route, then shuts down the owned
+service. Direct Python startup also preserves custom pipe, zero idle and debug
+options; debug metadata is bounded and omits argument values. The staged
+selector keeps its separate lock and explicit desktop ceiling.
+
+Legacy login autostart and its PowerShell service source remain temporarily.
+They require migration before the final service script can be deleted; this
+change does not install or alter the user's real Startup folder.
