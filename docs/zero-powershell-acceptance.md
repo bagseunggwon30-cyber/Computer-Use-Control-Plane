@@ -2,8 +2,19 @@
 
 The approved final target is zero tracked PowerShell source and zero required
 PowerShell execution, including installation, launchers, tests and CI. This is
-stronger than reducing the language percentage. Work remains on the migration
-feature branch; merging into main needs separate approval.
+stronger than reducing the language percentage. The user authorized continued
+migration through 0% and merging verified changes to main; exact-head passing
+checks remain required before each merge.
+
+The current main checkpoint `3916e00a43639a64a38883fc99401e25b77d82db`
+(PR #6) passed 13 core jobs and the actual Windows Python provider gate.
+It leaves 769,499 tracked PowerShell bytes in six runtime files and 26 test
+files. GitHub's refreshed main language API reports PowerShell 11.72%.
+The staged Python owner connects 62 working macros; 39 working macros remain
+unconnected, distinct from seven original placeholders. The older checkpoints
+below are historical evidence, not current main measurements. Historical
+PowerShell oracles are qualification aids and cannot become a production
+fallback or a required dependency of the final release.
 
 At the qualified planner checkpoint `aadbc58aa9dcc2254a3361cf8963429197859f22`,
 78,544 of the original 1,013,478 tracked PowerShell bytes were actually retired.

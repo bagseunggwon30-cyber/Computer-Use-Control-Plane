@@ -28,6 +28,8 @@ CASES = {
     'screenshot-diff': ['--before', 'before.png', '--after', 'after.png', '--threshold', '3', '--ignore-region', '0,0,2,2'],
     'ime-paste': ['--text', '한글😀', '--press-enter', '--target-match', 'Editor', '--target-hwnd', '0x7b'],
     'modal-detect': ['--match', 'Editor', '--target-hwnd', 'bad'],
+    'hit-test': ['--x','0x4','--y','5','--target-match','Owned','--target-hwnd','0x2a','--no-uia'],
+    'hit-scan': ['--x','4','--y','5','--target-match','Owned','--target-hwnd','0x2a','--radius','-1','--step','0'],
 }
 HANDLERS = {name: 'Invoke-Macro' + ''.join(word.title() for word in name.split('-')) for name in CASES}
 HANDLERS.update({'uia-click-label': 'Invoke-MacroUiaClickLabel', 'ocr-uia-fuse': 'Invoke-MacroOcrUiaFuse',
