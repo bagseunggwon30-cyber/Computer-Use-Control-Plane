@@ -4565,7 +4565,14 @@ function _Invoke-LegacyNativeMacro {
   $prepared=_Invoke-LegacyCdpBridge -Operation 'native-macro-prepare' -Request @{name=$Name;rest=$values} -LiveAuthority:([bool]$AllowLiveControl)
   $mayHaveActed=[bool]$prepared.live
   try {
-    $reply=Invoke-NativeHelper -ArgList ([string[]]$prepared.argv)
+    if($Name -ceq 'hit-test' -and $prepared.context.fast){
+      $watch=[Diagnostics.Stopwatch]::StartNew()
+      $hit=_Native-HitTestPoint -X $prepared.context.x -Y $prepared.context.y -TargetHwnd $prepared.context.target_hwnd -TargetMatch $prepared.context.target_match
+      $watch.Stop();$elapsed=[int]$watch.Elapsed.TotalMilliseconds
+      $hit | Add-Member -NotePropertyName elapsed_ms -NotePropertyValue $elapsed -Force
+      $code=if($hit.status -eq 'partial'){2}else{0}
+      $reply=@{Json=$hit;Raw='';Err='';ExitCode=$code;ElapsedMs=$elapsed}
+    }else{$reply=Invoke-NativeHelper -ArgList ([string[]]$prepared.argv)}
     $result=_Invoke-LegacyCdpBridge -Operation 'native-macro-complete' -Request @{name=$Name;rest=$values;prepared=$prepared.context;brief=[bool]$Brief;
       reply=@{ExitCode=[int]$reply.ExitCode;Json=$reply.Json;Raw=[string]$reply.Raw;Err=[string]$reply.Err;ElapsedMs=[int]$reply.ElapsedMs}} -LiveAuthority:([bool]$AllowLiveControl)
     if($null -ne $result.raw){[Console]::Out.Write([string]$result.raw)}
@@ -4622,105 +4629,11 @@ function Invoke-MacroUiaToggle {param([string[]]$Rest) return _Invoke-LegacyNati
 
 # macro hit-test --x N --y N [--target-match Electron app | --target-hwnd N]
 # 좌표가 어떤 윈도우 안인지 확인 (read-only, 클릭 안 함)
-function Invoke-MacroHitTest {
-  param([string[]]$Rest)
-  $x = [int](_Read-OptValue -Rest $Rest -Name "--x")
-  $y = [int](_Read-OptValue -Rest $Rest -Name "--y")
-  $tm = _Read-OptValue -Rest $Rest -Name "--target-match"
-  $th = [int](_Read-OptValue -Rest $Rest -Name "--target-hwnd")
-  $clickInset = [int](_Read-OptValue -Rest $Rest -Name "--click-inset")
-  $fast = _Read-Switch -Rest $Rest -Name "--fast"
-  $noUia = _Read-Switch -Rest $Rest -Name "--no-uia"
-  if ($x -le 0 -or $y -le 0) { throw "macro hit-test requires --x and --y" }
-  if ($clickInset -le 0) { $clickInset = 3 }
-
-  if ($fast) {
-    $swFast = [System.Diagnostics.Stopwatch]::StartNew()
-    $fastPayload = _Native-HitTestPoint -X $x -Y $y -TargetHwnd $th -TargetMatch $tm
-    $swFast.Stop()
-    $fastPayload | Add-Member -NotePropertyName elapsed_ms -NotePropertyValue ([int]$swFast.Elapsed.TotalMilliseconds) -Force
-    $exitCode = 0
-    if ($fastPayload.status -eq "partial") { $exitCode = 2 }
-    if ($Brief) {
-      $tag = "ok"
-      if ($fastPayload.status -eq "partial") { $tag = "partial" }
-      [Console]::Out.WriteLine("$tag hit-test @($x,$y) hwnd=$($fastPayload.root_hwnd) title='$($fastPayload.root_title)' process=$($fastPayload.process_name) matched=$($fastPayload.matched) reason=$($fastPayload.match_reason) uia=skipped source=wrapper_fast elapsed_ms=$($fastPayload.elapsed_ms)")
-    } else {
-      [Console]::Out.WriteLine(($fastPayload | ConvertTo-Json -Depth 8))
-    }
-    return $exitCode
-  }
-
-  $argList = @("-Action","hit-test","-X","$x","-Y","$y")
-  if ($tm) { $argList += @("-TargetMatch", $tm) }
-  if ($th -gt 0) { $argList += @("-TargetHwnd", "$th") }
-  $argList += @("-ClickInset", "$clickInset")
-  if ($fast -or $noUia) { $argList += "-SkipUia" }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-
-  if ($Brief) {
-    if ($r.Json) {
-      $tag = "ok"
-      if ($r.Json.status -eq "partial") { $tag = "partial" }
-      $uiaSuffix = ""
-      if ($r.Json.uia_point) {
-        $uiaSuffix = " uia_refine=($($r.Json.uia_point.refined_x),$($r.Json.uia_point.refined_y)) role='$($r.Json.uia_point.role)' score=$($r.Json.uia_point.score) source=$($r.Json.uia_point.point_source)"
-      } elseif ($r.Json.uia_skipped) {
-        $uiaSuffix = " uia=skipped"
-      }
-      [Console]::Out.WriteLine("$tag hit-test @($x,$y) hwnd=$($r.Json.root_hwnd) title='$($r.Json.root_title)' process=$($r.Json.process_name) matched=$($r.Json.matched) reason=$($r.Json.match_reason)$uiaSuffix")
-    } else {
-      [Console]::Out.WriteLine("err hit-test @($x,$y) helper_failed exit=$exitCode")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
+function Invoke-MacroHitTest {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'hit-test' -Rest $Rest}
 
 function Invoke-MacroHitTestBatch {param([string[]]$Rest) return _Invoke-LegacyCoordinateMacro -Name 'hit-test-batch' -Rest $Rest}
 
-function Invoke-MacroHitScan {
-  param([string[]]$Rest)
-  $x = [int](_Read-OptValue -Rest $Rest -Name "--x")
-  $y = [int](_Read-OptValue -Rest $Rest -Name "--y")
-  $tm = _Read-OptValue -Rest $Rest -Name "--target-match"
-  $th = [int](_Read-OptValue -Rest $Rest -Name "--target-hwnd")
-  $clickInset = [int](_Read-OptValue -Rest $Rest -Name "--click-inset")
-  $radiusRaw = _Read-OptValue -Rest $Rest -Name "--radius"
-  $stepRaw = _Read-OptValue -Rest $Rest -Name "--step"
-  $radius = 0
-  $step = 6
-  if ($null -ne $radiusRaw -and "$radiusRaw" -ne "") { $radius = [int]$radiusRaw }
-  if ($null -ne $stepRaw -and "$stepRaw" -ne "") { $step = [int]$stepRaw }
-  if ($x -le 0 -or $y -le 0) { throw "macro hit-scan requires --x and --y" }
-  if ($clickInset -le 0) { $clickInset = 3 }
-  if ($radius -lt 0) { $radius = 0 }
-  if ($step -le 0) { $step = 6 }
-
-  $argList = @("-Action","hit-scan","-X","$x","-Y","$y","-ClickInset","$clickInset","-ScanRadius","$radius","-ScanStep","$step")
-  if ($tm) { $argList += @("-TargetMatch", $tm) }
-  if ($th -gt 0) { $argList += @("-TargetHwnd", "$th") }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      $best = $r.Json.best
-      $pt = $r.Json.recommended_point
-      [Console]::Out.WriteLine("ok hit-scan @($x,$y) best=($($pt.x),$($pt.y)) confidence=$($pt.confidence) role='$($best.role)' score=$($best.final_score) support=$($best.support) source=$($pt.point_source) samples=$($r.Json.sample_count)")
-    } elseif ($r.Json) {
-      $reason = if ($r.Json.reason) { "$($r.Json.reason)" } else { "no_candidate" }
-      [Console]::Out.WriteLine("partial hit-scan @($x,$y) reason=$reason samples=$($r.Json.sample_count) matched=$($r.Json.target_matched_samples)")
-    } else {
-      [Console]::Out.WriteLine("err hit-scan @($x,$y) helper_failed exit=$exitCode")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
+function Invoke-MacroHitScan {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'hit-scan' -Rest $Rest}
 
 
 

@@ -92,6 +92,21 @@ class RootTests(unittest.TestCase):
         self.assertEqual(code, 3)
         self.assertEqual(json.loads(output)['schema'], 'cucp.safety-block/v1')
 
+    def test_hit_macros_are_readonly_and_fast_path_skips_desktop_helper(self):
+        owner=self.owner()
+        code,output=owner.invoke(['macro','hit-test','--x','1','--y','1','--fast',
+                                 '--target-match','CUCP absent hit macro target'])
+        payload=json.loads(output)
+        self.assertIn(code,(0,2));self.assertTrue(payload['uia_skipped'])
+        self.assertEqual(payload['source'],'wrapper_win32_fast')
+        for name,flags in [('hit-test',['--no-uia']),('hit-scan',['--radius','0'])]:
+            with self.subTest(name=name):
+                code,output=owner.invoke(['macro',name,'--x','1','--y','1',
+                    '--target-match','CUCP absent hit macro target',*flags])
+                self.assertIn(code,(0,2),output)
+                self.assertIn(json.loads(output)['status'],('ok','partial'))
+        self.assertFalse(owner.closed)
+
     def test_root_cancel_propagates_to_active_watch_and_rejects_further_invocations(self):
         owner = self.owner()
         timer = threading.Timer(.2, owner.close)

@@ -1,5 +1,6 @@
 """Original direct desktop macro arguments, reports and trajectory effects."""
 from datetime import datetime
+import time
 from .legacy_cdp_contract import _ps_equal, ps_string, utf16_length
 from .legacy_diagnostic_provider import option, owned_path
 from .legacy_host_protocol import Authority, require
@@ -8,7 +9,7 @@ from .legacy_values import int32
 
 OPERATIONS = frozenset(('native-health', 'native-windows', 'native-screenshot', 'type-native', 'shortcut-native',
     'uia-click-label', 'uia-invoke', 'uia-set-value', 'uia-toggle', 'ocr-screen', 'ocr-image', 'ocr-find-text',
-    'ocr-uia-fuse', 'ocr-uia-invoke', 'screenshot-diff', 'ime-paste', 'modal-detect'))
+    'ocr-uia-fuse', 'ocr-uia-invoke', 'screenshot-diff', 'ime-paste', 'modal-detect', 'hit-test', 'hit-scan'))
 LIVE = frozenset(('type-native', 'shortcut-native', 'uia-click-label', 'uia-invoke', 'uia-set-value', 'uia-toggle',
     'ocr-uia-invoke', 'ime-paste'))
 
@@ -17,14 +18,33 @@ def _get(row, name, default=None):
     return row.get(name, default) if type(row) is dict else default
 
 
+def _truth(value):
+    if type(value) is dict:
+        return True
+    if type(value) is list:
+        return len(value) > 1 or bool(value) and _truth(value[0])
+    return bool(value)
+
+
 class NativeMacros:
-    def __init__(self, native, *, cache_directory, audit_directory, authority=Authority()):
+    def __init__(self, native, *, cache_directory, audit_directory, authority=Authority(), fast_hit=None):
         self.native, self.authority = native, authority
         self.cache, self.audit = owned_path(str(cache_directory)), owned_path(str(audit_directory))
+        self.fast_hit = fast_hit
 
     def run(self, name, rest, *, brief=False):
         prepared=self.prepare(name,rest)
-        reply=self.native(prepared['argv'],Authority(prepared['live']))
+        if name == 'hit-test' and prepared['context']['fast']:
+            require(self.fast_hit is not None, 'Read-only fast hit provider is unavailable.')
+            started = time.monotonic()
+            context = prepared['context']
+            payload = self.fast_hit(context['x'], context['y'], context['target_hwnd'], context['target_match'])
+            require(type(payload) is dict, 'Invalid fast hit acquisition.')
+            payload = {**payload, 'elapsed_ms': round((time.monotonic() - started) * 1000)}
+            reply = dict(Json=payload, Raw='', Err='', ExitCode=2 if payload.get('status') == 'partial' else 0,
+                         ElapsedMs=payload['elapsed_ms'])
+        else:
+            reply=self.native(prepared['argv'],Authority(prepared['live']))
         return self.complete(name,rest,reply,prepared['context'],brief=brief)
 
     def prepare(self, name, rest):
@@ -47,7 +67,29 @@ class NativeMacros:
             if not item:
                 raise ValueError(f'macro {name} requires --{key}')
             return item
-        if name == 'native-health':
+        if name in {'hit-test', 'hit-scan'}:
+            x, y = int32(value('x')), int32(value('y'))
+            target, hwnd = value('target-match'), int32(value('target-hwnd'))
+            inset = int32(value('click-inset')); inset = inset if inset > 0 else 3
+            # Preserve parse-before-coordinate-validation order.
+            radius_raw, step_raw = value('radius'), value('step')
+            radius = int32(radius_raw) if name == 'hit-scan' and radius_raw else 0
+            step = int32(step_raw) if name == 'hit-scan' and step_raw else 6
+            if x <= 0 or y <= 0:
+                raise ValueError(f'macro {name} requires --x and --y')
+            context = dict(x=x, y=y)
+            argv = ['-Action', name, '-X', str(x), '-Y', str(y)]
+            if name == 'hit-test':
+                context.update(fast=flag('fast'), target_hwnd=hwnd, target_match=target or '')
+                add('TargetMatch', target)
+                if hwnd > 0: add('TargetHwnd', str(hwnd))
+                add('ClickInset', str(inset))
+                if flag('fast') or flag('no-uia'): argv.append('-SkipUia')
+            else:
+                argv += ['-ClickInset', str(inset), '-ScanRadius', str(max(0, radius)), '-ScanStep', str(step if step > 0 else 6)]
+                add('TargetMatch', target)
+                if hwnd > 0: add('TargetHwnd', str(hwnd))
+        elif name == 'native-health':
             argv = ['-Action', 'health']
         elif name == 'native-windows':
             argv = ['-Action', 'windows']; add('Match', value('match'))
@@ -124,12 +166,16 @@ class NativeMacros:
         require(type(context) is dict and type(reply) is dict, 'Invalid native macro completion.')
         if name in LIVE and not self.authority.live:
             raise PermissionError(f'macro {name} requires -AllowLiveControl')
-        fields=({'length','clear','enter'} if name=='type-native' else {'keys'} if name=='shortcut-native' else
+        fields=({'x','y','fast','target_hwnd','target_match'} if name=='hit-test' else {'x','y'} if name=='hit-scan' else
+            {'length','clear','enter'} if name=='type-native' else {'keys'} if name=='shortcut-native' else
             {'label','button'} if name=='uia-click-label' else {'label'} if name.startswith('uia-') else
             {'path'} if name=='ocr-image' else {'text','match'} if name in {'ocr-find-text','ocr-uia-fuse','ocr-uia-invoke'} else set())
         require(set(context)==fields,'Unexpected native macro completion context.')
         for key,item in context.items():
-            require(type(item) is bool if key in ('clear','enter') else type(item) is int and item>=0 if key=='length' else type(item) is str,
+            require(type(item) is bool if key in ('clear','enter','fast') else
+                type(item) is int and 0 < item < 2**31 if key in ('x','y') else
+                type(item) is int and -(2**31) <= item < 2**31 if key=='target_hwnd' else
+                type(item) is int and item>=0 if key=='length' else type(item) is str,
                 'Invalid native macro completion context value.')
         require(type(reply) is dict and type(reply.get('ExitCode')) is int and type(reply.get('Raw')) is str,
             'Invalid direct native macro reply.')
@@ -137,7 +183,36 @@ class NativeMacros:
         elapsed, code = reply['ElapsedMs'], reply['ExitCode']
         v = lambda key: ps_string(_get(payload, key))
         line, schema = '', None
-        if name == 'native-health':
+        if name == 'hit-test':
+            point = f"@({context['x']},{context['y']})"
+            if context['fast']:
+                require(type(payload) is dict, 'Invalid fast hit completion.')
+                tag = 'partial' if payload.get('status') == 'partial' else 'ok'
+                line = f"{tag} hit-test {point} hwnd={v('root_hwnd')} title='{v('root_title')}' process={v('process_name')} matched={v('matched')} reason={v('match_reason')} uia=skipped source=wrapper_fast elapsed_ms={v('elapsed_ms')}"
+                code = 2 if payload.get('status') == 'partial' else 0
+                return dict(payload=payload, exit=code, json_depth=8, brief=line if brief else None, emit_json=not brief, raw=None)
+            if payload is not None:
+                tag = 'partial' if payload.get('status') == 'partial' else 'ok'
+                suffix = ''
+                if _truth(_get(payload, 'uia_point')):
+                    uia = payload['uia_point']; u = lambda key: ps_string(_get(uia, key))
+                    suffix = f" uia_refine=({u('refined_x')},{u('refined_y')}) role='{u('role')}' score={u('score')} source={u('point_source')}"
+                elif _truth(_get(payload, 'uia_skipped')): suffix = ' uia=skipped'
+                line = f"{tag} hit-test {point} hwnd={v('root_hwnd')} title='{v('root_title')}' process={v('process_name')} matched={v('matched')} reason={v('match_reason')}{suffix}"
+            else:
+                line = f"err hit-test {point} helper_failed exit={code}"
+        elif name == 'hit-scan':
+            point = f"@({context['x']},{context['y']})"
+            if payload is not None and ok:
+                best, recommended = _get(payload, 'best'), _get(payload, 'recommended_point')
+                b = lambda key: ps_string(_get(best, key))
+                p = lambda key: ps_string(_get(recommended, key))
+                line = f"ok hit-scan {point} best=({p('x')},{p('y')}) confidence={p('confidence')} role='{b('role')}' score={b('final_score')} support={b('support')} source={p('point_source')} samples={v('sample_count')}"
+            elif payload is not None:
+                line = f"partial hit-scan {point} reason={v('reason') or 'no_candidate'} samples={v('sample_count')} matched={v('target_matched_samples')}"
+            else:
+                line = f"err hit-scan {point} helper_failed exit={code}"
+        elif name == 'native-health':
             line = f"ok native-health win32={v('win32')} uia={v('uia')} ocr={v('ocr')} ocr_languages={','.join(_get(payload, 'ocr_languages', []) or [])} elapsed_ms={elapsed}" if ok else 'err native-health helper_unavailable raw=' + ps_string(reply['Err'])
             code = 0 if ok else 1
         elif name == 'native-windows':

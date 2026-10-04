@@ -271,8 +271,13 @@ class PreservedOwner:
             runtime = self._desktop_runtime(scope)
             def run(port):
                 native = lambda argv, ceiling: port.native(argv, scope.authority.restrict(ceiling.live, ceiling.sensitive), scope)
+                def fast_hit(x, y, hwnd, match):
+                    coordinates = CoordinateRuntime(timeout_s=scope.remaining(), parent_deadline=scope.deadline,
+                        cancelled=scope.cancelled, culture=self.culture)
+                    return self._owned(coordinates, scope, lambda reader: reader.value('hit',
+                        dict(x=x, y=y, target_hwnd=hwnd, target_match=match)))
                 return NativeMacros(native, cache_directory=self.context['cache_directory'], audit_directory=self.context['audit_directory'],
-                    authority=scope.authority).run(name, rest, brief=brief)
+                    authority=scope.authority, fast_hit=fast_hit).run(name, rest, brief=brief)
             return self._owned(runtime, scope, run)
         if name in CDP:
             macro = prepare_macro(name, rest, allow_live_control=scope.authority.live)
