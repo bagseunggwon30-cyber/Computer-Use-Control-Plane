@@ -51,7 +51,8 @@ def handle(operation: str, request: dict, *, allow_live_control=False, endpoint=
         if any(value is not None for value in (cache_directory,audit_directory,endpoint,history_file,history_maximum,coordinate_culture)) or coordinate_modern:
             raise ValueError('Unexpected public surface bootstrap values')
         from .legacy_surface_macros import handle as surface_handle
-        return surface_handle(request,culture=surface_culture if surface_culture is not None else 'en-US',timeout_s=timeout_s)
+        return surface_handle(request,culture=surface_culture if surface_culture is not None else 'en-US',timeout_s=timeout_s,
+                              allow_live_control=allow_live_control)
     if surface_culture is not None:
         raise ValueError('Unexpected public surface culture')
     if operation == 'coordinates':

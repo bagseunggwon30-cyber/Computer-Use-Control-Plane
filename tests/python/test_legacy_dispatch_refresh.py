@@ -54,6 +54,9 @@ class RegistryRefreshTests(unittest.TestCase):
             expected=expected.replace(dispatch._function_extent(expected,name)[2],dispatch._function_extent(actual,name)[2],1)
         surface_delegate=dispatch._function_extent(actual,'_Invoke-LegacySurfaceMacro')[2]
         expected=expected.replace('function Invoke-MacroVersion {',surface_delegate+'\n\nfunction Invoke-MacroVersion {',1)
+        from test_authorization_production import HANDLERS as AUTHORIZATION_HANDLERS
+        for name in AUTHORIZATION_HANDLERS:
+            expected=expected.replace(dispatch._function_extent(expected,name)[2],dispatch._function_extent(actual,name)[2],1)
         helper=dispatch._function_extent(actual,'_Invoke-LegacyNativeMacro')[2]
         expected=expected.replace('function Invoke-MacroNativeHealth {',helper+'\n\nfunction Invoke-MacroNativeHealth {',1)
         for before,after in (
@@ -88,8 +91,9 @@ class RegistryRefreshTests(unittest.TestCase):
                 (current_first, current_last, dispatch._digest(current_body)))
         from test_legacy_native_macros import HANDLERS
         from test_surface_macro_production import HANDLERS as SURFACE_HANDLERS
+        from test_authorization_production import HANDLERS as AUTHORIZATION_HANDLERS
         self.assertEqual(set(changed),{'Invoke-NativeHelper','Invoke-MacroHistory','Invoke-MacroCoordProfile',
-                                     'Invoke-MacroCoordMap','Invoke-MacroHitTestBatch',*HANDLERS.values(),*SURFACE_HANDLERS})
+                                     'Invoke-MacroCoordMap','Invoke-MacroHitTestBatch',*HANDLERS.values(),*SURFACE_HANDLERS,*AUTHORIZATION_HANDLERS})
         dispatch.assert_frozen_sources(ROOT)
 
     def test_all_dispatch_handler_and_safety_invariants_remain_identical(self):

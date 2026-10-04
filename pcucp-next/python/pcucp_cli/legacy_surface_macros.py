@@ -95,8 +95,12 @@ def build_version(args):
                      helper_server='pcucp-next/bin/legacy-helper/manifest.json'),
         recoverable_errors=errors,generated_at=args['generated_at'])
 
-def handle(request, *, culture='en-US', timeout_s=15):
+def handle(request, *, culture='en-US', timeout_s=15, allow_live_control=False):
     require(type(request) is dict and type(request.get('name')) is str,'Invalid public surface request.')
+    if request['name'] in ('authorization-predicates','authorization'):
+        exact(request,('name','argv'))
+        from .legacy_authorization import predicates,authorize
+        return predicates(request['argv']) if request['name']=='authorization-predicates' else authorize(request['argv'],allow_live_control=allow_live_control)
     if request['name']=='version-report':
         exact(request,('name','args'))
         return dict(value=build_version(request['args']))
