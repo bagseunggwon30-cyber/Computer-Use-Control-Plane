@@ -215,8 +215,14 @@ class LegacyDispatchContractTests(unittest.TestCase):
             self.assertEqual(positions, sorted(positions), function)
         ordered("Invoke-Macro", ["$AllowLiveControl -and", "$directSafetyLiveMacros -contains $sub",
                 "_Read-StandaloneConfirmation -Rest $rest", "_Classify-SafetyFromText", "return 3", "switch ($sub)"])
-        ordered("Assert-Authorized", ["Test-LiveControlRequest", "Test-CoordinateMissingObservation",
-                "if ($missingObs)", "if ($isLive -and -not $AllowLiveControl)"])
+        ordered("Assert-Authorized", ["-LiveAuthority:([bool]$AllowLiveControl)", "name='authorization'",
+                "foreach($notice", "if($result.error)"])
+        import inspect
+        from pcucp_cli.legacy_authorization import authorize
+        body = inspect.getsource(authorize)
+        positions = [body.index(token) for token in ("result=predicates(words)",
+            "if result['missing_observation']", "if result['live'] and not allow_live_control")]
+        self.assertEqual(positions, sorted(positions), "Python authorization precedence")
         ordered("_Read-StandaloneConfirmation", ["Get-Variable", "return $false", "_Invoke-LegacyCompatibility", "return [bool]$result.confirmed"])
         ordered("_Invoke-LegacyExecutionFamily", ["$liveCeiling=", "$sensitiveCeiling=", "$inherited=", "$restCopy=", "return _Invoke-LegacyExecutionHost"])
         ordered("_Invoke-LegacyExecutionEffectLoop", ["_Execution-ValidateEffect $message", "$State.live_effect_seen=$true", "_Execution-Dispatch $message"])
