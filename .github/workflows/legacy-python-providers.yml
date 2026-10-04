@@ -8,10 +8,13 @@ on:
       - 'pcucp-next/python/pcucp_cli/legacy_*.py'
       - 'pcucp-next/dotnet/PcuCp.NativeHost/**'
       - 'pcucp-next/dotnet/PcuCp.LegacyDesktop/**'
+      - 'pcucp-next/dotnet/PcuCp.LegacySyntax/**'
       - 'pcucp-next/dotnet/PcuCp.LegacyInterop.Net8/**'
       - 'tests/python/test_legacy_diagnostic_provider.py'
       - 'tests/python/test_legacy_diagnostic_runtime.py'
       - 'tests/python/test_legacy_native_desktop.py'
+      - 'tests/python/test_legacy_execution_runtime.py'
+      - 'tests/python/test_legacy_syntax_runtime.py'
       - '.github/workflows/legacy-python-providers.yml'
 permissions:
   contents: read
@@ -36,6 +39,8 @@ jobs:
         run: dotnet build pcucp-next/dotnet/PcuCp.NativeHost/PcuCp.NativeHost.csproj -c Release --nologo
       - name: Build retained Framework desktop backend
         run: dotnet build pcucp-next/dotnet/PcuCp.LegacyDesktop/PcuCp.LegacyDesktop.csproj -c Release -warnaserror --nologo
+      - name: Build read-only Windows workflow syntax compatibility
+        run: dotnet build pcucp-next/dotnet/PcuCp.LegacySyntax/PcuCp.LegacySyntax.csproj -c Release -warnaserror --nologo
       - name: Generate owned OCR fixtures
         run: python -m pip install Pillow
       - name: Qualify Python files, Node argv, native reads and shared deadlines
@@ -46,4 +51,6 @@ jobs:
         run: |
           export CUCP_DIAGNOSTIC_PROVIDER_NATIVE="$(cygpath -w "$GITHUB_WORKSPACE/pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll")"
           export CUCP_LEGACY_DESKTOP_EXE="$(cygpath -w "$GITHUB_WORKSPACE/pcucp-next/dotnet/PcuCp.LegacyDesktop/bin/Release/net48/PcuCp.LegacyDesktop.exe")"
-          python -m unittest test_legacy_diagnostic_runtime test_legacy_diagnostic_provider test_legacy_native_desktop test_legacy_host_protocol test_native_session test_legacy_dispatch_contract test_legacy_dispatch_refresh -v
+          export CUCP_LEGACY_SYNTAX_EXE="$(cygpath -w "$GITHUB_WORKSPACE/pcucp-next/dotnet/PcuCp.LegacySyntax/bin/Release/net48/PcuCp.LegacySyntax.exe")"
+          export CUCP_NATIVE_HOST="$CUCP_DIAGNOSTIC_PROVIDER_NATIVE"
+          python -m unittest test_legacy_diagnostic_runtime test_legacy_diagnostic_provider test_legacy_native_desktop test_legacy_execution_runtime test_legacy_syntax_runtime test_legacy_host_protocol test_native_session test_legacy_dispatch_contract test_legacy_dispatch_refresh -v

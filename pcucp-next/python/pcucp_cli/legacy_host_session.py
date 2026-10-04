@@ -14,6 +14,7 @@ import queue
 import subprocess
 import threading
 import time
+from contextlib import contextmanager
 
 from . import native_host
 from .legacy_host_protocol import (Authority, Effect, FAMILIES, LegacyHostError, CHUNK_BYTES,
@@ -31,13 +32,51 @@ def _coordinator_argv():
     return command
 
 
+class Cancellation:
+    """Read-only view of local and ancestor cancellation; never clears either."""
+    def __init__(self, *events):
+        self.events = tuple(event for event in events if event is not None)
+
+    def is_set(self):
+        return any(event.is_set() for event in self.events)
+
+    def wait(self, seconds):
+        deadline = time.monotonic() + seconds
+        while not self.is_set() and time.monotonic() < deadline:
+            time.sleep(min(.01, max(0, deadline - time.monotonic())))
+        return self.is_set()
+
+
+@contextmanager
+def cancel_with_owner(port, cancelled):
+    """Propagate cancellation into socket adapters during a blocking call."""
+    if cancelled is None:
+        yield port
+        return
+    require(not cancelled.is_set(), 'Owner cancelled before adapter dispatch; action not retried.')
+    done = threading.Event()
+    def watch():
+        while not done.wait(.01):
+            if cancelled.is_set():
+                port.close()
+                return
+    thread = threading.Thread(target=watch, daemon=True)
+    thread.start()
+    try:
+        yield port
+    finally:
+        done.set()
+        thread.join(.1)
+
+
 class LegacyEffectSession:
-    def __init__(self, *, timeout_s=30.0):
+    def __init__(self, *, timeout_s=30.0, parent_cancelled=None):
         require(type(timeout_s) in (int, float) and math.isfinite(timeout_s) and timeout_s > 0,
                 'Legacy session timeout must be positive and finite.')
         self.timeout_s = timeout_s
         self._lock = threading.RLock()
         self._cancelled = threading.Event()
+        self._cancellation = Cancellation(self._cancelled, parent_cancelled)
         self._process = None
         self._used = False
         self._threads = []
@@ -53,7 +92,7 @@ class LegacyEffectSession:
             native_host._terminate_process_tree(process)
 
     def _check(self, deadline):
-        require(not self._cancelled.is_set(), 'Legacy session cancelled; action not retried.')
+        require(not self._cancellation.is_set(), 'Legacy session cancelled; action not retried.')
         require(time.monotonic() < deadline, 'Legacy session timed out; action not retried.')
 
     def run(self, family, startup, authority, provider):
@@ -69,7 +108,7 @@ class LegacyEffectSession:
             self._used = True
         deadline = min(time.monotonic() + self.timeout_s, getattr(provider, 'parent_deadline', math.inf))
         if hasattr(provider, 'bind_session'):
-            provider.bind_session(deadline, self._cancelled)
+            provider.bind_session(deadline, self._cancellation)
         provider.validate_startup(family, startup, authority)
         encoded = frames(startup, 0, startup=True)
         command = [*_coordinator_argv(), FAMILIES[family][0]]

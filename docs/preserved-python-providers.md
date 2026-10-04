@@ -57,6 +57,33 @@ separate qualification project and is excluded from the production package.
 
 ## Verification and remaining cutovers
 
+`legacy_execution_runtime` now supplies closed Python acquisition for all seven
+retained execution coordinators: workflow-run, task-run, form-run, smart-click,
+watch, recovery-plan and recovery-run. Planning acquisition also covers workflow,
+task, form, preset and smart-plan recipes. Root child/local ports are explicit
+trusted callbacks; this does not enable the incomplete production wrapper. Each
+nested invocation inherits the same deadline and restricted authority. Ancestor
+cancellation interrupts both worker processes and owned CDP sockets, without
+starting a native fallback or repeating a dispatched action. Smart-click's
+existing Console-only/null-payload completion is retained, not fabricated as JSON.
+
+The old literal parser remains excluded from NativeHost. `PcuCp.LegacySyntax`
+instead uses the Windows-provided **read-only PowerShell 5.1 PSParser API** for
+exact workflow tokenization. It creates no runspace, pipeline, interpreter or
+PowerShell process and never evaluates a token. This is a documented system
+library dependency, not zero installed PowerShell components. The system assembly
+is not copied into the release package. Actual local comparisons include the
+previously unresolved broad grammar, neighboring edges, localized diagnostics,
+NUL-only tokens, step acquisition, and complete workflow plans. Qualification
+alone reads pure functions from the pinned historical Git source as the oracle;
+production code never reads or executes that source.
+
+Local execution checks cover all seven actual coordinators, nested dry-run task
+execution, real read-only workflow children/audit, generated document plans,
+owned history/tie/rotation rules, missing targets, denial before child dispatch,
+and cancellation during delay or a stalled owned CDP connection. These do not
+certify live actions in external applications or the remaining root cutovers.
+
 The Windows provider job builds the actual NativeHost, exercises all nine
 diagnostics (including full/cold perf), retained find-label, appshot cold/warm
 cache and audit, Unicode paths, missing dependencies, and shared sampling
