@@ -107,8 +107,14 @@ foreach ($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | Con
                     after.pop('elapsed_ms', None)
                     self.assertEqual(after, before)
 
+            # Preserve the qualified PS/C# math facade as an immutable oracle.
+            # Current Python acquisition/reporting is exercised separately by
+            # test_coordinate_production, not substituted for this fixture.
+            previous = root / 'previous-math-facade.ps1'
+            previous.write_bytes(subprocess.check_output(['git','show',
+                'b1a5641f129c039afdc8cbe969c3d365e5539740:scripts/cucp.ps1'],cwd=ROOT))
             bridge = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-File', str(runner),
-                '-SourcePath', str(ROOT/'scripts/cucp.ps1'), '-InputPath', str(inputs), '-Bridge'],
+                '-SourcePath', str(previous), '-InputPath', str(inputs), '-Bridge'],
                 env={**os.environ, 'CUCP_NATIVE_HOST': str(host)}, capture_output=True, timeout=120)
             self.assertEqual(bridge.returncode, 0, bridge.stderr.decode('utf-8', errors='replace'))
             self.assertEqual(json.loads(bridge.stdout.decode('utf-8-sig')), expected)

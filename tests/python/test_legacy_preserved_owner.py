@@ -67,6 +67,22 @@ class RootTests(unittest.TestCase):
             owner.invoke(['macro', 'recorder'])
         self.assertFalse(owner.closed)
 
+    def test_coordinate_macros_are_connected_without_live_authority(self):
+        owner = self.owner()
+        code, output = owner.invoke(['macro','coord-profile','--x','-100000','--y','-100000',
+                                    '--target-match','CUCP absent owner coordinate target'])
+        payload = json.loads(output)
+        self.assertEqual(code, 0, payload)
+        self.assertEqual(payload['coordinate_risk'], 'high')
+        self.assertFalse(payload['point_inside_virtual_screen'])
+        code, output = owner.invoke(['macro','coord-map','--from','window','--x','1','--y','2',
+                                    '--target-match','CUCP absent owner coordinate target'])
+        self.assertEqual(code, 2, output)
+        self.assertEqual(json.loads(output)['reason'], 'target_window_not_found')
+        code, output = owner.invoke(['macro','hit-test-batch','--points','0,1;bad'])
+        self.assertEqual(code, 2, output)
+        self.assertEqual(json.loads(output)['error_count'], 2)
+
     def test_control_looking_text_cannot_mint_sensitive_approval(self):
         owner = self.owner(authority=Authority(True, True))
         def forbidden(*args, **kwargs):

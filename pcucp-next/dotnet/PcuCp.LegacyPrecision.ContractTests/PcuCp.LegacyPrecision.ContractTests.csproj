@@ -5,6 +5,7 @@
     <Compile Include="../PcuCp.LegacyPrecision/*.cs" Link="%(Filename)%(Extension)" />
     <Compile Include="../PcuCp.NativeHost/LegacyTextKernel.cs" Link="LegacyTextKernel.cs" />
     <Compile Include="../PcuCp.NativeHost/LegacyCoordinateKernel.cs" Link="LegacyCoordinateKernel.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyOcrMatcher.cs" Link="LegacyOcrMatcher.cs" />
     <Compile Include="../PcuCp.NativeHost/Contracts.cs" Link="Contracts.cs" />
   </ItemGroup>
 </Project>

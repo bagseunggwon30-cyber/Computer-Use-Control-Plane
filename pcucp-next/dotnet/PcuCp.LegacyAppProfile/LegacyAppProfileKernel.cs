@@ -54,7 +54,7 @@ internal static class LegacyAppProfileKernel
             _ => j.ToString()
         }, _ => Convert.ToString(value, CultureInfo.InvariantCulture) ?? ""
     };
-    private static long N(object? value, bool wide = false)
+    internal static long N(object? value, bool wide = false)
     {
         string source = S(value), type = wide ? "Int64" : "Int32";
         if (source.Length == 0) return 0;

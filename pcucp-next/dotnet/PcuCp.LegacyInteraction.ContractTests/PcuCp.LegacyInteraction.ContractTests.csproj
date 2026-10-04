@@ -8,6 +8,7 @@
     <Compile Include="../PcuCp.NativeHost/LegacySafetyKernel.cs" Link="LegacySafetyKernel.cs" />
     <Compile Include="../PcuCp.NativeHost/LegacyTextKernel.cs" Link="LegacyTextKernel.cs" />
     <Compile Include="../PcuCp.NativeHost/LegacyCoordinateKernel.cs" Link="LegacyCoordinateKernel.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyOcrMatcher.cs" Link="LegacyOcrMatcher.cs" />
     <Compile Include="../PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs" Link="LegacyTaskPresetKernel.cs" />
     <Compile Include="../PcuCp.LegacyTaskForm/LegacyTaskFormKernel.cs" Link="LegacyTaskFormKernel.cs" />
   </ItemGroup>

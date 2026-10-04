@@ -152,7 +152,7 @@ internal static class LegacyOcrMatcher
     private static extern int FindNLSStringEx(string locale, uint flags, string source, int sourceLength,
         string value, int valueLength, IntPtr foundLength, IntPtr version, IntPtr reserved, IntPtr sortHandle);
 
-    private static bool LegacyEqual(string left, string right)
+    internal static bool LegacyEqual(string left, string right)
     {
         if (!OperatingSystem.IsWindows()) return CultureInfo.InvariantCulture.CompareInfo.Compare(left, right, CompareOptions.IgnoreCase) == 0;
         var result = CompareStringEx("", 1, left, left.Length, right, right.Length, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
@@ -160,7 +160,7 @@ internal static class LegacyOcrMatcher
         return result == 2;
     }
 
-    private static int LegacyIndex(string source, string value)
+    internal static int LegacyIndex(string source, string value)
     {
         if (!OperatingSystem.IsWindows()) return source.IndexOf(value, StringComparison.CurrentCulture);
         var result = FindNLSStringEx(CultureInfo.CurrentCulture.Name, 0, source, source.Length, value, value.Length,
@@ -169,7 +169,7 @@ internal static class LegacyOcrMatcher
         return result;
     }
 
-    private static void LegacySort<T>(T[] values, Comparison<T> compare)
+    internal static void LegacySort<T>(T[] values, Comparison<T> compare)
     {
         // Preserve PS5/.NET4 pre-4.5 equal-key ordering, rather than silently
         // switching first-match behavior to the modern stable LINQ ordering.

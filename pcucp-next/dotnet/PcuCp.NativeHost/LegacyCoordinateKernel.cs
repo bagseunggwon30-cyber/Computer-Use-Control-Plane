@@ -14,6 +14,54 @@ internal static class LegacyCoordinateKernel
         internal object Json => new { x = X, y = Y };
     }
     private static readonly string[] Modes = ["screen", "window", "visible-window", "normalized", "visible-normalized"];
+    internal static object BatchPoints(JsonElement args)
+    {
+        var fields = args.EnumerateObject().Select(p => p.Name).ToArray();
+        if (fields.Length != 2 || fields.Distinct(StringComparer.Ordinal).Count() != 2 ||
+            fields.Any(p => p is not ("points" or "maximum")) || !args.TryGetProperty("points", out var points) ||
+            points.ValueKind != JsonValueKind.Array || points.EnumerateArray().Any(p => p.ValueKind != JsonValueKind.String))
+            throw CommandOptions.Invalid("Invalid captured point specifications.");
+        int maximum = Integer(args, "maximum"); if (maximum <= 0) maximum = 200;
+        if (points.GetArrayLength() == 0) throw CommandOptions.Invalid("macro hit-test-batch requires --point \"x,y\" or --points \"x,y;x,y\"");
+        if (points.GetArrayLength() > maximum) throw CommandOptions.Invalid($"macro hit-test-batch point count exceeds --max-points ({maximum})");
+        var valid = new List<object>(); var errors = new List<object>(); int index = 0;
+        foreach (var point in points.EnumerateArray())
+        {
+            ++index; string text = point.GetString()!;
+            var match = System.Text.RegularExpressions.Regex.Match(text, @"^\s*(-?\d+)\s*,\s*(-?\d+)\s*$");
+            if (!match.Success) { errors.Add(new { index, point = text, code = "bad_point_spec", message = "point must be x,y" }); continue; }
+            int x = int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            int y = int.Parse(match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+            if (x <= 0 || y <= 0) { errors.Add(new { index, point = text, code = "invalid_coords", message = "x and y must be positive" }); continue; }
+            valid.Add(new { index, x, y });
+        }
+        return new { schema = "cucp.coord-batch-points/v1", valid, errors };
+    }
+    internal static object SelectWindow(JsonElement args)
+    {
+        var fields = args.EnumerateObject().Select(p => p.Name).ToArray();
+        if (fields.Length != 3 || fields.Distinct(StringComparer.Ordinal).Count() != 3 ||
+            fields.Any(p => p is not ("windows" or "match" or "modern")) ||
+            !args.TryGetProperty("modern", out var mode) || mode.ValueKind is not (JsonValueKind.True or JsonValueKind.False) ||
+            !args.TryGetProperty("windows", out var windows) || windows.ValueKind != JsonValueKind.Array || windows.GetArrayLength() > 16384)
+            throw CommandOptions.Invalid("Invalid captured coordinate window selection.");
+        bool modern = mode.GetBoolean();
+        string Lower(string text) => modern ? text.ToLowerInvariant() : LegacyTextKernel.LowerValue(text, System.Globalization.CultureInfo.InvariantCulture);
+        bool Equal(string left, string right) => modern ? StringComparer.InvariantCultureIgnoreCase.Equals(left, right) : LegacyOcrMatcher.LegacyEqual(left, right);
+        bool Contains(string source, string value) => source.Length != 0 && (modern ? source.IndexOf(value, StringComparison.CurrentCulture) : LegacyOcrMatcher.LegacyIndex(source, value)) >= 0;
+        bool Flag(JsonElement row, string name) => row.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.True;
+        string match = Text(args, "match"), needle = Lower(match);
+        var rows = windows.EnumerateArray().Where(row => Flag(row, "visible") && needle.Length != 0 &&
+            (Contains(Lower(Text(row, "title")), needle) || Contains(Lower(Text(row, "process")), needle))).ToArray();
+        int Rank(JsonElement row) => Text(row, "title").Length != 0 && Equal(Lower(Text(row, "title")), needle) ? 0 :
+            Text(row, "process").Length != 0 && Equal(Lower(Text(row, "process")), needle) ? 1 : 2;
+        if (modern) rows = rows.OrderBy(Rank).ThenBy(row => Flag(row, "minimized") ? 1 : 0).ToArray();
+        else LegacyOcrMatcher.LegacySort(rows, (left, right) => {
+            int comparison = Rank(left).CompareTo(Rank(right));
+            return comparison != 0 ? comparison : Flag(left, "minimized").CompareTo(Flag(right, "minimized"));
+        });
+        return new { schema = "cucp.coord-window/v1", window = rows.Length == 0 ? (JsonElement?)null : rows[0].Clone() };
+    }
     private static void Fields(JsonElement args)
     {
         if (args.ValueKind != JsonValueKind.Object) throw CommandOptions.Invalid("Coordinate arguments must be an object.");

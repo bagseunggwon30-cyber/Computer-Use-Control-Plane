@@ -3,6 +3,7 @@ import time
 from .legacy_cdp_contract import _ps_equal, _invariant_lower, _framework_sort
 from .legacy_native_kernel import compatibility
 from .legacy_host_protocol import require
+from .legacy_values import int32
 
 
 def find_window(windows, match):
@@ -19,26 +20,52 @@ def find_window(windows, match):
 
 
 class Coordinates:
-    def __init__(self, read, *, culture='en-US', remaining=lambda: 30, cancelled=None):
-        self.read, self.culture, self.remaining, self.cancelled = read, culture, remaining, cancelled
+    def __init__(self, read, *, culture='en-US', remaining=lambda: 30, cancelled=None, modern=False):
+        self.read, self.culture, self.remaining, self.cancelled, self.modern = read, culture, remaining, cancelled, modern
 
     def hit(self, x, y, target_hwnd=0, target_match=''):
         return self.read('hit-test-point', ['--x', str(x), '--y', str(y), '--target-hwnd', str(target_hwnd), '--target-match', target_match or ''])
 
+    def _find(self, match):
+        result = compatibility('coord-window', dict(windows=self.read('windows', []), match=match, modern=self.modern),
+            culture=self.culture, timeout_s=self.remaining(), cancelled=self.cancelled)
+        require(result.get('schema') == 'cucp.coord-window/v1', 'Invalid coordinate window selection.')
+        return result['window']
+
+    def _precheck_window(self, hit, *, synthetic=True):
+        if not hit or hit['root_hwnd'] <= 0:
+            return None
+        window = next((row for row in self.read('windows', []) if row['hwnd'] == hit['root_hwnd']), None)
+        if window or not synthetic:
+            return window
+        return dict(
+            hwnd=hit['root_hwnd'], title=hit['root_title'], process=hit['process_name'], pid=hit['process_id'],
+            **{'class': hit['root_class']}, visible=True, minimized=False, foreground=False, rect=None)
+
     def profile(self, *, has_point=False, x=0, y=0, target_hwnd=0, target_match=''):
         started = time.monotonic()
-        windows = self.read('windows', [])
-        hit = self.hit(x, y, target_hwnd, target_match) if has_point else None
-        target = next((row for row in windows if row['hwnd'] == target_hwnd), None) if target_hwnd > 0 else None
-        target = target or find_window(windows, target_match)
-        if not target and hit and hit['root_hwnd'] > 0:
-            target = next((row for row in windows if row['hwnd'] == hit['root_hwnd']), None) or dict(
-                hwnd=hit['root_hwnd'], title=hit['root_title'], process=hit['process_name'], **{'class': hit['root_class']},
-                foreground=False, rect=None)
         raw = self.read('coordinate-snapshot', ['--x', str(x), '--y', str(y), '--has-point', 'true' if has_point else 'false',
-            '--target-hwnd', str(target['hwnd'] if target else 0)])
+            '--target-hwnd', '0'])
         virtual, monitors = raw['virtual_screen'], raw['monitors']
-        point_monitor, target_monitor = raw['point_monitor'], raw['target_monitor']
+        point_monitor = raw['point_monitor'] if has_point else None
+        hit = None
+        if has_point and -2147483648 <= target_hwnd <= 2147483647:
+            try:
+                hit = self.hit(x, y, target_hwnd, target_match)
+            except (OSError, ValueError, RuntimeError):
+                self.remaining()  # Cancellation/deadlines remain terminal.
+        target = next((row for row in self.read('windows', []) if row['hwnd'] == target_hwnd), None) if target_hwnd > 0 else None
+        if not target and target_match:
+            target = self._find(target_match)
+        if not target and hit:
+            target = self._precheck_window(hit)
+        target_monitor, window_dpi = None, None
+        if target:
+            try:
+                extra = self.read('coordinate-target', ['--target-hwnd', str(target['hwnd'])])
+                target_monitor, window_dpi = extra['target_monitor'], extra['target_window_dpi']
+            except (OSError, ValueError, RuntimeError):
+                self.remaining()
         inside = virtual['x'] <= x < virtual['right'] and virtual['y'] <= y < virtual['bottom'] if has_point else None
         rect = target['rect'] if target else None
         in_target, relative, edge = None, None, None
@@ -46,8 +73,8 @@ class Coordinates:
             right, bottom = rect['x'] + rect['width'], rect['y'] + rect['height']
             in_target = rect['x'] <= x < right and rect['y'] <= y < bottom
             relative = dict(x=x - rect['x'], y=y - rect['y'],
-                norm_x=round((x - rect['x']) / rect['width'], 6) if rect['width'] > 0 else None,
-                norm_y=round((y - rect['y']) / rect['height'], 6) if rect['height'] > 0 else None)
+                norm_x=round((x - rect['x']) / rect['width'] * 1000000) / 1000000 if rect['width'] > 0 else None,
+                norm_y=round((y - rect['y']) / rect['height'] * 1000000) / 1000000 if rect['height'] > 0 else None)
             edge = dict(left=x - rect['x'], top=y - rect['y'], right=right - x - 1, bottom=bottom - y - 1)
             edge['min'] = min(edge.values())
         warnings, risk = [], 'low'
@@ -74,21 +101,24 @@ class Coordinates:
             has_point=has_point, coordinate_risk=risk, warnings=warnings, virtual_screen=virtual, monitors=monitors,
             point_inside_virtual_screen=inside, point_monitor=point_monitor, target_window={key: target[key] for key in
                 ('hwnd', 'title', 'process', 'class', 'foreground', 'rect')} if target else None, target_monitor=target_monitor,
-            target_window_dpi=raw['target_window_dpi'], point_inside_target_window=in_target, point_window_relative=relative,
+            target_window_dpi=window_dpi, point_inside_target_window=in_target, point_window_relative=relative,
             edge_distance_to_target=edge, hit_test=hit, coord_signature='|'.join(signature),
             elapsed_ms=round((time.monotonic() - started) * 1000), next_step=
             'Use point-plan for micro-refined click planning; if coordinate_risk is high, re-ground with app-profile or smart-plan before live control.' if has_point else
             'Use this profile to understand DPI/monitor layout before planning coordinate clicks.')
 
-    def map(self, *, source='screen', x=0, y=0, norm_x=0, norm_y=0, has_norm=False, target_hwnd=0, target_match=''):
+    def map(self, *, source='screen', x=0, y=0, norm_x=0, norm_y=0, has_norm=False, target_hwnd=0, target_match='', synthetic_fallback=True):
         started = time.monotonic()
-        windows = self.read('windows', [])
-        window = next((row for row in windows if row['hwnd'] == target_hwnd), None) if target_hwnd > 0 else None
-        window = window or find_window(windows, target_match)
-        if not window and source.lower() == 'screen':
-            hit = self.hit(round(x), round(y))
-            window = next((row for row in windows if row['hwnd'] == hit['root_hwnd']), None)
         snapshot = self.read('coordinate-snapshot', [])
+        window = next((row for row in self.read('windows', []) if row['hwnd'] == target_hwnd), None) if target_hwnd > 0 else None
+        if not window and target_match:
+            window = self._find(target_match)
+        if not window and source.lower() == 'screen':
+            try:
+                hit = self.hit(int32(round(x)), int32(round(y)))
+                window = self._precheck_window(hit, synthetic=synthetic_fallback)
+            except (OSError, ValueError, RuntimeError):
+                self.remaining()
         virtual = {key: item for key, item in snapshot['virtual_screen'].items() if key != 'same_display_format'}
         result = compatibility('coord-map', dict(**{'from': source or 'screen'}, x=x, y=y, norm_x=norm_x, norm_y=norm_y,
             has_norm=has_norm, target_hwnd=target_hwnd, target_match=target_match, virtual_screen=virtual, selected_window=window),

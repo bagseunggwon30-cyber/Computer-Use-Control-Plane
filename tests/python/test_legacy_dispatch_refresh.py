@@ -44,6 +44,11 @@ class RegistryRefreshTests(unittest.TestCase):
             expected=expected.replace(dispatch._function_extent(expected,name)[2],dispatch._function_extent(actual,name)[2],1)
         history_capture=dispatch._function_extent(actual,'_History-Capture')[2]
         expected=expected.replace('function Invoke-MacroHistory {',history_capture+'\n\nfunction Invoke-MacroHistory {',1)
+        from test_coordinate_production import HANDLERS as COORDINATE_HANDLERS
+        for name in COORDINATE_HANDLERS:
+            expected=expected.replace(dispatch._function_extent(expected,name)[2],dispatch._function_extent(actual,name)[2],1)
+        coordinate_delegate=dispatch._function_extent(actual,'_Invoke-LegacyCoordinateMacro')[2]
+        expected=expected.replace('function Invoke-MacroCoordProfile {',coordinate_delegate+'\n\nfunction Invoke-MacroCoordProfile {',1)
         helper=dispatch._function_extent(actual,'_Invoke-LegacyNativeMacro')[2]
         expected=expected.replace('function Invoke-MacroNativeHealth {',helper+'\n\nfunction Invoke-MacroNativeHealth {',1)
         for before,after in (
@@ -77,7 +82,8 @@ class RegistryRefreshTests(unittest.TestCase):
             self.assertEqual((row['start_line'], row['end_line'], row['sha256']),
                 (current_first, current_last, dispatch._digest(current_body)))
         from test_legacy_native_macros import HANDLERS
-        self.assertEqual(set(changed),{'Invoke-NativeHelper','Invoke-MacroHistory',*HANDLERS.values()})
+        self.assertEqual(set(changed),{'Invoke-NativeHelper','Invoke-MacroHistory','Invoke-MacroCoordProfile',
+                                     'Invoke-MacroCoordMap','Invoke-MacroHitTestBatch',*HANDLERS.values()})
         dispatch.assert_frozen_sources(ROOT)
 
     def test_all_dispatch_handler_and_safety_invariants_remain_identical(self):

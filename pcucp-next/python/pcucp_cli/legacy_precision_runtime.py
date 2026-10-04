@@ -123,7 +123,10 @@ class PrecisionRuntime:
             if kind == 'coord-map':
                 require(operation == 'coord-anchor' and self.reads == 0 and args['from'] == 'screen' and args['has_norm'] is False and
                     args['norm_x'] == args['norm_y'] == 0, 'Invalid coordinate mapping order.')
-                return self.coordinates.map(x=x, y=y, target_hwnd=hwnd, target_match=match)
+                # The staged planner requires an enumerated rectangle. Preserve
+                # its existing partial result for unenumerated hit-test roots;
+                # production coord-map retains the historical synthetic fallback.
+                return self.coordinates.map(x=x, y=y, target_hwnd=hwnd, target_match=match, synthetic_fallback=False)
             if kind == 'hit-test':
                 require(operation == 'point-plan' and self.reads == 0, 'Invalid point precheck order.')
                 self.precheck = self.coordinates.hit(x, y, hwnd, match)

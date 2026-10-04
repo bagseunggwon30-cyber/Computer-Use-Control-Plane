@@ -24,6 +24,8 @@ class CoordinateRiskTests(unittest.TestCase):
         def read(operation, args):
             if operation == 'windows': return [window]
             if operation == 'coordinate-snapshot': return snapshot
+            if operation == 'coordinate-target':
+                return {key: snapshot[key] for key in ('target_monitor', 'target_window_dpi')}
             values = dict(zip(args[::2], args[1::2]))
             return dict(status='ok' if matched else 'partial', root_hwnd=42, root_title=window['title'], process_name='editor',
                 process_id=1, root_class='Owned', matched=matched, x=int(values['--x']), y=int(values['--y']))

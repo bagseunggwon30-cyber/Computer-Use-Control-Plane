@@ -2227,69 +2227,9 @@ function _Native-ClickPoint {
 }
 
 function _Native-HitTestPoint {
-  param(
-    [int]$X,
-    [int]$Y,
-    [int]$TargetHwnd,
-    [string]$TargetMatch
-  )
-  if (-not (_Ensure-Win32Loaded)) { throw "Win32 load failed" }
-  $win = [CucpWin32]::WindowFromScreenPoint($X, $Y)
-  if (-not $win) {
-    return [pscustomobject]@{
-      status = "partial"
-      reason = "no_window_at_coords"
-      x = $X
-      y = $Y
-      child_hwnd = 0
-      root_hwnd = 0
-      root_title = ""
-      child_title = ""
-      root_class = ""
-      process_id = 0
-      process_name = ""
-      target_hwnd = $TargetHwnd
-      target_match = $TargetMatch
-      matched = $false
-      match_reason = "no_window_at_coords"
-      uia_skipped = $true
-      source = "wrapper_win32_fast"
-    }
-  }
-
-  $matched = $true
-  $matchReason = "no_target_specified"
-  if ($TargetHwnd -gt 0) {
-    $matched = ([int64]$win.Hwnd -eq [int64]$TargetHwnd)
-    $matchReason = if ($matched) { "hwnd_match" } else { "hwnd_mismatch" }
-  } elseif ($TargetMatch) {
-    $needle = $TargetMatch.ToLowerInvariant()
-    $title = if ($win.Title) { "$($win.Title)".ToLowerInvariant() } else { "" }
-    $proc = if ($win.ProcessName) { "$($win.ProcessName)".ToLowerInvariant() } else { "" }
-    $matched = ($title.Contains($needle) -or $proc.Contains($needle))
-    $matchReason = if ($matched) { "title_or_process_match" } else { "title_mismatch" }
-  }
-  $status = "ok"
-  if ((($TargetHwnd -gt 0) -or $TargetMatch) -and -not $matched) { $status = "partial" }
-
-  return [pscustomobject]@{
-    status = $status
-    x = $X
-    y = $Y
-    child_hwnd = [int64]$win.ChildHwnd
-    root_hwnd = [int64]$win.Hwnd
-    root_title = "$($win.Title)"
-    child_title = ""
-    root_class = "$($win.ClassName)"
-    process_id = [int]$win.Pid
-    process_name = "$($win.ProcessName)"
-    target_hwnd = $TargetHwnd
-    target_match = $TargetMatch
-    matched = [bool]$matched
-    match_reason = $matchReason
-    uia_skipped = $true
-    source = "wrapper_win32_fast"
-  }
+  param([int]$X,[int]$Y,[int]$TargetHwnd,[string]$TargetMatch)
+  $result=_Invoke-LegacyCdpBridge -Operation 'coordinates' -Request @{action='hit';args=@{x=$X;y=$Y;target_hwnd=$TargetHwnd;target_match=[string]$TargetMatch}}
+  return $result.value
 }
 
 function _CoordProfile-MonitorObject {
@@ -2340,191 +2280,21 @@ function _CoordProfile-WindowFromPrecheck {
 }
 
 function _Build-CoordProfile {
-  param(
-    [bool]$HasPoint,
-    [int]$X,
-    [int]$Y,
-    [int64]$TargetHwnd,
-    [string]$TargetMatch
-  )
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  if (-not (_Ensure-Win32Loaded)) {
-    $sw.Stop()
-    return [pscustomobject]@{
-      schema = "cucp.coord-profile/v1"
-      status = "partial"
-      reason = "win32_load_failed"
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    }
-  }
-
-  $virtualRaw = [CucpWin32]::GetVirtualScreenInfo()
-  $virtual = [pscustomobject]@{
-    x = [int]$virtualRaw.X
-    y = [int]$virtualRaw.Y
-    width = [int]$virtualRaw.Width
-    height = [int]$virtualRaw.Height
-    right = [int]($virtualRaw.X + $virtualRaw.Width)
-    bottom = [int]($virtualRaw.Y + $virtualRaw.Height)
-    monitor_count = [int]$virtualRaw.MonitorCount
-    same_display_format = [bool]$virtualRaw.SameDisplayFormat
-  }
-  $monitors = @([CucpWin32]::EnumerateMonitors() | ForEach-Object { _CoordProfile-MonitorObject -Monitor $_ })
-  $point = if ($HasPoint) { [pscustomobject]@{ x = $X; y = $Y } } else { $null }
-  $insideVirtual = $null
-  $pointMonitor = $null
-  $pointHit = $null
-  if ($HasPoint) {
-    $insideVirtual = ($X -ge $virtual.x -and $X -lt $virtual.right -and $Y -ge $virtual.y -and $Y -lt $virtual.bottom)
-    try { $pointMonitor = _CoordProfile-MonitorObject -Monitor ([CucpWin32]::MonitorFromScreenPointInfo($X,$Y)) } catch { }
-    try { $pointHit = _Native-HitTestPoint -X $X -Y $Y -TargetHwnd ([int]$TargetHwnd) -TargetMatch $TargetMatch } catch { }
-  }
-
-  $targetWindow = $null
-  if ($TargetHwnd -gt 0) {
-    foreach ($w in @(_Enumerate-Win32Windows)) {
-      if ([int64]$w.hwnd -eq [int64]$TargetHwnd) { $targetWindow = $w; break }
-    }
-  }
-  if (-not $targetWindow -and $TargetMatch) { $targetWindow = _Native-FindWindow -Name $TargetMatch }
-  if (-not $targetWindow -and $pointHit) { $targetWindow = _CoordProfile-WindowFromPrecheck -Precheck $pointHit }
-
-  $targetRect = $null
-  $targetMonitor = $null
-  $windowDpi = $null
-  if ($targetWindow) {
-    $targetRect = $targetWindow.rect
-    try { $targetMonitor = _CoordProfile-MonitorObject -Monitor ([CucpWin32]::MonitorFromWindowInfo([IntPtr]([int64]$targetWindow.hwnd))) } catch { }
-    try {
-      $dpiValue = [CucpWin32]::GetWindowDpiValue([IntPtr]([int64]$targetWindow.hwnd))
-      if ([int]$dpiValue -gt 0) {
-        $windowDpi = [pscustomobject]@{
-          dpi = [int]$dpiValue
-          scale = [Math]::Round(([double]$dpiValue / 96.0), 4)
-        }
-      }
-    } catch { }
-  }
-
-  $pointInTarget = $null
-  $pointWindowRelative = $null
-  $edgeDistance = $null
-  if ($HasPoint -and $targetRect) {
-    $right = [int]$targetRect.x + [int]$targetRect.width
-    $bottom = [int]$targetRect.y + [int]$targetRect.height
-    $pointInTarget = ($X -ge [int]$targetRect.x -and $X -lt $right -and $Y -ge [int]$targetRect.y -and $Y -lt $bottom)
-    $relX = $X - [int]$targetRect.x
-    $relY = $Y - [int]$targetRect.y
-    $pointWindowRelative = [pscustomobject]@{
-      x = [int]$relX
-      y = [int]$relY
-      norm_x = if ([int]$targetRect.width -gt 0) { [Math]::Round(([double]$relX / [double]$targetRect.width), 6) } else { $null }
-      norm_y = if ([int]$targetRect.height -gt 0) { [Math]::Round(([double]$relY / [double]$targetRect.height), 6) } else { $null }
-    }
-    $edgeDistance = [pscustomobject]@{
-      left = [int]($X - [int]$targetRect.x)
-      top = [int]($Y - [int]$targetRect.y)
-      right = [int]($right - $X - 1)
-      bottom = [int]($bottom - $Y - 1)
-      min = [int]([Math]::Min([Math]::Min($X - [int]$targetRect.x, $Y - [int]$targetRect.y), [Math]::Min($right - $X - 1, $bottom - $Y - 1)))
-    }
-  }
-
-  $warnings = New-Object System.Collections.ArrayList
-  $risk = "low"
-  if ($HasPoint -and -not $insideVirtual) {
-    $risk = "high"
-    [void]$warnings.Add("point_outside_virtual_screen")
-  }
-  if ($HasPoint -and $targetRect -and -not $pointInTarget) {
-    $risk = "high"
-    [void]$warnings.Add("point_outside_target_window")
-  }
-  if ($HasPoint -and $edgeDistance -and [int]$edgeDistance.min -ge 0 -and [int]$edgeDistance.min -lt 4 -and $risk -ne "high") {
-    $risk = "medium"
-    [void]$warnings.Add("point_near_target_window_edge")
-  }
-  if ($targetMonitor -and ($targetMonitor.dpi.scale_x -ne 1.0 -or $targetMonitor.dpi.scale_y -ne 1.0)) {
-    if ($risk -eq "low") { $risk = "medium" }
-    [void]$warnings.Add("non_100_percent_dpi_scale")
-  }
-  if ([int]$virtual.monitor_count -gt 1) {
-    if ($risk -eq "low") { $risk = "medium" }
-    [void]$warnings.Add("multi_monitor_coordinates")
-  }
-  if ($HasPoint -and $pointMonitor -and $targetMonitor -and $pointMonitor.device -and $targetMonitor.device -and $pointMonitor.device -ne $targetMonitor.device) {
-    $risk = "high"
-    [void]$warnings.Add("point_monitor_differs_from_target_window_monitor")
-  }
-  if ($pointHit -and (($TargetMatch) -or ($TargetHwnd -gt 0)) -and -not [bool]$pointHit.matched) {
-    $risk = "high"
-    [void]$warnings.Add("win32_hit_test_target_mismatch")
-  }
-
-  $signatureParts = New-Object System.Collections.ArrayList
-  [void]$signatureParts.Add("vs=$($virtual.x),$($virtual.y),$($virtual.width),$($virtual.height)")
-  foreach ($m in @($monitors)) {
-    [void]$signatureParts.Add("m=$($m.device):$($m.rect.x),$($m.rect.y),$($m.rect.width),$($m.rect.height):$($m.dpi.x)x$($m.dpi.y)")
-  }
-  if ($targetWindow) { [void]$signatureParts.Add("target=$([int64]$targetWindow.hwnd)") }
-  $signature = (($signatureParts | ForEach-Object { "$_" }) -join "|")
-
-  $sw.Stop()
-  return [pscustomobject]@{
-    schema = "cucp.coord-profile/v1"
-    status = "ok"
-    point = $point
-    has_point = [bool]$HasPoint
-    coordinate_risk = $risk
-    warnings = @($warnings)
-    virtual_screen = $virtual
-    monitors = @($monitors)
-    point_inside_virtual_screen = $insideVirtual
-    point_monitor = $pointMonitor
-    target_window = if ($targetWindow) {
-      [pscustomobject]@{
-        hwnd = [int64]$targetWindow.hwnd
-        title = "$($targetWindow.title)"
-        process = "$($targetWindow.process)"
-        class = "$($targetWindow.class)"
-        foreground = [bool]$targetWindow.foreground
-        rect = $targetRect
-      }
-    } else { $null }
-    target_monitor = $targetMonitor
-    target_window_dpi = $windowDpi
-    point_inside_target_window = $pointInTarget
-    point_window_relative = $pointWindowRelative
-    edge_distance_to_target = $edgeDistance
-    hit_test = $pointHit
-    coord_signature = $signature
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    next_step = if ($HasPoint) { "Use point-plan for micro-refined click planning; if coordinate_risk is high, re-ground with app-profile or smart-plan before live control." } else { "Use this profile to understand DPI/monitor layout before planning coordinate clicks." }
-  }
+  param([bool]$HasPoint,[int]$X,[int]$Y,[int64]$TargetHwnd,[string]$TargetMatch)
+  $result=_Invoke-LegacyCdpBridge -Operation 'coordinates' -Request @{action='profile';args=@{has_point=$HasPoint;x=$X;y=$Y;target_hwnd=$TargetHwnd;target_match=[string]$TargetMatch}}
+  return $result.value
 }
 
-function Invoke-MacroCoordProfile {
-  param([string[]]$Rest)
-  $xRaw = _Read-OptValue -Rest $Rest -Name "--x"
-  $yRaw = _Read-OptValue -Rest $Rest -Name "--y"
-  $hasPoint = ($null -ne $xRaw -and $null -ne $yRaw)
-  $x = 0
-  $y = 0
-  if ($hasPoint) { $x = [int]$xRaw; $y = [int]$yRaw }
-  $tm = _Read-OptValue -Rest $Rest -Name "--target-match"
-  if (-not $tm) { $tm = _Read-OptValue -Rest $Rest -Name "--match" }
-  if (-not $tm) { $tm = _Read-OptValue -Rest $Rest -Name "--window" }
-  $th = [int64](_Read-OptValue -Rest $Rest -Name "--target-hwnd")
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $profile = _Build-CoordProfile -HasPoint $hasPoint -X $x -Y $y -TargetHwnd $th -TargetMatch $tm
-  if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine("$($profile.status) coord-profile risk=$($profile.coordinate_risk) monitors=$($profile.virtual_screen.monitor_count) warnings=$(@($profile.warnings).Count) elapsed_ms=$($profile.elapsed_ms)")
-  } else {
-    [Console]::Out.WriteLine(($profile | ConvertTo-Json -Depth 12))
-  }
-  if ($profile.status -eq "ok") { return 0 }
-  return 2
+function _Invoke-LegacyCoordinateMacro {
+  param([string]$Name,[string[]]$Rest)
+  $values=[string[]]@();if($null -ne $Rest){$values=$Rest.Clone()}
+  $result=_Invoke-LegacyCdpBridge -Operation 'coordinates' -Request @{action='macro';name=$Name;rest=$values;brief=[bool]$Brief}
+  if($null -ne $result.brief){[Console]::Out.WriteLine([string]$result.brief)}
+  else{[Console]::Out.WriteLine((ConvertTo-Json -InputObject $result.payload -Depth ([int]$result.json_depth)))}
+  return [int]$result.exit
 }
+
+function Invoke-MacroCoordProfile {param([string[]]$Rest) return _Invoke-LegacyCoordinateMacro -Name 'coord-profile' -Rest $Rest}
 
 function _CoordMap-ResolveWindow {
   param([int64]$TargetHwnd, [string]$TargetMatch)
@@ -2538,92 +2308,12 @@ function _CoordMap-ResolveWindow {
 }
 
 function _Build-CoordMap {
-  param(
-    [string]$From,
-    [double]$X,
-    [double]$Y,
-    [double]$NormX,
-    [double]$NormY,
-    [bool]$HasNorm,
-    [int64]$TargetHwnd,
-    [string]$TargetMatch
-  )
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  if (-not (_Ensure-Win32Loaded)) {
-    $sw.Stop()
-    return [pscustomobject]@{ schema="cucp.coord-map/v1"; status="partial"; reason="win32_load_failed"; elapsed_ms=[int]$sw.Elapsed.TotalMilliseconds }
-  }
-  if (-not $From) { $From = "screen" }
-  $From = "$From".ToLowerInvariant()
-  $virtualRaw = [CucpWin32]::GetVirtualScreenInfo()
-  $virtual = [pscustomobject]@{
-    x = [int]$virtualRaw.X
-    y = [int]$virtualRaw.Y
-    width = [int]$virtualRaw.Width
-    height = [int]$virtualRaw.Height
-    right = [int]($virtualRaw.X + $virtualRaw.Width)
-    bottom = [int]($virtualRaw.Y + $virtualRaw.Height)
-    monitor_count = [int]$virtualRaw.MonitorCount
-  }
-
-  $win = _CoordMap-ResolveWindow -TargetHwnd $TargetHwnd -TargetMatch $TargetMatch
-  if (-not $win -and $From -eq "screen") {
-    try {
-      $hit = _Native-HitTestPoint -X ([int][Math]::Round($X)) -Y ([int][Math]::Round($Y)) -TargetHwnd 0 -TargetMatch $null
-      if ($hit -and [int64]$hit.root_hwnd -gt 0) { $win = _CoordProfile-WindowFromPrecheck -Precheck $hit }
-    } catch { }
-  }
-  $result = _Invoke-LegacyCompatibility -Operation 'coord-map' -Arguments @{
-    from=$From; x=$X; y=$Y; norm_x=$NormX; norm_y=$NormY; has_norm=$HasNorm
-    target_hwnd=$TargetHwnd; target_match=$TargetMatch; virtual_screen=$virtual; selected_window=$win
-  }
-  if ($result.schema -ne 'cucp.coord-map/v1' -or $result.status -notin @('ok','partial')) {
-    throw 'Invalid coordinate mapping response; no action was attempted.'
-  }
-  # Discovery remains local to the compatibility adapter; pure pixel math is C#.
-  if ($result.status -eq 'ok' -and $result.screen_point) {
-    $profile = _Build-CoordProfile -HasPoint $true -X $result.screen_point.x -Y $result.screen_point.y -TargetHwnd ([int64]$win.hwnd) -TargetMatch $null
-    $result.coordinate_profile = $profile
-    if ($profile -and $profile.coordinate_risk -eq 'high') {
-      $result.warnings += 'coordinate_profile_high_risk'
-      foreach ($warning in @($profile.warnings)) { if ($warning) { $result.warnings += "$warning" } }
-    }
-  }
-  $sw.Stop()
-  $result.elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-  return $result
+  param([string]$From,[double]$X,[double]$Y,[double]$NormX,[double]$NormY,[bool]$HasNorm,[int64]$TargetHwnd,[string]$TargetMatch)
+  $result=_Invoke-LegacyCdpBridge -Operation 'coordinates' -Request @{action='map';args=@{source=[string]$From;x=$X;y=$Y;norm_x=$NormX;norm_y=$NormY;has_norm=$HasNorm;target_hwnd=$TargetHwnd;target_match=[string]$TargetMatch}}
+  return $result.value
 }
 
-function Invoke-MacroCoordMap {
-  param([string[]]$Rest)
-  $from = _Read-OptValue -Rest $Rest -Name "--from"
-  if (-not $from) { $from = _Read-OptValue -Rest $Rest -Name "--mode" }
-  if (-not $from) { $from = "screen" }
-  $xRaw = _Read-OptValue -Rest $Rest -Name "--x"
-  $yRaw = _Read-OptValue -Rest $Rest -Name "--y"
-  $normXRaw = _Read-OptValue -Rest $Rest -Name "--norm-x"
-  $normYRaw = _Read-OptValue -Rest $Rest -Name "--norm-y"
-  $hasNorm = ($null -ne $normXRaw -and $null -ne $normYRaw)
-  if ((-not $hasNorm) -and ($null -eq $xRaw -or $null -eq $yRaw)) { throw "macro coord-map requires --x/--y or --norm-x/--norm-y" }
-  $x = if ($null -ne $xRaw) { [double]$xRaw } else { 0.0 }
-  $y = if ($null -ne $yRaw) { [double]$yRaw } else { 0.0 }
-  $normX = if ($hasNorm) { [double]$normXRaw } else { 0.0 }
-  $normY = if ($hasNorm) { [double]$normYRaw } else { 0.0 }
-  $tm = _Read-OptValue -Rest $Rest -Name "--target-match"
-  if (-not $tm) { $tm = _Read-OptValue -Rest $Rest -Name "--match" }
-  if (-not $tm) { $tm = _Read-OptValue -Rest $Rest -Name "--window" }
-  $th = [int64](_Read-OptValue -Rest $Rest -Name "--target-hwnd")
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $payload = _Build-CoordMap -From $from -X $x -Y $y -NormX $normX -NormY $normY -HasNorm $hasNorm -TargetHwnd $th -TargetMatch $tm
-  if ($Brief -and -not $jsonOnly) {
-    $sp = if ($payload.screen_point) { "$($payload.screen_point.x),$($payload.screen_point.y)" } else { "none" }
-    [Console]::Out.WriteLine("$($payload.status) coord-map from=$from screen=$sp inside=$($payload.inside_window) warnings=$(@($payload.warnings).Count) elapsed_ms=$($payload.elapsed_ms)")
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 12))
-  }
-  if ($payload.status -eq "ok") { return 0 }
-  return 2
-}
+function Invoke-MacroCoordMap {param([string[]]$Rest) return _Invoke-LegacyCoordinateMacro -Name 'coord-map' -Rest $Rest}
 
 function _Precision-EncodeWire($Value) {
   if($null -eq $Value){return @{kind='scalar';value=$null}}
@@ -4989,87 +4679,7 @@ function Invoke-MacroHitTest {
   return $exitCode
 }
 
-function Invoke-MacroHitTestBatch {
-  param([string[]]$Rest)
-  $pointSpecs = New-Object System.Collections.ArrayList
-  $pointsRaw = _Read-OptValue -Rest $Rest -Name "--points"
-  foreach ($p in @(_Read-AllOptValues -Rest $Rest -Name "--point")) { [void]$pointSpecs.Add($p) }
-  if ($pointsRaw) {
-    foreach ($p in @($pointsRaw -split ';')) {
-      if ("$p".Trim()) { [void]$pointSpecs.Add($p) }
-    }
-  }
-  $tm = _Read-OptValue -Rest $Rest -Name "--target-match"
-  $th = [int](_Read-OptValue -Rest $Rest -Name "--target-hwnd")
-  $maxPoints = [int](_Read-OptValue -Rest $Rest -Name "--max-points")
-  if ($maxPoints -le 0) { $maxPoints = 200 }
-  if ($pointSpecs.Count -eq 0) { throw "macro hit-test-batch requires --point `"x,y`" or --points `"x,y;x,y`"" }
-  if ($pointSpecs.Count -gt $maxPoints) { throw "macro hit-test-batch point count exceeds --max-points ($maxPoints)" }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $results = New-Object System.Collections.ArrayList
-  $errors = New-Object System.Collections.ArrayList
-  $index = 0
-  foreach ($spec in @($pointSpecs)) {
-    $index++
-    $rawSpec = "$spec"
-    if ($rawSpec -notmatch '^\s*(-?\d+)\s*,\s*(-?\d+)\s*$') {
-      [void]$errors.Add([pscustomobject]@{
-        index = $index
-        point = $rawSpec
-        code = "bad_point_spec"
-        message = "point must be x,y"
-      })
-      continue
-    }
-    $x = [int]$Matches[1]
-    $y = [int]$Matches[2]
-    if ($x -le 0 -or $y -le 0) {
-      [void]$errors.Add([pscustomobject]@{
-        index = $index
-        point = $rawSpec
-        code = "invalid_coords"
-        message = "x and y must be positive"
-      })
-      continue
-    }
-    $hit = _Native-HitTestPoint -X $x -Y $y -TargetHwnd $th -TargetMatch $tm
-    $hit | Add-Member -NotePropertyName index -NotePropertyValue $index -Force
-    [void]$results.Add($hit)
-  }
-  $sw.Stop()
-
-  $matchedCount = @($results | Where-Object { $_.matched }).Count
-  $partialCount = @($results | Where-Object { $_.status -ne "ok" }).Count
-  $safeToAct = ($results.Count -gt 0 -and $errors.Count -eq 0 -and $partialCount -eq 0)
-  $status = "ok"
-  if (-not $safeToAct) { $status = "partial" }
-  $payload = [pscustomobject]@{
-    schema = "cucp.hit-test-batch/v1"
-    status = $status
-    source = "wrapper_win32_fast"
-    uia_skipped = $true
-    target_hwnd = $th
-    target_match = $tm
-    point_count = $pointSpecs.Count
-    result_count = $results.Count
-    matched_count = $matchedCount
-    partial_count = $partialCount
-    error_count = $errors.Count
-    safe_to_act = [bool]$safeToAct
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    results = @($results)
-    errors = @($errors)
-  }
-
-  if ($Brief) {
-    [Console]::Out.WriteLine("$status hit-test-batch points=$($pointSpecs.Count) matched=$matchedCount partial=$partialCount errors=$($errors.Count) elapsed_ms=$($payload.elapsed_ms)")
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 10))
-  }
-  if ($status -eq "ok") { return 0 }
-  return 2
-}
+function Invoke-MacroHitTestBatch {param([string[]]$Rest) return _Invoke-LegacyCoordinateMacro -Name 'hit-test-batch' -Rest $Rest}
 
 function Invoke-MacroHitScan {
   param([string[]]$Rest)

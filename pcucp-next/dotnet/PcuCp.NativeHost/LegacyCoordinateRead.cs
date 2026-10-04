@@ -31,6 +31,18 @@ internal static class LegacyCoordinateRead
         "primary", value.Primary, "rect", D("x", value.X, "y", value.Y, "width", value.Width, "height", value.Height),
         "work_rect", D("x", value.WorkX, "y", value.WorkY, "width", value.WorkWidth, "height", value.WorkHeight),
         "dpi", D("x", value.DpiX, "y", value.DpiY, "scale_x", value.ScaleX, "scale_y", value.ScaleY));
+    internal static object Target(CommandOptions options)
+    {
+        if (!long.TryParse(options.Get("--target-hwnd") ?? "0", NumberStyles.Integer, CultureInfo.InvariantCulture, out long target))
+            throw CommandOptions.Invalid("Coordinate target must be Int64.");
+        object? monitor = null, dpi = null;
+        if (target != 0)
+        {
+            try { monitor = Monitor(CucpWin32.MonitorFromWindowInfo(new IntPtr(target))); } catch { }
+            try { uint raw = CucpWin32.GetWindowDpiValue(new IntPtr(target)); if (raw > 0) dpi = D("dpi", raw, "scale", Math.Round(raw / 96.0, 4)); } catch { }
+        }
+        return D("target_monitor", monitor, "target_window_dpi", dpi);
+    }
     internal static object Snapshot(CommandOptions options)
     {
         int x = LegacyTaskFormKernel.LegacyInt(options.Get("--x")), y = LegacyTaskFormKernel.LegacyInt(options.Get("--y"));
