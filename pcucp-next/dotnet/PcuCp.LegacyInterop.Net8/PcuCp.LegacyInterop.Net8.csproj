@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion>
+    <Nullable>disable</Nullable><ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>PcuCp.LegacyInterop.Net8</AssemblyName>
+    <Deterministic>true</Deterministic><TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../PcuCp.LegacyInterop/*.cs" Link="%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

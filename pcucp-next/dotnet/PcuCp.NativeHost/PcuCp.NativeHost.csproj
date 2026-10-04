@@ -10,7 +10,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../PcuCp.LegacyInterop/*.cs" Link="LegacyInterop/%(Filename)%(Extension)" />
+    <ProjectReference Include="../PcuCp.LegacyInterop.Net8/PcuCp.LegacyInterop.Net8.csproj" />
     <Compile Remove="LegacyWorkflowLiteralParser.cs" />
     <Compile Include="../PcuCp.LegacyExecution/*.cs" Link="LegacyExecution/%(Filename)%(Extension)" />
     <Compile Include="../PcuCp.LegacyInteraction/*.cs" Link="LegacyInteraction/%(Filename)%(Extension)" />
