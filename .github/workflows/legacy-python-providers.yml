@@ -17,6 +17,8 @@ on:
       - 'tests/python/test_legacy_native_macros.py'
       - 'tests/python/test_legacy_coordinates_runtime.py'
       - 'tests/python/test_legacy_preserved_owner.py'
+      - 'tests/python/test_legacy_precision_runtime.py'
+      - 'tests/python/test_legacy_interaction_runtime.py'
       - 'tests/python/test_legacy_syntax_runtime.py'
       - '.github/workflows/legacy-python-providers.yml'
 permissions:
@@ -56,4 +58,4 @@ jobs:
           export CUCP_LEGACY_DESKTOP_EXE="$(cygpath -w "$GITHUB_WORKSPACE/pcucp-next/dotnet/PcuCp.LegacyDesktop/bin/Release/net48/PcuCp.LegacyDesktop.exe")"
           export CUCP_LEGACY_SYNTAX_EXE="$(cygpath -w "$GITHUB_WORKSPACE/pcucp-next/dotnet/PcuCp.LegacySyntax/bin/Release/net48/PcuCp.LegacySyntax.exe")"
           export CUCP_NATIVE_HOST="$CUCP_DIAGNOSTIC_PROVIDER_NATIVE"
-          python -m unittest test_legacy_diagnostic_runtime test_legacy_diagnostic_provider test_legacy_native_desktop test_legacy_native_macros test_legacy_coordinates_runtime test_legacy_preserved_owner test_legacy_execution_runtime test_legacy_syntax_runtime test_legacy_host_protocol test_native_session test_legacy_dispatch_contract test_legacy_dispatch_refresh -v
+          python -m unittest test_legacy_diagnostic_runtime test_legacy_diagnostic_provider test_legacy_native_desktop test_legacy_native_macros test_legacy_coordinates_runtime test_legacy_preserved_owner test_legacy_precision_runtime test_legacy_interaction_runtime test_legacy_execution_runtime test_legacy_syntax_runtime test_legacy_host_protocol test_native_session test_legacy_dispatch_contract test_legacy_dispatch_refresh -v

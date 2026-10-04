@@ -5,7 +5,7 @@ the owner and restrict both ceilings; they do not acquire/overwrite an outer
 session lock, reset the deadline, or create an implicit replay. This candidate
 does not change the production launcher or advertise the remaining cutovers.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import math
 import threading
@@ -22,14 +22,18 @@ from .legacy_execution_runtime import ExecutionRuntime
 from .legacy_host_protocol import Authority, LegacyHostError, require
 from .legacy_host_session import Cancellation, LegacyEffectSession, cancel_with_owner
 from .legacy_label_provider import LabelReadProvider
-from .legacy_native_kernel import compatibility
+from .legacy_interaction_provider import InteractionProvider
+from .legacy_native_kernel import compatibility, precision as precision_kernel
 from .legacy_native_macros import NativeMacros, OPERATIONS as NATIVE
 from .legacy_planning_runtime import PlanningRuntime
+from .legacy_precision_runtime import PrecisionRuntime, PrecisionStorage, project
 from .legacy_storage import append_trajectory
 from .legacy_windows import observe_windows
 from .native_session import NativeSession
 
 PLANNING = frozenset(('workflow-plan', 'task-plan', 'form-plan', 'task-preset', 'smart-plan'))
+PRECISION = frozenset(('coord-anchor', 'point-plan', 'target-validate'))
+INTERACTION = frozenset(('click-point', 'safe-type', 'ocr-click', 'precision-validate', 'icon-find'))
 
 
 @dataclass(frozen=True)
@@ -38,6 +42,7 @@ class Invocation:
     deadline: float
     cancelled: object
     depth: int = 0
+    mutation: object = field(default_factory=threading.Event)
 
     def remaining(self):
         require(not self.cancelled.is_set(), 'Legacy owner cancelled; action not retried.')
@@ -48,7 +53,7 @@ class Invocation:
     def child(self, authority):
         require(self.depth < 64, 'Legacy invocation nesting exceeds 64.')
         ceiling = self.authority.restrict(authority.live, authority.sensitive)
-        return Invocation(ceiling, self.deadline, self.cancelled, self.depth + 1)
+        return Invocation(ceiling, self.deadline, self.cancelled, self.depth + 1, self.mutation)
 
 
 def render(result):
@@ -78,6 +83,8 @@ class PreservedOwner:
         self.context = dict(context)
         for key in ('audit_directory', 'cache_directory', 'wrapper_log', 'changelog_path', 'temp_root'):
             self.context[key] = str(owned_path(context[key]))
+        for key in ('audit_directory', 'cache_directory'):
+            owned_path(self.context[key]).mkdir(parents=True, exist_ok=True)
         self.authority, self.culture, self.timeout_s, self.cache_seconds = authority, culture, timeout_s, cache_seconds
         self._cancelled, self._serial, self._lock = threading.Event(), threading.Lock(), threading.RLock()
         self._active, self._cdp_cache = set(), LegacyCdpPortCache()
@@ -101,8 +108,15 @@ class PreservedOwner:
         try:
             with cancel_with_owner(port, scope.cancelled):
                 result = callback(port)
-            scope.remaining()
+            try:
+                scope.remaining()
+            except LegacyHostError as error:
+                raise LegacyHostError(str(error), uncertain=scope.mutation.is_set() or error.uncertain) from error
             return result
+        except LegacyHostError as error:
+            if scope.mutation.is_set() and not error.uncertain:
+                raise LegacyHostError(str(error), uncertain=True) from error
+            raise
         finally:
             port.close()
             with self._lock:
@@ -153,12 +167,12 @@ class PreservedOwner:
                 summary=f"매크로 '{name}' 는 이 버전에서 아직 구현되지 않았습니다 (surface 에는 등록됨).", hint=route.macro.hint or '',
                 next_action="다른 매크로로 대체하거나, 이 기능이 필요하면 별도 구현 요청. 'cucp macro' 로 사용 가능 목록 확인.")
             return dict(payload=payload, exit=1, json_depth=6, brief='not_implemented ' + name if brief else None, emit_json=not brief)
-        available = name in DIAGNOSTICS | EXECUTION | PLANNING | NATIVE | CDP | {'windows', 'metrics', 'find-label'}
+        available = name in DIAGNOSTICS | EXECUTION | PLANNING | PRECISION | INTERACTION | NATIVE | CDP | {'windows', 'metrics', 'find-label'}
         require(available, 'unqualified_surface: preserved macro ' + name + ' still requires its closed provider.')
         # Derive consent only from the invocation's original argv and ceiling.
         confirmed = compatibility('execution-confirmation', dict(original_argv=rest), culture=self.culture,
             timeout_s=scope.remaining(), cancelled=scope.cancelled)['confirmed'] and scope.authority.sensitive
-        scope = Invocation(Authority(scope.authority.live, bool(confirmed)), scope.deadline, scope.cancelled, scope.depth)
+        scope = Invocation(Authority(scope.authority.live, bool(confirmed)), scope.deadline, scope.cancelled, scope.depth, scope.mutation)
         if scope.authority.live and requires_direct_safety(name) and not confirmed:
             safety = compatibility('safety-classify', dict(text=' '.join([name, *rest]), macro=name), culture=self.culture,
                 timeout_s=scope.remaining(), cancelled=scope.cancelled)
@@ -174,6 +188,67 @@ class PreservedOwner:
             return runtime.run(name, rest, brief=brief)
         if name in PLANNING:
             return self._planning(scope).run(name, rest, brief=brief)
+        if name in INTERACTION:
+            def interaction(runtime):
+                def read(operation, args):
+                    code, payload, error = runtime.native('legacy-diagnostic-read', ['--operation', operation, *args], timeout_s=scope.remaining())
+                    if code != 0 or payload is None: raise OSError(error or 'Fixed interaction acquisition failed.')
+                    return payload['data']['value']
+                coordinates = Coordinates(read, culture=self.culture, remaining=scope.remaining, cancelled=scope.cancelled)
+                storage = PrecisionStorage(self.context['audit_directory'], self.context['cache_directory'])
+                desktop = self._desktop_runtime(scope)
+                def port(effect, provider):
+                    kind, data = effect.kind, effect.data
+                    if kind == 'Native':
+                        return desktop.native(list(effect.argv), scope.authority.restrict(effect.live, False), provider)
+                    if kind == 'UIAffordances': return runtime._affordances(data['focused_window'], data['max_elements'])
+                    if kind == 'HitTestPoint': return coordinates.hit(data['x'], data['y'], data['target_hwnd'], data['target_match'])
+                    if kind == 'CoordProfile': return coordinates.profile(**data)
+                    if kind == 'PointCacheRead': return storage.read(data['key'], data['max_age_seconds'])
+                    if kind == 'PointCacheWrite':
+                        serialized = json.dumps(project(data['payload'], 14), ensure_ascii=False, allow_nan=False, indent=2)
+                        provider.remaining(); scope.mutation.set(); storage.write(data['key'], serialized); return None
+                    if kind == 'AnchorScore':
+                        records = precision_kernel('history-read', dict(lines=storage.lines(), last=500), culture=self.culture,
+                            timeout_s=provider.remaining(), cancelled=provider.cancelled)
+                        require(records.get('state') == 'complete' and records.get('effects') == [], 'Invalid pure anchor history parse.')
+                        result = precision_kernel('history-score', dict(record=data['record'], records=records['payload'], tolerance=.012,
+                            history_file=str(storage.history)), culture=self.culture, timeout_s=provider.remaining(), cancelled=provider.cancelled)
+                        require(result.get('state') == 'complete' and result.get('effects') == [], 'Invalid pure anchor score.')
+                        return result['payload']
+                    if kind == 'AnchorAppend':
+                        serialized = json.dumps(project(data['record'], 10), ensure_ascii=False, allow_nan=False, separators=(',', ':'))
+                        provider.remaining(); scope.mutation.set(); return storage.append(serialized)
+                    if kind == 'TrajectoryAppend': append_trajectory(self.context['audit_directory'], effect.name, data); return None
+                    require(False, 'Unknown connected interaction acquisition.')
+                ports = {kind: port for kind in ('Native', 'UIAffordances', 'HitTestPoint', 'CoordProfile', 'PointCacheRead',
+                    'PointCacheWrite', 'AnchorScore', 'AnchorAppend', 'TrajectoryAppend')}
+                provider = InteractionProvider(operation=name, rest=rest, authority=scope.authority, culture=self.culture, brief=brief,
+                    cache_seconds=self.cache_seconds, vision_available=bool(self.context['cli_path']), ports=ports, parent_deadline=scope.deadline)
+                session = LegacyEffectSession(timeout_s=scope.remaining(), parent_cancelled=scope.cancelled)
+                def execute(unused):
+                    result = self._owned(session, scope, lambda worker: worker.run('interaction', provider.startup(), scope.authority, provider))
+                    return {**result, 'console': list(provider.console), 'pipeline': list(provider.pipeline)}
+                return self._owned(desktop, scope, execute)
+            return self._observations(scope, interaction)
+        if name in PRECISION:
+            def precision(runtime):
+                def read(operation, args):
+                    code, payload, error = runtime.native('legacy-diagnostic-read', ['--operation', operation, *args], timeout_s=scope.remaining())
+                    if code != 0 or payload is None:
+                        raise OSError(error or 'Fixed coordinate acquisition failed.')
+                    return payload['data']['value']
+                coordinates = Coordinates(read, culture=self.culture, remaining=scope.remaining, cancelled=scope.cancelled)
+                desktop = self._desktop_runtime(scope)
+                def execute(port):
+                    planner = PrecisionRuntime(coordinates, lambda argv: port.native(argv, Authority(), scope),
+                        audit_directory=self.context['audit_directory'], cache_directory=self.context['cache_directory'],
+                        remaining=scope.remaining, cancelled=scope.cancelled, culture=self.culture, cache_seconds=self.cache_seconds,
+                        on_persistence=scope.mutation.set,
+                        child=lambda argv: capture(self._invoke(['macro', 'point-plan', *argv], scope.child(Authority()), brief=False, quiet=True)))
+                    return planner.run(name, rest, brief=brief)
+                return self._owned(desktop, scope, execute)
+            return self._observations(scope, precision)
         if name in EXECUTION:
             def child(effect, provider):
                 ceiling = scope.authority.restrict(effect.live, effect.confirm_sensitive)

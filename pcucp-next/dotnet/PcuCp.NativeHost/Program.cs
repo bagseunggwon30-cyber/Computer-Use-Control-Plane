@@ -69,7 +69,7 @@ if (command is "legacy-execution-session" or "legacy-interaction-session" or "le
         return 2;
     }
 }
-if (command is "legacy-ocr-match" or "legacy-compat" or "legacy-execution-confirmation")
+if (command is "legacy-ocr-match" or "legacy-compat" or "legacy-execution-confirmation" or "legacy-precision-advance")
 {
     // Pure compatibility entry: bounded stdin JSON, no shell, files or desktop API.
     try
@@ -79,21 +79,22 @@ if (command is "legacy-ocr-match" or "legacy-compat" or "legacy-execution-confir
         using var buffer = new MemoryStream();
         var chunk = new byte[8192];
         bool confirmationOnly = command == "legacy-execution-confirmation";
-        int maximumRequestBytes = confirmationOnly ? LegacyExecutionStartup.MaximumStartupBytes : LegacyOcrMatcher.MaximumRequestBytes;
+        bool precisionOnly = command == "legacy-precision-advance";
+        int maximumRequestBytes = confirmationOnly ? LegacyExecutionStartup.MaximumStartupBytes : precisionOnly ? 16 * 1024 * 1024 : LegacyOcrMatcher.MaximumRequestBytes;
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         while (true)
         {
             var count = await input.ReadAsync(chunk, timeout.Token);
             if (count == 0) break;
             if (buffer.Length + count > maximumRequestBytes) throw CommandOptions.Invalid(confirmationOnly
-                ? "Execution confirmation request exceeds 32 MiB." : "Legacy OCR request exceeds 1 MiB.");
+                ? "Execution confirmation request exceeds 32 MiB." : precisionOnly ? "Precision request exceeds 16 MiB." : "Legacy OCR request exceeds 1 MiB.");
             buffer.Write(chunk, 0, count);
         }
         var utf8 = buffer.ToArray();
         // Windows PowerShell/.NET Framework's redirected StreamWriter may emit
         // a UTF-8 preamble. Accept exactly one leading BOM, never arbitrary data.
         var prefix = utf8.Length >= 3 && utf8[0] == 0xEF && utf8[1] == 0xBB && utf8[2] == 0xBF ? 3 : 0;
-        using var document = JsonDocument.Parse(new UTF8Encoding(false, true).GetString(utf8, prefix, utf8.Length - prefix), new JsonDocumentOptions { MaxDepth = 32 });
+        using var document = JsonDocument.Parse(new UTF8Encoding(false, true).GetString(utf8, prefix, utf8.Length - prefix), new JsonDocumentOptions { MaxDepth = precisionOnly ? 128 : 32 });
         // A legacy caller can have a runspace-specific culture. Preserve it
         // inside this one pure request, never in OS settings or later requests.
         var previousCulture = CultureInfo.CurrentCulture;
@@ -107,7 +108,7 @@ if (command is "legacy-ocr-match" or "legacy-compat" or "legacy-execution-confir
                 try { CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture.GetString()!); }
                 catch (CultureNotFoundException) { throw CommandOptions.Invalid("Unsupported compatibility culture."); }
             }
-            data = command == "legacy-ocr-match" ? LegacyOcrMatcher.Match(document.RootElement) : LegacyCompatibilityDispatcher.Execute(document.RootElement, confirmationOnly);
+            data = command == "legacy-ocr-match" ? LegacyOcrMatcher.Match(document.RootElement) : precisionOnly ? LegacyPrecisionFacade.Execute(document.RootElement) : LegacyCompatibilityDispatcher.Execute(document.RootElement, confirmationOnly);
         }
         finally { CultureInfo.CurrentCulture = previousCulture; }
         Console.WriteLine(JsonSerializer.Serialize(NativeResult.Ok(command, data), NativeDispatcher.JsonOptions));

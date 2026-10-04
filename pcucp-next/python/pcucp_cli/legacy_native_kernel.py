@@ -28,3 +28,15 @@ def compatibility(operation, args, *, culture='en-US', timeout_s=15, cancelled=N
     error = native_host._validate_payload('legacy-compat', result)
     require(not error and code == 0 and result['status'] == 'ok', error or 'Legacy compatibility kernel failed.')
     return result['data']
+
+
+def precision(operation, args, *, culture='en-US', timeout_s=15, cancelled=None):
+    request = dict(schema='cucp.legacy-precision-advance/v1', operation=operation, args=args, culture=culture)
+    data = json.dumps(request, ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8')
+    require(len(data) <= 16 * 1024 * 1024, 'Precision pure request exceeds 16 MiB.')
+    code, stdout, stderr = capture([*_coordinator_argv(), 'legacy-precision-advance'], timeout_s,
+        input_bytes=data, native_guard=True, cancelled=cancelled)
+    result = parse_json(stdout)
+    error = native_host._validate_payload('legacy-precision-advance', result)
+    require(not error and code == 0 and result['status'] == 'ok', error or 'Precision pure kernel failed.')
+    return result['data']

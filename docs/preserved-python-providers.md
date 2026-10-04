@@ -73,6 +73,23 @@ containing `--confirm-sensitive` cannot mint sensitive approval before input.
 This owner is still a candidate: remaining routes, root serialization, top-level
 aliases and external CLI forwarding must qualify before it becomes production.
 
+The precision planners now have an additional pure, closed C# advance entry.
+Python acquires each read once, supplies the captured trace, and renders the
+complete output/persistence bytes before a single terminal cache/history write.
+No native acquisition or pure evaluation follows that write. Point-plan cache
+cold/warm checks verify that the warm case performs no second scan. Actual
+Windows root checks also exercise all three planners against an absent target;
+those checks do not establish successful targeting of an external application.
+
+Five interaction routes are also connected: click-point, safe-type, ocr-click,
+precision-validate and icon-find. Their effect owner rejects unacquired action
+observations, changed native/live classifications, unqueried cache writes and
+unscored anchor appends. Actual Windows missing-target tests place an independent
+guard before every native input call and verify that no input is dispatched.
+The retained affordance reader may fall back to the desktop root when a window
+title is absent; icon-find can consequently return a candidate. This behavior
+is preserved and is not presented as evidence that a missing window was found.
+
 `legacy_execution_runtime` now supplies closed Python acquisition for all seven
 retained execution coordinators: workflow-run, task-run, form-run, smart-click,
 watch, recovery-plan and recovery-run. Planning acquisition also covers workflow,
