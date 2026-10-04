@@ -7,6 +7,7 @@ import sys
 from pcucp_cli.legacy_helper_client import _json
 from pcucp_cli.legacy_helper_runtime import StagedHelperRuntime, WindowsAuthority, validate_package
 from pcucp_cli.legacy_helper_autostart import AutostartController, WindowsAutostartStore
+from pcucp_cli.legacy_default_autostart import DefaultAutostartController
 
 
 def main(argv=None):
@@ -17,6 +18,7 @@ def main(argv=None):
     parser.add_argument('--startup-directory', type=Path)
     parser.add_argument('--metadata-directory', type=Path)
     parser.add_argument('--allow-autostart-change', action='store_true')
+    parser.add_argument('--default-autostart', action='store_true')
     args = parser.parse_args(argv)
     try:
         raw = sys.stdin.buffer.read(1024 * 1024 + 1)
@@ -28,14 +30,17 @@ def main(argv=None):
         if operation in ('autostart-install', 'autostart-uninstall', 'autostart-status'):
             if args.startup_directory is None or args.metadata_directory is None: raise ValueError('fixed_autostart_directories_required')
             authority = WindowsAuthority()
-            runtime = AutostartController(args.startup_directory, sys.executable,
-                Path(__file__).resolve().with_name('legacy_helper_autostart_entry.py'),
+            controller = DefaultAutostartController if args.default_autostart else AutostartController
+            bootstrap = 'legacy_helper_autostart_default.py' if args.default_autostart else 'legacy_helper_autostart_entry.py'
+            options = dict(legacy_server=Path(__file__).resolve().parents[2]/'scripts/cucp-helper-server.ps1') if args.default_autostart else {}
+            runtime = controller(args.startup_directory, sys.executable,
+                Path(__file__).resolve().with_name(bootstrap),
                 metadata_directory=args.metadata_directory,
                 store=WindowsAutostartStore(args.startup_directory, args.metadata_directory, authority),
                 allow_change=args.allow_autostart_change, desktop=args.allow_readonly_desktop,
-                validate_install=lambda: validate_package(package))
+                validate_install=lambda: validate_package(package), **options)
         else:
-            if args.startup_directory is not None or args.metadata_directory is not None or args.allow_autostart_change:
+            if args.startup_directory is not None or args.metadata_directory is not None or args.allow_autostart_change or args.default_autostart:
                 raise ValueError('unexpected_autostart_bootstrap_context')
             runtime = StagedHelperRuntime(package, args.lock_file, desktop=args.allow_readonly_desktop)
         response = dict(schema='cucp.staged-helper-bridge/v1', status='ok', data=runtime.handle(request))

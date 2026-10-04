@@ -33,8 +33,16 @@ class RegistryRefreshTests(unittest.TestCase):
         expected = dispatch._canonical_text(current).replace(old_body, new_body, 1).replace(
             '$Script:NativeHelperPath = Join-Path $PSScriptRoot "cucp-native-helper.ps1"',
             '$Script:NativeHelperPath = Join-Path $PSScriptRoot "cucp-native-helper.py"', 1)
-        for name in ('_Read-LockSafely','_Is-StaleLock','_Try-Delete-Lock','Get-HelperServerStatus','Invoke-HelperPipe','Start-HelperServer','Stop-HelperServer'):
+        for name in ('_Read-LockSafely','_Is-StaleLock','_Try-Delete-Lock','Get-HelperServerStatus','Invoke-HelperPipe','Start-HelperServer','Stop-HelperServer',
+                     'Install-HelperAutostart','Uninstall-HelperAutostart','Get-HelperAutostartStatus','_Read-HelperServerVersion','Get-CucpVersionReport'):
             expected = expected.replace(dispatch._function_extent(expected,name)[2], dispatch._function_extent(actual,name)[2],1)
+        for before,after in (
+            ('$Script:HelperServerScript = Join-Path $PSScriptRoot "cucp-helper-server.ps1"','$Script:HelperServerScript = Join-Path $PSScriptRoot "cucp-helper-server.py"'),
+            ('# cucp-helper-server.ps1 (named pipe server) 와의 JSON-line IPC 헬퍼.','# Python/C# read-only helper named-pipe client.'),
+            ('# 없거나 stale 이면 child PowerShell fallback.','# 없거나 stale 이면 Python/C# cold path.'),
+            ('# server 가 직접 처리 가능한 action 화이트리스트 (cucp-helper-server.ps1 v1.7.0 의 _Dispatch 와 일치)','# Closed read-only action list supported by the compiled helper.')):
+            self.assertEqual(expected.count(before),1)
+            expected=expected.replace(before,after,1)
         self.assertEqual(actual, expected)
         self.assertIn("-Operation 'desktop-native'", new_body)
         self.assertNotIn('Start-Process', new_body)

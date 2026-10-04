@@ -233,9 +233,9 @@ if (-not $Script:NativeHelperPath) {
 # ============================================================================
 # v1.6.0 — Helper Persistent Server IPC
 # ============================================================================
-# cucp-helper-server.ps1 (named pipe server) 와의 JSON-line IPC 헬퍼.
+# Python/C# read-only helper named-pipe client.
 # wrapper 가 첫 호출 시 lock 파일 (helper.pid) 검사 → server 살아있으면 pipe,
-# 없거나 stale 이면 child PowerShell fallback. 같은 wrapper invocation 안에서
+# 없거나 stale 이면 Python/C# cold path. 같은 wrapper invocation 안에서
 # 여러 매크로가 helper 를 N회 호출할 때 cold-start 비용 (~500ms × N) 회피.
 #
 # 사용 흐름:
@@ -246,10 +246,10 @@ if (-not $Script:NativeHelperPath) {
 # ============================================================================
 
 $Script:HelperLockPath = Join-Path $Script:AuditDir "helper.pid"
-$Script:HelperServerScript = Join-Path $PSScriptRoot "cucp-helper-server.ps1"
+$Script:HelperServerScript = Join-Path $PSScriptRoot "cucp-helper-server.py"
 $Script:_HelperPipeReqId = 0
 . (Join-Path $PSScriptRoot 'cucp-staged-helper-adapter.ps1')
-# server 가 직접 처리 가능한 action 화이트리스트 (cucp-helper-server.ps1 v1.7.0 의 _Dispatch 와 일치)
+# Closed read-only action list supported by the compiled helper.
 $Script:HelperServerSupported = @("windows", "health", "focused", "modal-detect", "ocr-screen-fast", "uia-find-fast")
 
 function _Read-LockSafely {
@@ -311,64 +311,16 @@ function _Get-AutostartShimPath {
 }
 
 function Install-HelperAutostart {
-  # Startup 폴더에 helper-server 를 hidden 으로 기동하는 .cmd shim 생성 (idempotent).
-  param([int]$IdleTimeoutMs = 28800000)  # 기본 8시간
-  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'autostart-install' -Arguments @{idle_timeout_ms=$IdleTimeoutMs}) }
-  if (-not $Script:HelperServerScript -or -not (Test-Path -LiteralPath $Script:HelperServerScript)) {
-    return [pscustomobject]@{ status = "error"; reason = "helper_server_script_missing"; path = $Script:HelperServerScript }
-  }
-  $shimPath = _Get-AutostartShimPath
-  # cmd shim: powershell 을 hidden 으로 띄워 helper-server 를 background 기동.
-  # 경로/인자는 cmd 인용 규칙에 맞춰 "..." 로 감쌈 (공백 포함 경로 안전).
-  # 주의: start 명령과 인자는 반드시 한 줄. 줄바꿈되면 cmd 가 인자를 못 받는다.
-  # 주석은 ASCII 로만 (cmd 기본 코드페이지에서 한글 mojibake 회피).
-  $psArgs = '-NoProfile -NoLogo -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $Script:HelperServerScript + '" -IdleTimeoutMs ' + $IdleTimeoutMs
-  $startLine = 'start "" /min powershell.exe ' + $psArgs
-  $content = "@echo off`r`n" +
-             "rem CUCP helper-server autostart shim (v2.2.0). Remove via: cucp macro session uninstall-autostart`r`n" +
-             $startLine + "`r`n"
-  try {
-    # ASCII 인코딩 + 명시적 CRLF 로 cmd 호환성 보장. WriteAllText 로 한 번에 기록
-    # (Set-Content 배열 처리로 긴 줄이 분할되는 문제 회피).
-    [System.IO.File]::WriteAllText($shimPath, $content, [System.Text.Encoding]::ASCII)
-  } catch {
-    return [pscustomobject]@{ status = "error"; reason = "shim_write_failed"; detail = "$($_.Exception.Message)"; path = $shimPath }
-  }
-  return [pscustomobject]@{
-    status = "ok"
-    action = "install-autostart"
-    shim_path = $shimPath
-    idle_timeout_ms = $IdleTimeoutMs
-    note = "다음 로그인부터 helper-server 가 자동 기동됩니다. 지금 바로 띄우려면 macro session start-helper."
-  }
+  param([int]$IdleTimeoutMs=28800000)
+  return (_Invoke-StagedHelper -Operation 'autostart-install' -Arguments @{idle_timeout_ms=$IdleTimeoutMs})
 }
 
 function Uninstall-HelperAutostart {
-  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'autostart-uninstall') }
-  # Startup shim 제거. shim 없어도 graceful (status ok, removed=false).
-  $shimPath = _Get-AutostartShimPath
-  $removed = $false
-  if (Test-Path -LiteralPath $shimPath) {
-    try { Remove-Item -LiteralPath $shimPath -Force; $removed = $true }
-    catch { return [pscustomobject]@{ status = "error"; reason = "shim_remove_failed"; detail = "$($_.Exception.Message)"; path = $shimPath } }
-  }
-  return [pscustomobject]@{
-    status = "ok"
-    action = "uninstall-autostart"
-    shim_path = $shimPath
-    removed = $removed
-  }
+  return (_Invoke-StagedHelper -Operation 'autostart-uninstall')
 }
 
 function Get-HelperAutostartStatus {
-  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'autostart-status') }
-  # shim 설치 여부 + 경로 반환.
-  $shimPath = _Get-AutostartShimPath
-  return [pscustomobject]@{
-    status = "ok"
-    installed = [bool](Test-Path -LiteralPath $shimPath)
-    shim_path = $shimPath
-  }
+  return (_Invoke-StagedHelper -Operation 'autostart-status')
 }
 
 # ============================================================================
@@ -458,30 +410,8 @@ function _Read-CliVersion {
 }
 
 function _Read-HelperServerVersion {
-  if ($Script:StagedCompiledHelper) { try { return (_Invoke-StagedHelper -Operation 'version') } catch { return @{version=$null; error='helper_compiled_runtime_unavailable'} } }
-  # cucp-helper-server.ps1 헤더 주석 또는 helper_version 라인에서 SemVer 추출.
-  if (-not $Script:HelperServerScript -or -not (Test-Path -LiteralPath $Script:HelperServerScript)) {
-    return @{ version = $null; error = "helper_server_script_missing" }
-  }
-  try {
-    $head = Get-Content -LiteralPath $Script:HelperServerScript -TotalCount 600 -Encoding UTF8 -ErrorAction SilentlyContinue
-    if (-not $head) { return @{ version = $null; error = "helper_server_empty" } }
-    foreach ($line in $head) {
-      # 우선순위 1: helper_version = "X.Y.Z" 라인 (단일 source of truth)
-      if ($line -match 'helper_version\s*=\s*"(\d+\.\d+\.\d+)"') {
-        return @{ version = $Matches[1]; error = $null }
-      }
-    }
-    foreach ($line in $head) {
-      # 우선순위 2: 헤더 주석 "# CUCP Helper Persistent Server (vX.Y.Z)"
-      if ($line -match 'Helper.*\(v(\d+\.\d+\.\d+)\)') {
-        return @{ version = $Matches[1]; error = $null }
-      }
-    }
-    return @{ version = $null; error = "helper_server_version_not_found" }
-  } catch {
-    return @{ version = $null; error = "helper_server_read_failed" }
-  }
+  try { return (_Invoke-StagedHelper -Operation 'version') }
+  catch { return @{version=$null; error='helper_compiled_runtime_unavailable'} }
 }
 
 function Get-CucpVersionReport {
@@ -501,7 +431,7 @@ function Get-CucpVersionReport {
   }
   $hs = _Read-HelperServerVersion
   if ($hs.error) {
-    $helperRecommendation = if ($Script:StagedCompiledHelper) { 'Build and verify pcucp-next/bin/legacy-helper with packaging/publish_legacy_helper.py' } else { 'Verify scripts/cucp-helper-server.ps1 헤더의 helper_version 표기' }
+    $helperRecommendation = 'Build and verify pcucp-next/bin/legacy-helper with packaging/publish_legacy_helper.py'
     [void]$errs.Add((_Make-RecoverableError -Code $hs.error -Layer "helper_server" -RecommendedAction $helperRecommendation))
   }
   $lock = _Read-LockSafely
@@ -523,7 +453,7 @@ function Get-CucpVersionReport {
     sources = @{
       skill = "scripts/cucp.ps1::Script:SkillVersion"
       cli = $cli.package_path
-      helper_server = if ($Script:StagedCompiledHelper) { 'pcucp-next/bin/legacy-helper/manifest.json' } else { $Script:HelperServerScript }
+      helper_server = 'pcucp-next/bin/legacy-helper/manifest.json'
     }
     recoverable_errors = @($errs)
     generated_at = (_Now-Iso)

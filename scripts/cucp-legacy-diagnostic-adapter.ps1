@@ -29,7 +29,7 @@ function _Diagnostic-NewState {
   foreach($key in @('audit_directory','cache_directory','wrapper_log','cli_path','changelog_path','temp_root','benchmark_schema','release_schema')) {
     $owned|Add-Member NoteProperty $key $Context.$key
   }
-  $restCopy=@($Rest);if($null -ne $restCopy){$restCopy=$restCopy.Clone()}
+  $restCopy=[string[]]@();if($null -ne $Rest){$restCopy=$Rest.Clone()}
   return @{family='diagnostics';operation=$Operation;rest=$restCopy;context=$owned;
     live=$false;sensitive=$false;paths=@{};clocks=@{};writer=$null;live_effect_seen=$false;
     diagnostic_counts=@{};diagnostic_audit_files=@{};diagnostic_cache_path=$null;diagnostic_changelog=$null;
@@ -354,8 +354,9 @@ function _Diagnostic-ProcessorCount {return [Environment]::ProcessorCount}
 function _Invoke-LegacyDiagnosticFamily {
   param([ValidateSet('perf','diagnose-lag','health-quick','health-detail','log-tail','benchmark','self-test','audit-summary','release-notes')][string]$Operation,[string[]]$Rest)
   $context=_Diagnostic-GetContext
-  $state=_Diagnostic-NewState -Operation $Operation -Rest $Rest -Context $context
-  $startup=[ordered]@{schema='cucp.diagnostic-start/v1';operation=$Operation;rest=[string[]]@($Rest);brief=[bool]$Brief;
+  $restValues=[string[]]@();if($null -ne $Rest){$restValues=$Rest.Clone()}
+  $state=_Diagnostic-NewState -Operation $Operation -Rest $restValues -Context $context
+  $startup=[ordered]@{schema='cucp.diagnostic-start/v1';operation=$Operation;rest=$restValues;brief=[bool]$Brief;
     cache_seconds=[int]$CacheSeconds;vision_available=[bool]$Script:CliPath;culture=[Globalization.CultureInfo]::CurrentCulture.Name;context=$state.context}
   try {return _Invoke-LegacyExecutionHost -EntryPoint 'legacy-diagnostic-session' -Startup $startup -State $state}
   finally {_Diagnostic-DisposeProcesses $state}

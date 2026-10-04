@@ -2,7 +2,7 @@ name: Preserved Python diagnostic providers
 on:
   workflow_dispatch:
   push:
-    branches: [codex/preserve-features-python-runtime]
+    branches: [codex/preserve-features-python-runtime, codex/python-runtime-retirement]
   pull_request:
     paths:
       - 'pcucp-next/python/pcucp_cli/legacy_*.py'
@@ -25,6 +25,9 @@ on:
       - 'pcucp-next/dotnet/PcuCp.LegacyHelper/**'
       - 'tests/python/test_python_helper_server.py'
       - 'tests/python/test_python_helper_production.py'
+      - 'tests/python/test_legacy_default_autostart.py'
+      - 'tests/python/test_legacy_helper_autostart.py'
+      - 'pcucp-next/python/legacy_helper_autostart*.py'
       - 'tests/python/test_legacy_execution_runtime.py'
       - 'tests/python/test_legacy_native_macros.py'
       - 'tests/python/test_legacy_coordinates_runtime.py'
@@ -74,5 +77,10 @@ jobs:
           export CUCP_NATIVE_HOST="$CUCP_DIAGNOSTIC_PROVIDER_NATIVE"
           export CUCP_PYTHON_HELPER_PACKAGE="$(cygpath -w "$GITHUB_WORKSPACE/pcucp-next/bin/legacy-helper")"
           export CUCP_REQUIRE_PYTHON_HELPER_PRODUCTION=1
+          export CUCP_REQUIRE_STAGED_AUTOSTART=1
+          export CUCP_SOURCE_MAP_TEST_EXE="$CUCP_LEGACY_SYNTAX_EXE"
+          export CUCP_REQUIRE_LEGACY_FAST_SMOKE=1
+          python -m unittest test_source_map test_legacy_fast_smoke -v
+          python -m unittest test_legacy_default_autostart test_legacy_helper_autostart -v
           python -m unittest test_python_helper_server test_python_helper_production -v
           python -m unittest test_start_pi test_install_runtime test_legacy_native_entry test_legacy_native_retirement test_legacy_diagnostic_runtime test_legacy_diagnostic_provider test_legacy_native_desktop test_legacy_native_macros test_legacy_coordinates_runtime test_legacy_preserved_owner test_legacy_precision_runtime test_legacy_interaction_runtime test_legacy_execution_runtime test_legacy_syntax_runtime test_legacy_host_protocol test_native_session test_legacy_dispatch_contract test_legacy_dispatch_refresh -v

@@ -88,8 +88,10 @@ DLL to the Python entry and original brief comparisons. It never substitutes
 the portable fixture. Its owned original-vs-candidate file tests and all 20
 existing startup safeguards must run.
 
-The existing `migration-source-map.ps1` captures a real PowerShell AST without
-executing the mapped source. The CI runner verifies all eight frozen PS file
+`pcucp-next/packaging/source_map.py` uses the C# syntax worker and the Windows
+read-only parser library to capture the real AST without executing any source
+or starting a PowerShell process. Qualification explicitly builds the worker.
+The CI runner verifies all six remaining frozen PS file
 hashes and all 123 function extent hashes. The remaining four frozen line-range
 extents are covered by the unchanged registry/source tests. This map is retained
 with the raw process captures and the concrete checkout identity.

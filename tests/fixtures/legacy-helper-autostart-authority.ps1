@@ -1,5 +1,6 @@
 param([Parameter(Mandatory=$true)][string]$SourceRoot,
-      [Parameter(Mandatory=$true)][string]$OwnedRoot)
+      [Parameter(Mandatory=$true)][string]$OwnedRoot,
+      [switch]$DefaultMode)
 $ErrorActionPreference='Stop'
 # A disposable fixture layout only. The real Startup/LocalApplicationData lookup
 # is replaced before the production adapter or extracted delegate is invoked.
@@ -8,6 +9,7 @@ if ((Get-Content -LiteralPath $marker -Raw) -cne 'owned-temporary-autostart-auth
 $SourceRoot=[IO.Path]::GetFullPath($SourceRoot)
 $OwnedRoot=[IO.Path]::GetFullPath($OwnedRoot)
 $Script:AuditDir=Join-Path $OwnedRoot 'audit'
+$Script:HelperLockPath=Join-Path $Script:AuditDir 'helper.pid'
 $Script:OwnedStartup=Join-Path $OwnedRoot 'startup'
 $Script:OwnedMetadata=Join-Path $OwnedRoot 'state'
 $scripts=Join-Path $OwnedRoot 'scripts'; $python=Join-Path $OwnedRoot 'pcucp-next/python'
@@ -25,7 +27,8 @@ foreach ($name in @('Install-HelperAutostart','Uninstall-HelperAutostart','Get-H
   if ($nodes.Count -ne 1) { throw 'Unexpected autostart function inventory' }
   . ([scriptblock]::Create($nodes[0].Extent.Text))
 }
-$env:CUCP_STAGED_COMPILED_HELPER='1'; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP=$null
+$env:CUCP_STAGED_COMPILED_HELPER=if($DefaultMode){$null}else{'1'}
+$env:CUCP_STAGED_HELPER_READONLY_DESKTOP=$null
 $results=@()
 foreach ($initial in @($false,$true)) {
   $AllowLiveControl=$initial
@@ -38,7 +41,7 @@ foreach ($initial in @($false,$true)) {
   $status=Get-HelperAutostartStatus
   $uninstall=Uninstall-HelperAutostart
   foreach ($reply in @($install,$status,$uninstall)) {
-    if ($reply.allow_change -ne $initial -or $reply.desktop -ne $false -or
+    if ($reply.allow_change -ne $initial -or $reply.desktop -ne [bool]$DefaultMode -or $reply.default -ne [bool]$DefaultMode -or
         $reply.startup_directory -cne $Script:OwnedStartup -or
         $reply.metadata_directory -cne $Script:OwnedMetadata) { throw 'Authority or fixed fixture path changed' }
   }

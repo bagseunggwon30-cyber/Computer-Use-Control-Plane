@@ -114,7 +114,7 @@ class CandidateQualificationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / 'source-map.json'; path.write_text(json.dumps(value))
             result = runner.validate_source_map(path)
-            self.assertEqual((result['required_sources'], result['required_function_extents']), (7, 123))
+            self.assertEqual((result['required_sources'], result['required_function_extents']), (6, 123))
             for mutation in ('file', 'extent', 'duplicate'):
                 changed = copy.deepcopy(value)
                 if mutation == 'file': changed['files'][0]['sha256'] = 'bad'

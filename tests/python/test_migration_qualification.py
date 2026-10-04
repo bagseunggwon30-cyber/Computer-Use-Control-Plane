@@ -223,7 +223,7 @@ class QualificationSelectionTests(unittest.TestCase):
                 self.assertEqual(env['PYTHONPATH'], str(root / 'pcucp-next/python'))
                 self.assertEqual(env['PYTHONIOENCODING'], 'utf-8')
                 self.assertEqual(log_path, logs / f'{index:02d}.log')
-            self.assertEqual(calls[-1][0][-2:], ['-OutputPath', str(logs / 'source-map.json')])
+            self.assertEqual(calls[-1][0][-2:], ['--output', str(logs / 'source-map.json')])
 
     def test_foundation_failures_keep_complete_logs_raw_capture_and_source_map(self):
         # Build/contract failures must retain source provenance too. A raw
@@ -242,8 +242,8 @@ class QualificationSelectionTests(unittest.TestCase):
                     kwargs['stdout'].write(payload)
                     if 'test_legacy_workflow*.py' in argv:
                         Path(kwargs['env']['CUCP_WORKFLOW_DIAGNOSTIC_CAPTURE']).write_bytes(raw)
-                    if '-OutputPath' in argv:
-                        Path(argv[argv.index('-OutputPath') + 1]).write_bytes(source_map)
+                    if '--output' in argv:
+                        Path(argv[argv.index('--output') + 1]).write_bytes(source_map)
                     return subprocess.CompletedProcess(argv, 7 if len(calls) == fail_at else 0)
                 with patch.object(qualification, 'ROOT', root), \
                      patch.object(qualification.subprocess, 'run', side_effect=capture), \
@@ -252,8 +252,9 @@ class QualificationSelectionTests(unittest.TestCase):
                     qualification.run_family('foundation', log_dir=logs)
                 self.assertEqual(caught.exception.returncode, 7)
                 self.assertEqual(len(calls), fail_at + 1)
-                self.assertEqual(calls[-1][0], 'powershell.exe')
-                self.assertIn(str(root / 'tests/fixtures/migration-source-map.ps1'), calls[-1])
+                self.assertEqual(calls[-1][0], sys.executable)
+                self.assertIn(str(root / 'pcucp-next/packaging/source_map.py'), calls[-1])
+                self.assertIn('--build',calls[-1])
                 self.assertEqual((logs / 'source-map.json').read_bytes(), source_map)
                 self.assertEqual(len(list(logs.glob('*.log'))), len(calls))
                 for path in logs.glob('*.log'):
@@ -301,6 +302,8 @@ class QualificationSelectionTests(unittest.TestCase):
             (root / '.github/migration-adapters.json').write_text('{"test_adapters":["file-images"]}')
             (root / 'tests/fixtures/legacy-file-images-adapter.ps1').unlink()
             calls.clear()
+            from legacy_historical_native import helper
+            historical_helper=helper()
             with patch.object(qualification, 'ROOT', root), patch.object(qualification.subprocess, 'run',
                     side_effect=lambda argv, **kw: calls.append((argv, dict(kw['env'])))), \
                     patch.dict(os.environ, {'CUCP_LEGACY_IMAGES_ADAPTER_SOURCE':'stale-draft.ps1'}), \
@@ -309,8 +312,7 @@ class QualificationSelectionTests(unittest.TestCase):
                 suites = [(args, env) for args, env in calls if '-m' in args and 'unittest' in args]
                 self.assertEqual(len(suites), 2)
                 for _, env in suites:
-                    from legacy_historical_native import helper
-                    self.assertEqual(env['CUCP_LEGACY_IMAGES_ADAPTER_SOURCE'], str(helper()))
+                    self.assertEqual(env['CUCP_LEGACY_IMAGES_ADAPTER_SOURCE'], str(historical_helper))
                 production.unlink()
                 with self.assertRaisesRegex(ValueError, 'Missing migrated file-images Python entrypoint'):
                     qualification.run_family('file-images')

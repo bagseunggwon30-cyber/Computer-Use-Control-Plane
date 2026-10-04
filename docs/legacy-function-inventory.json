@@ -3,58 +3,8 @@
   "note": "Current retained legacy navigation after staged Python/C# migration. Original leaf acquisition/input, workflow tokenization and host adapters remain. Exact kernels/adapters passed their Windows/browser gate; integrated production remains subject to the full release gate. Normal Git history holds the baseline. The audit-summary body replacement qualified at 3cbbaaad / required core run37103102449 attempt2; its wrapper/file-effect adapter remain PowerShell-dependent. The benchmark body replacement qualified at 7b7e0d28 / required core run 37109440464 attempt 1; all nine diagnostic entries use fixed managed-adapter delegates while PowerShell effects remain. Independent helper action/lifecycle gates and newer helper probes remain unqualified; the core pass grants no whole-helper retirement. Historical original-body descriptions below refer to their recorded checkpoints.",
   "files": [
     {
-      "path": "scripts/cucp-helper-server.ps1",
-      "lines": 688,
-      "functions": [
-        {
-          "name": "_Log",
-          "line": 61
-        },
-        {
-          "name": "_Ensure-Win32Loaded",
-          "line": 69
-        },
-        {
-          "name": "_Action-Windows",
-          "line": 93
-        },
-        {
-          "name": "_Action-Health",
-          "line": 155
-        },
-        {
-          "name": "_Action-Focused",
-          "line": 169
-        },
-        {
-          "name": "_Action-ModalDetect",
-          "line": 195
-        },
-        {
-          "name": "_Server-Ensure-OCR",
-          "line": 291
-        },
-        {
-          "name": "_Server-Ensure-UIA",
-          "line": 317
-        },
-        {
-          "name": "_Action-OcrScreenFast",
-          "line": 332
-        },
-        {
-          "name": "_Action-UiaFindFast",
-          "line": 412
-        },
-        {
-          "name": "_Dispatch",
-          "line": 503
-        }
-      ]
-    },
-    {
       "path": "scripts/cucp.ps1",
-      "lines": 8065,
+      "lines": 7995,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -106,863 +56,863 @@
         },
         {
           "name": "Uninstall-HelperAutostart",
-          "line": 346
+          "line": 318
         },
         {
           "name": "Get-HelperAutostartStatus",
-          "line": 363
+          "line": 322
         },
         {
           "name": "_Now-Iso",
-          "line": 385
+          "line": 337
         },
         {
           "name": "_Make-RecoverableError",
-          "line": 390
+          "line": 342
         },
         {
           "name": "_Emit-Envelope",
-          "line": 407
+          "line": 359
         },
         {
           "name": "_Read-CliVersion",
-          "line": 437
+          "line": 389
         },
         {
           "name": "_Read-HelperServerVersion",
-          "line": 460
+          "line": 412
         },
         {
           "name": "Get-CucpVersionReport",
-          "line": 487
+          "line": 417
         },
         {
           "name": "Invoke-MacroVersion",
-          "line": 533
+          "line": 463
         },
         {
           "name": "_Make-PlatformStubEnvelope",
-          "line": 559
+          "line": 489
         },
         {
           "name": "_Assert-PlatformOrStub",
-          "line": 583
+          "line": 513
         },
         {
           "name": "_Recorder-Path",
-          "line": 610
+          "line": 540
         },
         {
           "name": "Recorder-Start",
-          "line": 619
+          "line": 549
         },
         {
           "name": "Recorder-Append",
-          "line": 627
+          "line": 557
         },
         {
           "name": "Recorder-Stop",
-          "line": 641
+          "line": 571
         },
         {
           "name": "Invoke-MacroRecorder",
-          "line": 667
+          "line": 597
         },
         {
           "name": "Invoke-MacroAuditSummary",
-          "line": 765
+          "line": 695
         },
         {
           "name": "Invoke-MacroPolicyCheck",
-          "line": 767
+          "line": 697
         },
         {
           "name": "_Vision-CheckBudget",
-          "line": 840
+          "line": 770
         },
         {
           "name": "_Vision-RecordCall",
-          "line": 851
+          "line": 781
         },
         {
           "name": "_Vision-GateOrRecord",
-          "line": 859
+          "line": 789
         },
         {
           "name": "Invoke-NativeHelper",
-          "line": 906
+          "line": 836
         },
         {
           "name": "Write-Notice",
-          "line": 1090
+          "line": 1020
         },
         {
           "name": "ConvertTo-ProcessArgumentString",
-          "line": 1104
+          "line": 1034
         },
         {
           "name": "Test-Tool",
-          "line": 1121
+          "line": 1051
         },
         {
           "name": "Invoke-Cucp",
-          "line": 1135
+          "line": 1065
         },
         {
           "name": "Test-LiveControlRequest",
-          "line": 1270
+          "line": 1200
         },
         {
           "name": "Test-CoordinateMissingObservation",
-          "line": 1304
+          "line": 1234
         },
         {
           "name": "Assert-Authorized",
-          "line": 1316
+          "line": 1246
         },
         {
           "name": "Get-CacheKey",
-          "line": 1337
+          "line": 1267
         },
         {
           "name": "Get-CachedAppshot",
-          "line": 1345
+          "line": 1275
         },
         {
           "name": "Save-AppshotCache",
-          "line": 1361
+          "line": 1291
         },
         {
           "name": "Invoke-Appshot",
-          "line": 1369
+          "line": 1299
         },
         {
           "name": "_Build-AppshotResult",
-          "line": 1416
+          "line": 1346
         },
         {
           "name": "_Ensure-Win32Loaded",
-          "line": 1479
+          "line": 1409
         },
         {
           "name": "_Enumerate-Win32Windows",
-          "line": 1500
+          "line": 1430
         },
         {
           "name": "_Ensure-UIALoaded",
-          "line": 1542
+          "line": 1472
         },
         {
           "name": "_Slug",
-          "line": 1555
+          "line": 1485
         },
         {
           "name": "_Get-UIAffordances",
-          "line": 1565
+          "line": 1495
         },
         {
           "name": "Find-Element",
-          "line": 1738
+          "line": 1668
         },
         {
           "name": "Find-AffordanceById",
-          "line": 1842
+          "line": 1772
         },
         {
           "name": "Get-ElementCenter",
-          "line": 1850
+          "line": 1780
         },
         {
           "name": "Invoke-Macro",
-          "line": 1859
+          "line": 1789
         },
         {
           "name": "_Read-OptValue",
-          "line": 2027
+          "line": 1957
         },
         {
           "name": "_Read-AllOptValues",
-          "line": 2034
+          "line": 1964
         },
         {
           "name": "_Read-Switch",
-          "line": 2045
+          "line": 1975
         },
         {
           "name": "_Macro-NotImplemented",
-          "line": 2067
+          "line": 1997
         },
         {
           "name": "_Read-StandaloneConfirmation",
-          "line": 2085
+          "line": 2015
         },
         {
           "name": "_Invoke-LegacyCompatibility",
-          "line": 2097
+          "line": 2027
         },
         {
           "name": "_Classify-SafetyFromText",
-          "line": 2160
+          "line": 2090
         },
         {
           "name": "Invoke-MacroSafetyClassify",
-          "line": 2169
+          "line": 2099
         },
         {
           "name": "_Ensure-NativeDesktopTypes",
-          "line": 2202
+          "line": 2132
         },
         {
           "name": "_Native-FindWindow",
-          "line": 2222
+          "line": 2152
         },
         {
           "name": "_Native-FocusWindow",
-          "line": 2234
+          "line": 2164
         },
         {
           "name": "_Native-SendShortcut",
-          "line": 2252
+          "line": 2182
         },
         {
           "name": "_Native-SetClipboard",
-          "line": 2277
+          "line": 2207
         },
         {
           "name": "_Native-ClickPoint",
-          "line": 2283
+          "line": 2213
         },
         {
           "name": "_Native-HitTestPoint",
-          "line": 2299
+          "line": 2229
         },
         {
           "name": "_CoordProfile-MonitorObject",
-          "line": 2365
+          "line": 2295
         },
         {
           "name": "_CoordProfile-WindowFromPrecheck",
-          "line": 2392
+          "line": 2322
         },
         {
           "name": "_Build-CoordProfile",
-          "line": 2412
+          "line": 2342
         },
         {
           "name": "Invoke-MacroCoordProfile",
-          "line": 2576
+          "line": 2506
         },
         {
           "name": "_CoordMap-ResolveWindow",
-          "line": 2599
+          "line": 2529
         },
         {
           "name": "_Build-CoordMap",
-          "line": 2610
+          "line": 2540
         },
         {
           "name": "Invoke-MacroCoordMap",
-          "line": 2667
+          "line": 2597
         },
         {
           "name": "_Precision-EncodeWire($Value)",
-          "line": 2698
+          "line": 2628
         },
         {
           "name": "_Precision-Require($Condition,[string]$Message)",
-          "line": 2706
+          "line": 2636
         },
         {
           "name": "_Precision-Fields($Value,[string[]]$Names)",
-          "line": 2710
+          "line": 2640
         },
         {
           "name": "_Precision-DecodeWire($Wire)",
-          "line": 2716
+          "line": 2646
         },
         {
           "name": "_Precision-WriteChunks($Writer,[long]$Id,[string]$Target,$Value)",
-          "line": 2743
+          "line": 2673
         },
         {
           "name": "_Precision-StartProcess",
-          "line": 2756
+          "line": 2686
         },
         {
           "name": "_Precision-ReadMessage($Reader,[long]$ExpectedId)",
-          "line": 2777
+          "line": 2707
         },
         {
           "name": "_Precision-Reply($Writer,[long]$Id,$Value,$ErrorMessage)",
-          "line": 2798
+          "line": 2728
         },
         {
           "name": "_Precision-AssertArgv($Actual,[string[]]$Expected)",
-          "line": 2803
+          "line": 2733
         },
         {
           "name": "_Precision-ReadEffect($Effect,$State)",
-          "line": 2808
+          "line": 2738
         },
         {
           "name": "_Invoke-LegacyPrecisionSession",
-          "line": 2873
+          "line": 2803
         },
         {
           "name": "_Invoke-LegacyPrecision",
-          "line": 2943
+          "line": 2873
         },
         {
           "name": "_Invoke-LegacyPrecisionValue",
-          "line": 2951
+          "line": 2881
         },
         {
           "name": "_Precision-HistoryLines",
-          "line": 2957
+          "line": 2887
         },
         {
           "name": "_AnchorHistory-Read",
-          "line": 2959
+          "line": 2889
         },
         {
           "name": "_AnchorHistory-NormDistance",
-          "line": 2961
+          "line": 2891
         },
         {
           "name": "_AnchorHistory-Append",
-          "line": 2963
+          "line": 2893
         },
         {
           "name": "_AnchorHistory-Score",
-          "line": 2969
+          "line": 2899
         },
         {
           "name": "Invoke-MacroCoordAnchor",
-          "line": 2971
+          "line": 2901
         },
         {
           "name": "_Native-Screenshot",
-          "line": 2973
+          "line": 2903
         },
         {
           "name": "Invoke-MacroScreenshot",
-          "line": 3004
+          "line": 2934
         },
         {
           "name": "Invoke-MacroListAffordances",
-          "line": 3016
+          "line": 2946
         },
         {
           "name": "Invoke-MacroClickId",
-          "line": 3124
+          "line": 3054
         },
         {
           "name": "Invoke-MacroWaitLabel",
-          "line": 3151
+          "line": 3081
         },
         {
           "name": "Invoke-MacroFindLabel",
-          "line": 3184
+          "line": 3114
         },
         {
           "name": "Invoke-MacroClickLabel",
-          "line": 3186
+          "line": 3116
         },
         {
           "name": "Invoke-MacroFillLabel",
-          "line": 3188
+          "line": 3118
         },
         {
           "name": "Invoke-MacroFocusWindow",
-          "line": 3221
+          "line": 3151
         },
         {
           "name": "Invoke-MacroWaitWindow",
-          "line": 3247
+          "line": 3177
         },
         {
           "name": "Invoke-MacroShortcut",
-          "line": 3296
+          "line": 3226
         },
         {
           "name": "Invoke-MacroClipboard",
-          "line": 3314
+          "line": 3244
         },
         {
           "name": "Invoke-MacroGoal",
-          "line": 3338
+          "line": 3268
         },
         {
           "name": "Invoke-MacroSelfTest",
-          "line": 3392
+          "line": 3322
         },
         {
           "name": "Invoke-MacroTrajectory",
-          "line": 3396
+          "line": 3326
         },
         {
           "name": "Invoke-MacroEnsureHelper",
-          "line": 3440
+          "line": 3370
         },
         {
           "name": "_Get-VisionWorkDir",
-          "line": 3467
+          "line": 3397
         },
         {
           "name": "_Find-CodexCli",
-          "line": 3475
+          "line": 3405
         },
         {
           "name": "_Quote-NativeWindowsArgument",
-          "line": 3496
+          "line": 3426
         },
         {
           "name": "_Invoke-CodexVision",
-          "line": 3504
+          "line": 3434
         },
         {
           "name": "Invoke-MacroVisionFind",
-          "line": 3629
+          "line": 3559
         },
         {
           "name": "Invoke-MacroVisionClick",
-          "line": 3686
+          "line": 3616
         },
         {
           "name": "Invoke-MacroMetrics",
-          "line": 3770
+          "line": 3700
         },
         {
           "name": "_New-ObservationEnvelope",
-          "line": 3831
+          "line": 3761
         },
         {
           "name": "_Get-DesktopSize",
-          "line": 3908
+          "line": 3838
         },
         {
           "name": "Invoke-MacroWindows",
-          "line": 3923
+          "line": 3853
         },
         {
           "name": "Invoke-MacroFocusVerify",
-          "line": 4090
+          "line": 4020
         },
         {
           "name": "Invoke-MacroHealthQuick",
-          "line": 4171
+          "line": 4101
         },
         {
           "name": "Invoke-MacroLogTail",
-          "line": 4173
+          "line": 4103
         },
         {
           "name": "Invoke-MacroDiagnoseLag",
-          "line": 4175
+          "line": 4105
         },
         {
           "name": "Invoke-MacroCleanup",
-          "line": 4177
+          "line": 4107
         },
         {
           "name": "Invoke-MacroIconFind",
-          "line": 4379
+          "line": 4309
         },
         {
           "name": "Invoke-MacroIconClick",
-          "line": 4381
+          "line": 4311
         },
         {
           "name": "_Crop-Bitmap",
-          "line": 4383
+          "line": 4313
         },
         {
           "name": "Invoke-MacroVisionClickPrecise",
-          "line": 4416
+          "line": 4346
         },
         {
           "name": "Invoke-MacroPerf",
-          "line": 4522
+          "line": 4452
         },
         {
           "name": "Invoke-MacroHealthDetail",
-          "line": 4524
+          "line": 4454
         },
         {
           "name": "_Resolve-AppPath",
-          "line": 4534
+          "line": 4464
         },
         {
           "name": "Invoke-MacroAppLaunch",
-          "line": 4592
+          "line": 4522
         },
         {
           "name": "Invoke-MacroAppClose",
-          "line": 4665
+          "line": 4595
         },
         {
           "name": "Invoke-MacroWithApp",
-          "line": 4718
+          "line": 4648
         },
         {
           "name": "_Compute-ImageHash",
-          "line": 4846
+          "line": 4776
         },
         {
           "name": "Invoke-MacroClickAndVerify",
-          "line": 4857
+          "line": 4787
         },
         {
           "name": "Invoke-MacroNativeHealth",
-          "line": 4942
+          "line": 4872
         },
         {
           "name": "Invoke-MacroNativeWindows",
-          "line": 4960
+          "line": 4890
         },
         {
           "name": "Invoke-MacroNativeScreenshot",
-          "line": 4978
+          "line": 4908
         },
         {
           "name": "Invoke-MacroClickPoint",
-          "line": 5008
+          "line": 4938
         },
         {
           "name": "Invoke-MacroTypeNative",
-          "line": 5010
+          "line": 4940
         },
         {
           "name": "Invoke-MacroShortcutNative",
-          "line": 5036
+          "line": 4966
         },
         {
           "name": "Invoke-MacroUiaClickLabel",
-          "line": 5056
+          "line": 4986
         },
         {
           "name": "Invoke-MacroUiaInvoke",
-          "line": 5103
+          "line": 5033
         },
         {
           "name": "Invoke-MacroUiaSetValue",
-          "line": 5135
+          "line": 5065
         },
         {
           "name": "Invoke-MacroUiaToggle",
-          "line": 5162
+          "line": 5092
         },
         {
           "name": "Invoke-MacroHitTest",
-          "line": 5198
+          "line": 5128
         },
         {
           "name": "Invoke-MacroHitTestBatch",
-          "line": 5255
+          "line": 5185
         },
         {
           "name": "Invoke-MacroHitScan",
-          "line": 5337
+          "line": 5267
         },
         {
           "name": "_PointPlan-CacheKey",
-          "line": 5380
+          "line": 5310
         },
         {
           "name": "_PointPlan-CachePath",
-          "line": 5385
+          "line": 5315
         },
         {
           "name": "_PointPlan-ReadCache",
-          "line": 5387
+          "line": 5317
         },
         {
           "name": "_PointPlan-WriteCache",
-          "line": 5389
+          "line": 5319
         },
         {
           "name": "Invoke-MacroPointPlan",
-          "line": 5391
+          "line": 5321
         },
         {
           "name": "_TargetValidate-ConfidenceRank",
-          "line": 5393
+          "line": 5323
         },
         {
           "name": "_TargetValidate-SizeClass",
-          "line": 5395
+          "line": 5325
         },
         {
           "name": "_TargetValidate-PointEdgeDistance",
-          "line": 5397
+          "line": 5327
         },
         {
           "name": "_TargetValidate-InvokePointPlanJson",
-          "line": 5399
+          "line": 5329
         },
         {
           "name": "Invoke-MacroTargetValidate",
-          "line": 5411
+          "line": 5341
         },
         {
           "name": "Invoke-MacroSafeType",
-          "line": 5417
+          "line": 5347
         },
         {
           "name": "Test-CdpPortQuick",
-          "line": 5426
+          "line": 5356
         },
         {
           "name": "Invoke-MacroHistory",
-          "line": 5509
+          "line": 5439
         },
         {
           "name": "Invoke-MacroSmartPlan",
-          "line": 5615
+          "line": 5545
         },
         {
           "name": "_Parse-WorkflowStepTokens",
-          "line": 5712
+          "line": 5642
         },
         {
           "name": "_Read-WorkflowStepSpecs",
-          "line": 5747
+          "line": 5677
         },
         {
           "name": "_Build-WorkflowPlan",
-          "line": 5768
+          "line": 5698
         },
         {
           "name": "Invoke-MacroWorkflowPlan",
-          "line": 5782
+          "line": 5712
         },
         {
           "name": "_Invoke-LegacyExecutionChild",
-          "line": 5795
+          "line": 5725
         },
         {
           "name": "_Execution-EncodeWire($Value)",
-          "line": 5848
+          "line": 5778
         },
         {
           "name": "_Execution-Require($Condition,[string]$Message)",
-          "line": 5856
+          "line": 5786
         },
         {
           "name": "_Execution-Fields($Value,[string[]]$Names)",
-          "line": 5860
+          "line": 5790
         },
         {
           "name": "_Execution-DecodeWire($Wire)",
-          "line": 5866
+          "line": 5796
         },
         {
           "name": "_Execution-WriteChunks($Writer,[long]$Id,[string]$Target,$Value)",
-          "line": 5893
+          "line": 5823
         },
         {
           "name": "_Execution-WriteDiagnostic($State,$Process,$Stderr,[string]$ErrorText)",
-          "line": 5906
+          "line": 5836
         },
         {
           "name": "_Execution-ValidateEffect($Effect,$State)",
-          "line": 5926
+          "line": 5856
         },
         {
           "name": "_Execution-SendEscape",
-          "line": 5987
+          "line": 5917
         },
         {
           "name": "_Execution-Dispatch($Effect,$State)",
-          "line": 5992
+          "line": 5922
         },
         {
           "name": "_Execution-EffectMayChangeState($Effect)",
-          "line": 6033
+          "line": 5963
         },
         {
           "name": "_Invoke-LegacyExecutionEffectLoop",
-          "line": 6046
+          "line": 5976
         },
         {
           "name": "_Invoke-LegacyExecutionFamily",
-          "line": 6108
+          "line": 6038
         },
         {
           "name": "_Invoke-LegacyExecutionHost",
-          "line": 6123
+          "line": 6053
         },
         {
           "name": "Invoke-MacroWorkflowRun",
-          "line": 6178
+          "line": 6108
         },
         {
           "name": "_AppStrategy-NormalizeRoute",
-          "line": 6186
+          "line": 6116
         },
         {
           "name": "_AppStrategy-Read",
-          "line": 6207
+          "line": 6137
         },
         {
           "name": "_AppStrategy-LastGood",
-          "line": 6220
+          "line": 6150
         },
         {
           "name": "_AppStrategy-Append",
-          "line": 6230
+          "line": 6160
         },
         {
           "name": "Invoke-MacroAppProfile",
-          "line": 6273
+          "line": 6203
         },
         {
           "name": "_Invoke-LegacyReadOnlyQuery",
-          "line": 6374
+          "line": 6304
         },
         {
           "name": "Invoke-MacroTaskPreset",
-          "line": 6427
+          "line": 6357
         },
         {
           "name": "Invoke-MacroTaskPlan",
-          "line": 6477
+          "line": 6407
         },
         {
           "name": "Invoke-MacroTaskRun",
-          "line": 6510
+          "line": 6440
         },
         {
           "name": "Invoke-MacroFormPlan",
-          "line": 6512
+          "line": 6442
         },
         {
           "name": "Invoke-MacroFormRun",
-          "line": 6541
+          "line": 6471
         },
         {
           "name": "Invoke-MacroSmartClick",
-          "line": 6543
+          "line": 6473
         },
         {
           "name": "Invoke-MacroWatch",
-          "line": 6558
+          "line": 6488
         },
         {
           "name": "Invoke-MacroOcrScreen",
-          "line": 6572
+          "line": 6502
         },
         {
           "name": "Invoke-MacroOcrImage",
-          "line": 6601
+          "line": 6531
         },
         {
           "name": "Invoke-MacroOcrFindText",
-          "line": 6625
+          "line": 6555
         },
         {
           "name": "Invoke-MacroOcrClick",
-          "line": 6668
+          "line": 6598
         },
         {
           "name": "Invoke-MacroOcrUiaFuse",
-          "line": 6682
+          "line": 6612
         },
         {
           "name": "Invoke-MacroOcrUiaInvoke",
-          "line": 6725
+          "line": 6655
         },
         {
           "name": "Invoke-MacroScreenshotDiff",
-          "line": 6767
+          "line": 6697
         },
         {
           "name": "Invoke-MacroClickAndVerifyScreen",
-          "line": 6806
+          "line": 6736
         },
         {
           "name": "Invoke-MacroAutoDo",
-          "line": 6903
+          "line": 6833
         },
         {
           "name": "_Trajectory-Append",
-          "line": 7012
+          "line": 6942
         },
         {
           "name": "_Trajectory-Read",
-          "line": 7036
+          "line": 6966
         },
         {
           "name": "_Trajectory-Clear",
-          "line": 7050
+          "line": 6980
         },
         {
           "name": "_History-Append",
-          "line": 7074
+          "line": 7004
         },
         {
           "name": "_History-PickBestStrategy",
-          "line": 7113
+          "line": 7043
         },
         {
           "name": "_History-Stats",
-          "line": 7160
+          "line": 7090
         },
         {
           "name": "_Helper-IsUp",
-          "line": 7197
+          "line": 7127
         },
         {
           "name": "_Helper-Ensure",
-          "line": 7202
+          "line": 7132
         },
         {
           "name": "Invoke-MacroSession",
-          "line": 7223
+          "line": 7153
         },
         {
           "name": "Invoke-MacroImePaste",
-          "line": 7458
+          "line": 7388
         },
         {
           "name": "Invoke-MacroSafeTypeIme",
-          "line": 7510
+          "line": 7440
         },
         {
           "name": "Invoke-MacroModalDetect",
-          "line": 7590
+          "line": 7520
         },
         {
           "name": "Invoke-MacroRecoveryPlan",
-          "line": 7623
+          "line": 7553
         },
         {
           "name": "Invoke-MacroRecoveryRun",
-          "line": 7631
+          "line": 7561
         },
         {
           "name": "Invoke-MacroPrecisionValidate",
-          "line": 7638
+          "line": 7568
         },
         {
           "name": "Invoke-MacroBenchmark",
-          "line": 7646
+          "line": 7576
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 7654
+          "line": 7584
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 7686
+          "line": 7616
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 7801
+          "line": 7731
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 7897
+          "line": 7827
         }
       ]
     },
@@ -1112,7 +1062,7 @@
     },
     {
       "path": "scripts/cucp-legacy-diagnostic-adapter.ps1",
-      "lines": 397,
+      "lines": 398,
       "functions": [
         {
           "name": "_Diagnostic-Require($Condition,[string]$Message)",
@@ -1200,21 +1150,21 @@
         },
         {
           "name": "_Diagnostic-Processes($State)",
-          "line": 363
+          "line": 364
         },
         {
           "name": "_Diagnostic-ProcessMetrics($State,[int]$CurrentOrdinal,$PreviousOrdinal)",
-          "line": 377
+          "line": 378
         },
         {
           "name": "_Diagnostic-DisposeProcesses($State)",
-          "line": 394
+          "line": 395
         }
       ]
     },
     {
       "path": "scripts/cucp-staged-helper-adapter.ps1",
-      "lines": 137,
+      "lines": 138,
       "functions": [
         {
           "name": "_Get-StagedAutostartMetadataDirectory",
@@ -1519,8 +1469,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 857221,
-    "removed": 156257,
+    "current": 819881,
+    "removed": 193597,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
@@ -2174,6 +2124,24 @@
         "_Action-ModalDetect"
       ],
       "evidence": "24 C# desktop and 10 Python CDP actions; actual Windows public native/cold production and owned desktop provider tests. Historical adapters remain hash-pinned Git oracles only; no runtime script fallback."
+    },
+    {
+      "path": "scripts/cucp-helper-server.ps1",
+      "replacement": "scripts/cucp-helper-server.py",
+      "original_sha256": "31742c3a48c3305f26751ea9c3b8b8db5592a0aa5f192ccdfea5795252731e81",
+      "evidence": "Python default helper lifecycle and owned NTFS autostart migration/launch/pipe/shutdown qualification; no historical production fallback."
+    },
+    {
+      "path": "tests/cucp.Fast.Tests.ps1",
+      "replacement": "tests/python/test_legacy_fast_smoke.py",
+      "original_sha256": "948b657e377bf88f7b7dca448e67b37fa43f7492a0d5f07af6a836e56a5e8970",
+      "evidence": "All six original smoke checks retained in Python; actual Windows version, no-startup health, observation, dry-run cleanup and governance gates."
+    },
+    {
+      "path": "tests/fixtures/migration-source-map.ps1",
+      "replacement": "pcucp-next/packaging/source_map.py",
+      "original_sha256": "0d34f9042b2ea20c54d1032940c8712d7fde68e47a7eee43bd886ff6cbf2fe7e",
+      "evidence": "C# read-only Parser.ParseInput and Python collection; independent pinned historical AST/hash parity and inert side-effect/nested Unicode checks."
     }
   ]
 }

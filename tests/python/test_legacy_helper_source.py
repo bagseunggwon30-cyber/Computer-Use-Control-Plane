@@ -200,10 +200,11 @@ class HelperSourceTests(unittest.TestCase):
         self.assertEqual(server['raw_bytes'] + sum(f['utf8_bytes'] for f in wrapper['functions'] if f['name'] != 'Invoke-NativeHelper'), 35505)
         self.assertEqual(MANIFEST['published_commit'], '3e892ab02395bdc916a5814e39d4154efd1f6249')
 
-    def test_originals_remain_and_oracle_bodies_are_not_metadata(self):
+    def test_historical_originals_remain_and_oracle_bodies_are_not_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             for pin in MANIFEST['files']:
-                current = (ROOT / pin['path']).read_bytes().decode('utf-8-sig').replace('\r\n', '\n')
+                from legacy_historical_native import scripts
+                current = (scripts() / Path(pin['path']).name).read_bytes().decode('utf-8-sig').replace('\r\n', '\n')
                 if pin['path'].endswith('server.ps1'):
                     self.assertEqual(hashlib.sha256(current.encode()).hexdigest(), pin['normalized_sha256'])
                 else:

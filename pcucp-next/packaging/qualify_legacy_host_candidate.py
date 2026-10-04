@@ -161,7 +161,7 @@ def validate_source_map(path):
                    if item['name'] == row['name'] and item['parent_function'] is None]
         if len(matches) != 1 or matches[0]['sha256'] != row['sha256']:
             raise ValueError('Production AST function extent drift: ' + row['name'])
-    if len(required) != 7 or len(extents) != 123:
+    if len(required) != 6 or len(extents) != 123:
         raise ValueError('Unexpected production AST coverage count')
     return dict(required_sources=len(required), required_function_extents=len(extents), sha256=sha(path))
 
@@ -313,9 +313,8 @@ def run(args):
             report['suites'][group] = validate_suite_report(json.loads(output.read_text()), target=args.target, group=group)
         report['owned_processes'] = validate_process_artifacts(inner, args.target)
         if args.target == 'windows':
-            _command(['powershell.exe', '-NoProfile', '-NonInteractive', '-File',
-                ROOT / 'tests/fixtures/migration-source-map.ps1', '-Root', ROOT,
-                '-OutputPath', destination / 'source-map.json'], destination, 'production-source-map', env, timeout=180)
+            _command([sys.executable, ROOT / 'pcucp-next/packaging/source_map.py', '--build', '--root', ROOT,
+                '--output', destination / 'source-map.json'], destination, 'production-source-map', env, timeout=240)
             report['production_ast_source_map'] = validate_source_map(destination / 'source-map.json')
         final_state = _command(['git', 'status', '--porcelain', '--untracked-files=all'], destination, 'final-source-state', env)['stdout']
         if final_state.strip() or sha(host) != report['host_sha256']:
