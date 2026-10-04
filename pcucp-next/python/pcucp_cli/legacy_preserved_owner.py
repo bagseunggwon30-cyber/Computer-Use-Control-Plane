@@ -29,6 +29,7 @@ from .legacy_planning_runtime import PlanningRuntime
 from .legacy_precision_runtime import PrecisionRuntime, PrecisionStorage, project
 from .legacy_storage import append_trajectory
 from .legacy_coordinate_runtime import CoordinateRuntime, OPERATIONS as COORDINATE
+from .legacy_surface_macros import run_safety, SAFETY
 from .legacy_windows import observe_windows
 from .native_session import NativeSession
 
@@ -168,7 +169,7 @@ class PreservedOwner:
                 summary=f"매크로 '{name}' 는 이 버전에서 아직 구현되지 않았습니다 (surface 에는 등록됨).", hint=route.macro.hint or '',
                 next_action="다른 매크로로 대체하거나, 이 기능이 필요하면 별도 구현 요청. 'cucp macro' 로 사용 가능 목록 확인.")
             return dict(payload=payload, exit=1, json_depth=6, brief='not_implemented ' + name if brief else None, emit_json=not brief)
-        available = name in DIAGNOSTICS | EXECUTION | PLANNING | PRECISION | INTERACTION | NATIVE | CDP | COORDINATE | {'windows', 'metrics', 'find-label'}
+        available = name in DIAGNOSTICS | EXECUTION | PLANNING | PRECISION | INTERACTION | NATIVE | CDP | COORDINATE | SAFETY | {'windows', 'metrics', 'find-label'}
         require(available, 'unqualified_surface: preserved macro ' + name + ' still requires its closed provider.')
         # Derive consent only from the invocation's original argv and ceiling.
         confirmed = compatibility('execution-confirmation', dict(original_argv=rest), culture=self.culture,
@@ -183,6 +184,9 @@ class PreservedOwner:
                     next_action='Re-run with --confirm-sensitive only if the user explicitly approved this exact sensitive live action.')
                 return dict(payload=payload, exit=3, json_depth=10, emit_json=not brief,
                     brief=f"blocked {name} reason=sensitive_action_requires_confirmation risk={safety['risk_level']}" if brief else None)
+        if name in SAFETY:
+            return run_safety(rest,brief=brief,culture=self.culture,timeout_s=scope.remaining(),
+                              parent_deadline=scope.deadline,cancelled=scope.cancelled)
         if name in COORDINATE:
             runtime = CoordinateRuntime(timeout_s=scope.remaining(), parent_deadline=scope.deadline, cancelled=scope.cancelled,
                                         culture=self.culture)

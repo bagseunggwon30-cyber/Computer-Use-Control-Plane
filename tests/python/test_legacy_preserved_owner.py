@@ -92,6 +92,16 @@ class RootTests(unittest.TestCase):
         self.assertEqual(code, 3)
         self.assertEqual(json.loads(output)['schema'], 'cucp.safety-block/v1')
 
+    def test_safety_classification_is_connected_and_does_not_grant_live_authority(self):
+        owner=self.owner()
+        code,output=owner.invoke(['macro','safety-classify','--text','macro app-close delete password'])
+        payload=json.loads(output)
+        self.assertEqual(code,0)
+        self.assertEqual(payload['schema'],'cucp.safety-classify/v1')
+        self.assertTrue(payload['requires_explicit_confirmation'])
+        self.assertFalse(owner.authority.live)
+        self.assertFalse(owner.closed)
+
     def test_hit_macros_are_readonly_and_fast_path_skips_desktop_helper(self):
         owner=self.owner()
         code,output=owner.invoke(['macro','hit-test','--x','1','--y','1','--fast',

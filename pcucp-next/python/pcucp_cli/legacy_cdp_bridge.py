@@ -44,9 +44,16 @@ def _helper_reply(reply: Any) -> tuple[LegacyCdpResult, str | None, bool]:
 
 def handle(operation: str, request: dict, *, allow_live_control=False, endpoint=None, timeout_s=8,
            cache_directory=None,audit_directory=None,history_file=None,history_maximum=None,
-           coordinate_culture=None,coordinate_modern=False) -> dict:
+           coordinate_culture=None,coordinate_modern=False,surface_culture=None) -> dict:
     if type(allow_live_control) is not bool:
         raise ValueError('startup live authority must be boolean')
+    if operation == 'surface-macro':
+        if any(value is not None for value in (cache_directory,audit_directory,endpoint,history_file,history_maximum,coordinate_culture)) or coordinate_modern:
+            raise ValueError('Unexpected public surface bootstrap values')
+        from .legacy_surface_macros import handle as surface_handle
+        return surface_handle(request,culture=surface_culture if surface_culture is not None else 'en-US',timeout_s=timeout_s)
+    if surface_culture is not None:
+        raise ValueError('Unexpected public surface culture')
     if operation == 'coordinates':
         if any(value is not None for value in (cache_directory, audit_directory, endpoint, history_file, history_maximum)):
             raise ValueError('Unexpected coordinate bootstrap values')
@@ -127,7 +134,7 @@ def handle(operation: str, request: dict, *, allow_live_control=False, endpoint=
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--operation', choices=('native', 'desktop-native', 'native-prepare', 'macro-prepare', 'macro-complete',
-        'native-macro-prepare','native-macro-complete','history-storage','coordinates'), required=True)
+        'native-macro-prepare','native-macro-complete','history-storage','coordinates','surface-macro'), required=True)
     parser.add_argument('--endpoint')
     parser.add_argument('--allow-live-control', action='store_true')
     parser.add_argument('--timeout-s', type=float, default=8)
@@ -137,6 +144,7 @@ def main(argv=None):
     parser.add_argument('--history-maximum', type=int)
     parser.add_argument('--coordinate-culture')
     parser.add_argument('--coordinate-modern', action='store_true')
+    parser.add_argument('--surface-culture')
     options = parser.parse_args(argv)
     try:
         maximum_input=64*1024*1024 if options.operation in ('native-macro-complete', 'history-storage') else MAX_FRAME
@@ -151,7 +159,8 @@ def main(argv=None):
                         endpoint=options.endpoint, timeout_s=options.timeout_s,
                         cache_directory=options.cache_directory,audit_directory=options.audit_directory,
                         history_file=options.history_file,history_maximum=options.history_maximum,
-                        coordinate_culture=options.coordinate_culture,coordinate_modern=options.coordinate_modern)
+                        coordinate_culture=options.coordinate_culture,coordinate_modern=options.coordinate_modern,
+                        surface_culture=options.surface_culture)
         response, exit_code = dict(schema=SCHEMA, status='ok', data=result), 0
     except (ValueError, CdpError, LegacyHostError, OSError, OverflowError) as exc:
         response, exit_code = dict(schema=SCHEMA, status='error', error=dict(

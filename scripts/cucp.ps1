@@ -415,69 +415,33 @@ function _Read-HelperServerVersion {
 }
 
 function Get-CucpVersionReport {
-  # 출력 envelope schema = "cucp.version/v1"
-  # 입력: 없음 (전역 상태 $Script:SkillVersion / CliPath / HelperServerScript / lock 참조)
-  # 출력 필드:
-  #   surface     : "wrapper_only" (cucp.ps1 단독) | "wrapper+cli" (cli backend 동반)
-  #   helper_mode : "persistent_server" (lock alive) | "child_only" (lock 부재/stale)
-  #   status      : "ok" | "partial" (cli / helper_server layer 누락 시)
-  #   versions    : { skill, cli, helper_server } SemVer
-  #   recoverable_errors[] : 누락 layer 마다 code/layer/recommended_action
-  # why: AI agent 가 한 번의 호출로 3 layer 버전 + 가동 모드를 파악하게 함.
-  $errs = New-Object System.Collections.ArrayList
-  $cli = _Read-CliVersion
-  if ($cli.error) {
-    [void]$errs.Add((_Make-RecoverableError -Code $cli.error -Layer "cli" -RecommendedAction "Set CUCP_CLI_PATH or run wrapper-only mode"))
-  }
-  $hs = _Read-HelperServerVersion
-  if ($hs.error) {
-    $helperRecommendation = 'Build and verify pcucp-next/bin/legacy-helper with packaging/publish_legacy_helper.py'
-    [void]$errs.Add((_Make-RecoverableError -Code $hs.error -Layer "helper_server" -RecommendedAction $helperRecommendation))
-  }
-  $lock = _Read-LockSafely
-  $helperMode = "child_only"
-  if ($lock -and -not (_Is-StaleLock -Lock $lock)) { $helperMode = "persistent_server" }
-  $surface = "wrapper_only"
-  if ($cli.version) { $surface = "wrapper+cli" }
-  $status = if ($errs.Count -gt 0) { "partial" } else { "ok" }
-  return [pscustomobject]@{
-    schema = "cucp.version/v1"
-    status = $status
-    surface = $surface
-    helper_mode = $helperMode
-    versions = @{
-      skill = $Script:SkillVersion
-      cli = $cli.version
-      helper_server = $hs.version
-    }
-    sources = @{
-      skill = "scripts/cucp.ps1::Script:SkillVersion"
-      cli = $cli.package_path
-      helper_server = 'pcucp-next/bin/legacy-helper/manifest.json'
-    }
-    recoverable_errors = @($errs)
-    generated_at = (_Now-Iso)
-  }
+  $cli=_Read-CliVersion;$helper=_Read-HelperServerVersion
+  $lock=_Read-LockSafely
+  $mode=if($lock -and -not (_Is-StaleLock -Lock $lock)){'persistent_server'}else{'child_only'}
+  $generatedAt=_Now-Iso
+  $result=_Invoke-LegacyCdpBridge -Operation 'surface-macro' -Request @{name='version-report';args=@{
+    skill=[string]$Script:SkillVersion;generated_at=$generatedAt;helper_mode=$mode;
+    cli=@{version=$cli.version;package_path=$cli.package_path;error=$cli.error};
+    helper=@{version=$helper.version;error=$helper.error}
+  }}
+  # PS7 ConvertFrom-Json recognizes date strings; the original field is text.
+  $result.value.generated_at=$generatedAt
+  return $result.value
 }
 
-function Invoke-MacroVersion {
-  # macro version [--json-only]
-  # 사용처:
-  #   - cucp version                    (사람용 brief 한 줄, 단 brief 모드일 때만)
-  #   - cucp macro version              (envelope JSON)
-  #   - cucp macro version --json-only  (envelope JSON only, brief 무시)
-  # 반환 exit code: status="partial" 이면 2, 아니면 0.
-  param([string[]]$Rest)
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $report = Get-CucpVersionReport
-  $skill = if ($report.versions.skill) { "v$($report.versions.skill)" } else { "v?" }
-  $cli = if ($report.versions.cli) { "v$($report.versions.cli)" } else { "missing" }
-  $hs = if ($report.versions.helper_server) { "v$($report.versions.helper_server)" } else { "missing" }
-  $briefLine = "ok cucp $skill (skill) + $cli (cli) + $hs (helper-server, $($report.helper_mode)) surface=$($report.surface) status=$($report.status)"
-  _Emit-Envelope -Envelope $report -BriefLine $briefLine -Depth 8 -ForceJson:$jsonOnly
-  if ($report.status -eq "partial") { return 2 }
-  return 0
+function _Invoke-LegacySurfaceMacro {
+  param([string]$Name,[string[]]$Rest)
+  $values=[string[]]@();if($null -ne $Rest){$values=$Rest.Clone()}
+  $request=@{name=$Name;rest=$values;brief=[bool]$Brief}
+  if($Name -ceq 'version'){$request.report=Get-CucpVersionReport}
+  $result=_Invoke-LegacyCdpBridge -Operation 'surface-macro' -Request $request
+  if($Name -ceq 'version'){$result.payload.generated_at=$request.report.generated_at}
+  if($null -ne $result.brief){[Console]::Out.WriteLine([string]$result.brief)}
+  elseif($result.emit_json){[Console]::Out.WriteLine((ConvertTo-Json -InputObject $result.payload -Depth ([int]$result.json_depth)))}
+  return [int]$result.exit
 }
+
+function Invoke-MacroVersion {param([string[]]$Rest) return _Invoke-LegacySurfaceMacro -Name 'version' -Rest $Rest}
 
 # ============================================================================
 # v1.9.0 — Cross-platform honest stub
@@ -2096,38 +2060,7 @@ function _Classify-SafetyFromText {
   return $result
 }
 
-function Invoke-MacroSafetyClassify {
-  param([string[]]$Rest)
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $macro = _Read-OptValue -Rest $Rest -Name "--macro"
-  $parts = New-Object System.Collections.ArrayList
-  foreach ($v in @(_Read-AllOptValues -Rest $Rest -Name "--text")) { if ($null -ne $v) { [void]$parts.Add("$v") } }
-  foreach ($v in @(_Read-AllOptValues -Rest $Rest -Name "--step")) { if ($null -ne $v) { [void]$parts.Add("$v") } }
-  foreach ($v in @(_Read-AllOptValues -Rest $Rest -Name "--command")) { if ($null -ne $v) { [void]$parts.Add("$v") } }
-  if ($parts.Count -eq 0) {
-    $skipValue = @{"--text"=$true; "--step"=$true; "--command"=$true; "--macro"=$true}
-    $skip = @{"--json-only"=$true}
-    $skipNext = $false
-    foreach ($a in @($Rest)) {
-      if ($skipNext) { $skipNext = $false; continue }
-      if ($skip.ContainsKey($a)) { continue }
-      if ($skipValue.ContainsKey($a)) { $skipNext = $true; continue }
-      [void]$parts.Add("$a")
-    }
-  }
-  $text = (@($parts) -join " ")
-  if (-not $macro) {
-    $parsed = _Parse-WorkflowStepTokens -Step $text
-    if ($parsed.ok -and $parsed.tokens.Count -ge 2 -and $parsed.tokens[0] -eq "macro") { $macro = "$($parsed.tokens[1])" }
-  }
-  $payload = _Classify-SafetyFromText -Text $text -MacroName $macro
-  if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine("ok safety-classify risk=$($payload.risk_level) score=$($payload.risk_score) confirm=$($payload.requires_explicit_confirmation)")
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 10))
-  }
-  return 0
-}
+function Invoke-MacroSafetyClassify {param([string[]]$Rest) return _Invoke-LegacySurfaceMacro -Name 'safety-classify' -Rest $Rest}
 
 function _Ensure-NativeDesktopTypes {
   if ("CUCP.NativeDesktop" -as [type]) { return }
