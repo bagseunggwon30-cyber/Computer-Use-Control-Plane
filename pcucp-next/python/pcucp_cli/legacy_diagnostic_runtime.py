@@ -17,7 +17,7 @@ import math
 
 from .legacy_diagnostic_provider import DiagnosticProvider, OPERATIONS, owned_path, read_regular, timestamp
 from .legacy_host_protocol import Authority, LegacyHostError, parse_json, require
-from .legacy_host_session import LegacyEffectSession
+from .legacy_host_session import LegacyEffectSession, cancel_with_owner
 from .native_session import NativeSession
 
 
@@ -45,13 +45,15 @@ def validate_cli(path):
 
 class DiagnosticRuntime:
     def __init__(self, context, *, culture='en-US', timeout_s=30, cache_seconds=2,
-                 cli_path=None, helper_status=None, read_macro=None, native_factory=NativeSession, parent_deadline=math.inf):
+                 cli_path=None, helper_status=None, read_macro=None, native_factory=NativeSession, parent_deadline=math.inf,
+                 parent_cancelled=None):
         self.context = dict(context)
         self.context['cli_path'] = validate_cli(cli_path or context.get('cli_path'))
         self.culture, self.timeout_s, self.cache_seconds = culture, timeout_s, cache_seconds
         self.helper_status, self.read_macro, self.native_factory = helper_status, read_macro, native_factory
         self.native = None
-        self.parent_deadline, self._deadline, self._cancelled = parent_deadline, math.inf, None
+        self.parent_deadline, self._deadline, self._cancelled = parent_deadline, math.inf, parent_cancelled
+        self.parent_cancelled = parent_cancelled
 
     def _bind_session(self, deadline, cancelled):
         self._deadline, self._cancelled = deadline, cancelled
@@ -226,14 +228,15 @@ class DiagnosticRuntime:
             return self.read_macro(name, argv)
         if name == 'health-quick':
             return DiagnosticRuntime(self.context, culture=self.culture, timeout_s=self.timeout_s,
-                cache_seconds=self.cache_seconds, helper_status=self.helper_status, parent_deadline=self._deadline).run(name, argv)['exit']
+                cache_seconds=self.cache_seconds, helper_status=self.helper_status, parent_deadline=self._deadline,
+                parent_cancelled=self._cancelled).run(name, argv)['exit']
         if name == 'windows':
             from .legacy_windows import observe_windows
             return observe_windows(self, argv)[0]
         if name == 'find-label':
             from .legacy_label_provider import LabelReadProvider
             provider = LabelReadProvider(self, argv)
-            return LegacyEffectSession(timeout_s=self._remaining()).run('interaction', provider.startup(), Authority(), provider)['exit']
+            return LegacyEffectSession(timeout_s=self._remaining(), parent_cancelled=self._cancelled).run('interaction', provider.startup(), Authority(), provider)['exit']
         if name == 'metrics':
             self._metrics()
             return 0
@@ -241,7 +244,7 @@ class DiagnosticRuntime:
 
     def run(self, operation, rest, *, brief=False):
         require(operation in OPERATIONS, 'Unknown legacy diagnostic operation.')
-        with self.native_factory(allow_live_control=False) as native:
+        with self.native_factory(allow_live_control=False) as native, cancel_with_owner(native, self.parent_cancelled):
             self.native = native
             callbacks = {
                 'Cli': lambda name, argv, value: self._cli(argv),
@@ -260,7 +263,7 @@ class DiagnosticRuntime:
             provider = DiagnosticProvider(operation=operation, rest=rest, context=self.context, culture=self.culture,
                 brief=brief, cache_seconds=self.cache_seconds, callbacks=callbacks,
                 parent_deadline=self.parent_deadline, on_session=self._bind_session)
-            return LegacyEffectSession(timeout_s=self.timeout_s).run('diagnostics', provider.startup(), Authority(), provider)
+            return LegacyEffectSession(timeout_s=self.timeout_s, parent_cancelled=self.parent_cancelled).run('diagnostics', provider.startup(), Authority(), provider)
 
 
 def main(argv=None):

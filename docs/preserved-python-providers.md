@@ -57,6 +57,22 @@ separate qualification project and is excluded from the production package.
 
 ## Verification and remaining cutovers
 
+The 17 direct desktop macro wrappers now preserve their old helper argv, brief
+reports, raw output and exit rules. An inert differential check against main
+compares 136 success/partial/blocked/absent-reply variants; it never dispatches
+input. Actual Windows checks separately cover health/windows, absent images and
+modal reports. Coordinate acquisition uses the retained wrapper Win32 interop
+for monitor/DPI and point-target evidence; risk tests include edges, mismatched
+targets and monitors. Actual outside-screen reads have also passed.
+
+`PreservedOwner` connects the completed providers in one staged Python owner.
+It supports nested task/workflow calls, immutable child ceilings, cancellation,
+the original seven placeholders, and refusal for still-pending cutovers. The
+previous brief-only host is not widened. A direct owned test verifies that text
+containing `--confirm-sensitive` cannot mint sensitive approval before input.
+This owner is still a candidate: remaining routes, root serialization, top-level
+aliases and external CLI forwarding must qualify before it becomes production.
+
 `legacy_execution_runtime` now supplies closed Python acquisition for all seven
 retained execution coordinators: workflow-run, task-run, form-run, smart-click,
 watch, recovery-plan and recovery-run. Planning acquisition also covers workflow,
