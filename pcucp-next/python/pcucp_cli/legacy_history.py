@@ -36,9 +36,9 @@ def _records(path):
 
 
 class SmartClickHistory:
-    def __init__(self, audit_directory, maximum=1000):
+    def __init__(self, audit_directory, maximum=1000, *, path=None):
         self.directory = owned_path(str(audit_directory))
-        self.path = owned_path(str(self.directory / 'smart-click-history.ndjson'))
+        self.path = owned_path(str(path or self.directory / 'smart-click-history.ndjson'))
         self.maximum = maximum
 
     def pick(self, label, match, lookback=5):
