@@ -13,6 +13,7 @@ internal static class LegacyDiagnosticRead
         if (operation == "uia-affordances") options.Allow("--operation", "--focused-window", "--max-elements", "--min-size", "--hwnd");
         else if (operation == "hit-test-point") options.Allow("--operation", "--x", "--y", "--target-hwnd", "--target-match");
         else if (operation == "coordinate-snapshot") options.Allow("--operation", "--x", "--y", "--target-hwnd", "--has-point");
+        else if (operation == "coordinate-target") options.Allow("--operation", "--target-hwnd");
         else if (operation == "process-metrics") options.Allow("--operation", "--current", "--previous");
         else options.Allow("--operation");
         object? data = options.Get("--operation") switch
@@ -21,6 +22,7 @@ internal static class LegacyDiagnosticRead
             "windows" => WrapperWindows(), "processes" => Processes(), "process-metrics" => Metrics(options),
             "uia-affordances" => Affordances(options),
             "hit-test-point" => LegacyCoordinateRead.Hit(options), "coordinate-snapshot" => LegacyCoordinateRead.Snapshot(options),
+            "coordinate-target" => LegacyCoordinateRead.Target(options),
             "desktop-size" => new { width = CucpWin32.GetSystemMetrics(0), height = CucpWin32.GetSystemMetrics(1) },
             "native-health" => Health(), "native-windows" => NativeWindows(),
             "native-focused" => Focused(), "native-modal-detect" => Modal(),
