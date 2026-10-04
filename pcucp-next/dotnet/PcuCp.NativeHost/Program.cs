@@ -126,8 +126,12 @@ if (command == "serve")
     {
         var options = new CommandOptions(args.Skip(1).ToArray());
         options.Allow("--allow-live-control");
-        return await NativeSession.RunAsync(Console.OpenStandardInput(), Console.Out,
-            options.Has("--allow-live-control"), NativeDispatcher.ExecuteAsync);
+        try
+        {
+            return await NativeSession.RunAsync(Console.OpenStandardInput(), Console.Out,
+                options.Has("--allow-live-control"), NativeDispatcher.ExecuteAsync);
+        }
+        finally { LegacyDiagnosticRead.Close(); }
     }
     catch (IOException) { return 1; }
     catch (Exception ex)

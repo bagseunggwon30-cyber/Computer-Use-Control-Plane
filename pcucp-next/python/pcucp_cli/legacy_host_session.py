@@ -67,6 +67,9 @@ class LegacyEffectSession:
         with self._lock:
             require(not self._used and not self._cancelled.is_set(), 'Legacy session is single-attempt and cannot restart.')
             self._used = True
+        deadline = min(time.monotonic() + self.timeout_s, getattr(provider, 'parent_deadline', math.inf))
+        if hasattr(provider, 'bind_session'):
+            provider.bind_session(deadline, self._cancelled)
         provider.validate_startup(family, startup, authority)
         encoded = frames(startup, 0, startup=True)
         command = [*_coordinator_argv(), FAMILIES[family][0]]
@@ -74,7 +77,6 @@ class LegacyEffectSession:
             command.append('--allow-live-control')
         if authority.sensitive:
             command.append('--confirm-sensitive')
-        deadline = time.monotonic() + self.timeout_s
         inbox = queue.Queue(maxsize=4)
         stderr = bytearray()
         stderr_failed = threading.Event()
@@ -225,6 +227,7 @@ class LegacyEffectSession:
                 self.dispatched += 1
                 try:
                     value = provider.dispatch(effect)
+                    self._check(deadline)
                     reply = {'state': 'ok', 'value': wire(value)}
                 except OSError as failure:
                     reply = {'state': 'error', 'message': str(failure),

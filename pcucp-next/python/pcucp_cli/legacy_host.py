@@ -37,7 +37,7 @@ class HostOptions:
                 'Legacy startup timeout must be positive and finite.')
 
 
-def _legacy_lines(raw):
+def _legacy_text(raw):
     """Get-Content's reached text-file boundary: BOM or Windows ANSI.
 
     Portable qualification files must be ASCII or BOM-marked. A Linux locale is
@@ -55,8 +55,12 @@ def _legacy_lines(raw):
     else:
         require(raw.isascii(), 'Portable legacy text qualification requires ASCII or an explicit BOM.')
         text = raw.decode('ascii')
+    return text
+
+
+def _legacy_lines(raw):
     # StreamReader.ReadLine recognizes CR, LF, CRLF, not every Unicode separator.
-    return _read_lines(text)
+    return _read_lines(_legacy_text(raw))
 
 
 def _read_lines(text):

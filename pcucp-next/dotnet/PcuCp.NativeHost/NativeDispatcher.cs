@@ -34,6 +34,7 @@ internal static class NativeDispatcher
             var result = command switch
             {
                 "windows" => WindowEnumerator.Observe(cli), "uia-tree" => UiaTreeObserver.Observe(cli),
+                "legacy-diagnostic-read" => LegacyDiagnosticRead.Execute(cli),
                 "ocr-window" => await OcrWindowObserver.ObserveAsync(cli),
                 "screenshot" => ScreenshotObserver.Observe(cli), "privileges" => PrivilegeInspector.Observe(cli),
                 "focus" or "click" or "drag" or "type" or "key" or "scroll" => DesktopActions.Execute(command, cli),

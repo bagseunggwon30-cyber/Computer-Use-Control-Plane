@@ -1,0 +1,41 @@
+name: Preserved Python diagnostic providers
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/preserve-features-python-runtime]
+  pull_request:
+    paths:
+      - 'pcucp-next/python/pcucp_cli/legacy_*.py'
+      - 'pcucp-next/dotnet/PcuCp.NativeHost/**'
+      - 'tests/python/test_legacy_diagnostic_provider.py'
+      - 'tests/python/test_legacy_diagnostic_runtime.py'
+      - '.github/workflows/legacy-python-providers.yml'
+permissions:
+  contents: read
+jobs:
+  windows-providers:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build actual Windows coordinator and acquisition worker
+        run: dotnet build pcucp-next/dotnet/PcuCp.NativeHost/PcuCp.NativeHost.csproj -c Release --nologo
+      - name: Qualify Python files, Node argv, native reads and shared deadlines
+        shell: bash
+        env:
+          PYTHONPATH: 'pcucp-next/python;tests/python'
+          PYTHONIOENCODING: utf-8
+        run: |
+          export CUCP_DIAGNOSTIC_PROVIDER_NATIVE="$(cygpath -w "$GITHUB_WORKSPACE/pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll")"
+          python -m unittest test_legacy_diagnostic_runtime test_legacy_diagnostic_provider test_legacy_host_protocol test_native_session test_legacy_dispatch_contract test_legacy_dispatch_refresh -v
