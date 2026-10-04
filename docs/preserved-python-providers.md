@@ -35,6 +35,26 @@ or partial reports; it cannot synthesize a successful appshot. Tests use an owne
 Node fixture to verify argument/artifact contracts, not to certify that dependency.
 Backend identity now honestly reports .NET rather than a PowerShell version.
 
+The external source was subsequently located using the installation path in
+`references/command-reference.md`, adjusted for the current user profile. An
+actual CLI `health-detail` probe has passed its required checks. Its native and
+semantic adapters themselves still contain PowerShell calls; their connection
+must also be migrated before claiming a complete runtime retirement.
+
+`PcuCp.LegacyDesktop` now ports the 24 non-CDP native helper actions using the
+existing Framework interop, observation and image libraries. Its typed Python
+transport routes OCR matching to the existing native kernel. Startup authority
+is separate from JSON/argv and a missing worker never selects a script fallback.
+UIA pattern errors after dispatch return an uncertain outcome rather than trying
+another action. `publish_legacy_desktop.py` builds the separate package explicitly.
+
+Local owned-file checks cover actual WinRT OCR and matching. One disposable
+Windows form has additionally verified background UIA value/invoke/toggle,
+foreground focus, guarded Unicode input, refusal for a mismatched target, and
+IME paste with clipboard restoration. This is proof of these owned scenarios,
+not of every public macro or third-party application. The GUI surface lives in a
+separate qualification project and is excluded from the production package.
+
 ## Verification and remaining cutovers
 
 The Windows provider job builds the actual NativeHost, exercises all nine

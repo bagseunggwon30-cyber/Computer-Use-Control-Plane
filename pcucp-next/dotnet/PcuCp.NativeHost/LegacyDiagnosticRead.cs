@@ -77,7 +77,7 @@ internal static class LegacyDiagnosticRead
     private static object NativeWindows()
     {
         var windows = (Dictionary<string, object?>[])Windows();
-        return new { status = "ok", match = (string?)null, windows, count = windows.Length };
+        return new { status = "ok", match = "", windows, count = windows.Length };
     }
     private static object Focused()
     {
