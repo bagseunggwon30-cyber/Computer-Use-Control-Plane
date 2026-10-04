@@ -33,8 +33,21 @@ class RegistryRefreshTests(unittest.TestCase):
         expected = dispatch._canonical_text(current).replace(old_body, new_body, 1).replace(
             '$Script:NativeHelperPath = Join-Path $PSScriptRoot "cucp-native-helper.ps1"',
             '$Script:NativeHelperPath = Join-Path $PSScriptRoot "cucp-native-helper.py"', 1)
-        for name in ('_Read-LockSafely','_Is-StaleLock','_Try-Delete-Lock','Get-HelperServerStatus','Invoke-HelperPipe','Start-HelperServer','Stop-HelperServer'):
+        for name in ('_Read-LockSafely','_Is-StaleLock','_Try-Delete-Lock','Get-HelperServerStatus','Invoke-HelperPipe','Start-HelperServer','Stop-HelperServer',
+                     'Install-HelperAutostart','Uninstall-HelperAutostart','Get-HelperAutostartStatus','_Read-HelperServerVersion','Get-CucpVersionReport'):
             expected = expected.replace(dispatch._function_extent(expected,name)[2], dispatch._function_extent(actual,name)[2],1)
+        from test_legacy_native_macros import HANDLERS
+        for name in HANDLERS.values():
+            expected=expected.replace(dispatch._function_extent(expected,name)[2],dispatch._function_extent(actual,name)[2],1)
+        helper=dispatch._function_extent(actual,'_Invoke-LegacyNativeMacro')[2]
+        expected=expected.replace('function Invoke-MacroNativeHealth {',helper+'\n\nfunction Invoke-MacroNativeHealth {',1)
+        for before,after in (
+            ('$Script:HelperServerScript = Join-Path $PSScriptRoot "cucp-helper-server.ps1"','$Script:HelperServerScript = Join-Path $PSScriptRoot "cucp-helper-server.py"'),
+            ('# cucp-helper-server.ps1 (named pipe server) 와의 JSON-line IPC 헬퍼.','# Python/C# read-only helper named-pipe client.'),
+            ('# 없거나 stale 이면 child PowerShell fallback.','# 없거나 stale 이면 Python/C# cold path.'),
+            ('# server 가 직접 처리 가능한 action 화이트리스트 (cucp-helper-server.ps1 v1.7.0 의 _Dispatch 와 일치)','# Closed read-only action list supported by the compiled helper.')):
+            self.assertEqual(expected.count(before),1)
+            expected=expected.replace(before,after,1)
         self.assertEqual(actual, expected)
         self.assertIn("-Operation 'desktop-native'", new_body)
         self.assertNotIn('Start-Process', new_body)
@@ -58,7 +71,8 @@ class RegistryRefreshTests(unittest.TestCase):
             current_first, current_last, current_body = dispatch._function_extent(actual, row['name'])
             self.assertEqual((row['start_line'], row['end_line'], row['sha256']),
                 (current_first, current_last, dispatch._digest(current_body)))
-        self.assertEqual(changed, ['Invoke-NativeHelper'])
+        from test_legacy_native_macros import HANDLERS
+        self.assertEqual(set(changed),{'Invoke-NativeHelper',*HANDLERS.values()})
         dispatch.assert_frozen_sources(ROOT)
 
     def test_all_dispatch_handler_and_safety_invariants_remain_identical(self):

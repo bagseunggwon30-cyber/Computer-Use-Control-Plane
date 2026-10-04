@@ -35,6 +35,18 @@ class PythonHelperProductionTests(unittest.TestCase):
                     '-Quiet','macro','native-health'],env=env,capture_output=True,text=True,encoding='utf-8',timeout=30)
                 self.assertEqual(cold.returncode,0,cold.stderr+cold.stdout)
                 self.assertEqual(json.loads(cold.stdout)['helper_mode'],'persistent_server')
+                def macro(name,*arguments):
+                    return subprocess.run(['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',str(ROOT/'scripts/cucp.ps1'),
+                        '-Quiet','macro',name,*arguments],env=env,capture_output=True,text=True,encoding='utf-8',timeout=30)
+                windows=macro('native-windows','--match','CUCP-owned-absent-native-macro')
+                self.assertEqual(windows.returncode,0,windows.stderr)
+                self.assertEqual(json.loads(windows.stdout)['count'],0)
+                missing=macro('ocr-image','--path',str(temp/'missing.png'))
+                self.assertEqual(missing.returncode,1,missing.stderr)
+                self.assertNotEqual(json.loads(missing.stdout)['status'],'ok')
+                denied=macro('uia-set-value','--label','CUCP-owned-absent-native-macro','--value','literal')
+                self.assertEqual(denied.returncode,3,denied.stderr)
+                self.assertFalse((temp/'computer-use-control-plane/trajectory.ndjson').exists())
             finally:
                 stopped=call('stop-helper')
                 self.assertEqual(stopped['status'],'ok')

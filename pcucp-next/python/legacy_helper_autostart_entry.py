@@ -9,22 +9,23 @@ import json
 import os
 from pathlib import Path
 
-from pcucp_cli.legacy_helper_client import _positive_integer
+from pcucp_cli.legacy_helper_client import _idle_timeout
 from pcucp_cli.legacy_helper_runtime import StagedHelperRuntime, validate_package
 
 
-def start_once(idle_timeout_ms, desktop, *, temp_root, package, runtime_factory=StagedHelperRuntime):
-    _positive_integer(idle_timeout_ms,'idle_timeout_ms')
+def start_once(idle_timeout_ms, desktop, *, temp_root, package, runtime_factory=StagedHelperRuntime, default_lock=False):
+    _idle_timeout(idle_timeout_ms)
     if type(desktop) is not bool: raise ValueError('invalid_desktop_authority')
+    if type(default_lock) is not bool: raise ValueError('invalid_lock_selection')
     validate_package(package)
     if not temp_root: raise ValueError('TEMP is required for the staged helper lock')
     directory=Path(temp_root)/'computer-use-control-plane'
     directory.mkdir(parents=True,exist_ok=True)
-    runtime=runtime_factory(package,directory/'helper-staged.pid',desktop=desktop)
+    runtime=runtime_factory(package,directory/('helper.pid' if default_lock else 'helper-staged.pid'),desktop=desktop)
     return runtime.client.start(runtime.launcher,idle_timeout_ms=idle_timeout_ms)
 
 
-def main(argv=None):
+def main(argv=None, *, default_lock=False):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--staged-unqualified',action='store_true',required=True)
     parser.add_argument('--idle-timeout-ms',type=int,default=28800000)
@@ -32,7 +33,7 @@ def main(argv=None):
     args=parser.parse_args(argv)
     try:
         package=Path(__file__).resolve().parents[1]/'bin/legacy-helper'
-        result=start_once(args.idle_timeout_ms,args.allow_readonly_desktop,temp_root=os.environ.get('TEMP'),package=package)
+        result=start_once(args.idle_timeout_ms,args.allow_readonly_desktop,temp_root=os.environ.get('TEMP'),package=package,default_lock=default_lock)
     except Exception as exc:
         result=dict(status='error',reason=str(exc)[:512])
     print(json.dumps(result,ensure_ascii=True,allow_nan=False,separators=(',',':')))

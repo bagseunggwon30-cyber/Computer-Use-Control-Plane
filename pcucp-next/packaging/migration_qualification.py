@@ -233,9 +233,8 @@ def run_family(family: str, browser: bool = False, log_dir: Path | None = None) 
             run([sys.executable, "-m", "unittest", "discover", "-s", "tests/python", "-p", pattern, "-v"])
     finally:
         if not browser and log_dir is not None:
-            run(["powershell.exe", "-NoProfile", "-NonInteractive", "-File",
-                 str(ROOT / "tests/fixtures/migration-source-map.ps1"), "-Root", str(ROOT),
-                 "-OutputPath", str(log_dir / "source-map.json")])
+            run([sys.executable, str(ROOT / "pcucp-next/packaging/source_map.py"), "--build", "--root", str(ROOT),
+                 "--output", str(log_dir / "source-map.json")])
 
 
 def available_families(root: Path = ROOT) -> list[str]:

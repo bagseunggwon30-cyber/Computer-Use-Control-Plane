@@ -4,6 +4,9 @@ using System.IO;
 using System.Globalization;
 using System.Linq;
 using System.Management.Automation;
+using System.Management.Automation.Language;
+using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -39,6 +42,14 @@ internal static class Program
                 }
                 var json = new JavaScriptSerializer { MaxJsonLength = 32 * 1024 * 1024, RecursionLimit = 100 };
                 var request = ParseRequest(json, new UTF8Encoding(false, true).GetString(buffer.ToArray()));
+                if (request != null && request.TryGetValue("schema", out object schema) && Equals(schema, "cucp.source-map-input/v1"))
+                {
+                    string mapped = json.Serialize(SourceMap(request));
+                    if (new UTF8Encoding(false, true).GetByteCount(mapped) > 4 * 1024 * 1024)
+                        throw new ArgumentException("Source-map reply exceeds 4 MiB.");
+                    Console.WriteLine(mapped);
+                    return 0;
+                }
                 if (request == null || request.Count != 3 || !request.ContainsKey("schema") || !Equals(request["schema"], "cucp.legacy-syntax/v1") ||
                     !request.TryGetValue("culture", out object locale) || !(locale is string cultureName) || cultureName.Length > 128 ||
                     !request.TryGetValue("steps", out object source) || !(source is object[] steps) || steps.Any(step => !(step is string)))
@@ -97,5 +108,44 @@ internal static class Program
             if (token.Content != null && !StringComparer.InvariantCultureIgnoreCase.Equals(token.Content, "")) items.Add(token.Content);
         }
         return new { ok = items.Count != 0, error = items.Count == 0 ? "empty_step" : "", detail = "", tokens = items.ToArray() };
+    }
+
+    private static string Hash(string text)
+    {
+        using (var hash = SHA256.Create())
+            return BitConverter.ToString(hash.ComputeHash(new UTF8Encoding(false, true).GetBytes(text))).Replace("-", "").ToLowerInvariant();
+    }
+
+    private static object SourceMap(IDictionary<string, object> request)
+    {
+        if (request.Count != 2 || !request.TryGetValue("files", out object value) || !(value is object[] files) || files.Length == 0 || files.Length > 1024)
+            throw new ArgumentException("Expected bounded source-map files.");
+        var paths = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<KeyValuePair<string, object>>();
+        foreach (object item in files)
+        {
+            if (!(item is IDictionary<string, object> file) || file.Count != 2 ||
+                !file.TryGetValue("path", out object pathValue) || !(pathValue is string path) || path.Length > 4096 ||
+                !Regex.IsMatch(path, @"\A(?:scripts/[a-zA-Z0-9_.-]+\.ps1|tests/fixtures/legacy-[a-zA-Z0-9_.-]+-adapter\.ps1)\z") ||
+                !paths.Add(path) || !file.TryGetValue("text", out object textValue) || !(textValue is string text) || text.Contains("\r\n") || text.StartsWith("\uFEFF", StringComparison.Ordinal))
+                throw new ArgumentException("Invalid or duplicate source-map file.");
+            Token[] tokens;
+            ParseError[] errors;
+            // Parse source as inert data. No Runspace, pipeline or script block
+            // is created or invoked, including function bodies with side effects.
+            var ast = Parser.ParseInput(text, out tokens, out errors);
+            if (errors.Length != 0) throw new ArgumentException("Source-map parse failed for " + path + ": " + errors[0].Message);
+            var functions = ast.FindAll(node => node is FunctionDefinitionAst, true).Cast<FunctionDefinitionAst>().Select(function =>
+            {
+                string parentName = null;
+                for (Ast parent = function.Parent; parent != null; parent = parent.Parent)
+                    if (parent is FunctionDefinitionAst owner) { parentName = owner.Name; break; }
+                return new { name = function.Name, parent_function = parentName, start_utf16 = function.Extent.StartOffset,
+                    end_utf16 = function.Extent.EndOffset, sha256 = Hash(function.Extent.Text) };
+            }).ToArray();
+            result.Add(new KeyValuePair<string, object>(path,new { path, sha256 = Hash(text), utf16_length = (long)text.Length, functions }));
+        }
+        return new { schema = "cucp.migration-source-map/v1", encoding = "utf-8-no-bom-lf",
+            files = result.OrderBy(pair => pair.Key,StringComparer.CurrentCultureIgnoreCase).Select(pair => pair.Value).ToArray() };
     }
 }

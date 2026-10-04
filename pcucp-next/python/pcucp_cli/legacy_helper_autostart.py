@@ -14,7 +14,7 @@ import json
 import os
 from pathlib import Path
 
-from .legacy_helper_client import _json, _positive_integer
+from .legacy_helper_client import _json, _idle_timeout
 
 SHIM_NAME = 'cucp-helper-autostart.cmd'
 MANIFEST_NAME = '.cucp-helper-autostart.json'
@@ -35,7 +35,7 @@ def _quoted(value):
 
 
 def plan_autostart(startup_dir, python_exe, bootstrap, *, idle_timeout_ms=28800000, desktop=False, metadata_directory=None, startup_identity=None):
-    _positive_integer(idle_timeout_ms, 'idle_timeout_ms')
+    _idle_timeout(idle_timeout_ms)
     if type(desktop) is not bool: raise ValueError('desktop authority must be boolean')
     directory, python_exe, bootstrap = _path(startup_dir), _path(python_exe), _path(bootstrap)
     metadata_directory=_path(metadata_directory if metadata_directory is not None else Path(directory).parent)
@@ -140,6 +140,47 @@ class WindowsAutostartStore:
         if name!=SHIM_NAME: raise ValueError('metadata_requires_retained_lease')
         return self.authority.lock(self._path(name),expected)
 
+    def replace_known(self, expected, raw):
+        """Rewrite only the acquired known shim, retaining its file handle.
+
+        Identity and bytes are checked under a write-exclusive handle. A failed
+        write restores the original bytes through that same handle; no pathname
+        reopen, unowned overwrite, or delete/create publication gap is used.
+        """
+        from ctypes import wintypes as w
+        from .legacy_helper_runtime import _FileInfo
+        from .legacy_helper_client import LockSnapshot
+        self._require_operation()
+        if type(raw) is not bytes or len(raw)>MAX_BYTES: raise ValueError('invalid_shim_replacement')
+        k=self.authority.k
+        k.SetFilePointerEx.argtypes=[w.HANDLE,ctypes.c_longlong,ctypes.POINTER(ctypes.c_longlong),w.DWORD]
+        k.SetFilePointerEx.restype=w.BOOL
+        k.SetEndOfFile.argtypes=[w.HANDLE];k.SetEndOfFile.restype=w.BOOL
+        handle=k.CreateFileW(str(self._path(SHIM_NAME)),0xc0000000,1,None,3,0x00200000,None)
+        if handle==ctypes.c_void_p(-1).value: raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            info=_FileInfo()
+            if not k.GetFileInformationByHandle(handle,ctypes.byref(info)): raise ctypes.WinError(ctypes.get_last_error())
+            size=info.size_high*2**32+info.size_low
+            if info.attributes & (0x400|0x10) or size>MAX_BYTES: raise ValueError('invalid_shim_replacement_target')
+            buffer=ctypes.create_string_buffer(size+1);read=w.DWORD()
+            if not k.ReadFile(handle,buffer,size+1,ctypes.byref(read),None): raise ctypes.WinError(ctypes.get_last_error())
+            if read.value!=size: raise OSError('shim_changed_during_acquisition')
+            acquired=LockSnapshot(buffer.raw[:size],(info.volume,info.index_high,info.index_low))
+            if acquired!=expected: return False
+            def write(value):
+                if not k.SetFilePointerEx(handle,0,None,0): raise ctypes.WinError(ctypes.get_last_error())
+                data=ctypes.create_string_buffer(value);written=w.DWORD()
+                if not k.WriteFile(handle,data,len(value),ctypes.byref(written),None): raise ctypes.WinError(ctypes.get_last_error())
+                if written.value!=len(value): raise OSError('shim_short_write')
+                if not k.SetEndOfFile(handle) or not k.FlushFileBuffers(handle): raise ctypes.WinError(ctypes.get_last_error())
+            try: write(raw)
+            except OSError:
+                write(acquired.raw)
+                raise
+            return True
+        finally: k.CloseHandle(handle)
+
     @contextmanager
     def marker(self,create=None):
         """No reopen gap: READ|DELETE/share-READ is held through publication."""
@@ -220,7 +261,7 @@ class AutostartController:
     def install(self,idle_timeout_ms=28800000):
         if not self.allow_change: raise PermissionError('session install-autostart requires -AllowLiveControl')
         try:
-            _positive_integer(idle_timeout_ms,'idle_timeout_ms');self.validate_install()
+            _idle_timeout(idle_timeout_ms);self.validate_install()
             with self.store.operation():
                 plan=self._plan(idle_timeout_ms)
                 if self.store.exists(SHIM_NAME) or self.store.exists(MANIFEST_NAME):

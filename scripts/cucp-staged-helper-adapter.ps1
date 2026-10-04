@@ -60,6 +60,7 @@ function _Invoke-StagedHelper {
   if ($startup) {
     $psi.Arguments += ' --startup-directory "' + $startup + '" --metadata-directory "' + $metadataDirectory + '"'
     if ($Script:StagedAutostartLive) { $psi.Arguments += ' --allow-autostart-change' }
+    if (-not $Script:StagedCompiledHelper) { $psi.Arguments += ' --default-autostart' }
   }
   $psi.UseShellExecute=$false; $psi.CreateNoWindow=$true
   $psi.RedirectStandardInput=$true; $psi.RedirectStandardOutput=$true; $psi.RedirectStandardError=$true

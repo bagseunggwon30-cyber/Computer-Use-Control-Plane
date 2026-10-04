@@ -202,6 +202,12 @@ def _positive_integer(value, label):
     return value
 
 
+def _idle_timeout(value):
+    if type(value) is not int or not 0 <= value <= 2147483647:
+        raise ValueError('idle_timeout_ms must be a nonnegative 32-bit integer')
+    return value
+
+
 def frame_request(request_id: int, action: str, args: Mapping[str, Any], timeout_ms: int) -> bytes:
     _positive_integer(request_id, 'request_id')
     _positive_integer(timeout_ms, 'timeout_ms')
@@ -333,7 +339,7 @@ class LegacyHelperClient:
         return status_envelope(state, extra)
 
     def start(self, launcher: DetachedLauncher, *, idle_timeout_ms: int = 60000) -> dict:
-        _positive_integer(idle_timeout_ms, 'idle_timeout_ms')
+        _idle_timeout(idle_timeout_ms)
         state = self.state()
         if state.usable:
             return _started(state.record, reused=True)

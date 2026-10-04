@@ -153,11 +153,15 @@ if ($target -ne '.NETFramework,Version=v4.8') { throw "Wrong framework: $target"
             self.assertIn("PASS: PowerShell 5.1", text)
 
 
-    def test_production_loader_definitions_load_compiled_types_without_runtime_compilation(self):
+    def test_current_wrapper_and_historical_server_load_compiled_types_without_runtime_compilation(self):
         candidate = Path(os.environ["CUCP_LEGACY_INTEROP_TEST_DLL"]).resolve()
         powershell = shutil.which("powershell.exe")
         for relative, type_name in (("scripts/cucp.ps1", "CucpWin32"), ("scripts/cucp-helper-server.ps1", "HelperWin32")):
             with self.subTest(source=relative):
+                source=ROOT/relative
+                if type_name=='HelperWin32':
+                    from legacy_historical_native import scripts
+                    source=scripts()/'cucp-helper-server.ps1'
                 script = r'''
 $ErrorActionPreference = 'Stop'
 $tokens=$null; $errors=$null
@@ -178,7 +182,7 @@ if (-not (_Ensure-Win32Loaded)) { throw 'Repeated loader failed' }
 '''
                 encoded=base64.b64encode(script.encode("utf-16le")).decode("ascii")
                 text=self.run_checked([powershell,"-NoProfile","-NonInteractive","-EncodedCommand",encoded],
-                    env={**os.environ,"CUCP_LEGACY_INTEROP_DLL":str(candidate),"CUCP_LOADER_SOURCE":str(ROOT/relative),"CUCP_EXPECT_TYPE":type_name})
+                    env={**os.environ,"CUCP_LEGACY_INTEROP_DLL":str(candidate),"CUCP_LOADER_SOURCE":str(source),"CUCP_EXPECT_TYPE":type_name})
                 self.assertIn("PASS: production compiled loader",text)
 
 

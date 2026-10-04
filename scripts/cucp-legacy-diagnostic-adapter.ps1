@@ -354,8 +354,9 @@ function _Diagnostic-ProcessorCount {return [Environment]::ProcessorCount}
 function _Invoke-LegacyDiagnosticFamily {
   param([ValidateSet('perf','diagnose-lag','health-quick','health-detail','log-tail','benchmark','self-test','audit-summary','release-notes')][string]$Operation,[string[]]$Rest)
   $context=_Diagnostic-GetContext
-  $state=_Diagnostic-NewState -Operation $Operation -Rest $Rest -Context $context
-  $startup=[ordered]@{schema='cucp.diagnostic-start/v1';operation=$Operation;rest=[string[]]@($Rest);brief=[bool]$Brief;
+  $restValues=[string[]]@();if($null -ne $Rest){$restValues=$Rest.Clone()}
+  $state=_Diagnostic-NewState -Operation $Operation -Rest $restValues -Context $context
+  $startup=[ordered]@{schema='cucp.diagnostic-start/v1';operation=$Operation;rest=$restValues;brief=[bool]$Brief;
     cache_seconds=[int]$CacheSeconds;vision_available=[bool]$Script:CliPath;culture=[Globalization.CultureInfo]::CurrentCulture.Name;context=$state.context}
   try {return _Invoke-LegacyExecutionHost -EntryPoint 'legacy-diagnostic-session' -Startup $startup -State $state}
   finally {_Diagnostic-DisposeProcesses $state}

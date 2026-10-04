@@ -93,7 +93,8 @@ class AutostartControllerTests(unittest.TestCase):
         self.assertNotIn('--allow-readonly-desktop',p['command'])
 
     def test_invalid_idle_authority_and_paths_fail_before_write(self):
-        for value in (0,-1,True,1.5,'1',2**31):
+        self.assertEqual(plan_autostart(self.root,'python.exe','bootstrap.py',idle_timeout_ms=0)['idle_timeout_ms'],0)
+        for value in (-1,True,1.5,'1',2**31):
             with self.assertRaises(ValueError): plan_autostart(self.root,'python.exe','bootstrap.py',idle_timeout_ms=value)
         for value in (None,1,'true'):
             with self.assertRaises(ValueError): plan_autostart(self.root,'python.exe','bootstrap.py',desktop=value)
@@ -236,7 +237,7 @@ class AutostartControllerTests(unittest.TestCase):
             with self.assertRaises(ValueError): store._path(name)
 
 
-    def test_default_autostart_bodies_are_exact_pinned_historical_source(self):
+    def test_original_autostart_bodies_remain_exact_pinned_historical_source(self):
         import hashlib
         import re
         from helper_process_evidence import run_evidence,require_success
@@ -247,7 +248,8 @@ class AutostartControllerTests(unittest.TestCase):
         require_success(result)
         self.assertEqual(hashlib.sha256(result['stdout']).hexdigest(),entry['raw_sha256'])
         original=result['stdout'].decode('utf-8-sig').replace('\r\n','\n')
-        current=(ROOT/'scripts/cucp.ps1').read_text(encoding='utf-8-sig')
+        from legacy_historical_native import wrapper
+        current=wrapper().read_text(encoding='utf-8-sig')
         for name in ('_Get-AutostartShimPath','Install-HelperAutostart','Uninstall-HelperAutostart','Get-HelperAutostartStatus'):
             pattern=r'(?ms)^function '+re.escape(name)+r' \{.*?^\}'
             before=re.findall(pattern,original);after=re.findall(pattern,current)
@@ -407,11 +409,18 @@ class AutostartBootstrapTests(unittest.TestCase):
         self.runtime.client.start.assert_called_once_with(self.runtime.launcher,idle_timeout_ms=28800000)
 
     def test_invalid_values_and_failed_package_do_not_create_runtime_or_lock_directory(self):
-        for idle in (0,-1,True,1.5):
+        for idle in (-1,True,1.5):
             with self.assertRaises(ValueError): self.entry.start_once(idle,False,temp_root=self.root,package=self.package,runtime_factory=self.factory)
         with patch.object(self.entry,'validate_package',side_effect=ValueError('missing package')):
             with self.assertRaises(ValueError): self.entry.start_once(1000,False,temp_root=self.root,package=self.package,runtime_factory=self.factory)
         self.factory.assert_not_called();self.assertEqual(list(self.root.iterdir()),[])
+
+    def test_default_lock_and_no_expiry_are_fixed_by_bootstrap(self):
+        with patch.object(self.entry,'validate_package'):
+            result=self.entry.start_once(0,True,temp_root=self.root,package=self.package,runtime_factory=self.factory,default_lock=True)
+        self.assertEqual(result,dict(status='ok',reused=False))
+        self.factory.assert_called_once_with(self.package,self.root/'computer-use-control-plane/helper.pid',desktop=True)
+        self.runtime.client.start.assert_called_once_with(self.runtime.launcher,idle_timeout_ms=0)
 
     def test_launch_failure_has_no_retry_and_no_authority_from_environment(self):
         self.runtime.client.start.side_effect=OSError('uncertain owned launch')
@@ -488,16 +497,19 @@ class AutostartBridgeDispatchTests(unittest.TestCase):
 class AutostartWindowsBridgeTests(unittest.TestCase):
     def test_actual_adapter_delegates_capture_authority_once_and_use_owned_paths(self):
         from helper_process_evidence import run_evidence,require_success
-        with tempfile.TemporaryDirectory(prefix='cucp autostart authority owned ') as temporary:
-            root=Path(temporary)
-            (root/'.autostart-authority-fixture').write_text('owned-temporary-autostart-authority/v1',encoding='ascii')
-            result=run_evidence(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass',
-                '-File',str(ROOT/'tests/fixtures/legacy-helper-autostart-authority.ps1'),'-SourceRoot',str(ROOT),'-OwnedRoot',str(root)],
-                directory=os.environ.get('CUCP_HELPER_EVIDENCE_DIR',root/'evidence'),label='autostart-authority',timeout=45)
-            require_success(result)
-            reply=json.loads(result['stdout'])
-            self.assertEqual(reply['status'],'ok');self.assertEqual(len(reply['results']),2)
-            self.assertEqual([r['captured'] for r in reply['results']],[False,True])
+        for default in (False,True):
+            with self.subTest(default=default),tempfile.TemporaryDirectory(prefix='cucp autostart authority owned ') as temporary:
+                root=Path(temporary)
+                (root/'.autostart-authority-fixture').write_text('owned-temporary-autostart-authority/v1',encoding='ascii')
+                command=['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass',
+                    '-File',str(ROOT/'tests/fixtures/legacy-helper-autostart-authority.ps1'),'-SourceRoot',str(ROOT),'-OwnedRoot',str(root)]
+                if default: command.append('-DefaultMode')
+                result=run_evidence(command,directory=os.environ.get('CUCP_HELPER_EVIDENCE_DIR',root/'evidence'),
+                    label='autostart-authority-'+str(default),timeout=45)
+                require_success(result)
+                reply=json.loads(result['stdout'])
+                self.assertEqual(reply['status'],'ok');self.assertEqual(len(reply['results']),2)
+                self.assertEqual([r['captured'] for r in reply['results']],[False,True])
 
     def test_actual_bridge_owned_lifecycle_and_missing_package_status_uninstall(self):
         import shutil

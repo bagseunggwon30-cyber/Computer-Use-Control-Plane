@@ -73,17 +73,17 @@ class StagedPackageRuntimeTests(unittest.TestCase):
 
 
 class StagedBoundaryTests(unittest.TestCase):
-    def test_nonpositive_idle_and_invalid_types_rejected_before_any_effect(self):
+    def test_negative_idle_and_invalid_types_rejected_before_any_effect(self):
         from pcucp_cli.legacy_helper_client import LegacyHelperClient, LockState, LockRecord
         client=object.__new__(LegacyHelperClient)
         client.state=Mock(return_value=LockState('valid','',None,LockRecord(1,'cucp-helper-1','2026-01-01T00:00:00Z','2.0.0','owner')))
         launcher=Mock()
-        for value in (-2147483648,-1,0,True,1.5,'10',2147483648,-2147483649):
+        for value in (-2147483648,-1,True,1.5,'10',2147483648,-2147483649):
             with self.subTest(value=value):
                 with self.assertRaises(ValueError): client.start(launcher,idle_timeout_ms=value)
         client.state.assert_not_called()
         launcher.launch.assert_not_called()
-        for value in (1,60000,2147483647): self.assertTrue(client.start(launcher,idle_timeout_ms=value)['reused'])
+        for value in (0,1,60000,2147483647): self.assertTrue(client.start(launcher,idle_timeout_ms=value)['reused'])
         launcher.launch.assert_not_called()
 
     def test_exchange_worker_bounds_and_timeout_never_retry(self):

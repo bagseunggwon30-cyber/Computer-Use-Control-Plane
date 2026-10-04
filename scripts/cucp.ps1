@@ -233,9 +233,9 @@ if (-not $Script:NativeHelperPath) {
 # ============================================================================
 # v1.6.0 — Helper Persistent Server IPC
 # ============================================================================
-# cucp-helper-server.ps1 (named pipe server) 와의 JSON-line IPC 헬퍼.
+# Python/C# read-only helper named-pipe client.
 # wrapper 가 첫 호출 시 lock 파일 (helper.pid) 검사 → server 살아있으면 pipe,
-# 없거나 stale 이면 child PowerShell fallback. 같은 wrapper invocation 안에서
+# 없거나 stale 이면 Python/C# cold path. 같은 wrapper invocation 안에서
 # 여러 매크로가 helper 를 N회 호출할 때 cold-start 비용 (~500ms × N) 회피.
 #
 # 사용 흐름:
@@ -246,10 +246,10 @@ if (-not $Script:NativeHelperPath) {
 # ============================================================================
 
 $Script:HelperLockPath = Join-Path $Script:AuditDir "helper.pid"
-$Script:HelperServerScript = Join-Path $PSScriptRoot "cucp-helper-server.ps1"
+$Script:HelperServerScript = Join-Path $PSScriptRoot "cucp-helper-server.py"
 $Script:_HelperPipeReqId = 0
 . (Join-Path $PSScriptRoot 'cucp-staged-helper-adapter.ps1')
-# server 가 직접 처리 가능한 action 화이트리스트 (cucp-helper-server.ps1 v1.7.0 의 _Dispatch 와 일치)
+# Closed read-only action list supported by the compiled helper.
 $Script:HelperServerSupported = @("windows", "health", "focused", "modal-detect", "ocr-screen-fast", "uia-find-fast")
 
 function _Read-LockSafely {
@@ -311,64 +311,16 @@ function _Get-AutostartShimPath {
 }
 
 function Install-HelperAutostart {
-  # Startup 폴더에 helper-server 를 hidden 으로 기동하는 .cmd shim 생성 (idempotent).
-  param([int]$IdleTimeoutMs = 28800000)  # 기본 8시간
-  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'autostart-install' -Arguments @{idle_timeout_ms=$IdleTimeoutMs}) }
-  if (-not $Script:HelperServerScript -or -not (Test-Path -LiteralPath $Script:HelperServerScript)) {
-    return [pscustomobject]@{ status = "error"; reason = "helper_server_script_missing"; path = $Script:HelperServerScript }
-  }
-  $shimPath = _Get-AutostartShimPath
-  # cmd shim: powershell 을 hidden 으로 띄워 helper-server 를 background 기동.
-  # 경로/인자는 cmd 인용 규칙에 맞춰 "..." 로 감쌈 (공백 포함 경로 안전).
-  # 주의: start 명령과 인자는 반드시 한 줄. 줄바꿈되면 cmd 가 인자를 못 받는다.
-  # 주석은 ASCII 로만 (cmd 기본 코드페이지에서 한글 mojibake 회피).
-  $psArgs = '-NoProfile -NoLogo -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $Script:HelperServerScript + '" -IdleTimeoutMs ' + $IdleTimeoutMs
-  $startLine = 'start "" /min powershell.exe ' + $psArgs
-  $content = "@echo off`r`n" +
-             "rem CUCP helper-server autostart shim (v2.2.0). Remove via: cucp macro session uninstall-autostart`r`n" +
-             $startLine + "`r`n"
-  try {
-    # ASCII 인코딩 + 명시적 CRLF 로 cmd 호환성 보장. WriteAllText 로 한 번에 기록
-    # (Set-Content 배열 처리로 긴 줄이 분할되는 문제 회피).
-    [System.IO.File]::WriteAllText($shimPath, $content, [System.Text.Encoding]::ASCII)
-  } catch {
-    return [pscustomobject]@{ status = "error"; reason = "shim_write_failed"; detail = "$($_.Exception.Message)"; path = $shimPath }
-  }
-  return [pscustomobject]@{
-    status = "ok"
-    action = "install-autostart"
-    shim_path = $shimPath
-    idle_timeout_ms = $IdleTimeoutMs
-    note = "다음 로그인부터 helper-server 가 자동 기동됩니다. 지금 바로 띄우려면 macro session start-helper."
-  }
+  param([int]$IdleTimeoutMs=28800000)
+  return (_Invoke-StagedHelper -Operation 'autostart-install' -Arguments @{idle_timeout_ms=$IdleTimeoutMs})
 }
 
 function Uninstall-HelperAutostart {
-  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'autostart-uninstall') }
-  # Startup shim 제거. shim 없어도 graceful (status ok, removed=false).
-  $shimPath = _Get-AutostartShimPath
-  $removed = $false
-  if (Test-Path -LiteralPath $shimPath) {
-    try { Remove-Item -LiteralPath $shimPath -Force; $removed = $true }
-    catch { return [pscustomobject]@{ status = "error"; reason = "shim_remove_failed"; detail = "$($_.Exception.Message)"; path = $shimPath } }
-  }
-  return [pscustomobject]@{
-    status = "ok"
-    action = "uninstall-autostart"
-    shim_path = $shimPath
-    removed = $removed
-  }
+  return (_Invoke-StagedHelper -Operation 'autostart-uninstall')
 }
 
 function Get-HelperAutostartStatus {
-  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'autostart-status') }
-  # shim 설치 여부 + 경로 반환.
-  $shimPath = _Get-AutostartShimPath
-  return [pscustomobject]@{
-    status = "ok"
-    installed = [bool](Test-Path -LiteralPath $shimPath)
-    shim_path = $shimPath
-  }
+  return (_Invoke-StagedHelper -Operation 'autostart-status')
 }
 
 # ============================================================================
@@ -458,30 +410,8 @@ function _Read-CliVersion {
 }
 
 function _Read-HelperServerVersion {
-  if ($Script:StagedCompiledHelper) { try { return (_Invoke-StagedHelper -Operation 'version') } catch { return @{version=$null; error='helper_compiled_runtime_unavailable'} } }
-  # cucp-helper-server.ps1 헤더 주석 또는 helper_version 라인에서 SemVer 추출.
-  if (-not $Script:HelperServerScript -or -not (Test-Path -LiteralPath $Script:HelperServerScript)) {
-    return @{ version = $null; error = "helper_server_script_missing" }
-  }
-  try {
-    $head = Get-Content -LiteralPath $Script:HelperServerScript -TotalCount 600 -Encoding UTF8 -ErrorAction SilentlyContinue
-    if (-not $head) { return @{ version = $null; error = "helper_server_empty" } }
-    foreach ($line in $head) {
-      # 우선순위 1: helper_version = "X.Y.Z" 라인 (단일 source of truth)
-      if ($line -match 'helper_version\s*=\s*"(\d+\.\d+\.\d+)"') {
-        return @{ version = $Matches[1]; error = $null }
-      }
-    }
-    foreach ($line in $head) {
-      # 우선순위 2: 헤더 주석 "# CUCP Helper Persistent Server (vX.Y.Z)"
-      if ($line -match 'Helper.*\(v(\d+\.\d+\.\d+)\)') {
-        return @{ version = $Matches[1]; error = $null }
-      }
-    }
-    return @{ version = $null; error = "helper_server_version_not_found" }
-  } catch {
-    return @{ version = $null; error = "helper_server_read_failed" }
-  }
+  try { return (_Invoke-StagedHelper -Operation 'version') }
+  catch { return @{version=$null; error='helper_compiled_runtime_unavailable'} }
 }
 
 function Get-CucpVersionReport {
@@ -501,7 +431,7 @@ function Get-CucpVersionReport {
   }
   $hs = _Read-HelperServerVersion
   if ($hs.error) {
-    $helperRecommendation = if ($Script:StagedCompiledHelper) { 'Build and verify pcucp-next/bin/legacy-helper with packaging/publish_legacy_helper.py' } else { 'Verify scripts/cucp-helper-server.ps1 헤더의 helper_version 표기' }
+    $helperRecommendation = 'Build and verify pcucp-next/bin/legacy-helper with packaging/publish_legacy_helper.py'
     [void]$errs.Add((_Make-RecoverableError -Code $hs.error -Layer "helper_server" -RecommendedAction $helperRecommendation))
   }
   $lock = _Read-LockSafely
@@ -523,7 +453,7 @@ function Get-CucpVersionReport {
     sources = @{
       skill = "scripts/cucp.ps1::Script:SkillVersion"
       cli = $cli.package_path
-      helper_server = if ($Script:StagedCompiledHelper) { 'pcucp-next/bin/legacy-helper/manifest.json' } else { $Script:HelperServerScript }
+      helper_server = 'pcucp-next/bin/legacy-helper/manifest.json'
     }
     recoverable_errors = @($errs)
     generated_at = (_Now-Iso)
@@ -4939,155 +4869,40 @@ function Invoke-MacroClickAndVerify {
 # 모든 actuation 매크로는 -AllowLiveControl 게이트 통과해야 함.
 # ============================================================================
 
-function Invoke-MacroNativeHealth {
-  param([string[]]$Rest)
-  $r = Invoke-NativeHelper -ArgList @("-Action","health")
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      $ocrLangs = ""
-      if ($r.Json.ocr_languages) { $ocrLangs = ($r.Json.ocr_languages -join ',') }
-      [Console]::Out.WriteLine("ok native-health win32=$($r.Json.win32) uia=$($r.Json.uia) ocr=$($r.Json.ocr) ocr_languages=$ocrLangs elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      [Console]::Out.WriteLine("err native-health helper_unavailable raw=" + $r.Err)
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
+function _Invoke-LegacyNativeMacro {
+  param([string]$Name,[string[]]$Rest)
+  $values=[string[]]@();if($null -ne $Rest){$values=$Rest.Clone()}
+  $prepared=_Invoke-LegacyCdpBridge -Operation 'native-macro-prepare' -Request @{name=$Name;rest=$values} -LiveAuthority:([bool]$AllowLiveControl)
+  $mayHaveActed=[bool]$prepared.live
+  try {
+    $reply=Invoke-NativeHelper -ArgList ([string[]]$prepared.argv)
+    $result=_Invoke-LegacyCdpBridge -Operation 'native-macro-complete' -Request @{name=$Name;rest=$values;prepared=$prepared.context;brief=[bool]$Brief;
+      reply=@{ExitCode=[int]$reply.ExitCode;Json=$reply.Json;Raw=[string]$reply.Raw;Err=[string]$reply.Err;ElapsedMs=[int]$reply.ElapsedMs}} -LiveAuthority:([bool]$AllowLiveControl)
+    if($null -ne $result.raw){[Console]::Out.Write([string]$result.raw)}
+    elseif($null -ne $result.brief){[Console]::Out.WriteLine([string]$result.brief)}
+    elseif($result.emit_json){[Console]::Out.WriteLine((ConvertTo-Json -InputObject $result.payload -Depth ([int]$result.json_depth)))}
+    return [int]$result.exit
+  } catch {
+    if(-not $mayHaveActed){throw}
+    # Reporting failure after a live dispatch is uncertain; never replay input.
+    [Console]::Out.WriteLine('{"schema":"cucp.native-macro-failure/v1","status":"partial","reason":"native_post_dispatch_reporting_failed","mutation_may_have_occurred":true,"automatic_retry":false}')
+    return 2
   }
-  if ($r.Json -and $r.Json.status -eq "ok") { return 0 }
-  return 1
 }
 
-function Invoke-MacroNativeWindows {
-  param([string[]]$Rest)
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $args = @("-Action","windows")
-  if ($match) { $args += @("-Match", $match) }
-  $r = Invoke-NativeHelper -ArgList $args
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok native-windows count=$($r.Json.count) elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      [Console]::Out.WriteLine("err native-windows helper_failed")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroNativeHealth {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'native-health' -Rest $Rest}
 
-function Invoke-MacroNativeScreenshot {
-  param([string[]]$Rest)
-  # --out-path / --out 둘 다 지원 (PowerShell의 -Out partial match 회피)
-  $out = _Read-OptValue -Rest $Rest -Name "--out-path"
-  if (-not $out) { $out = _Read-OptValue -Rest $Rest -Name "--out" }
-  if (-not $out) {
-    $out = Join-Path $Script:CacheDir ("native-shot-" + (Get-Date).ToString("yyyyMMdd-HHmmss-fff") + ".png")
-  }
-  $args = @("-Action","screenshot","-OutPath",$out)
-  $regionX = _Read-OptValue -Rest $Rest -Name "--x"
-  $regionY = _Read-OptValue -Rest $Rest -Name "--y"
-  $regionW = _Read-OptValue -Rest $Rest -Name "--width"
-  $regionH = _Read-OptValue -Rest $Rest -Name "--height"
-  if ($regionX) { $args += @("-ScreenshotX", $regionX) }
-  if ($regionY) { $args += @("-ScreenshotY", $regionY) }
-  if ($regionW) { $args += @("-ScreenshotW", $regionW) }
-  if ($regionH) { $args += @("-ScreenshotH", $regionH) }
-  $r = Invoke-NativeHelper -ArgList $args
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok native-screenshot path='$($r.Json.out_path)' bytes=$($r.Json.bytes) elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      [Console]::Out.WriteLine("err native-screenshot")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroNativeWindows {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'native-windows' -Rest $Rest}
+
+function Invoke-MacroNativeScreenshot {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'native-screenshot' -Rest $Rest}
 
 function Invoke-MacroClickPoint {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'click-point' -Rest $Rest -ScriptPath $PSCommandPath}
 
-function Invoke-MacroTypeNative {
-  # macro type-native --text <s> [--clear] [--enter]
-  # 유니코드 텍스트 입력 (한글/이모지 OK). -AllowLiveControl 필수.
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro type-native requires -AllowLiveControl" }
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  $clear = _Read-Switch -Rest $Rest -Name "--clear"
-  $enter = _Read-Switch -Rest $Rest -Name "--enter"
-  if (-not $text -and -not $clear -and -not $enter) { throw "macro type-native requires --text or --clear or --enter" }
-  $args = @("-Action","type")
-  if ($text)  { $args += @("-Text", $text) }
-  if ($clear) { $args += "-ClearFirst" }
-  if ($enter) { $args += "-PressEnter" }
-  $r = Invoke-NativeHelper -ArgList $args
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok type-native length=$($text.Length) clear=$clear enter=$enter elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      [Console]::Out.WriteLine("err type-native exit=$($r.ExitCode)")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroTypeNative {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'type-native' -Rest $Rest}
 
-function Invoke-MacroShortcutNative {
-  # macro shortcut-native --keys "ctrl+s"
-  # 단축키 (외부 helper 없이). -AllowLiveControl 필수.
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro shortcut-native requires -AllowLiveControl" }
-  $keys = _Read-OptValue -Rest $Rest -Name "--keys"
-  if (-not $keys) { throw "macro shortcut-native requires --keys" }
-  $r = Invoke-NativeHelper -ArgList @("-Action","shortcut","-Keys",$keys)
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok shortcut-native keys='$keys' elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      [Console]::Out.WriteLine("err shortcut-native exit=$($r.ExitCode)")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroShortcutNative {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'shortcut-native' -Rest $Rest}
 
-function Invoke-MacroUiaClickLabel {
-  # macro uia-click-label --label <text> [--match <window>] [--role <role>] [--button left|right|double]
-  # UIA BoundingRectangle 기반 결정론적 클릭. 외부 helper 의존 없음.
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro uia-click-label requires -AllowLiveControl" }
-  $label = _Read-OptValue -Rest $Rest -Name "--label"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $role  = _Read-OptValue -Rest $Rest -Name "--role"
-  $btn   = _Read-OptValue -Rest $Rest -Name "--button"
-  if (-not $btn) { $btn = "left" }
-  if (-not $label) { throw "macro uia-click-label requires --label" }
-
-  $args = @("-Action","uia-click","-Label",$label,"-Button",$btn)
-  if ($match) { $args += @("-Match", $match) }
-  if ($role)  { $args += @("-Role", $role) }
-  $r = Invoke-NativeHelper -ArgList $args
-  _Trajectory-Append -Kind "click" -Payload @{
-    label = $label
-    source = "native_uia_click_label"
-    button = $btn
-    exit = $r.ExitCode
-  }
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok uia-click-label '$label' @($($r.Json.x),$($r.Json.y)) matched='$($r.Json.matched_text)' elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      $reason = ""
-      if ($r.Json -and $r.Json.reason) { $reason = $r.Json.reason }
-      [Console]::Out.WriteLine("err uia-click-label '$label' exit=$($r.ExitCode) reason=$reason")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroUiaClickLabel {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'uia-click-label' -Rest $Rest}
 
 # ============================================================================
 # UIA Pattern 직접 호출 매크로 — 마우스 안 움직이는 클릭
@@ -5100,89 +4915,11 @@ function Invoke-MacroUiaClickLabel {
 # (좌표 fallback 자동 안 함 — 명시적으로 click-point 사용해야 함).
 # ============================================================================
 
-function Invoke-MacroUiaInvoke {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro uia-invoke requires -AllowLiveControl" }
-  $label = _Read-OptValue -Rest $Rest -Name "--label"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $role  = _Read-OptValue -Rest $Rest -Name "--role"
-  if (-not $label) { throw "macro uia-invoke requires --label" }
+function Invoke-MacroUiaInvoke {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'uia-invoke' -Rest $Rest}
 
-  $args = @("-Action","uia-invoke","-Label",$label)
-  if ($match) { $args += @("-Match", $match) }
-  if ($role)  { $args += @("-Role", $role) }
-  $r = Invoke-NativeHelper -ArgList $args
-  _Trajectory-Append -Kind "click" -Payload @{
-    label = $label
-    source = "native_uia_invoke"
-    method = if ($r.Json) { "$($r.Json.method)" } else { "" }
-    mouse_moved = if ($r.Json) { [bool]$r.Json.mouse_moved } else { $true }
-    exit = $r.ExitCode
-  }
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok uia-invoke '$label' method=$($r.Json.method) mouse_moved=$($r.Json.mouse_moved) elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      $reason = if ($r.Json -and $r.Json.reason) { $r.Json.reason } else { "" }
-      [Console]::Out.WriteLine("partial uia-invoke '$label' reason=$reason exit=$($r.ExitCode)")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroUiaSetValue {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'uia-set-value' -Rest $Rest}
 
-function Invoke-MacroUiaSetValue {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro uia-set-value requires -AllowLiveControl" }
-  $label = _Read-OptValue -Rest $Rest -Name "--label"
-  $value = _Read-OptValue -Rest $Rest -Name "--value"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $role  = _Read-OptValue -Rest $Rest -Name "--role"
-  if (-not $label) { throw "macro uia-set-value requires --label" }
-  if ($null -eq $value) { throw "macro uia-set-value requires --value" }
-
-  $args = @("-Action","uia-set-value","-Label",$label,"-Value",$value)
-  if ($match) { $args += @("-Match", $match) }
-  if ($role)  { $args += @("-Role", $role) }
-  $r = Invoke-NativeHelper -ArgList $args
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok uia-set-value '$label' length=$($r.Json.value_length) keyboard_used=$($r.Json.keyboard_used) elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      $reason = if ($r.Json -and $r.Json.reason) { $r.Json.reason } else { "" }
-      [Console]::Out.WriteLine("partial uia-set-value '$label' reason=$reason exit=$($r.ExitCode)")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $r.ExitCode
-}
-
-function Invoke-MacroUiaToggle {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro uia-toggle requires -AllowLiveControl" }
-  $label = _Read-OptValue -Rest $Rest -Name "--label"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $role  = _Read-OptValue -Rest $Rest -Name "--role"
-  if (-not $label) { throw "macro uia-toggle requires --label" }
-
-  $args = @("-Action","uia-toggle","-Label",$label)
-  if ($match) { $args += @("-Match", $match) }
-  if ($role)  { $args += @("-Role", $role) }
-  $r = Invoke-NativeHelper -ArgList $args
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok uia-toggle '$label' previous=$($r.Json.previous_state) elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      $reason = if ($r.Json -and $r.Json.reason) { $r.Json.reason } else { "" }
-      [Console]::Out.WriteLine("partial uia-toggle '$label' reason=$reason exit=$($r.ExitCode)")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroUiaToggle {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'uia-toggle' -Rest $Rest}
 
 # ============================================================================
 # v1.2.0 — hit-test 가드 + safe-type
@@ -6569,95 +6306,17 @@ function Invoke-MacroWatch {param([string[]]$Rest) return _Invoke-LegacyExecutio
 
 # macro ocr-screen [--region x,y,w,h] [--language ko]
 # 화면 영역 캡처 + OCR. read-only.
-function Invoke-MacroOcrScreen {
-  param([string[]]$Rest)
-  $region = _Read-OptValue -Rest $Rest -Name "--region"
-  $lang = _Read-OptValue -Rest $Rest -Name "--language"
-  $args = @("-Action","ocr-screen")
-  if ($region) {
-    # "x,y,w,h" 형식
-    $parts = $region -split ','
-    if ($parts.Count -eq 4) {
-      $args += @("-ScreenshotX",$parts[0].Trim(),"-ScreenshotY",$parts[1].Trim(),
-                 "-ScreenshotW",$parts[2].Trim(),"-ScreenshotH",$parts[3].Trim())
-    }
-  }
-  if ($lang) { $args += @("-OcrLanguage", $lang) }
-  $r = Invoke-NativeHelper -ArgList $args
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok ocr-screen lines=$($r.Json.line_count) words=$($r.Json.word_count) language=$($r.Json.engine_language) elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      [Console]::Out.WriteLine("err ocr-screen reason=$($r.Json.reason) exit=$($r.ExitCode)")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroOcrScreen {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'ocr-screen' -Rest $Rest}
 
 # macro ocr-image --path <png> [--language ko]
 # 임의 PNG 파일 OCR. read-only. 좌표는 이미지 픽셀 기준.
-function Invoke-MacroOcrImage {
-  param([string[]]$Rest)
-  $path = _Read-OptValue -Rest $Rest -Name "--path"
-  $lang = _Read-OptValue -Rest $Rest -Name "--language"
-  if (-not $path) { throw "macro ocr-image requires --path <png>" }
-  $args = @("-Action","ocr-image","-OcrPath",$path)
-  if ($lang) { $args += @("-OcrLanguage", $lang) }
-  $r = Invoke-NativeHelper -ArgList $args
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok ocr-image path='$path' lines=$($r.Json.line_count) words=$($r.Json.word_count) language=$($r.Json.engine_language) elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      [Console]::Out.WriteLine("err ocr-image path='$path' reason=$($r.Json.reason) exit=$($r.ExitCode)")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroOcrImage {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'ocr-image' -Rest $Rest}
 
 # macro ocr-find-text --text <s> [--match contains|exact|prefix|fuzzy] [--region x,y,w,h]
 #                     [--path <png>] [--target-match <window>] [--language ko] [--max-candidates N]
 # 화면(또는 이미지)에서 텍스트 위치 찾기. read-only.
 # 출력: top 후보의 (cx,cy) 클릭 좌표 + score
-function Invoke-MacroOcrFindText {
-  param([string[]]$Rest)
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $region = _Read-OptValue -Rest $Rest -Name "--region"
-  $path = _Read-OptValue -Rest $Rest -Name "--path"
-  $targetMatch = _Read-OptValue -Rest $Rest -Name "--target-match"
-  $lang = _Read-OptValue -Rest $Rest -Name "--language"
-  $maxN = [int](_Read-OptValue -Rest $Rest -Name "--max-candidates")
-  if (-not $text) { throw "macro ocr-find-text requires --text" }
-  if (-not $match) { $match = "contains" }
-  $args = @("-Action","ocr-find-text","-OcrText",$text,"-OcrMatch",$match)
-  if ($maxN -gt 0) { $args += @("-OcrMaxCandidates","$maxN") }
-  if ($lang) { $args += @("-OcrLanguage", $lang) }
-  if ($path) { $args += @("-OcrPath", $path) }
-  elseif ($targetMatch) { $args += @("-Match", $targetMatch) }
-  if ($region) {
-    $parts = $region -split ','
-    if ($parts.Count -eq 4) {
-      $args += @("-ScreenshotX",$parts[0].Trim(),"-ScreenshotY",$parts[1].Trim(),
-                 "-ScreenshotW",$parts[2].Trim(),"-ScreenshotH",$parts[3].Trim())
-    }
-  }
-  $r = Invoke-NativeHelper -ArgList $args
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      $top = $r.Json.top
-      [Console]::Out.WriteLine("ok ocr-find-text '$text' match='$match' top='$($top.text)' score=$($top.score) cx=$($top.cx) cy=$($top.cy) candidates=$($r.Json.candidate_count) elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      [Console]::Out.WriteLine("partial ocr-find-text '$text' reason=$($r.Json.reason) exit=$($r.ExitCode)")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroOcrFindText {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'ocr-find-text' -Rest $Rest}
 
 # macro ocr-click --text <s> [--match contains|exact|prefix|fuzzy] [--region x,y,w,h]
 #                 [--button left|right|double] [--language ko] [--min-score 70] [--target-match <window>]
@@ -6679,124 +6338,20 @@ function Invoke-MacroOcrClick {param([string[]]$Rest) return _Invoke-LegacyInter
 # macro ocr-uia-fuse --text <s> [--match contains|exact|prefix|fuzzy] [--match-window <s>]
 #                    [--region x,y,w,h] [--language ko]
 # OCR 1순위 좌표 위에 UIA element 가 있으면 invoke 패턴 가능 여부 보고 (read-only).
-function Invoke-MacroOcrUiaFuse {
-  param([string[]]$Rest)
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $matchWindow = _Read-OptValue -Rest $Rest -Name "--match-window"
-  $region = _Read-OptValue -Rest $Rest -Name "--region"
-  $lang = _Read-OptValue -Rest $Rest -Name "--language"
-  if (-not $text) { throw "macro ocr-uia-fuse requires --text" }
-  if (-not $match) { $match = "contains" }
-  $argList = @("-Action","ocr-uia-fuse","-OcrText",$text,"-OcrMatch",$match)
-  if ($matchWindow) { $argList += @("-Match", $matchWindow) }
-  if ($lang) { $argList += @("-OcrLanguage", $lang) }
-  if ($region) {
-    $parts = $region -split ','
-    if ($parts.Count -eq 4) {
-      $argList += @("-ScreenshotX",$parts[0].Trim(),"-ScreenshotY",$parts[1].Trim(),
-                    "-ScreenshotW",$parts[2].Trim(),"-ScreenshotH",$parts[3].Trim())
-    }
-  }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      $rec = $r.Json.recommendation
-      $canI = $r.Json.can_invoke
-      $pat = "n/a"
-      if ($r.Json.invoke_pattern) { $pat = $r.Json.invoke_pattern }
-      $top = $r.Json.ocr_top
-      [Console]::Out.WriteLine("ok ocr-uia-fuse '$text' top='$($top.text)' score=$($top.score) can_invoke=$canI pattern=$pat recommend=$rec elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      [Console]::Out.WriteLine("partial ocr-uia-fuse '$text' reason=$($r.Json.reason) recommend=$($r.Json.recommendation)")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
+function Invoke-MacroOcrUiaFuse {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'ocr-uia-fuse' -Rest $Rest}
 
 # macro ocr-uia-invoke --text <s> [--match contains|exact|prefix|fuzzy] [--match-window <s>]
 #                      [--language ko]
 # OCR 좌표 위 UIA element 를 한 프로세스 안에서 직접 InvokePattern.Invoke().
 # 마우스 안 움직임. UIA Name 비어있어도 AutomationId / ClassName 으로 invoke.
 # -AllowLiveControl 필수 (실제 actuation).
-function Invoke-MacroOcrUiaInvoke {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro ocr-uia-invoke requires -AllowLiveControl" }
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $matchWindow = _Read-OptValue -Rest $Rest -Name "--match-window"
-  $lang = _Read-OptValue -Rest $Rest -Name "--language"
-  if (-not $text) { throw "macro ocr-uia-invoke requires --text" }
-  if (-not $match) { $match = "contains" }
-  $argList = @("-Action","ocr-uia-invoke","-OcrText",$text,"-OcrMatch",$match)
-  if ($matchWindow) { $argList += @("-Match", $matchWindow) }
-  if ($lang) { $argList += @("-OcrLanguage", $lang) }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-  _Trajectory-Append -Kind "click" -Payload @{
-    source = "ocr_uia_invoke"
-    text = $text
-    method = "$($r.Json.method)"
-    uia_name = "$($r.Json.uia_name)"
-    uia_automation_id = "$($r.Json.uia_automation_id)"
-    exit = $exitCode
-  }
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      $idLabel = "n/a"
-      if ($r.Json.uia_name) { $idLabel = "name='$($r.Json.uia_name)'" }
-      elseif ($r.Json.uia_automation_id) { $idLabel = "id='$($r.Json.uia_automation_id)'" }
-      elseif ($r.Json.uia_class_name) { $idLabel = "class='$($r.Json.uia_class_name)'" }
-      [Console]::Out.WriteLine("ok ocr-uia-invoke '$text' method=$($r.Json.method) $idLabel score=$($r.Json.ocr_score) mouse_moved=False elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      [Console]::Out.WriteLine("partial ocr-uia-invoke '$text' reason=$($r.Json.reason) exit=$exitCode")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
+function Invoke-MacroOcrUiaInvoke {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'ocr-uia-invoke' -Rest $Rest}
 
 # macro screenshot-diff --before <png> --after <png> [--threshold N]
 #                       [--region x,y,w,h] [--ignore-region "x,y,w,h;x2,y2,w2,h2"]
 # 두 PNG 의 픽셀 변화 비율 측정. read-only.
 # v1.0.0: --ignore-region 으로 동영상/애니메이션 영역 마스킹 (false positive 방지)
-function Invoke-MacroScreenshotDiff {
-  param([string[]]$Rest)
-  $before = _Read-OptValue -Rest $Rest -Name "--before"
-  $after  = _Read-OptValue -Rest $Rest -Name "--after"
-  $thr    = [int](_Read-OptValue -Rest $Rest -Name "--threshold")
-  $region = _Read-OptValue -Rest $Rest -Name "--region"
-  $ignore = _Read-OptValue -Rest $Rest -Name "--ignore-region"
-  if (-not $before -or -not $after) { throw "macro screenshot-diff requires --before and --after" }
-  $argList = @("-Action","screenshot-diff","-DiffBefore",$before,"-DiffAfter",$after)
-  if ($thr -gt 0) { $argList += @("-DiffThreshold","$thr") }
-  if ($ignore) { $argList += @("-DiffIgnoreRegions", $ignore) }
-  if ($region) {
-    $parts = $region -split ','
-    if ($parts.Count -eq 4) {
-      $argList += @("-ScreenshotX",$parts[0].Trim(),"-ScreenshotY",$parts[1].Trim(),
-                    "-ScreenshotW",$parts[2].Trim(),"-ScreenshotH",$parts[3].Trim())
-    }
-  }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      $ignoredHint = ""
-      if ($r.Json.ignored_pixels -gt 0) { $ignoredHint = " ignored=$($r.Json.ignored_pixels)" }
-      [Console]::Out.WriteLine("ok screenshot-diff changed=$($r.Json.changed) ratio=$($r.Json.changed_ratio) pixels=$($r.Json.changed_pixels)/$($r.Json.effective_pixels)$ignoredHint elapsed_ms=$($r.ElapsedMs)")
-    } else {
-      [Console]::Out.WriteLine("err screenshot-diff reason=$($r.Json.reason) exit=$exitCode")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
+function Invoke-MacroScreenshotDiff {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'screenshot-diff' -Rest $Rest}
 
 # macro click-and-verify-screen --x <n> --y <n> [--button left|right|double]
 #                               [--region x,y,w,h] [--threshold N] [--wait-ms N]
@@ -7455,50 +7010,7 @@ $Script:CucpV14Schema = @{
 # 출력: cucp.ime-paste/v1
 # 보안: clipboard 백업/복구, hit-test 가드, 마우스 안 움직임
 # ----------------------------------------------------------------------------
-function Invoke-MacroImePaste {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro ime-paste requires -AllowLiveControl" }
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  if (-not $text) { throw "macro ime-paste requires --text" }
-  $tm = _Read-OptValue -Rest $Rest -Name "--target-match"
-  $thStr = _Read-OptValue -Rest $Rest -Name "--target-hwnd"
-  $th = 0
-  if ($thStr) { try { $th = [int]$thStr } catch { $th = 0 } }
-  $pressEnter = _Read-Switch -Rest $Rest -Name "--press-enter"
-  $argList = @("-Action","ime-paste","-Text",$text)
-  if ($pressEnter) { $argList += "-PressEnter" }
-  if ($tm) { $argList += @("-TargetMatch", $tm) }
-  if ($th -gt 0) { $argList += @("-TargetHwnd", "$th") }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $out = [ordered]@{ schema = $Script:CucpV14Schema.ImePaste }
-  if ($r.Json) {
-    foreach ($prop in $r.Json.PSObject.Properties) { $out[$prop.Name] = $prop.Value }
-  } else {
-    $out["status"] = "error"
-    $out["reason"] = "helper_failed"
-  }
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok ime-paste len=$($r.Json.text_len) restored=$($r.Json.restored_clipboard)")
-    } elseif ($r.Json -and $r.Json.status -eq "blocked") {
-      [Console]::Out.WriteLine("blocked ime-paste reason=$($r.Json.reason)")
-    } else {
-      $reason = "helper_failed"
-      if ($r.Json -and $r.Json.reason) { $reason = $r.Json.reason }
-      [Console]::Out.WriteLine("partial ime-paste reason=$reason")
-    }
-  } else {
-    [Console]::Out.WriteLine(($out | ConvertTo-Json -Depth 10))
-  }
-  if ($r.Json) {
-    switch ($r.Json.status) {
-      "ok"      { return 0 }
-      "blocked" { return 3 }
-      default   { return 2 }
-    }
-  }
-  return 1
-}
+function Invoke-MacroImePaste {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'ime-paste' -Rest $Rest}
 
 # ----------------------------------------------------------------------------
 # 3. safe-type-ime ─ focus + ime-paste + 선택적 verify (live)
@@ -7587,33 +7099,7 @@ function Invoke-MacroSafeTypeIme {
 # 입력: [--match <s>] [--target-hwnd <n>]
 # 출력: cucp.modal-detect/v1 (native helper output + schema)
 # ----------------------------------------------------------------------------
-function Invoke-MacroModalDetect {
-  param([string[]]$Rest)
-  $tm = _Read-OptValue -Rest $Rest -Name "--match"
-  $thStr = _Read-OptValue -Rest $Rest -Name "--target-hwnd"
-  $th = 0
-  if ($thStr) { try { $th = [int]$thStr } catch { $th = 0 } }
-  $argList = @("-Action","modal-detect")
-  if ($tm) { $argList += @("-Match", $tm) }
-  if ($th -gt 0) { $argList += @("-TargetHwnd", "$th") }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $out = [ordered]@{ schema = $Script:CucpV14Schema.ModalDetect }
-  if ($r.Json) {
-    foreach ($prop in $r.Json.PSObject.Properties) { $out[$prop.Name] = $prop.Value }
-  } else {
-    $out["status"] = "error"
-    $out["reason"] = "helper_failed"
-  }
-  if ($Brief) {
-    $cc = 0; $rec = "observe"
-    if ($r.Json -and $r.Json.candidate_count)    { $cc  = [int]$r.Json.candidate_count }
-    if ($r.Json -and $r.Json.recommended_action) { $rec = "$($r.Json.recommended_action)" }
-    [Console]::Out.WriteLine("ok modal-detect candidates=$cc recommended=$rec")
-  } else {
-    [Console]::Out.WriteLine(($out | ConvertTo-Json -Depth 10))
-  }
-  return 0
-}
+function Invoke-MacroModalDetect {param([string[]]$Rest) return _Invoke-LegacyNativeMacro -Name 'modal-detect' -Rest $Rest}
 
 # ----------------------------------------------------------------------------
 # 5. recovery-plan ─ 실패 후 재관찰 + retry 추천 (read-only)
