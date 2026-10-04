@@ -123,6 +123,9 @@ class NodeRuntime:
                 time.sleep(.005)
             try:process.wait(timeout=1)
             except subprocess.TimeoutExpired:raise OSError('Owned Node worker did not stop; no retry.')
+            # close() may stop the worker between poll() calls. A killed process
+            # is not an ordinary completion of the cancelled invocation.
+            if self.cancelled.is_set():raise OSError('Node owner cancelled; no retry.')
             return process.returncode,timed_out
         finally:
             if process.poll() is None:native_host._terminate_process_tree(process)
