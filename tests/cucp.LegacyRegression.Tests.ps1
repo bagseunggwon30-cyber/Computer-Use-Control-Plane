@@ -12,6 +12,8 @@ $wrapperAst = [System.Management.Automation.Language.Parser]::ParseFile($wrapper
 if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
 $helperAst = [System.Management.Automation.Language.Parser]::ParseFile($helperPath, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+$historicalWrapperAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $historicalDirectory 'cucp.ps1'), [ref]$tokens, [ref]$parseErrors)
+if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
 $cdpPath = Join-Path $repoRoot "scripts/cucp-legacy-cdp-adapter.ps1"
 $cdpAst = [System.Management.Automation.Language.Parser]::ParseFile($cdpPath, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
@@ -445,16 +447,39 @@ Describe "legacy lifecycle boundary regressions" {
     foreach ($name in @("Stop-HelperServer", "Invoke-MacroAppClose", "_Quote-NativeWindowsArgument")) {
       . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $wrapperAst -Name $name)))
     }
+    # Retain the old stale-lock invariant as a pinned oracle; the current
+    # wrapper delegates to Python, whose stale/force cases have their own gate.
+    $historicalStop = Get-LegacyFunctionText -Ast $historicalWrapperAst -Name 'Stop-HelperServer'
+    . ([scriptblock]::Create(($historicalStop -replace '^function Stop-HelperServer', 'function Stop-HistoricalHelperServer')))
+    function _Invoke-StagedHelper { param($Operation, $Arguments) throw 'Must be mocked' }
     function _Read-LockSafely { return @{ pid=123; owner_user='test' } }
     function _Is-StaleLock { param($Lock) return $true }
     function _Try-Delete-Lock { }
     function Invoke-HelperPipe { param($Action, $ArgsHash, $TimeoutMs) throw 'Must be mocked' }
   }
-  It "never kills a stale helper PID even with force" {
+  It "historically never kills a stale helper PID even with force" {
     Mock Stop-Process { throw 'Unrelated PID must not be killed' }
     Mock Invoke-HelperPipe { throw 'Stale pipe must not be contacted' }
-    $result = Stop-HelperServer -Force
+    $result = Stop-HistoricalHelperServer -Force
     $result.reason | Should -Be 'stale_lock_removed'
+    Should -Invoke Stop-Process -Times 0
+    Should -Invoke Invoke-HelperPipe -Times 0
+  }
+  It "delegates forced shutdown to Python without local PID or pipe operations" {
+    Mock Stop-Process { throw 'Unrelated PID must not be killed' }
+    Mock Invoke-HelperPipe { throw 'The wrapper must not contact the pipe' }
+    Mock _Invoke-StagedHelper { return @{status='ok'; reason='shutdown_requested'; forced=$false} }
+    foreach ($force in @($false, $true)) {
+      $result = Stop-HelperServer -Force:$force
+      $result.reason | Should -Be 'shutdown_requested'
+      $result.forced | Should -BeFalse
+    }
+    Should -Invoke _Invoke-StagedHelper -Times 1 -Exactly -ParameterFilter {
+      $Operation -ceq 'stop' -and $Arguments.force -eq $false
+    }
+    Should -Invoke _Invoke-StagedHelper -Times 1 -Exactly -ParameterFilter {
+      $Operation -ceq 'stop' -and $Arguments.force -eq $true
+    }
     Should -Invoke Stop-Process -Times 0
     Should -Invoke Invoke-HelperPipe -Times 0
   }
