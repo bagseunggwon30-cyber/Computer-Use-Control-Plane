@@ -1656,8 +1656,8 @@
     },
     {
       "path": "pcucp-next/python/pcucp_cli/legacy_node_runtime.py",
-      "sha256": "460ecef3c8b56ac81acb882b196103ca7484d7589c1cf94c85255d6cb976be43",
-      "lines": 130
+      "sha256": "da0366855923f79e5d5fd7404c5b4fcab21dea4e6fb5e8904724d3b5b2db350e",
+      "lines": 133
     },
     {
       "path": "pcucp-next/python/legacy_node_capture.py",

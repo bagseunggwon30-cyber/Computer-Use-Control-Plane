@@ -62,6 +62,15 @@ else{process.stdout.write(JSON.stringify({status:'ok',args}));}
         try:
             with self.assertRaises(LegacyHostError):runtime.invoke([])
         finally:runtime._serial.release()
+    def test_cancellation_is_terminal_when_worker_already_exited_between_polls(self):
+        class ExitedWorker:
+            returncode=-15
+            def poll(self):return self.returncode
+            def wait(self,timeout):return self.returncode
+        runtime=self.runtime();runtime.close()
+        with self.assertRaisesRegex(OSError,'cancelled'):
+            runtime._wait(ExitedWorker(),time.monotonic()+1)
+        self.assertIsNone(runtime._process)
     def test_fixed_entry_carries_text_as_base64_and_rejects_path_selection(self):
         entry=Path(__file__).resolve().parents[2]/'pcucp-next/python/legacy_node_capture.py'
         command=[sys.executable,str(entry),'--cli-path',str(self.cli),'--cache-directory',str(self.root/'cache'),
