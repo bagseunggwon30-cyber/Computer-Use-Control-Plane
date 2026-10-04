@@ -94,6 +94,10 @@ class CoordinateParityTests(unittest.TestCase):
                 f=fixture();f.update(operation='macro', name='hit-test-batch', rest=rest, brief=brief);cases.append(f)
         for has_point in (False, True):
             f=fixture();f['loaded']=False;f.update(operation='profile', args=dict(has_point=has_point,x=1,y=1,target_hwnd=0,target_match=''));cases.append(f)
+        f=fixture();f['windows']=[]
+        f.update(operation='profile',args=dict(has_point=True,x=1,y=1,target_hwnd=0,target_match=''));cases.append(f)
+        f=fixture();f['windows']=[]
+        f.update(operation='macro',name='coord-map',rest=['--x','1','--y','1'],brief=False);cases.append(f)
         with tempfile.TemporaryDirectory(prefix='CUCP coordinate oracle ') as directory:
             owned=Path(directory);source=owned/'original.ps1';source.write_bytes(subprocess.check_output(['git','show',BASE+':scripts/cucp.ps1'],cwd=ROOT))
             inputs=owned/'input.json';inputs.write_text(json.dumps(cases,ensure_ascii=True),encoding='utf-8-sig')
@@ -155,6 +159,17 @@ foreach($case in (Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|Conver
                                     import re
                                     self.assertEqual(re.sub(r'elapsed_ms=\d+','elapsed_ms=N',after['brief']),re.sub(r'elapsed_ms=\d+','elapsed_ms=N',before['output'].strip()))
                     finally:runtime.close()
+
+    def test_staged_planner_preserves_partial_mapping_for_unenumerated_hit_root(self):
+        f=fixture()
+        def read(operation, argv):
+            if operation == 'coordinate-snapshot':return f['layout']
+            if operation == 'windows':return []
+            if operation == 'hit-test-point':return f['hit']
+            self.fail(operation)
+        result=Coordinates(read).map(x=1,y=1,target_match='absent',synthetic_fallback=False)
+        self.assertEqual(result['status'],'partial')
+        self.assertEqual(result['reason'],'target_window_not_found')
 
     def test_actual_production_wrapper_reads_and_batch_reuse_without_input(self):
         if not shutil.which('powershell.exe'):self.skipTest('Windows shell is unavailable.')

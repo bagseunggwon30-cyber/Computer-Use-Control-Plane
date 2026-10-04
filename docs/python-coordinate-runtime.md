@@ -23,7 +23,7 @@ single-attempt and bounded by one invocation deadline; a failed worker is not
 restarted. Large target handles retain Int64, while the legacy point-hit Int32
 conversion failure remains optional inside profile acquisition.
 
-`test_coordinate_production.py` compares 84 captured scenarios per actual
+`test_coordinate_production.py` compares 86 captured scenarios per actual
 Windows shell against immutable main commit
 `b1a5641f129c039afdc8cbe969c3d365e5539740`. They cover point edges, negative
 origins, multi-monitor/mixed DPI risk, missing/oversized handles, equal-rank
@@ -31,6 +31,11 @@ windows, option aliases, invalid numbers, Unicode digits, point-spec errors,
 brief/JSON output, and unavailable Win32. Elapsed time is the only excluded
 runtime field. Actual wrapper/owner reads and 50-point single-worker reuse are
 separate checks; they do not prove real multi-monitor hardware or user input.
+
+The staged precision planner retains its existing requirement for an enumerated
+window rectangle. An unenumerated hit-test root yields its partial mapping
+result; production coordinate macros retain the historical synthetic-window
+fallback and error behavior. Both paths have independent regression cases.
 
 The previous PS/C# math facade remains a hash-addressed Git oracle only in
 `test_legacy_coordinate_parity.py`; the production runtime has no historical

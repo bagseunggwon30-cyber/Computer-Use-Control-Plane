@@ -79,7 +79,7 @@
         "scope": "Owned reads, append/rotation, statistics, lookback/frequency planning, show selection and clear are Python. Current PowerShell JSON/scalar facts, final linguistic tie comparisons and Console formatting remain in thin compatibility glue. Both PS5.1 and PS7 observed; no qualification-only C# reducer promoted."
       },
       "python_coordinates": {
-        "base_commit": "b1a5641f129c039afdc8cbe969c3d365e5539740",
+        "base_commit": "0936803c15cc94072d4de303cb1be4b6dbbf57dd",
         "replacement": "pcucp-next/python/pcucp_cli/legacy_coordinate_runtime.py",
         "scope": "Three read-only macros and Win32 coordinate builders now run through Python/C#. PS5 NLS/unstable ties and PS7 ICU/stable ties are startup dialects. Physical coordinate reads use one readonly worker per invocation; batch reuses the worker. Historical PS/C# math facade remains an immutable oracle, never a fallback."
       }
@@ -1597,8 +1597,8 @@
     },
     {
       "path": "pcucp-next/python/pcucp_cli/legacy_coordinates.py",
-      "sha256": "ed5e70d252985e1897c13725b5ffc84795584a5650ad86e28737d6b19d076a3a",
-      "lines": 131
+      "sha256": "e5b89b7673cfb6b855e81949aed1603138066838b9ca11c2801d89df4091701b",
+      "lines": 134
     },
     {
       "path": "pcucp-next/python/pcucp_cli/legacy_coordinate_runtime.py",

@@ -32,10 +32,13 @@ class Coordinates:
         require(result.get('schema') == 'cucp.coord-window/v1', 'Invalid coordinate window selection.')
         return result['window']
 
-    def _precheck_window(self, hit):
+    def _precheck_window(self, hit, *, synthetic=True):
         if not hit or hit['root_hwnd'] <= 0:
             return None
-        return next((row for row in self.read('windows', []) if row['hwnd'] == hit['root_hwnd']), None) or dict(
+        window = next((row for row in self.read('windows', []) if row['hwnd'] == hit['root_hwnd']), None)
+        if window or not synthetic:
+            return window
+        return dict(
             hwnd=hit['root_hwnd'], title=hit['root_title'], process=hit['process_name'], pid=hit['process_id'],
             **{'class': hit['root_class']}, visible=True, minimized=False, foreground=False, rect=None)
 
@@ -104,7 +107,7 @@ class Coordinates:
             'Use point-plan for micro-refined click planning; if coordinate_risk is high, re-ground with app-profile or smart-plan before live control.' if has_point else
             'Use this profile to understand DPI/monitor layout before planning coordinate clicks.')
 
-    def map(self, *, source='screen', x=0, y=0, norm_x=0, norm_y=0, has_norm=False, target_hwnd=0, target_match=''):
+    def map(self, *, source='screen', x=0, y=0, norm_x=0, norm_y=0, has_norm=False, target_hwnd=0, target_match='', synthetic_fallback=True):
         started = time.monotonic()
         snapshot = self.read('coordinate-snapshot', [])
         window = next((row for row in self.read('windows', []) if row['hwnd'] == target_hwnd), None) if target_hwnd > 0 else None
@@ -113,7 +116,7 @@ class Coordinates:
         if not window and source.lower() == 'screen':
             try:
                 hit = self.hit(int32(round(x)), int32(round(y)))
-                window = self._precheck_window(hit)
+                window = self._precheck_window(hit, synthetic=synthetic_fallback)
             except (OSError, ValueError, RuntimeError):
                 self.remaining()
         virtual = {key: item for key, item in snapshot['virtual_screen'].items() if key != 'same_display_format'}
