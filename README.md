@@ -86,7 +86,19 @@ SYSTEM/PPL·UAC 보안 데스크톱·로그인 화면 제어는 지원하지 않
 `scripts/`, Codex 플러그인/스킬 및 앱별 매크로는 **레거시 호환 소스**입니다. 설치는 `python install.py`를 사용합니다. 기본 설치 대상은 기존 매크로를 제공하는 레거시 백엔드이며, 아직 PowerShell 래퍼가 필요합니다.
 새 배포본에 포함하지 않으며, MCP/JSONL 코어와 Pi 어댑터는 이를 자동으로 호출하지 않습니다.
 기존 설치기는 레거시를 설치합니다. 새 MCP 변경은 위 소스 안내를, 기존 배포 버전은 0.4.0 포터블 안내를 사용하세요.
-소스 개발자가 필요할 때만 `python -m pcucp_cli legacy -- ...`로 명시적으로 호출할 수 있습니다. 레거시 Win32 경로는 `python pcucp-next/packaging/publish_legacy_interop.py`로 사전 빌드한 호환 DLL도 필요합니다. 레거시 OCR·이미지 비교 경로에는 같은 커밋에서 `python pcucp-next/packaging/publish_legacy_images.py`로 빌드한 `PcuCp.LegacyImages.dll`이 필요합니다. 실행 중 C# 코드를 컴파일하거나 누락 DLL을 내려받는 대체 경로는 없습니다.
+소스 개발자가 필요할 때만 `python -m pcucp_cli legacy -- ...`로 명시적으로 호출할 수 있습니다. 기존 래퍼의 네이티브 호출과 보조 서버도 이제 Python/C#을 사용하므로, 새 소스 체크아웃에서는 Python 3.10+와 .NET 8 SDK를 준비하고 **같은 커밋에서 아래 구성 요소를 사전 빌드**한 뒤 설치하세요. Framework 구성 요소의 실행에는 Windows의 .NET Framework 4.8이 필요합니다.
+
+```text
+python pcucp-next/packaging/publish_native.py
+python pcucp-next/packaging/publish_legacy_interop.py
+python pcucp-next/packaging/publish_legacy_images.py
+python pcucp-next/packaging/publish_legacy_desktop.py
+python pcucp-next/packaging/publish_legacy_syntax.py
+python pcucp-next/packaging/publish_legacy_helper.py
+python install.py
+```
+
+이 단계는 Win32 호환 DLL, OCR·이미지 DLL, 네이티브 실행 파일, 읽기 전용 문법 파서와 보조 서버 패키지를 고정된 소스 경로에 게시합니다. 기존 Node CLI가 필요한 명령은 계속 `CUCP_CLI_PATH`로 원본 `cli.mjs`를 지정해야 합니다. 설치기는 이 구성 요소를 자동으로 빌드하지 않으며, 실행 중 C# 코드를 컴파일하거나 누락 DLL을 내려받는 대체 경로도 없습니다.
 
 GitHub 언어 비율에는 보존 중인 레거시 코드가 계속 포함됩니다. 언어 비율을 바꾸려고
 통계에서 숨기거나 미이전 기능을 삭제하지 않았습니다. 전체 레거시 기능 포팅은 완료되지 않았습니다.
