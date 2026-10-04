@@ -1027,136 +1027,59 @@ if (-not $Script:CliPath -or -not (Test-Path -LiteralPath $Script:CliPath)) {
 
 # ----- core invocation ------------------------------------------------------
 function Invoke-Cucp {
-  param([string[]]$ArgList, [switch]$CaptureJson)
-
-  $invokeId = [guid]::NewGuid().ToString("N").Substring(0, 12)
-  $invokeSw = [System.Diagnostics.Stopwatch]::StartNew()
-  Write-WrapperLog -Message "INVOKE [$invokeId] $($ArgList -join ' ')"
-
-  # CLI 경로 검증: 비어있으면 즉시 envelope 에러 반환 (외부 helper 의존 없는
-  # native 매크로는 이 경로를 우회함). cli.mjs 가 잘못 잡힌 경우(예: CUCP Lite)
-  # 호출 자체가 부적절한 메시지를 내는 것을 방지.
-  if (-not $Script:CliPath -or -not (Test-Path -LiteralPath $Script:CliPath)) {
-    Write-WrapperLog -Message "INVOKE [$invokeId] aborted: cli.mjs not found"
-    return [pscustomobject]@{
-      ExitCode = 1
-      Json = [pscustomobject]@{
-        status = "error"
-        error_type = "cli_missing"
-        summary = "CUCP control-plane CLI (cli.mjs) was not found"
-        recommended_action = "Set CUCP_CLI_PATH env var to the desktop control cli.mjs, or use 'macro native-*' commands which require no external CLI."
-      }
-      Raw = ""
-      Err = "cli.mjs not found"
-      FilePath = $null
-      CommandId = $invokeId
-      ElapsedMs = 0
+  param([string[]]$ArgList,[switch]$CaptureJson)
+  if(-not $CaptureJson){
+    $invokeId=[guid]::NewGuid().ToString('N').Substring(0,12)
+    $watch=[Diagnostics.Stopwatch]::StartNew()
+    Write-WrapperLog -Message "INVOKE [$invokeId] $($ArgList -join ' ')"
+    if(-not $Script:CliPath -or -not (Test-Path -LiteralPath $Script:CliPath)){
+      Write-WrapperLog -Message "INVOKE [$invokeId] aborted: cli.mjs not found"
+      return [pscustomobject]@{ExitCode=1;Json=[pscustomobject]@{status='error';error_type='cli_missing';
+        summary='CUCP control-plane CLI (cli.mjs) was not found';
+        recommended_action="Set CUCP_CLI_PATH env var to the desktop control cli.mjs, or use 'macro native-*' commands which require no external CLI."};
+        Raw='';Err='cli.mjs not found';FilePath=$null;CommandId=$invokeId;ElapsedMs=0}
     }
-  }
-
-  if ($CaptureJson) {
-    $stdoutFile = Join-Path $Script:CacheDir ("invoke-" + [guid]::NewGuid().ToString("N") + ".json")
-    try {
-      # Use System.Diagnostics.Process for reliable arg passing + UTF-8 stdout
-      $psi = New-Object System.Diagnostics.ProcessStartInfo
-      $psi.FileName = "node"
-      $psi.RedirectStandardOutput = $true
-      $psi.RedirectStandardError = $true
-      $psi.UseShellExecute = $false
-      $psi.CreateNoWindow = $true
-      $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
-      $psi.StandardErrorEncoding = [System.Text.Encoding]::UTF8
-      $psi.Arguments = ""
-      $allArgs = @($Script:CliPath) + $ArgList
-      foreach ($a in $allArgs) {
-        if ($a -match '[\s"]') {
-          $escaped = $a -replace '"', '\"'
-          $psi.Arguments += '"' + $escaped + '" '
-        } else {
-          $psi.Arguments += $a + ' '
-        }
-      }
-      $stderrFile = Join-Path $Script:CacheDir ("invoke-" + [guid]::NewGuid().ToString("N") + ".stderr.txt")
-      $proc = Start-Process -FilePath "node" `
-        -ArgumentList $psi.Arguments `
-        -RedirectStandardOutput $stdoutFile `
-        -RedirectStandardError $stderrFile `
-        -WindowStyle Hidden `
-        -PassThru
-      $exited = $proc.WaitForExit($Script:InvokeTimeoutMs)
-      if (-not $exited) {
-        try { $proc.Kill() } catch { }
-        try { [void]$proc.WaitForExit(5000) } catch { }
-        $invokeSw.Stop()
-        $elapsed = [int]$invokeSw.Elapsed.TotalMilliseconds
-        Write-WrapperLog -Message "TIMEOUT [$invokeId] $($ArgList -join ' ') after ${Script:InvokeTimeoutMs}ms (elapsed=${elapsed}ms)"
-        $envelope = [pscustomobject]@{
-          status = "error"
-          error_type = "invoke_timeout"
-          command_id = $invokeId
-          elapsed_ms = $elapsed
-          timeout_ms = $Script:InvokeTimeoutMs
-          summary = "CUCP command timed out after ${Script:InvokeTimeoutMs}ms"
-          recommended_action = "Increase -InvokeTimeoutMs or run 'cucp macro ensure-helper'. Failing command: $($ArgList -join ' ')"
-        }
-        return [pscustomobject]@{
-          ExitCode = 124
-          Json = $envelope
-          Raw = if (Test-Path -LiteralPath $stdoutFile) { [System.IO.File]::ReadAllText($stdoutFile, [System.Text.Encoding]::UTF8) } else { "" }
-          Err = "CUCP command timed out after ${Script:InvokeTimeoutMs}ms (id=$invokeId, elapsed=${elapsed}ms)"
-          FilePath = $stdoutFile
-          CommandId = $invokeId
-          ElapsedMs = $elapsed
-        }
-      }
-      # 이미 WaitForExit($InvokeTimeoutMs) 로 정상 종료를 확인한 경로다. 여기서의
-      # 두 번째 대기는 redirect 된 stdout/stderr 의 flush 완료 보장이 목적이며,
-      # 무바운드 WaitForExit() 는 이론상 핸들 잔류 시 행(hang) 위험이 있으므로
-      # 짧은 바운드(5s)를 준다. 초과해도 이미 exit 한 상태라 결과 읽기에 지장 없음.
-      try { [void]$proc.WaitForExit(5000) } catch { }
-      $invokeSw.Stop()
-      $elapsed = [int]$invokeSw.Elapsed.TotalMilliseconds
-      $raw = if (Test-Path -LiteralPath $stdoutFile) { [System.IO.File]::ReadAllText($stdoutFile, [System.Text.Encoding]::UTF8) } else { "" }
-      $err = if (Test-Path -LiteralPath $stderrFile) { [System.IO.File]::ReadAllText($stderrFile, [System.Text.Encoding]::UTF8) } else { "" }
-      try { $proc.Refresh() } catch { }
-      $code = $proc.ExitCode
-      if ($null -eq $code -and $raw -and $raw.Trim().Length -gt 0) { $code = 0 }
-      $json = $null
-      if ($raw -and $raw.Trim().Length -gt 0) {
-        try { $json = $raw | ConvertFrom-Json -ErrorAction Stop } catch { $json = $null }
-      }
-      return [pscustomobject]@{
-        ExitCode = $code
-        Json = $json
-        Raw = $raw
-        Err = $err
-        FilePath = $stdoutFile
-        CommandId = $invokeId
-        ElapsedMs = $elapsed
-      }
-    } catch {
-      $invokeSw.Stop()
-      return [pscustomobject]@{
-        ExitCode = 1
-        Json = $null
-        Raw = $_.Exception.Message
-        Err = ""
-        FilePath = $null
-        CommandId = $invokeId
-        ElapsedMs = [int]$invokeSw.Elapsed.TotalMilliseconds
-      }
-    }
-  } else {
     & node $Script:CliPath @ArgList
-    $invokeSw.Stop()
-    return [pscustomobject]@{
-      ExitCode = $LASTEXITCODE
-      Json = $null
-      Raw = ""
-      FilePath = $null
-      CommandId = $invokeId
-      ElapsedMs = [int]$invokeSw.Elapsed.TotalMilliseconds
-    }
+    $watch.Stop()
+    return [pscustomobject]@{ExitCode=$LASTEXITCODE;Json=$null;Raw='';FilePath=$null;CommandId=$invokeId;ElapsedMs=[int]$watch.Elapsed.TotalMilliseconds}
+  }
+  $python=@(Get-Command python.exe -CommandType Application -TotalCount 1 -ErrorAction Stop)
+  if($python.Count -ne 1){throw 'Node capture requires one Python application.'}
+  $bridge=[IO.Path]::GetFullPath((Join-Path $Script:LegacyCdpSourceRoot 'pcucp-next\python\legacy_node_capture.py'))
+  $startup=@($bridge,[string]$Script:CacheDir,[string]$Script:WrapperLog)
+  if($Script:CliPath){$startup+=([string]$Script:CliPath)}
+  foreach($path in $startup){if(-not [IO.Path]::IsPathRooted($path) -or $path.Contains('"') -or $path.Contains("`r") -or $path.Contains("`n") -or $path.EndsWith([char]92)){throw 'Invalid Node capture startup path.'}}
+  $psi=New-Object Diagnostics.ProcessStartInfo
+  $psi.FileName=$python[0].Source;$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true
+  $psi.RedirectStandardInput=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true
+  $utf8=New-Object Text.UTF8Encoding($false)
+  $psi.StandardOutputEncoding=$utf8;$psi.StandardErrorEncoding=$utf8
+  $psi.Arguments='-E -s "'+$bridge+'" --cache-directory "'+$Script:CacheDir+'" --wrapper-log "'+$Script:WrapperLog+'" --timeout-ms '+[string]$Script:InvokeTimeoutMs
+  if($Script:CliPath){$psi.Arguments+=' --cli-path "'+$Script:CliPath+'"'}
+  $values=[string[]]@();if($null -ne $ArgList){$values=$ArgList.Clone()}
+  $wire=@{argv=$values}|ConvertTo-Json -Depth 4 -Compress
+  $process=New-Object Diagnostics.Process;$process.StartInfo=$psi;$started=$false
+  try{
+    $started=$process.Start();if(-not $started){throw 'Node capture Python failed to start.'}
+    $stdout=$process.StandardOutput.ReadToEndAsync();$stderr=$process.StandardError.ReadToEndAsync()
+    $bytes=$utf8.GetBytes($wire);$process.StandardInput.BaseStream.Write($bytes,0,$bytes.Length);$process.StandardInput.Close()
+    $budget=if($Script:InvokeTimeoutMs -eq -1){-1}else{[int][Math]::Min([int]::MaxValue,[long]$Script:InvokeTimeoutMs+5000)}
+    if(-not $process.WaitForExit($budget)){throw 'Node capture bridge timed out; no replay.'}
+    if(-not $stdout.Wait(1000) -or -not $stderr.Wait(1000)){throw 'Node capture reply incomplete.'}
+    if($process.ExitCode -ne 0){throw [string]$stderr.Result}
+    $reply=$stdout.Result|ConvertFrom-Json -ErrorAction Stop
+    if($reply.schema -cne 'cucp.node-capture/v1'){throw 'Invalid Node capture reply.'}
+    $result=$reply.data
+    $raw=$utf8.GetString([Convert]::FromBase64String([string]$result.RawBase64))
+    $err=$utf8.GetString([Convert]::FromBase64String([string]$result.ErrBase64))
+    $result.PSObject.Properties.Remove('RawBase64');$result.PSObject.Properties.Remove('ErrBase64')
+    $result|Add-Member -NotePropertyName Raw -NotePropertyValue $raw
+    $result|Add-Member -NotePropertyName Err -NotePropertyValue $err
+    if($null -eq $result.Json -and $raw -and $raw.Trim().Length -gt 0){try{$result.Json=$raw|ConvertFrom-Json -ErrorAction Stop}catch{}}
+    return $result
+  }finally{
+    if($started -and -not $process.HasExited){try{$process.Kill()}catch{}}
+    $process.Dispose()
   }
 }
 

@@ -57,6 +57,7 @@ class RegistryRefreshTests(unittest.TestCase):
         from test_authorization_production import HANDLERS as AUTHORIZATION_HANDLERS
         for name in AUTHORIZATION_HANDLERS:
             expected=expected.replace(dispatch._function_extent(expected,name)[2],dispatch._function_extent(actual,name)[2],1)
+        expected=expected.replace(dispatch._function_extent(expected,'Invoke-Cucp')[2],dispatch._function_extent(actual,'Invoke-Cucp')[2],1)
         helper=dispatch._function_extent(actual,'_Invoke-LegacyNativeMacro')[2]
         expected=expected.replace('function Invoke-MacroNativeHealth {',helper+'\n\nfunction Invoke-MacroNativeHealth {',1)
         for before,after in (
