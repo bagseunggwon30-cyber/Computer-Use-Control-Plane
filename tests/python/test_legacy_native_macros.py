@@ -71,12 +71,17 @@ class DirectMacroParityTests(unittest.TestCase):
             inputs, script = root / 'cases.json', root / 'oracle.ps1'
             inputs.write_text(json.dumps(cases, ensure_ascii=True), encoding='utf-8-sig')
             script.write_text(r'''
-param([string]$SourcePath,[string]$CasesPath,[string]$Cache)
+param([string]$SourcePath,[string]$CasesPath,[string]$Cache,[switch]$Current)
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 $t=$null;$e=$null;$ast=[Management.Automation.Language.Parser]::ParseFile($SourcePath,[ref]$t,[ref]$e)
 $rows=Get-Content -LiteralPath $CasesPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $names=@('_Read-OptValue','_Read-Switch')+@($rows.handler|Select-Object -Unique)
+if($Current){
+ $names+=@('_Invoke-LegacyNativeMacro')
+ $Script:LegacyCdpSourceRoot=Split-Path -Parent (Split-Path -Parent $SourcePath)
+ . (Join-Path $Script:LegacyCdpSourceRoot 'scripts/cucp-legacy-cdp-adapter.ps1')
+}
 foreach($name in $names){
  $f=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
  if($f.Count -ne 1){throw "Missing original function: $name"}
@@ -84,7 +89,7 @@ foreach($name in $names){
 }
 function Invoke-NativeHelper {param([string[]]$ArgList) $script:capturedArgs=@($ArgList);return $script:reply}
 function _Trajectory-Append {param($Kind,$Payload)}
-$Script:CacheDir=$Cache;$AllowLiveControl=$true
+$Script:CacheDir=$Cache;$Script:AuditDir=Join-Path $Cache 'audit';$AllowLiveControl=$true
 $Script:CucpV14Schema=@{ImePaste='cucp.ime-paste/v1';ModalDetect='cucp.modal-detect/v1'}
 $results=New-Object Collections.ArrayList
 foreach($case in $rows){
@@ -100,6 +105,18 @@ foreach($case in $rows){
                 '-SourcePath', str(source), '-CasesPath', str(inputs), '-Cache', str(root)], capture_output=True, timeout=60)
             self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8', errors='replace'))
             expected = json.loads(result.stdout.decode('utf-8-sig'))
+            current=subprocess.run([shutil.which('powershell.exe'),'-NoProfile','-NonInteractive','-File',str(script),
+                '-SourcePath',str(ROOT/'scripts/cucp.ps1'),'-CasesPath',str(inputs),'-Cache',str(root),'-Current'],
+                capture_output=True,timeout=180)
+            self.assertEqual(current.returncode,0,current.stderr.decode('utf-8',errors='replace'))
+            actual=json.loads(current.stdout.decode('utf-8-sig'))
+            self.assertEqual(len(actual),len(expected))
+            for case,before,after in zip(cases,expected,actual):
+                with self.subTest(production=case['name'],brief=case['brief']):
+                    self.assertEqual(after['argv'],before['argv']);self.assertEqual(after['exit'],before['exit'])
+                    if case['brief'] or case['name'] not in ('ime-paste','modal-detect'):
+                        self.assertEqual(after['output'],before['output'])
+                    else:self.assertEqual(json.loads(after['output']),json.loads(before['output']))
             for case, original in zip(cases, expected):
                 with self.subTest(name=case['name'], brief=case['brief'], status=case['reply']['Json'] and case['reply']['Json']['status']):
                     acquired = []

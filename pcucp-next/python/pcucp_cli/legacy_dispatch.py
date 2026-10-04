@@ -20,7 +20,7 @@ from .legacy_cdp_contract import _ps_equal
 SCHEMA = "cucp.legacy-dispatch-contract/v1"
 CONTRACT_PATH = Path(__file__).resolve().parents[3] / "docs/legacy-dispatch-contract.json"
 # Deliberately updated only with a reviewed source/contract checkpoint.
-CONTRACT_SHA256 = "865496ac226850d657c3cd182069d71538bdaef1fad3b0d1489c648ab48fd288"
+CONTRACT_SHA256 = "b2c9297ca01e844698e7f3035bae486aa04271e25d0eb977b3c5a718027f8228"
 
 
 class LegacyDispatchContractError(ValueError):

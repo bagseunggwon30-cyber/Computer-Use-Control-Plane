@@ -23,6 +23,11 @@ class NativeMacros:
         self.cache, self.audit = owned_path(str(cache_directory)), owned_path(str(audit_directory))
 
     def run(self, name, rest, *, brief=False):
+        prepared=self.prepare(name,rest)
+        reply=self.native(prepared['argv'],Authority(prepared['live']))
+        return self.complete(name,rest,reply,prepared['context'],brief=brief)
+
+    def prepare(self, name, rest):
         require(name in OPERATIONS and type(rest) is list and all(type(word) is str for word in rest), 'Unknown direct native macro.')
         if name in LIVE and not self.authority.live:
             raise PermissionError(f'macro {name} requires -AllowLiveControl')
@@ -112,7 +117,20 @@ class NativeMacros:
             if hwnd > 0: add('TargetHwnd', str(hwnd))
         else:
             require(False, 'Unknown direct native operation.')
-        reply = self.native(argv, Authority(self.authority.live and name in LIVE))
+        return dict(argv=argv,context=context,live=self.authority.live and name in LIVE)
+
+    def complete(self,name,rest,reply,context,*,brief=False):
+        require(name in OPERATIONS and type(rest) is list and all(type(word) is str for word in rest), 'Unknown direct native macro.')
+        require(type(context) is dict and type(reply) is dict, 'Invalid native macro completion.')
+        if name in LIVE and not self.authority.live:
+            raise PermissionError(f'macro {name} requires -AllowLiveControl')
+        fields=({'length','clear','enter'} if name=='type-native' else {'keys'} if name=='shortcut-native' else
+            {'label','button'} if name=='uia-click-label' else {'label'} if name.startswith('uia-') else
+            {'path'} if name=='ocr-image' else {'text','match'} if name in {'ocr-find-text','ocr-uia-fuse','ocr-uia-invoke'} else set())
+        require(set(context)==fields,'Unexpected native macro completion context.')
+        for key,item in context.items():
+            require(type(item) is bool if key in ('clear','enter') else type(item) is int and item>=0 if key=='length' else type(item) is str,
+                'Invalid native macro completion context value.')
         require(type(reply) is dict and type(reply.get('ExitCode')) is int and type(reply.get('Raw')) is str,
             'Invalid direct native macro reply.')
         payload = reply['Json']; ok = _get(payload, 'status') == 'ok'
@@ -120,7 +138,7 @@ class NativeMacros:
         v = lambda key: ps_string(_get(payload, key))
         line, schema = '', None
         if name == 'native-health':
-            line = f"ok native-health win32={v('win32')} uia={v('uia')} ocr={v('ocr')} ocr_languages={','.join(_get(payload, 'ocr_languages', []) or [])} elapsed_ms={elapsed}" if ok else 'err native-health helper_unavailable raw=' + reply['Err']
+            line = f"ok native-health win32={v('win32')} uia={v('uia')} ocr={v('ocr')} ocr_languages={','.join(_get(payload, 'ocr_languages', []) or [])} elapsed_ms={elapsed}" if ok else 'err native-health helper_unavailable raw=' + ps_string(reply['Err'])
             code = 0 if ok else 1
         elif name == 'native-windows':
             line = f"ok native-windows count={v('count')} elapsed_ms={elapsed}" if ok else 'err native-windows helper_failed'

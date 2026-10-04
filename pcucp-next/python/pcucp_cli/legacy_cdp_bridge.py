@@ -42,9 +42,33 @@ def _helper_reply(reply: Any) -> tuple[LegacyCdpResult, str | None, bool]:
     return LegacyCdpResult(payload or {}, reply['ExitCode']), raw, payload is not None
 
 
-def handle(operation: str, request: dict, *, allow_live_control=False, endpoint=None, timeout_s=8) -> dict:
+def handle(operation: str, request: dict, *, allow_live_control=False, endpoint=None, timeout_s=8,
+           cache_directory=None,audit_directory=None) -> dict:
     if type(allow_live_control) is not bool:
         raise ValueError('startup live authority must be boolean')
+    if operation in ('native-macro-prepare','native-macro-complete'):
+        fields={'name','rest'}
+        if operation=='native-macro-complete': fields|={'reply','prepared','brief'}
+        _fields(request,fields)
+        if type(request['name']) is not str or type(request['rest']) is not list or any(type(v) is not str for v in request['rest']):
+            raise ValueError('Native macro name and argv must be inert strings')
+        if type(cache_directory) is not str or type(audit_directory) is not str:
+            raise ValueError('Native macro directories must be supplied at startup')
+        from .legacy_native_macros import NativeMacros
+        runtime=NativeMacros(None,cache_directory=cache_directory,
+            audit_directory=audit_directory,authority=Authority(allow_live_control))
+        if operation=='native-macro-prepare': return runtime.prepare(request['name'],request['rest'])
+        _fields(request['reply'],{'ExitCode','Json','Raw','Err','ElapsedMs'})
+        reply=request['reply']
+        if (type(reply['ExitCode']) is not int or not -(2**31)<=reply['ExitCode']<2**31 or
+            type(reply['ElapsedMs']) is not int or not 0<=reply['ElapsedMs']<2**31 or
+            reply['Json'] is not None and type(reply['Json']) is not dict or
+            any(reply[k] is not None and type(reply[k]) is not str for k in ('Raw','Err'))):
+            raise ValueError('Invalid native helper reply')
+        if type(request['brief']) is not bool: raise ValueError('Native macro brief flag must be boolean')
+        return runtime.complete(request['name'],request['rest'],request['reply'],request['prepared'],brief=request['brief'])
+    if cache_directory is not None or audit_directory is not None:
+        raise ValueError('Unexpected native macro bootstrap directories')
     if operation == 'desktop-native':
         _fields(request, {'argv'})
         from .legacy_native_desktop import DesktopSession
@@ -86,27 +110,32 @@ def handle(operation: str, request: dict, *, allow_live_control=False, endpoint=
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--operation', choices=('native', 'desktop-native', 'native-prepare', 'macro-prepare', 'macro-complete'), required=True)
+    parser.add_argument('--operation', choices=('native', 'desktop-native', 'native-prepare', 'macro-prepare', 'macro-complete',
+        'native-macro-prepare','native-macro-complete'), required=True)
     parser.add_argument('--endpoint')
     parser.add_argument('--allow-live-control', action='store_true')
     parser.add_argument('--timeout-s', type=float, default=8)
+    parser.add_argument('--cache-directory')
+    parser.add_argument('--audit-directory')
     options = parser.parse_args(argv)
     try:
-        data = sys.stdin.buffer.readline(MAX_FRAME + 1)
-        if len(data) > MAX_FRAME:
+        maximum_input=64*1024*1024 if options.operation=='native-macro-complete' else MAX_FRAME
+        data = sys.stdin.buffer.readline(maximum_input + 1)
+        if len(data) > maximum_input:
             raise ValueError('bridge request exceeds 1 MiB')
         # Framework Process starts its stdin StreamWriter with AutoFlush=true;
         # Console.InputEncoding may therefore emit a UTF-8 preamble before the
         # host writes the bounded bytes. Accept one prefix, never relaxed JSON.
         request = _json(data.removeprefix(b'\xef\xbb\xbf'))
         result = handle(options.operation, request, allow_live_control=options.allow_live_control,
-                        endpoint=options.endpoint, timeout_s=options.timeout_s)
+                        endpoint=options.endpoint, timeout_s=options.timeout_s,
+                        cache_directory=options.cache_directory,audit_directory=options.audit_directory)
         response, exit_code = dict(schema=SCHEMA, status='ok', data=result), 0
     except (ValueError, CdpError, LegacyHostError, OSError, OverflowError) as exc:
         response, exit_code = dict(schema=SCHEMA, status='error', error=dict(
             code=getattr(exc, 'code', 'invalid_arguments'), message=str(exc)[:2048])), 1
     encoded = json.dumps(response, ensure_ascii=True, allow_nan=False, separators=(',', ':')).encode('ascii') + b'\n'
-    maximum = 32 * 1024 * 1024 if options.operation == 'desktop-native' else MAX_RESPONSE
+    maximum = 64*1024*1024 if options.operation=='native-macro-complete' else 32 * 1024 * 1024 if options.operation == 'desktop-native' else MAX_RESPONSE
     if len(encoded) > maximum:
         encoded = b'{"schema":"cucp.legacy-cdp-bridge/v1","status":"error","error":{"code":"response_limit","message":"Bridge response exceeds its byte limit"}}\n'
         exit_code = 1

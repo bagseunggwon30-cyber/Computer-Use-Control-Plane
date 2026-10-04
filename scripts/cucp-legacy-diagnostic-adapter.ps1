@@ -29,7 +29,7 @@ function _Diagnostic-NewState {
   foreach($key in @('audit_directory','cache_directory','wrapper_log','cli_path','changelog_path','temp_root','benchmark_schema','release_schema')) {
     $owned|Add-Member NoteProperty $key $Context.$key
   }
-  $restCopy=[string[]]@();if($null -ne $Rest){$restCopy=$Rest.Clone()}
+  $restCopy=@($Rest);if($null -ne $restCopy){$restCopy=$restCopy.Clone()}
   return @{family='diagnostics';operation=$Operation;rest=$restCopy;context=$owned;
     live=$false;sensitive=$false;paths=@{};clocks=@{};writer=$null;live_effect_seen=$false;
     diagnostic_counts=@{};diagnostic_audit_files=@{};diagnostic_cache_path=$null;diagnostic_changelog=$null;
