@@ -741,7 +741,7 @@ UIA가 못 보는 element 인데 OCR 텍스트가 보일 때, 또는 그 반대�
 ### PS5 함정 진단 (v1.1.0, read-only)
 
 ```powershell
-& <wrapper-dir>\references\audit-ps5-pitfalls.ps1 -ScriptRoot <wrapper-dir>
+python <wrapper-dir>\references\audit_ps5_pitfalls.py --script-root <wrapper-dir>
 ```
 
 CUCP 스크립트들의 inline-if numeric / `$args` 자동변수 / Get-Content 단일라인 /
@@ -1073,7 +1073,7 @@ CUCP에는 8개 라이브 워크플로우 매트릭스가 있습니다 (browser_
 - schema: `cucp.release-notes/v1`
 - 동작: CHANGELOG.md 를 `## v?(\d+\.\d+\.\d+)` 헤더로 split →
   각 버전 body 에서 `### Added/Improved/Verified/Fixed` 라인 분리 →
-  `_Cucp-RedactSecrets` 로 secret 패턴 치환 후 emit.
+  C# `DiagnosticReleaseRedactors` 로 동일한 secret 패턴 치환 후 emit.
 - redact 패턴 (6종):
   - GitHub PAT: `\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{16,}` → `[REDACTED:github_pat]`
   - OpenAI API key: `\bsk-[A-Za-z0-9]{20,}` → `[REDACTED:openai_key]`

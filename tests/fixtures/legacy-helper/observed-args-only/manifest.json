@@ -1,0 +1,476 @@
+{
+  "schema": "cucp.helper-args-only-observation-pin/v1",
+  "published_commit": "bb98df41d120cde6c6a2a18628e385d7ad432709",
+  "run_id": 37107497042,
+  "artifact_archive_sha256": "e44a60abfc64f21db097b033dc52f0a06e03bb91347f12ef232534e514278741",
+  "files": [
+    {
+      "case_id": "denied-six",
+      "case_sha256": "3c01502472c6ce3d3d6236ffbd28c539fcfddc51d15f02469eb445943e9e80b7",
+      "file": "denied-six.stdout.bin",
+      "artifact_file": "denied-six-corrected-intent-oracle-62ae08b91b79.stdout.bin",
+      "bytes": 20782,
+      "sha256": "cc100ab38676f8d544285a114c5369b1b2216fc3aeb20fa54a9b4a4386c8d7f5",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 20782,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "ocr-success-truthiness-cache",
+      "case_sha256": "ce4650d5e4fa090100650df49d1a36858e0701aaab66de83c6dcd0cf10559db5",
+      "file": "ocr-success-truthiness-cache.stdout.bin",
+      "artifact_file": "ocr-success-truthiness-cache-corrected-intent-oracle-e148e4eae81e.stdout.bin",
+      "bytes": 21879,
+      "sha256": "7c72dd2bcafb57e349ecc27cacd2ade77489d4b09dfc29d0e7a9ede890ad3c8e",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 21879,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "ocr-max-dimension",
+      "case_sha256": "cc658c510ae2648c1ce9e52668efe1eb690f64a9d3dc82c9c9e826ea01c16d6c",
+      "file": "ocr-max-dimension.stdout.bin",
+      "artifact_file": "ocr-max-dimension-corrected-intent-oracle-3a5a2c7b6df1.stdout.bin",
+      "bytes": 19946,
+      "sha256": "558ed47d44d72fc000c5d9873db834fa398b56695c28c975dad083beb3f71f2f",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 19946,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "ocr-init-retry",
+      "case_sha256": "768e003bcce1d3c08966ff0e0634dbcc1fd1a0b1ce110c305fc9033c621e1418",
+      "file": "ocr-init-retry.stdout.bin",
+      "artifact_file": "ocr-init-retry-corrected-intent-oracle-d2380f4f0e08.stdout.bin",
+      "bytes": 19932,
+      "sha256": "bb69286e04f70929874e6aa6b8b8efcb9eccaf70f96b9ad7f4097017b39284bf",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 19932,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "windows-en-US",
+      "case_sha256": "95bcddb36c22ecbff95daa2f58798786d3ac74ea252369e3feff6f09e7cc0fce",
+      "file": "windows-en-US.stdout.bin",
+      "artifact_file": "windows-en-US-corrected-intent-oracle-185596d2fc2c.stdout.bin",
+      "bytes": 21947,
+      "sha256": "e86d994285f772516e8647ea90abaf0b47d751a806844d6ca4e4f47a45287f09",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 21947,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "modal-en-US",
+      "case_sha256": "357435605638468c606a9e98b66d340fb04a84218d80e18d139b227d068abde1",
+      "file": "modal-en-US.stdout.bin",
+      "artifact_file": "modal-en-US-corrected-intent-oracle-3706fad2da5d.stdout.bin",
+      "bytes": 21168,
+      "sha256": "0add32a39c42e1a528141ef16549f748ebf47c657a4c46acea56999b7e95e017",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 21168,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "uia-en-US",
+      "case_sha256": "44f72438aafede0f30fb12d92e476df751e386ff6e72f3a07ff36ccace45022e",
+      "file": "uia-en-US.stdout.bin",
+      "artifact_file": "uia-en-US-corrected-intent-oracle-6d214c9696b1.stdout.bin",
+      "bytes": 22144,
+      "sha256": "5315aae2f3f2e023f71d39507ff4078c3afac19f21e18fc646485e0c5541636d",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 22144,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "windows-tr-TR",
+      "case_sha256": "13ac37cd7ce3b4af24e89607c784c6de9cf485a1deda3a6d454618ffa2a68c1b",
+      "file": "windows-tr-TR.stdout.bin",
+      "artifact_file": "windows-tr-TR-corrected-intent-oracle-1b53e39e313c.stdout.bin",
+      "bytes": 21820,
+      "sha256": "fe07caf73a0cf1f50906b13f6c27b322517004e41b20152be961a2fa10097b9f",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 21820,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "modal-tr-TR",
+      "case_sha256": "1e232682ee20e6233ede72d263de31bbfd8b16129f9aa305012a8e699cb46a7b",
+      "file": "modal-tr-TR.stdout.bin",
+      "artifact_file": "modal-tr-TR-corrected-intent-oracle-7cb44ff4e00d.stdout.bin",
+      "bytes": 21168,
+      "sha256": "0add32a39c42e1a528141ef16549f748ebf47c657a4c46acea56999b7e95e017",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 21168,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "uia-tr-TR",
+      "case_sha256": "c680ff43d92e7f7f11f1b0c312efded60febd48c87ee349e03bd9bf208bf649e",
+      "file": "uia-tr-TR.stdout.bin",
+      "artifact_file": "uia-tr-TR-corrected-intent-oracle-0f2e723816e0.stdout.bin",
+      "bytes": 22144,
+      "sha256": "5315aae2f3f2e023f71d39507ff4078c3afac19f21e18fc646485e0c5541636d",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 22144,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "windows-ko-KR",
+      "case_sha256": "76c7de5618c6b2f940b172244f387c08834b44b775be2e05e806cf452f48798d",
+      "file": "windows-ko-KR.stdout.bin",
+      "artifact_file": "windows-ko-KR-corrected-intent-oracle-ac0ca5f45b22.stdout.bin",
+      "bytes": 21947,
+      "sha256": "e86d994285f772516e8647ea90abaf0b47d751a806844d6ca4e4f47a45287f09",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 21947,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "modal-ko-KR",
+      "case_sha256": "dacdaba384e61b4bdafa155c9e2f3084e35820c2183d5a503f9afbacee4b54de",
+      "file": "modal-ko-KR.stdout.bin",
+      "artifact_file": "modal-ko-KR-corrected-intent-oracle-15dfb1280891.stdout.bin",
+      "bytes": 21168,
+      "sha256": "0add32a39c42e1a528141ef16549f748ebf47c657a4c46acea56999b7e95e017",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 21168,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "uia-ko-KR",
+      "case_sha256": "2c89596af881d46327d43b266cb143b5f9f35a8108f4a669dff2cca9ab20f789",
+      "file": "uia-ko-KR.stdout.bin",
+      "artifact_file": "uia-ko-KR-corrected-intent-oracle-836ff5d3f621.stdout.bin",
+      "bytes": 22144,
+      "sha256": "5315aae2f3f2e023f71d39507ff4078c3afac19f21e18fc646485e0c5541636d",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 22144,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "modal-large-ties",
+      "case_sha256": "ec9246afadd8688ff23dc3674fdc2fb6d349753a709c994eca735acf2944cd62",
+      "file": "modal-large-ties.stdout.bin",
+      "artifact_file": "modal-large-ties-corrected-intent-oracle-d170ee816005.stdout.bin",
+      "bytes": 28458,
+      "sha256": "dff02b706fd702b1b0148840d3153e927b668b5988ada8b1c360586f6d043cfb",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 28458,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "uia-caps-ties",
+      "case_sha256": "a4b0b549145b3284d7f5af62d8896b5b2fbccff05a176b68b8448967f7f801d7",
+      "file": "uia-caps-ties.stdout.bin",
+      "artifact_file": "uia-caps-ties-corrected-intent-oracle-113ce5b61df6.stdout.bin",
+      "bytes": 23481,
+      "sha256": "1b20fc1f717bd3c6067eeba464ef763a5e490c749eed68bc92aa924d7200b80d",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 23481,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "uia-scan-cap",
+      "case_sha256": "bb2c1d678e1a5810e8e8f888a5b15d193fb8c4bc5d2b8bae9238d0ea754ded20",
+      "file": "uia-scan-cap.stdout.bin",
+      "artifact_file": "uia-scan-cap-corrected-intent-oracle-d87f3daab712.stdout.bin",
+      "bytes": 46907,
+      "sha256": "8f1521b8eb28cebcf7dec8e270fc52a33c9b7891c10eceb659a4ca8e704c9e88",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 46907,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "focused-partial",
+      "case_sha256": "723b20138c233fe375b6f7ad10c0004a736d3c15031fc70724dece1c66c88b7e",
+      "file": "focused-partial.stdout.bin",
+      "artifact_file": "focused-partial-corrected-intent-oracle-702791f71799.stdout.bin",
+      "bytes": 19704,
+      "sha256": "453f0bd3d9b642f1ea64062604d32dc808d4602344334a99ea5db1480e703f96",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 19704,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    },
+    {
+      "case_id": "uia-no-match",
+      "case_sha256": "9b3b5fc76dca66b6d52badb2474db341dd27cb68a4b168edd4224d66dbb8b5ca",
+      "file": "uia-no-match.stdout.bin",
+      "artifact_file": "uia-no-match-corrected-intent-oracle-0596da31cff3.stdout.bin",
+      "bytes": 19854,
+      "sha256": "a791085ee04e1cdd6cdaa4d3e1f616dfa0f6c376d18caec2e022014611aec9c6",
+      "process_record": {
+        "exit_code": 0,
+        "timed_out": false,
+        "running": false,
+        "launch_error": null,
+        "kill_error": null,
+        "drain_incomplete": false,
+        "stdin_error": null,
+        "read_errors": {},
+        "bytes_observed": {
+          "stdout": 19854,
+          "stderr": 0
+        },
+        "truncated": {
+          "stdout": false,
+          "stderr": false
+        }
+      }
+    }
+  ]
+}

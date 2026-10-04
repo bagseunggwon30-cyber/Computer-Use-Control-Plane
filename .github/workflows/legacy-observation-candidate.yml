@@ -1,0 +1,48 @@
+name: Legacy observation candidate only
+on:
+  workflow_dispatch:
+  push:
+    branches: [migration/python-csharp-runtime]
+    paths:
+      - 'pcucp-next/dotnet/PcuCp.LegacyObservation*/**'
+      - 'pcucp-next/packaging/*legacy_observation.py'
+      - 'scripts/cucp-legacy-observation-adapter.ps1'
+      - 'scripts/cucp-native-helper.ps1'
+      - 'scripts/cucp.ps1'
+      - 'tests/fixtures/legacy-observation*/**'
+      - 'tests/fixtures/legacy-observation*.ps1'
+      - 'tests/python/test_legacy_observation.py'
+      - '.github/workflows/legacy-observation-candidate.yml'
+permissions:
+  contents: read
+jobs:
+  candidate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Portable observation contracts only
+        if: runner.os != 'Windows'
+        run: python pcucp-next/packaging/qualify_legacy_observation.py --log-dir .migration-logs/observation-candidate
+      - name: Pinned oracle, unchanged shared callers, and owned real desktop
+        if: runner.os == 'Windows'
+        run: python pcucp-next/packaging/qualify_legacy_observation.py --windows --log-dir .migration-logs/observation-candidate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legacy-observation-candidate-${{ runner.os }}
+          path: .migration-logs/observation-candidate
+          include-hidden-files: true
+          retention-days: 7

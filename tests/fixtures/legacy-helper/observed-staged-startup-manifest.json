@@ -1,0 +1,48 @@
+{
+  "schema": "cucp.staged-startup-observed-failure/v1",
+  "status": "failed-unqualified-baseline",
+  "public_commit": "89aa36fdae7b11f901fc1d1332b2391ef226c436",
+  "run": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37110868522",
+  "artifact_id": 11269507868,
+  "artifact_sha256": "193b94049eec4c6f03c08f733f52f63c3bf10fef031a51af0f1917ddd0a74cfc",
+  "program_canonical_sha256": "e34166530fe61ac89fda63327012198c4307a0d7fdcad7308f3c700f8b452e37",
+  "package_manifest": {
+    "entrypoint": "PcuCp.LegacyHelper.exe",
+    "files": {
+      "PcuCp.LegacyHelper.exe": {
+        "bytes": 56320,
+        "sha256": "0f07affe49cf1085267a9ad4b671c3972a0670492573d367add3a325912cbf01"
+      },
+      "PcuCp.LegacyHelper.exe.config": {
+        "bytes": 174,
+        "sha256": "051099983b896673909e01a1f631b6652abb88da95c9f06f3efef4be033091fa"
+      },
+      "PcuCp.LegacyInterop.dll": {
+        "bytes": 15872,
+        "sha256": "c2d3ac8f338d605080777c2b135ca8d4d01b6af4e1e5a0e5c439cd0031154412"
+      }
+    },
+    "helper_version": "2.0.0",
+    "runtime": "net48",
+    "runtime_dependencies": [
+      "Windows",
+      ".NET Framework 4.8"
+    ],
+    "schema": "cucp.legacy-helper-package/v1",
+    "status": "staged-unqualified"
+  },
+  "files": {
+    "observed-detached-startup.stderr.bin": {
+      "bytes": 256,
+      "sha256": "587a186d28a50c12c7e049d5f3a17a8115f8699507eaedd1f7e7d3eab09bb648",
+      "artifact_entry": "packaged-startup-detached--1-fab5a8fe300a.stderr.bin"
+    },
+    "observed-staged-wrapper-launch.log.bin": {
+      "bytes": 455,
+      "sha256": "1407c267fa7bf0fd484d85c4af8e6721b1b6affec69918d0903296a3d25c18db",
+      "artifact_entry": "staged-wrapper-start-543e8c7a5a7d.wrapper.log.bin"
+    }
+  },
+  "published_tree": "e12363426425f3ebe8c355775b757d6748d04155",
+  "equivalent_local_commit": "a7f0da28b7a32c3232bbf8419133bee892f692fb"
+}

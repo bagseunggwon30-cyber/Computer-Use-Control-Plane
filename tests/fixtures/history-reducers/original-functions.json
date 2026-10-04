@@ -1,0 +1,36 @@
+{
+  "source_revision": "d4c9660d40c7e909f18afb166a8e846798f63b1d",
+  "source_path": "scripts/cucp.ps1",
+  "source_sha256": "8a3140745701a828628b13c4741b30063119babbcbd74e5230caae2d49591c4c",
+  "functions": [
+    {
+      "name": "_History-PickBestStrategy",
+      "utf8_bytes": 1789,
+      "sha256": "82c82f36c700fbd1a5c225d91255b8cae2e5d54b3e3a8cbaaec41201c78f371d",
+      "byte_start": 356600,
+      "byte_end": 358389
+    },
+    {
+      "name": "_History-Stats",
+      "utf8_bytes": 991,
+      "sha256": "c21bcbd4182a0639650758639e0ce556a9b946cd1529a7327cc55daa75477997",
+      "byte_start": 358467,
+      "byte_end": 359458
+    },
+    {
+      "name": "_AppStrategy-Read",
+      "utf8_bytes": 522,
+      "sha256": "29de16bdfafe2ac8cbdd44fc8bf6f8800e4f121716ce81066958342d66edd6f9",
+      "byte_start": 310097,
+      "byte_end": 310619
+    },
+    {
+      "name": "_AppStrategy-LastGood",
+      "utf8_bytes": 349,
+      "sha256": "a7f6283ea0f8735af59ad7bb0789b4b01c29240c0586d7cc8af902a2f94e8e91",
+      "byte_start": 310621,
+      "byte_end": 310970
+    }
+  ],
+  "source_bytes": 410892
+}

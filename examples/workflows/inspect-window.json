@@ -1,0 +1,13 @@
+{
+  "schema": "cucp.workflow/v2",
+  "name": "Inspect one matching editor",
+  "timeout_ms": 15000,
+  "steps": [
+    {"id": "window", "command": "wait-window", "args": {"title": "Notepad", "timeout_ms": 5000}},
+    {"id": "capture", "command": "observe", "args": {
+      "hwnd": {"$ref": "/window/windows/0/hwnd"},
+      "pid": {"$ref": "/window/windows/0/process_id"},
+      "include_ui": true
+    }}
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "cucp.helper-autostart-launch-capture/v1",
+  "argv": [
+    "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\cucp-autostart-launch-mnefpu_l\\case-1\\\ud55c\uae00 space %CUCP_CAPTURE_EXPANSION% !bang! ^ & (round)\\capture bootstrap.py",
+    "--staged-unqualified",
+    "--idle-timeout-ms",
+    "28800000"
+  ],
+  "original_argv": [
+    "C:\\hostedtoolcache\\windows\\Python\\3.12.10\\x64\\python.exe",
+    "-E",
+    "-s",
+    "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\cucp-autostart-launch-mnefpu_l\\case-1\\\ud55c\uae00 space %CUCP_CAPTURE_EXPANSION% !bang! ^ & (round)\\capture bootstrap.py",
+    "--staged-unqualified",
+    "--idle-timeout-ms",
+    "28800000"
+  ],
+  "executable": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\cucp-autostart-launch-mnefpu_l\\python \ud55c\uae00 space %CUCP_CAPTURE_EXPANSION% !bang! ^ & (round)\\Scripts\\python.exe",
+  "ignore_environment": 1,
+  "no_user_site": 1,
+  "exit_code": 0,
+  "console": {
+    "input": 65001,
+    "output": 65001
+  },
+  "command_line": "\"C:\\hostedtoolcache\\windows\\Python\\3.12.10\\x64\\python.exe\" \"-E\" \"-s\" \"C:\\Users\\runneradmin\\AppData\\Local\\Temp\\cucp-autostart-launch-mnefpu_l\\case-1\\\ud55c\uae00 space %CUCP_CAPTURE_EXPANSION% !bang! ^ & (round)\\capture bootstrap.py\" \"--staged-unqualified\" \"--idle-timeout-ms\" \"28800000\""
+}

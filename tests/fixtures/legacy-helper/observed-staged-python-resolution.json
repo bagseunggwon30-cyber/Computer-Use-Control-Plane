@@ -1,0 +1,29 @@
+{
+  "schema": "cucp.staged-python-resolution-observation/v1",
+  "status": "failed-unqualified-baseline",
+  "public_commit": "8f3cdde59d2d9574cfd036bab0b4c0bae0940c89",
+  "published_tree": "c84b6c3963bb20f7f8f76562f0d0d8cc549beafb",
+  "run": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37111873744",
+  "artifact_id": 11270083312,
+  "artifact_sha256": "9843496ca05e284ba194f75abb5011f51ac4ad7a2daeca6c4e8062391afc6127",
+  "raw_file": "observed-staged-python-resolution.log.bin",
+  "raw_bytes": 1083,
+  "raw_sha256": "6889201ed3b6e0544cc7d5b600704b4d3b1f8e606ded3698706fb18541b3e65f",
+  "artifact_entry": "staged-wrapper-start-f49dd6788dda.wrapper.log.bin",
+  "observed": {
+    "commands": [
+      {
+        "command_type": "Application",
+        "path": "C:\\hostedtoolcache\\windows\\Python\\3.12.10\\x64\\python.exe",
+        "source": "C:\\hostedtoolcache\\windows\\Python\\3.12.10\\x64\\python.exe"
+      },
+      {
+        "command_type": "Application",
+        "path": "C:\\Users\\runneradmin\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe",
+        "source": "C:\\Users\\runneradmin\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe"
+      }
+    ],
+    "file_name": "C:\\hostedtoolcache\\windows\\Python\\3.12.10\\x64\\python.exe C:\\Users\\runneradmin\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe",
+    "command_count": 2
+  }
+}

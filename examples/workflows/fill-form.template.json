@@ -1,0 +1,7 @@
+{
+  "hwnd": "REPLACE_WITH_OBSERVED_HWND",
+  "fields": [
+    {"selector": {"automation_id": "REPLACE_WITH_EXACT_FIELD_ID"}, "text": "한글과 emoji 😀"}
+  ],
+  "timeout_ms": 30000
+}

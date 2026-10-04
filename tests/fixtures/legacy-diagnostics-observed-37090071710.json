@@ -1,0 +1,54 @@
+{
+  "schema": "cucp.retained-diagnostic-observed-fragments/v1",
+  "provenance": {
+    "run_id": 37090071710,
+    "head_sha": "7efbf9d21b3916f5789fe1c214a4294127ad0270",
+    "completed_at_utc": "2026-10-03T02:40:47Z",
+    "artifact_sha256": "e93a415dc74d7ca0939a6b752dd53dabda3fced6808c56420185386b5c40f05e",
+    "complete_logs_available": true,
+    "raw_route_arrays_available": false,
+    "basis": "Exact assertion-diff fragments from diagnostics/05.log; not a reconstructed full oracle payload"
+  },
+  "baseline_error_details": {
+    "baseline/number/Infinity": "Cannot convert value \"∞\" to type \"System.Int32\". Error: \"Value was either too large or too small for an Int32.\"",
+    "baseline/number/-Infinity": "Cannot convert value \"-∞\" to type \"System.Int32\". Error: \"Value was either too large or too small for an Int32.\"",
+    "baseline/cast/{}": "Cannot convert the \"\" value of type \"System.Management.Automation.PSCustomObject\" to type \"System.Int32\".",
+    "baseline/cast/{\"value\":1}": "Cannot convert the \"@{value=1}\" value of type \"System.Management.Automation.PSCustomObject\" to type \"System.Int32\".",
+    "baseline/cast/{\"items\":[1,2]}": "Cannot convert the \"@{items=System.Object[]}\" value of type \"System.Management.Automation.PSCustomObject\" to type \"System.Int32\"."
+  },
+  "korean_date_fragment": {
+    "case_id": "baseline/date/ko-KR",
+    "expected_fragment": "1970-01-01 오전 12:00:00"
+  },
+  "audit_payload_fragments": {
+    "audit/object/empty": {
+      "event_count": 1,
+      "by_macro": {
+        "fallback": 1
+      },
+      "by_exit_code": {},
+      "earliest_ts": "",
+      "latest_ts": ""
+    },
+    "audit/object/nested": {
+      "event_count": 1,
+      "by_macro": {
+        "@{nested=; items=System.Object[]}": 1
+      },
+      "by_exit_code": {},
+      "earliest_ts": null,
+      "latest_ts": null
+    }
+  },
+  "boolean_baseline_row": {
+    "case_id": "baseline/cast/true",
+    "expected_row": {
+      "name": "windows",
+      "baseline_p50_ms": 1,
+      "current_p50_ms": 37,
+      "delta_ms": 36,
+      "delta_pct": 3600,
+      "verdict": "regressed"
+    }
+  }
+}

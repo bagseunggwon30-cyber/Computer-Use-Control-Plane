@@ -1,0 +1,37 @@
+{
+  "schema": "cucp.observed-direct-path-failure/v1",
+  "status": "failed-unqualified",
+  "run_id": 37121668355,
+  "artifact_id": 11274200014,
+  "artifact_sha256": "354fecd20d0f9730718490be9eee34ede172713643d02aa2d0a46e480eaab1ea",
+  "public_commit": "968379e6eca731ff849fd554339601261c291584",
+  "local_commit": "8fafca8cc4b59d86a34ee6674aaea88b97009afb",
+  "tree": "5fb9191301f91e585efe40c8c86c0f74b296f92c",
+  "files": {
+    "failed-start.json": {
+      "source": "direct-start-failed-28486b5ba461.json",
+      "bytes": 991,
+      "sha256": "80e16f61610497cb247a5a9eef48b114078bd6a1030b9116b0417fc8df7e3410"
+    },
+    "failed-start.stderr.bin": {
+      "source": "direct-start-failed-28486b5ba461.stderr.bin",
+      "bytes": 68,
+      "sha256": "9ff4bfee5f93b6144b460a08c053e94fa1ad5c1be3b0bc1854216e12a3b38894"
+    },
+    "failed-suite.stderr.bin": {
+      "source": "helper-direct-tests-69bcb7a40add.stderr.bin",
+      "bytes": 15437,
+      "sha256": "598f50372a46f191fbdef83714d5cb470271fc82d29515ece23401028ae9d0fb"
+    },
+    "package-manifest.json": {
+      "source": "package-manifest.json",
+      "bytes": 728,
+      "sha256": "a678df09f38e5ada203cdbd66cafbf6c619b30cc7f63b081a2857cb22e19d567"
+    },
+    "package-build-closure.json": {
+      "source": "package-build-closure.json",
+      "bytes": 1215,
+      "sha256": "794bfa0f0d31ad25157aefbe6c3ce4289375e4160d8834239e7e3ddf882433c4"
+    }
+  }
+}

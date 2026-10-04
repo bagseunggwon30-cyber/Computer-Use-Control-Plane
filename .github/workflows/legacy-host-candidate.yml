@@ -1,0 +1,104 @@
+name: Legacy Python host candidate only
+on:
+  workflow_dispatch:
+  push:
+    branches: [migration/python-csharp-runtime]
+    paths:
+      - 'pcucp-next/python/pcucp_cli/legacy_host*.py'
+      - 'pcucp-next/python/pcucp_cli/legacy_dispatch.py'
+      - 'pcucp-next/python/pcucp_cli/native_host.py'
+      - 'pcucp-next/python/pcucp_cli/cdp.py'
+      - 'pcucp-next/python/pcucp_cli/protocol.py'
+      - 'pcucp-next/python/pcucp_cli/worker_lifetime.py'
+      - 'pcucp-next/python/pcucp_cli/legacy_cdp*.py'
+      - 'pcucp-next/python/pcucp_cli/legacy_cdp_assets/**'
+      - 'pcucp-next/dotnet/PcuCp.LegacyHost.Qualification/**'
+      - 'pcucp-next/dotnet/PcuCp.LegacyExecution/**'
+      - 'pcucp-next/dotnet/PcuCp.LegacyDiagnostics/**'
+      - 'pcucp-next/dotnet/PcuCp.NativeHost/**'
+      - 'pcucp-next/dotnet/PcuCp.LegacyInteraction/**'
+      - 'pcucp-next/dotnet/PcuCp.LegacyPrecision/**'
+      - 'pcucp-next/dotnet/PcuCp.LegacyTaskPreset/LegacyTaskPresetKernel.cs'
+      - 'pcucp-next/dotnet/PcuCp.LegacyTaskForm/LegacyTaskFormKernel.cs'
+      - 'pcucp-next/dotnet/PcuCp.LegacySmartPlan/LegacySmartPlanKernel.cs'
+      - 'pcucp-next/dotnet/PcuCp.LegacyAppProfile/LegacyAppProfileKernel.cs'
+      - 'pcucp-next/dotnet/PcuCp.LegacyAppProfile/LegacyAppProfileController.cs'
+      - 'pcucp-next/packaging/qualify_legacy_host_candidate.py'
+      - 'docs/legacy-dispatch-contract.json'
+      - 'tests/python/test_legacy_host*.py'
+      - 'tests/python/legacy_host_trace.py'
+      - 'tests/python/helper_process_evidence.py'
+      - 'tests/python/test_cdp.py'
+      - 'tests/python/test_legacy_cdp.py'
+      - 'tests/python/legacy_production_startup.py'
+      - 'tests/python/test_legacy_execution_startup.py'
+      - 'tests/python/test_legacy_interaction_startup.py'
+      - 'tests/python/test_legacy_diagnostics_startup.py'
+      - 'tests/python/test_legacy_production_startup_harness.py'
+      - 'tests/python/test_legacy_execution_protocol_integers.py'
+      - 'tests/python/test_legacy_dispatch*.py'
+      - 'tests/fixtures/legacy-host-candidate/**'
+      - 'tests/fixtures/legacy-family-production-*.ps1'
+      - 'tests/fixtures/legacy-protocol-integers.ps1'
+      - 'tests/fixtures/migration-source-map.ps1'
+      - 'scripts/cucp.ps1'
+      - 'scripts/cucp-native-helper.ps1'
+      - 'scripts/cucp-helper-server.ps1'
+      - 'scripts/cucp-legacy-cdp-adapter.ps1'
+      - 'scripts/cucp-staged-helper-adapter.ps1'
+      - 'scripts/cucp-legacy-observation-adapter.ps1'
+      - 'scripts/cucp-legacy-interaction-adapter.ps1'
+      - 'scripts/cucp-legacy-diagnostic-adapter.ps1'
+      - '.github/migration-adapters.json'
+      - '.github/workflows/legacy-host-candidate.yml'
+permissions:
+  contents: read
+jobs:
+  linux-process-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Qualify owned Linux entry modes using mandatory preinstalled strace
+        run: python pcucp-next/packaging/qualify_legacy_host_candidate.py --candidate-only --target linux --require-process-trace --log-dir .migration-logs/legacy-host-candidate/linux
+      - name: Retain bounded raw evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-host-candidate-linux
+          path: .migration-logs/legacy-host-candidate/linux
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+  windows-native-proof:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Qualify actual NativeHost and unchanged original brief oracle with startup safeguards
+        run: python pcucp-next/packaging/qualify_legacy_host_candidate.py --candidate-only --target windows --require-windows-oracle --log-dir .migration-logs/legacy-host-candidate/windows
+      - name: Retain bounded raw evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-host-candidate-windows
+          path: .migration-logs/legacy-host-candidate/windows
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7

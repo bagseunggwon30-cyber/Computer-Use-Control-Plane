@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../PcuCp.NativeHost/Contracts.cs" Link="Contracts.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacySafetyKernel.cs" Link="LegacySafetyKernel.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyWorkflowKernel.cs" Link="LegacyWorkflowKernel.cs" />
+    <Compile Include="../PcuCp.NativeHost/LegacyWorkflowLiteralParser.cs" Link="LegacyWorkflowLiteralParser.cs" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-ps51-observed-37058066571.json" Link="workflow-ps51-observed.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-literal-inferred.json" Link="workflow-literal-inferred.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-ps51-embedded-observed-37074340659.json" Link="workflow-ps51-embedded-observed.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-diagnostic-candidate.json" Link="workflow-diagnostic-candidate.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-boundary-candidate.json" Link="workflow-boundary-candidate.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-ps51-boundary-observed-37079778520.json" Link="workflow-ps51-boundary-observed.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-ps51-mode-observed-37079778520.json" Link="workflow-ps51-mode-observed.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-ps51-raw-diagnostics-37082726512.json" Link="workflow-raw-diagnostics-observed.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-diagnostic-repair-37082726512.json" Link="workflow-diagnostic-repair.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-command-position-observed-37084621275.json" Link="workflow-command-position-observed.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-ps51-raw-diagnostics-37086299736.json" Link="workflow-token-kind-raw.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../tests/fixtures/legacy-workflow-token-kind-repair-37086299736.json" Link="workflow-token-kind-repair.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

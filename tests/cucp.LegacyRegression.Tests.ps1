@@ -3,13 +3,33 @@ BeforeAll {
 # Run: Invoke-Pester tests/cucp.LegacyRegression.Tests.ps1
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $wrapperPath = Join-Path $repoRoot "scripts/cucp.ps1"
-$helperPath = Join-Path $repoRoot "scripts/cucp-native-helper.ps1"
+$historicalDirectory = Join-Path $TestDrive 'historical-native'
+$helperPath = & python (Join-Path $repoRoot 'tests/python/legacy_historical_native.py') --directory $historicalDirectory
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $helperPath -PathType Leaf)) { throw 'Pinned historical native oracle unavailable.' }
 $tokens = $null
 $parseErrors = $null
 $wrapperAst = [System.Management.Automation.Language.Parser]::ParseFile($wrapperPath, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
 $helperAst = [System.Management.Automation.Language.Parser]::ParseFile($helperPath, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+$historicalWrapperAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $historicalDirectory 'cucp.ps1'), [ref]$tokens, [ref]$parseErrors)
+if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+$cdpPath = Join-Path $repoRoot "scripts/cucp-legacy-cdp-adapter.ps1"
+$cdpAst = [System.Management.Automation.Language.Parser]::ParseFile($cdpPath, [ref]$tokens, [ref]$parseErrors)
+if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+$Script:LegacyCdpSourceRoot = $repoRoot
+# The CI gate supplies the matching compiled host for compatibility and family sessions.
+if (-not $env:CUCP_NATIVE_HOST -or -not (Test-Path -LiteralPath $env:CUCP_NATIVE_HOST -PathType Leaf) -or
+    [IO.Path]::GetExtension($env:CUCP_NATIVE_HOST) -notin @('.exe', '.dll')) {
+  throw 'Set CUCP_NATIVE_HOST to the matching built NativeHost executable or DLL before running these regressions.'
+}
+$Script:Brief = $false
+$Script:AllowLiveControl = $false
+$Script:CacheSeconds = 0
+$Script:CliPath = $null
+$Script:AuditDir = Join-Path $TestDrive 'audit'
+$Script:CacheDir = Join-Path $TestDrive 'cache'
+$Script:WrapperLog = Join-Path $TestDrive 'wrapper.log'
 
 function Get-LegacyFunctionText {
   param($Ast, [string]$Name)
@@ -19,10 +39,58 @@ function Get-LegacyFunctionText {
   if ($found.Count -ne 1) { throw "Expected one definition of $Name; found $($found.Count)" }
   return $found[0].Extent.Text
 }
-foreach ($name in @("_Read-OptValue", "_Read-Switch", "_Parse-WorkflowStepTokens", "_Read-WorkflowStepSpecs",
-    "_Build-WorkflowPlan", "Invoke-MacroCdpEval", "Invoke-MacroSafeType", "Invoke-MacroClickPoint",
+foreach ($name in @("_Invoke-LegacyCompatibility", "_Read-OptValue", "_Read-Switch", "_Parse-WorkflowStepTokens", "_Read-WorkflowStepSpecs",
+    "_Build-WorkflowPlan", "Invoke-MacroSafeType", "Invoke-MacroClickPoint",
     "Invoke-MacroBenchmark", "Invoke-MacroPrecisionValidate")) {
   . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $wrapperAst -Name $name)))
+}
+foreach ($name in @("_Invoke-LegacyCdpBridge", "_Invoke-LegacyCdpMacro", "Invoke-MacroCdpEval")) {
+  . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $cdpAst -Name $name)))
+}
+# Load real transport and family support for both retained bodies and promoted
+# delegates. Public macros above always come from the main production wrapper.
+foreach ($name in @('_Read-StandaloneConfirmation', '_Execution-Require', '_Execution-Fields',
+    '_Execution-EncodeWire', '_Execution-DecodeWire', '_Execution-WriteChunks', '_Execution-WriteDiagnostic',
+    '_Execution-ValidateEffect', '_Execution-Dispatch', '_Execution-EffectMayChangeState',
+    '_Invoke-LegacyExecutionEffectLoop', '_Invoke-LegacyExecutionHost')) {
+  . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $wrapperAst -Name $name)))
+}
+$familySupport = @(
+  @{ Path = 'scripts/cucp-legacy-interaction-adapter.ps1'; Names = @(
+    '_Interaction-Integer', '_Interaction-Number', '_Interaction-Text', '_Interaction-Point',
+    '_Interaction-Arguments', '_Interaction-Record', '_Interaction-ValidateEffect', '_Interaction-Dispatch',
+    '_Invoke-LegacyInteractionFamily') },
+  @{ Path = 'scripts/cucp-legacy-diagnostic-adapter.ps1'; SourceFile = $true; Names = @(
+    '_Diagnostic-Require', '_Diagnostic-Fields', '_Diagnostic-ArgvEquals', '_Diagnostic-Value',
+    '_Diagnostic-IntOption', '_Diagnostic-NewState', '_Diagnostic-Limit', '_Diagnostic-ValidateEffect',
+    '_Diagnostic-Clock', '_Diagnostic-NodeVersion', '_Diagnostic-TailBytes', '_Diagnostic-AssertOwnedRoot',
+    '_Diagnostic-PathEquals', '_Diagnostic-AuditProbe', '_Diagnostic-ClearAppshotCache',
+    '_Diagnostic-CapturedMacro', '_Diagnostic-Dispatch', '_Diagnostic-PreparePayload', '_Diagnostic-GetContext',
+    '_Diagnostic-ProcessorCount', '_Invoke-LegacyDiagnosticFamily', '_Diagnostic-Processes',
+    '_Diagnostic-ProcessMetrics', '_Diagnostic-DisposeProcesses') }
+)
+foreach ($support in $familySupport) {
+  $supportPath = Join-Path $repoRoot $support.Path
+  $supportAst = [System.Management.Automation.Language.Parser]::ParseFile($supportPath, [ref]$tokens, [ref]$parseErrors)
+  if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+  foreach ($name in $support.Names) {
+    $functionText = Get-LegacyFunctionText -Ast $supportAst -Name $name
+    if (-not $support.SourceFile) { . ([scriptblock]::Create($functionText)) }
+  }
+  if ($support.SourceFile) {
+    # Preserve the real file's PSScriptRoot used by _Diagnostic-GetContext.
+    # Only the listed support definitions may execute; public macros stay above.
+    $statements = @($supportAst.EndBlock.Statements)
+    if ($supportAst.UsingStatements.Count -or $supportAst.ParamBlock -or
+        $supportAst.BeginBlock -or $supportAst.ProcessBlock -or
+        ($supportAst.PSObject.Properties['CleanBlock'] -and $supportAst.CleanBlock) -or
+        $supportAst.DynamicParamBlock -or $supportAst.EndBlock.Traps.Count -or
+        $statements.Count -ne $support.Names.Count -or @($statements | Where-Object {
+          $_ -isnot [System.Management.Automation.Language.FunctionDefinitionAst] -or
+          $_.Name -cnotin $support.Names
+        }).Count) { throw 'File-backed support must contain only the selected function definitions.' }
+    . $supportPath
+  }
 }
 function Invoke-NativeHelper { param([string[]]$ArgList) throw "Live helper must be mocked" }
 function _Classify-SafetyFromText { param($Text, $MacroName) return @{ requires_explicit_confirmation=$false } }
@@ -40,7 +108,8 @@ function Invoke-CapturedLegacy {
 }
 
 # Exercise the production SendInput check with an injected native API stub.
-$helperSource = Get-Content -LiteralPath $helperPath -Raw -Encoding UTF8
+$interopSource = Join-Path $repoRoot "pcucp-next/dotnet/PcuCp.LegacyInterop/CucpNative.cs"
+$helperSource = Get-Content -LiteralPath $interopSource -Raw -Encoding UTF8
 $checkedMethod = [regex]::Match($helperSource, '(?s)  private static void SendInputChecked\(INPUT\[\] inputs\) \{.*?\n  \}').Value
 if (-not $checkedMethod) { throw "SendInputChecked implementation missing" }
 if (-not ("CucpLegacyInputTestNative" -as [type])) {
@@ -64,8 +133,158 @@ Describe "legacy command boundaries" {
   }
   It "blocks arbitrary JavaScript before touching a CDP target" {
     Mock Invoke-NativeHelper { throw "Must not execute" }
-    { Invoke-MacroCdpEval -Rest @("--expr", "document.body.remove()") } | Should -Throw
+    { Invoke-MacroCdpEval -Rest @("--expr", "document.body.remove()") } | Should -Throw "*requires -AllowLiveControl*"
     Assert-MockCalled Invoke-NativeHelper -Times 0 -Exactly
+  }
+  It "uses the first Python on PATH when duplicate applications are discoverable" {
+    Mock Invoke-NativeHelper { throw "Must not execute" }
+    $originalPath = $env:PATH
+    $originalCdpHost = $env:CUCP_LEGACY_CDP_HOST
+    $originalCdpPython = $env:CUCP_LEGACY_CDP_PYTHON
+    try {
+      $realPython = (Get-Command python.exe -CommandType Application -TotalCount 1 -ErrorAction Stop).Source
+      Test-Path -LiteralPath $realPython -PathType Leaf | Should -BeTrue
+      $secondDirectory = Join-Path $TestDrive 'secondary-python'
+      [void](New-Item -ItemType Directory -Path $secondDirectory)
+      $inertPython = Join-Path $secondDirectory 'python.exe'
+      [IO.File]::WriteAllBytes($inertPython, [byte[]]@())
+      $env:PATH = ([IO.Path]::GetDirectoryName($realPython), $secondDirectory, $originalPath) -join [IO.Path]::PathSeparator
+      $env:CUCP_LEGACY_CDP_HOST = $null
+      $env:CUCP_LEGACY_CDP_PYTHON = $null
+      $candidates = @(Get-Command python.exe -CommandType Application -ErrorAction Stop)
+      $candidates.Count | Should -BeGreaterOrEqual 2
+      $candidates[0].Source | Should -Be $realPython
+      @($candidates.Source) | Should -Contain $inertPython
+      { Invoke-MacroCdpEval -Rest @("--expr", "document.body.remove()") } | Should -Throw "*requires -AllowLiveControl*"
+      Assert-MockCalled Invoke-NativeHelper -Times 0 -Exactly
+    } finally {
+      $env:PATH = $originalPath
+      $env:CUCP_LEGACY_CDP_HOST = $originalCdpHost
+      $env:CUCP_LEGACY_CDP_PYTHON = $originalCdpPython
+    }
+  }
+  It "uses the same first-Application rule for the actual staged helper bridge" {
+    $originalPath = $env:PATH
+    $originalStaged = $env:CUCP_STAGED_COMPILED_HELPER
+    $originalDesktop = $env:CUCP_STAGED_HELPER_READONLY_DESKTOP
+    $originalSelected = $Script:StagedCompiledHelper
+    $originalCeiling = $Script:StagedHelperDesktop
+    $originalLock = $Script:HelperLockPath
+    try {
+      $realPython = (Get-Command python.exe -CommandType Application -TotalCount 1 -ErrorAction Stop).Source
+      $secondDirectory = Join-Path $TestDrive 'staged-secondary-python'
+      [void](New-Item -ItemType Directory -Path $secondDirectory)
+      $inertPython = Join-Path $secondDirectory 'python.exe'
+      [IO.File]::WriteAllBytes($inertPython, [byte[]]@())
+      $env:PATH = ([IO.Path]::GetDirectoryName($realPython), $secondDirectory, $originalPath) -join [IO.Path]::PathSeparator
+      $candidates = @(Get-Command python.exe -CommandType Application -ErrorAction Stop)
+      $candidates.Count | Should -BeGreaterOrEqual 2
+      $candidates[0].Source | Should -Be $realPython
+      @($candidates.Source) | Should -Contain $inertPython
+      $env:CUCP_STAGED_COMPILED_HELPER = '1'
+      $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $null
+      . (Join-Path $repoRoot 'scripts/cucp-staged-helper-adapter.ps1')
+      # Reach the actual Python bridge with a closed invalid operation. Package
+      # availability may vary in this shared gate; either error is returned by
+      # the launched bridge, never by Process.Start or a second executable.
+      $message = $null
+      try { $null = _Invoke-StagedHelper -Operation 'owned-invalid-operation' }
+      catch { $message = $_.Exception.Message }
+      $message | Should -BeLike 'Staged helper failed; no fallback or retry:*'
+    } finally {
+      $env:PATH = $originalPath
+      $env:CUCP_STAGED_COMPILED_HELPER = $originalStaged
+      $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $originalDesktop
+      $Script:StagedCompiledHelper = $originalSelected
+      $Script:StagedHelperDesktop = $originalCeiling
+      $Script:HelperLockPath = $originalLock
+    }
+  }
+  It "refuses an empty or nonscalar staged Python result before process construction" {
+    $originalStaged = $env:CUCP_STAGED_COMPILED_HELPER
+    $originalDesktop = $env:CUCP_STAGED_HELPER_READONLY_DESKTOP
+    $originalSelected = $Script:StagedCompiledHelper
+    $originalCeiling = $Script:StagedHelperDesktop
+    $originalLock = $Script:HelperLockPath
+    try {
+      $env:CUCP_STAGED_COMPILED_HELPER = '1'; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $null
+      . (Join-Path $repoRoot 'scripts/cucp-staged-helper-adapter.ps1')
+      Mock Get-Command { return $script:InjectedStagedCommands } -ParameterFilter { $Name -eq 'python.exe' }
+      Mock New-Object { throw 'Must not construct a process' } -ParameterFilter { $TypeName -eq 'Diagnostics.Process' }
+      $script:InjectedStagedCommands = @()
+      { _Invoke-StagedHelper -Operation 'version' } | Should -Throw '*one Python application*'
+      $script:InjectedStagedCommands = @([pscustomobject]@{Source='invalid.exe';CommandType='Application'})
+      { _Invoke-StagedHelper -Operation 'version' } | Should -Throw '*invalid or missing*'
+      $script:InjectedStagedCommands = @([pscustomobject]@{Source='first.exe'},[pscustomobject]@{Source='second.exe'})
+      { _Invoke-StagedHelper -Operation 'version' } | Should -Throw '*one Python application*'
+      Assert-MockCalled Get-Command -Times 3 -Exactly -ParameterFilter { $Name -eq 'python.exe' -and $TotalCount -eq 1 }
+      Assert-MockCalled New-Object -Times 0 -Exactly -ParameterFilter { $TypeName -eq 'Diagnostics.Process' }
+    } finally {
+      $env:CUCP_STAGED_COMPILED_HELPER = $originalStaged; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $originalDesktop
+      $Script:StagedCompiledHelper = $originalSelected; $Script:StagedHelperDesktop = $originalCeiling; $Script:HelperLockPath = $originalLock
+    }
+  }
+  It "refuses a disappeared first staged Python without discovering a replacement" {
+    $originalStaged = $env:CUCP_STAGED_COMPILED_HELPER
+    $originalDesktop = $env:CUCP_STAGED_HELPER_READONLY_DESKTOP
+    $originalSelected = $Script:StagedCompiledHelper
+    $originalCeiling = $Script:StagedHelperDesktop
+    $originalLock = $Script:HelperLockPath
+    try {
+      $script:SelectedStagedPython = Get-Command python.exe -CommandType Application -TotalCount 1 -ErrorAction Stop
+      $script:SelectedStagedSource = $script:SelectedStagedPython.Source
+      $env:CUCP_STAGED_COMPILED_HELPER = '1'; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $null
+      . (Join-Path $repoRoot 'scripts/cucp-staged-helper-adapter.ps1')
+      Mock Get-Command { return $script:SelectedStagedPython } -ParameterFilter { $Name -eq 'python.exe' }
+      Mock Test-Path { return $false } -ParameterFilter { $LiteralPath -eq $script:SelectedStagedSource }
+      Mock New-Object { throw 'Must not construct a process' } -ParameterFilter { $TypeName -eq 'Diagnostics.Process' }
+      { _Invoke-StagedHelper -Operation 'version' } | Should -Throw '*invalid or missing*'
+      Assert-MockCalled Get-Command -Times 1 -Exactly -ParameterFilter { $Name -eq 'python.exe' -and $TotalCount -eq 1 }
+      Assert-MockCalled New-Object -Times 0 -Exactly -ParameterFilter { $TypeName -eq 'Diagnostics.Process' }
+    } finally {
+      $env:CUCP_STAGED_COMPILED_HELPER = $originalStaged; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $originalDesktop
+      $Script:StagedCompiledHelper = $originalSelected; $Script:StagedHelperDesktop = $originalCeiling; $Script:HelperLockPath = $originalLock
+    }
+  }
+  It "does not emit async write completion objects beside the staged bridge reply" {
+    $originalStaged = $env:CUCP_STAGED_COMPILED_HELPER
+    $originalDesktop = $env:CUCP_STAGED_HELPER_READONLY_DESKTOP
+    $originalSelected = $Script:StagedCompiledHelper
+    $originalCeiling = $Script:StagedHelperDesktop
+    $originalLock = $Script:HelperLockPath
+    try {
+      # Copy the actual adapter byte-for-byte into an owned source layout, with
+      # an inert Python reply fixture at its fixed bridge path. No real helper.
+      $layout = Join-Path $TestDrive 'staged-void-completion'
+      $scripts = Join-Path $layout 'scripts'
+      $python = Join-Path $layout 'pcucp-next/python'
+      [void](New-Item -ItemType Directory -Path $scripts -Force)
+      [void](New-Item -ItemType Directory -Path $python -Force)
+      $adapter = Join-Path $scripts 'cucp-staged-helper-adapter.ps1'
+      Copy-Item -LiteralPath (Join-Path $repoRoot 'scripts/cucp-staged-helper-adapter.ps1') -Destination $adapter
+      Copy-Item -LiteralPath (Join-Path $repoRoot 'tests/fixtures/legacy-helper-staged-reply.py') -Destination (Join-Path $python 'legacy_helper_bridge.py')
+      $env:CUCP_STAGED_COMPILED_HELPER = '1'; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $null
+      . $adapter
+      $replies = @(_Invoke-StagedHelper -Operation 'status')
+      $replies.Count | Should -Be 1
+      $reply = $replies[0]
+      $reply.marker | Should -Be 'owned-scalar-reply'
+      @($reply.PSObject.Properties.Name).Count | Should -Be 4
+      $reply.empty.Count | Should -Be 0
+      $reply.number | Should -Be 0
+      $reply.flag | Should -BeFalse
+      $missing = _Invoke-StagedHelper -Operation 'read'
+      ($null -eq $missing) | Should -BeTrue
+      $falseReply = _Invoke-StagedHelper -Operation 'stale' -Arguments @{snapshot=$null}
+      ($falseReply -is [bool]) | Should -BeTrue
+      $falseReply | Should -BeFalse
+      $trueReply = _Invoke-StagedHelper -Operation 'delete' -Arguments @{snapshot=$null}
+      ($trueReply -is [bool]) | Should -BeTrue
+      $trueReply | Should -BeTrue
+    } finally {
+      $env:CUCP_STAGED_COMPILED_HELPER = $originalStaged; $env:CUCP_STAGED_HELPER_READONLY_DESKTOP = $originalDesktop
+      $Script:StagedCompiledHelper = $originalSelected; $Script:StagedHelperDesktop = $originalCeiling; $Script:HelperLockPath = $originalLock
+    }
   }
   It "classifies cdp-eval as a live workflow step" {
     $plan = _Build-WorkflowPlan -Rest @("--step", 'macro cdp-eval --expr 1+1')
@@ -155,11 +374,24 @@ Describe "legacy measurement evidence" {
     $script:Brief = $false
     $script:CucpV14Schema = @{ Benchmark="cucp.benchmark/v1"; PrecisionValidate="cucp.precision-validate/v1" }
   }
+  It "loads diagnostic context from the production support file" {
+    $path = Join-Path $repoRoot 'scripts/cucp-legacy-diagnostic-adapter.ps1'
+    (Get-Command _Diagnostic-GetContext).ScriptBlock.File | Should -Be $path
+    $context = _Diagnostic-GetContext
+    [IO.Path]::GetFullPath($context.changelog_path) | Should -Be (Join-Path $repoRoot 'CHANGELOG.md')
+    $context.audit_directory | Should -Be $Script:AuditDir
+    $context.benchmark_schema | Should -Be 'cucp.benchmark/v1'
+  }
   It "does not pass a timing SLO with zero successful samples" {
     Mock Invoke-NativeHelper { return @{ExitCode=5; Json=@{status="ok"}} }
     $r = Invoke-CapturedLegacy { Invoke-MacroBenchmark -Rest @("--iters", "2") }
+    $r.ExitCode | Should -Be 0
+    $r.Json.schema | Should -Be 'cucp.benchmark/v1'
+    @($r.Json.results).Count | Should -Be 4
+    Assert-MockCalled Invoke-NativeHelper -Times 8 -Exactly
     $r.Json.slo_pass_count | Should -Be 0
     foreach ($row in $r.Json.results) {
+      @($row.samples).Count | Should -Be 2
       $row.ok_count | Should -Be 0
       $row.slo_ok | Should -Be $false
       ($null -eq $row.p95_ms) | Should -Be $true
@@ -173,7 +405,13 @@ Describe "legacy measurement evidence" {
       return @{ExitCode=0; Json=@{status="ok"}}
     }
     $r = Invoke-CapturedLegacy { Invoke-MacroBenchmark -Rest @("--iters", "3") }
+    $r.ExitCode | Should -Be 0
+    $r.Json.schema | Should -Be 'cucp.benchmark/v1'
+    @($r.Json.results).Count | Should -Be 4
+    Assert-MockCalled Invoke-NativeHelper -Times 12 -Exactly
     foreach ($row in $r.Json.results) {
+      @($row.samples).Count | Should -Be 3
+      $row.ok_count | Should -Be 3
       $row.p95_ms | Should -Be (($row.samples.ms | Measure-Object -Maximum).Maximum)
     }
   }
@@ -209,16 +447,39 @@ Describe "legacy lifecycle boundary regressions" {
     foreach ($name in @("Stop-HelperServer", "Invoke-MacroAppClose", "_Quote-NativeWindowsArgument")) {
       . ([scriptblock]::Create((Get-LegacyFunctionText -Ast $wrapperAst -Name $name)))
     }
+    # Retain the old stale-lock invariant as a pinned oracle; the current
+    # wrapper delegates to Python, whose stale/force cases have their own gate.
+    $historicalStop = Get-LegacyFunctionText -Ast $historicalWrapperAst -Name 'Stop-HelperServer'
+    . ([scriptblock]::Create(($historicalStop -replace '^function Stop-HelperServer', 'function Stop-HistoricalHelperServer')))
+    function _Invoke-StagedHelper { param($Operation, $Arguments) throw 'Must be mocked' }
     function _Read-LockSafely { return @{ pid=123; owner_user='test' } }
     function _Is-StaleLock { param($Lock) return $true }
     function _Try-Delete-Lock { }
     function Invoke-HelperPipe { param($Action, $ArgsHash, $TimeoutMs) throw 'Must be mocked' }
   }
-  It "never kills a stale helper PID even with force" {
+  It "historically never kills a stale helper PID even with force" {
     Mock Stop-Process { throw 'Unrelated PID must not be killed' }
     Mock Invoke-HelperPipe { throw 'Stale pipe must not be contacted' }
-    $result = Stop-HelperServer -Force
+    $result = Stop-HistoricalHelperServer -Force
     $result.reason | Should -Be 'stale_lock_removed'
+    Should -Invoke Stop-Process -Times 0
+    Should -Invoke Invoke-HelperPipe -Times 0
+  }
+  It "delegates forced shutdown to Python without local PID or pipe operations" {
+    Mock Stop-Process { throw 'Unrelated PID must not be killed' }
+    Mock Invoke-HelperPipe { throw 'The wrapper must not contact the pipe' }
+    Mock _Invoke-StagedHelper { return @{status='ok'; reason='shutdown_requested'; forced=$false} }
+    foreach ($force in @($false, $true)) {
+      $result = Stop-HelperServer -Force:$force
+      $result.reason | Should -Be 'shutdown_requested'
+      $result.forced | Should -BeFalse
+    }
+    Should -Invoke _Invoke-StagedHelper -Times 1 -Exactly -ParameterFilter {
+      $Operation -ceq 'stop' -and $Arguments.force -eq $false
+    }
+    Should -Invoke _Invoke-StagedHelper -Times 1 -Exactly -ParameterFilter {
+      $Operation -ceq 'stop' -and $Arguments.force -eq $true
+    }
     Should -Invoke Stop-Process -Times 0
     Should -Invoke Invoke-HelperPipe -Times 0
   }

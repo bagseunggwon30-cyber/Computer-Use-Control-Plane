@@ -1,0 +1,35 @@
+{
+  "argv": [
+    "D:\\a\\Computer-Use-Control-Plane\\Computer-Use-Control-Plane\\pcucp-next\\bin\\legacy-helper\\PcuCp.LegacyHelper.exe",
+    "serve-direct",
+    "--pipe-name",
+    "cucp-owned-direct-2cd468ef02234036a651a90eca3b1b36",
+    "--lock-file",
+    "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\CUCP direct owned \ud55c\uae00 7ajj406k\\owned-1.pid",
+    "--idle-timeout-ms",
+    "4000",
+    "--diagnostic-phases",
+    "--diagnostic-acl"
+  ],
+  "creationflags": 0,
+  "hide_window": false,
+  "exit_code": 1,
+  "timed_out": false,
+  "running": false,
+  "launch_error": null,
+  "kill_error": null,
+  "drain_incomplete": false,
+  "elapsed_ms": 93,
+  "stdin_error": null,
+  "read_errors": {},
+  "bytes_observed": {
+    "stdout": 0,
+    "stderr": 68
+  },
+  "truncated": {
+    "stdout": false,
+    "stderr": false
+  },
+  "stdout_base64": "",
+  "stderr_base64": "QXJndW1lbnRFeGNlcHRpb246IGRpcmVjdCBsb2NrIHBhdGggbXVzdCBub3QgcmVxdWlyZSBub3JtYWxpemF0aW9uDQo="
+}

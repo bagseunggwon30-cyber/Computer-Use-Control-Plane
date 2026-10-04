@@ -37,6 +37,13 @@ def smoke(bundle: Path):
             digest, name = line.split("  ", 1)
             check(hashlib.sha256((relocated / name).read_bytes()).hexdigest() == digest, f"Checksum mismatch: {name}")
         check(not list(relocated.rglob("*.ps1")), "PowerShell script leaked into the portable bundle")
+        asset_roots = [p for p in relocated.rglob("legacy_cdp_assets") if p.is_dir()]
+        check(len(asset_roots) == 1, "Frozen legacy CDP asset directory is missing or ambiguous")
+        source_assets = Path(__file__).resolve().parents[1] / "python/pcucp_cli/legacy_cdp_assets"
+        for source_asset in source_assets.glob("*.js"):
+            bundled = asset_roots[0] / source_asset.name
+            check(bundled.is_file() and bundled.read_bytes() == source_asset.read_bytes(),
+                  f"Frozen legacy CDP asset differs: {source_asset.name}")
         env = isolated_environment()
         exe = relocated / "CUCP.exe"
 
@@ -55,6 +62,12 @@ def smoke(bundle: Path):
         expected_native = relocated / "native" / "PcuCp.NativeHost.exe"
         check(Path(diagnostic["native_command"][0]).samefile(expected_native),
               f"Native path did not follow relocated executable: {diagnostic['native_command']}")
+        bridge = json.loads(invoke([exe, "legacy-cdp-bridge", "--operation", "native",
+                                    "--endpoint", "http://127.0.0.1:9"],
+                                   json.dumps({"action": "cdp-click", "args": {"selector": "#never-click"}}) + "\n"))
+        check(bridge["status"] == "ok" and bridge["data"]["payload"]["reason"] == "live_control_required",
+              "Frozen legacy CDP bridge did not reject input before network access")
+        check(bridge["data"]["exit_code"] == 3, "Frozen legacy CDP authority exit changed")
         requests = [
             {"schema": "cucp.request/v1", "id": "caps-한글", "command": "capabilities", "args": {}},
             {"schema": "cucp.request/v1", "id": "no-input", "command": "click", "args": {"observation_id": "bad", "x": 0, "y": 0}},
@@ -68,6 +81,38 @@ def smoke(bundle: Path):
         live = [json.loads(line) for line in invoke([exe, "serve", "--allow-live-control"], source).splitlines()]
         check(live[0]["data"]["allow_live_control"] is True, "Startup authority flag was lost")
         check(live[1]["errors"][0]["code"] == "stale_observation", "Live mode accepted an unobserved target")
+        # New Python orchestration and pure-processing modules must be present in
+        # the frozen package; these probes deliberately issue no desktop action.
+        probes = [
+            {"schema": "cucp.request/v1", "id": "plan", "command": "workflow-plan", "args": {"workflow": {
+                "steps": [{"command": "windows", "args": {}}]}}},
+            {"schema": "cucp.request/v1", "id": "blocked-form", "command": "form-run", "args": {
+                "hwnd": "0x1", "fields": [{"selector": {"name": "Title"}, "text": "한글"}]}},
+            {"schema": "cucp.request/v1", "id": "no-ocr", "command": "ocr-find", "args": {"observation_id": "absent", "text": "text"}},
+            {"schema": "cucp.request/v1", "id": "no-diff", "command": "screenshot-diff", "args": {"before_id": "absent", "after_id": "absent"}},
+            {"schema": "cucp.request/v1", "id": "record", "command": "record-start", "args": {}},
+            {"schema": "cucp.request/v1", "id": "stop", "command": "record-stop", "args": {}},
+            {"schema": "cucp.request/v1", "id": "cdp-disabled", "command": "cdp-detect", "args": {}},
+        ]
+        probes_wire = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in probes)
+        checks = [json.loads(line) for line in invoke([exe, "serve"], probes_wire).splitlines()]
+        check(len(checks) == len(probes), "Expanded JSONL tools returned missing responses")
+        check(checks[0]["status"] == "ok", "Frozen workflow planner unavailable")
+        check(checks[1]["errors"][0]["code"] == "live_control_required", "Frozen form live gate failed")
+        check(checks[2]["errors"][0]["code"] == "stale_observation", "Frozen OCR processing module unavailable")
+        check(checks[3]["errors"][0]["code"] == "snapshot_unavailable", "Frozen PNG/diff module unavailable")
+        check(checks[4]["status"] == "ok" and checks[5]["data"]["active"] is False, "Frozen audit lifecycle failed")
+        check(checks[6]["errors"][0]["code"] == "cdp_not_configured", "Frozen optional CDP adapter did not fail closed")
+        handshake = [
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-11-25",
+                "capabilities": {}, "clientInfo": {"name": "portable-smoke", "version": "1"}}},
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+        ]
+        mcp = [json.loads(line) for line in invoke([exe, "mcp"], "".join(json.dumps(r) + "\n" for r in handshake)).splitlines()]
+        names = {tool["name"] for tool in mcp[-1]["result"]["tools"]}
+        check({"cucp_workflow_run", "cucp_form_run", "cucp_uia_toggle", "cucp_ocr_window", "cucp_screenshot_diff", "cucp_cdp_observe", "cucp_cdp_eval"} <= names,
+              "Frozen MCP capability inventory is incomplete")
         # Prove the published worker starts twice on one connection, with its own .NET runtime.
         native = relocated / "native" / "PcuCp.NativeHost.exe"
         wire = "".join(json.dumps({"schema": "pcucp.native.request/v1", "id": i, "command": "version", "args": []}) + "\n" for i in (1, 2))
@@ -75,7 +120,7 @@ def smoke(bundle: Path):
         check(len(responses) == 2 and all(r["exit_code"] == 0 for r in responses), "Native resident protocol failed")
         check(responses[0]["payload"]["data"]["process"] == responses[1]["payload"]["data"]["process"], "Native worker was not reused")
         invoke([exe, "legacy", "version"], expected=2)
-        print("Portable smoke passed: checksums, relocation, Unicode paths, no runtime PATH, doctor, JSONL, authority gates, resident native worker, legacy exclusion.")
+        print("Portable smoke passed: checksums, relocation, Unicode paths, no runtime PATH, doctor, JSONL, authority gates, resident native worker, expanded workflows/OCR/diff, MCP schemas, legacy exclusion.")
 
 
 if __name__ == "__main__":

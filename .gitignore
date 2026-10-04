@@ -60,3 +60,6 @@ tests/_*.ps1
 tests/scratch-*.ps1
 tests/.*.ps1
 tests/.*.txt
+
+# Raw migration fixture evidence (CI uploads; never runtime inputs).
+/.migration-logs/

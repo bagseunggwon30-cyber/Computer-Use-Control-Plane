@@ -1,0 +1,349 @@
+{
+  "schema": "cucp.workflow-command-position-repair/v1",
+  "provenance": {
+    "evidence": "observed-windows-powershell-5.1-raw-diagnostics",
+    "run_id": "37084621275",
+    "run_url": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37084621275",
+    "tested_commit": "fe3963929cebefd23b318f129a236d8ff7b5acb3",
+    "raw_capture_sha256": "7e12bab3a28adf209bc1a7d1437260cc9b53af2e84a006d1be94639d8ddcade0",
+    "artifact_zip_sha256": "351a8145d09804fd3dfd8a8ddc08f465ff7fdd3f9c985fb6611e8927df5e94a0",
+    "historical_raw_case_count": 124,
+    "historical_exact_gap_count": 107,
+    "historical_normalized_gap_count": 9,
+    "historical_text_only_gap_count": 98,
+    "qualification": "Preserved full positive original/candidate row. Counts describe the historical capture and overlap; this is not full parser parity.",
+    "observed_positive_rows_sha256": "a674092da4b3662c85a4a4ac5997b72b752a0b10797f01123bb62d2f7f5f7f86"
+  },
+  "oracle_provenance": {
+    "ps_culture": "en-US",
+    "os_version": "Microsoft Windows NT 10.0.26100.0",
+    "captured_at_utc": "2026-10-03T01:05:50.1209314Z",
+    "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
+    "helper_sha256": {
+      "_Build-WorkflowPlan": "ddf28af7d127b8fd8d65cabee819b837498e13559fe44b9c6c47d44a2be18321",
+      "_Read-WorkflowStepSpecs": "09a422b9c0c01ceba581b27ac731a452bef598622bd850cc60a23aa857e4efde",
+      "_Parse-WorkflowStepTokens": "fe3f57b751d83d78a5f938c42e92a9a29302bf9f08a270d30dd50e24b5e26f97",
+      "_Classify-SafetyFromText": "b2daf87d93f94c44fba02c399b2fb8e43a4824671471296c1a2b3d7d9b2d8492",
+      "_Read-OptValue": "6030677f02f72efe4fddb607a600489d9782dc404df1d5a7ed0a83d07e19faaf",
+      "_Safety-Truncate": "0adbf080570404c8c1c9b98d624a35c2cc5a14fc05c6e507357fa75c359b3035"
+    },
+    "oracle": "PSParser.Tokenize plus unchanged pinned private workflow functions",
+    "culture": "en-US",
+    "ui_culture": "en-US",
+    "input_sha256": "c9d9e3b1a9ebb84b37cd85f97015498f18f8742a8e3a9eef1c14a9962389655d",
+    "source_sha256": "cde48460283ad24758fbcea36310385c270984582ffd833c3aa30e7f0c983dfd",
+    "powershell_edition": "Desktop",
+    "clr_version": "4.0.30319.42000",
+    "evidence": "observed-windows-powershell-5.1-raw-diagnostics",
+    "ps_ui_culture": "en-US",
+    "powershell_version": "5.1.26100.33438",
+    "candidate_commit": "fe3963929cebefd23b318f129a236d8ff7b5acb3",
+    "candidate_worktree_dirty": false
+  },
+  "observed_positive_targets": [
+    {
+      "id": "diagnostic_context_named_block_after_newline",
+      "step": "macro windows\nprocess",
+      "parse_errors": [],
+      "plan": {
+        "schema": "cucp.workflow-plan/v1",
+        "status": "ok",
+        "name": null,
+        "step_count": 1,
+        "allowed_count": 1,
+        "live_step_count": 0,
+        "sensitive_step_count": 0,
+        "requires_sensitive_confirmation": false,
+        "safe_to_run": true,
+        "safety_policy": {
+          "schema": "cucp.safety-policy/v1",
+          "confirmation_flag": "--confirm-sensitive",
+          "levels_requiring_confirmation": [
+            "medium",
+            "high",
+            "critical"
+          ],
+          "categories_requiring_confirmation": [
+            "credentials",
+            "payment",
+            "destructive",
+            "external_send",
+            "identity_or_privacy",
+            "system_change",
+            "app_settings"
+          ]
+        },
+        "steps": [
+          {
+            "index": 1,
+            "raw": "macro windows\nprocess",
+            "macro": "windows",
+            "command": [
+              "macro",
+              "windows",
+              "process"
+            ],
+            "allowed": true,
+            "live_required": false,
+            "reason": "read_only_macro",
+            "safety": {
+              "schema": "cucp.safety-classify/v1",
+              "status": "ok",
+              "macro": "windows",
+              "risk_level": "none",
+              "risk_score": 0,
+              "requires_explicit_confirmation": false,
+              "blocked_by_default": false,
+              "confirmation_flag": "--confirm-sensitive",
+              "categories": [],
+              "matches": [],
+              "input_preview": "macro windows process",
+              "recommended_action": "No sensitive-action confirmation required by the local classifier."
+            },
+            "requires_sensitive_confirmation": false
+          }
+        ],
+        "errors": []
+      },
+      "first_unsupported_token_type": null,
+      "parsed": {
+        "ok": true,
+        "error": "",
+        "detail": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "process"
+        ]
+      },
+      "candidate": {
+        "parsed": {
+          "ok": false,
+          "error": "unsupported_token",
+          "detail": "Reserved statement keywords are not literal commands.",
+          "tokens": []
+        },
+        "plan": {
+          "schema": "cucp.workflow-plan/v1",
+          "status": "partial",
+          "name": null,
+          "step_count": 0,
+          "allowed_count": 0,
+          "live_step_count": 0,
+          "sensitive_step_count": 0,
+          "requires_sensitive_confirmation": false,
+          "safe_to_run": false,
+          "safety_policy": {
+            "schema": "cucp.safety-policy/v1",
+            "confirmation_flag": "--confirm-sensitive",
+            "levels_requiring_confirmation": [
+              "medium",
+              "high",
+              "critical"
+            ],
+            "categories_requiring_confirmation": [
+              "credentials",
+              "payment",
+              "destructive",
+              "external_send",
+              "identity_or_privacy",
+              "system_change",
+              "app_settings"
+            ]
+          },
+          "steps": [],
+          "errors": [
+            {
+              "index": 1,
+              "code": "unsupported_token",
+              "message": "Reserved statement keywords are not literal commands.",
+              "step": "macro windows\nprocess"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "historical_inferred_prediction": {
+    "id": "diagnostic_context_named_block_after_newline",
+    "evidence": "inferred-unqualified",
+    "step": "macro windows\nprocess",
+    "preflight_error": "",
+    "candidate": {
+      "ok": false,
+      "error": "unsupported_token",
+      "tokens": []
+    }
+  },
+  "inferred_live_neighbors": [
+    {
+      "id": "command_position_begin",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows\nbegin",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "begin"
+        ]
+      }
+    },
+    {
+      "id": "command_position_end",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows\nend",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "end"
+        ]
+      }
+    },
+    {
+      "id": "command_position_dynamicparam",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows\ndynamicparam",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "dynamicparam"
+        ]
+      }
+    },
+    {
+      "id": "command_position_uppercase_crlf",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows\r\nPROCESS",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "PROCESS"
+        ]
+      }
+    }
+  ],
+  "inferred_managed_neighbors": [
+    {
+      "id": "command_position_bare_cr",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows\rprocess",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "process"
+        ]
+      }
+    },
+    {
+      "id": "command_position_blank_lines",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows\n\nprocess",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "process"
+        ]
+      }
+    },
+    {
+      "id": "command_position_different_command",
+      "evidence": "inferred-unqualified",
+      "step": "windows\nprocess",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "windows",
+          "process"
+        ]
+      }
+    },
+    {
+      "id": "command_position_script_head",
+      "evidence": "inferred-unqualified",
+      "step": "process",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "command_position_leading_blank",
+      "evidence": "inferred-unqualified",
+      "step": "\nprocess",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "command_position_other_keyword",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows\nif",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "command_position_separator",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows;process",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "command_position_group",
+      "evidence": "inferred-unqualified",
+      "step": "macro windows\nprocess (",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "command_position_quoted_expression",
+      "evidence": "inferred-unqualified",
+      "step": "'literal'\nprocess",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "command_position_numeric_expression",
+      "evidence": "inferred-unqualified",
+      "step": "1\nprocess",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    }
+  ]
+}

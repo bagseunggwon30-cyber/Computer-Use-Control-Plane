@@ -1,0 +1,603 @@
+{
+  "schema": "cucp.workflow-boundary-observations/v1",
+  "provenance": {
+    "evidence": "observed-windows-powershell-5.1",
+    "run_id": "37079778520",
+    "run_url": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37079778520",
+    "tested_commit": "0e6e6748f475ee1526b82f3751f11da8ba42e64a",
+    "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
+    "log_sha256": "1c43ee04c706b02e83d7c4363c80a06c22fdb1f37945f0220ee1d5353da1a61c",
+    "log_line": 271,
+    "normalization": "Full original boundary mismatch rows copied unchanged from WORKFLOW BOUNDARY EDGES NOT QUALIFIED. before is actual PS5.1 output; after is the historical candidate. Localized details were excluded by the original harness.",
+    "rows_sha256": "8b8b9a1eb3d6925fe0efa03d5ceb26df5b0e83a25b084d996e8924794e6b3e1f"
+  },
+  "repair_target_ids": [
+    "stop_cooked_marker_64",
+    "stop_cooked_marker_65",
+    "nul_198",
+    "nul_199",
+    "nul_203"
+  ],
+  "observed_gaps": [
+    {
+      "id": "signed_expression_15",
+      "step": "+1 | macro windows",
+      "before": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_16",
+      "step": "+1 + 2",
+      "before": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_32",
+      "step": "-1 | macro windows",
+      "before": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_33",
+      "step": "-1 + 2",
+      "before": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_34",
+      "step": "+",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_35",
+      "step": "-",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_36",
+      "step": "++1",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_37",
+      "step": "--1",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_38",
+      "step": "+abc",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_39",
+      "step": "-abc",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-abc"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_42",
+      "step": "-1e",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-1e"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_43",
+      "step": "-1e+",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-1e+"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_45",
+      "step": "+0x",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_46",
+      "step": "-.",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_47",
+      "step": "-1e9999",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_cooked_marker_64",
+      "step": "macro windows '--%' a b",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a",
+          "b"
+        ]
+      },
+      "after": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "stop_cooked_marker_65",
+      "step": "macro windows \"--%\" a b",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a",
+          "b"
+        ]
+      },
+      "after": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "bracket_syntax_122",
+      "step": "macro windows [",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "["
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bracket_syntax_123",
+      "step": "macro windows [ word ]",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "[",
+          "word",
+          "]"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bracket_syntax_124",
+      "step": "macro windows ]",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "]"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bracket_syntax_125",
+      "step": "macro windows ]suffix",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "]",
+          "suffix"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "nul_198",
+      "step": "macro windows a\u0000",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a"
+        ]
+      },
+      "after": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "\u0000"
+        ]
+      }
+    },
+    {
+      "id": "nul_199",
+      "step": "macro windows a\u0000\u0000b",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "\u0000b"
+        ]
+      },
+      "after": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "\u0000",
+          "\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "nul_203",
+      "step": "macro windows a\u0000 b",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      },
+      "after": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "\u0000",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_nul_unqualified_204",
+      "step": "macro windows \"a\u0000b\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u0000b"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "quoted_nul_unqualified_205",
+      "step": "macro windows 'a\u0000b'",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u0000b"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "quoted_nul_unqualified_206",
+      "step": "macro windows \"a`\u0000b\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a`\u0000b"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "quoted_nul_unqualified_207",
+      "step": "macro windows @'\na\u0000b\n'@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u0000b"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "quoted_nul_unqualified_208",
+      "step": "macro windows @\"\na\u0000b\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u0000b"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_adjacent_nul_unterminated_quote",
+      "step": "macro windows --%\u0000\"unterminated",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "\u0000\"unterminated"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_adjacent_nul_subexpression",
+      "step": "macro windows --%\u0000$(",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "\u0000$("
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_quoted_marker_adjacent_nul",
+      "step": "macro windows '--%'\u0000raw",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "\u0000raw"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_escaped_marker_adjacent_nul",
+      "step": "macro windows `--%\u0000raw",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "\u0000raw"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    }
+  ]
+}

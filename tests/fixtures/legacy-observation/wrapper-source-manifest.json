@@ -1,0 +1,12 @@
+{
+  "schema": "cucp.observation-wrapper-source/v1",
+  "git_blob": "dc4d420158f490000c85e0b8a0eb483f022dcc76",
+  "raw_sha256": "f151774d4675b232f62c2b952cb7fe27c4173e9ceeb1b489603961eff6f9b8cc",
+  "raw_bytes": 402720,
+  "windows_sha256": "e45d872e18d61e01027397bf72dc206c026f1fdcbe1c97d3bc8d2811a8f90729",
+  "windows_bytes": 411059,
+  "evidence_run": "37120978323",
+  "artifact_sha256": "92ccf3d8f305b62fe9ab3fc1f927be668bb163afb3ecddcee2573a6ee25a74b4",
+  "line_endings": "CRLF reproduces the immutable Windows checkout bytes",
+  "retirement_credit": 0
+}

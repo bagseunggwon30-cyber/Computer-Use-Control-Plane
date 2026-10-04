@@ -24,7 +24,7 @@ cucp doctor --json
 cucp mcp
 ```
 
-Publishing is an explicit developer build, never an action-time rebuild. For ARM64, add `--runtime win-arm64` (not verified in this change). `--dotnet` selects an SDK executable; `--output` selects a publish folder. The old `publish-native.ps1` is a compatibility shim delegating to this Python command. A future newly built portable bundle can use `CUCP.exe mcp`; existing 0.4.0 published downloads do **not** contain these uncommitted changes.
+Publishing is an explicit developer build, never an action-time rebuild. For ARM64, add `--runtime win-arm64` (not verified in this change). `--dotnet` selects an SDK executable; `--output` selects a publish folder. The old `publish-native.ps1` shim has been retired; use this Python command directly. A future newly built portable bundle can use `CUCP.exe mcp`; existing 0.4.0 published downloads do **not** contain these changes.
 
 ## Generic local MCP configuration
 
@@ -82,7 +82,7 @@ See [migration matrix](migration-matrix.md). Linux tests use native fakes and ex
 
 ## Observation-bound UIA and input additions (local stage two)
 
-The new core exposes 20 tools over stdio MCP and JSONL. The existing Pi extension
+This feature branch exposes 52 tools over stdio MCP and JSONL. The existing Pi extension
 retains its earlier explicit tool subset; no claim is made that its schemas gained
 these new operations. A host can use MCP or map the JSONL contract without Pi.
 
@@ -150,3 +150,13 @@ though the unreleased source still uses the same version number. `doctor` report
 missing guard support as a feature mismatch when a version response is available.
 The parent-liveness contract itself still needs real Windows handle/parent-crash
 validation; Linux tests only verify parsing and adapter wiring.
+
+
+## Expanded Python/C# feature branch
+
+See [workflow migration](workflow-migration.md) for 64-step workflows, PID-bound tasks, fresh-selector forms, bounded read-only watches and memory-only audits. New UIA patterns and exact-pixel window OCR require a native binary built from the same commit. `doctor` checks feature markers as well as the version label. No model API, Pi account, persistent service, PowerShell runtime or shell adapter is required by these tools.
+
+
+## Optional already-authorized browser endpoint
+
+Start `cucp mcp --cdp-endpoint http://127.0.0.1:9222` (or `serve`) only when a human has already authorized that specific existing endpoint. Add `--allow-live-control` only for an approved live session. CUCP does not open a debug port, scan ports, start a user's browser, change browser settings or contact a model. Discovery/DOM tools remain read-only; arbitrary `cdp-eval` is always a mutation. See [CDP migration](cdp-migration.md) for exact bounds and browser qualification limits. Native actions invalidate browser snapshots, and browser actions invalidate native observations.

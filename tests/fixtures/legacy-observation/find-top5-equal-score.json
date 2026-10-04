@@ -1,0 +1,333 @@
+{
+  "Operation": "uia-find",
+  "Options": {
+    "X": 10,
+    "Y": 10,
+    "Label": "Run",
+    "MaxElements": 25
+  },
+  "Windows": [
+    {
+      "Hwnd": 100,
+      "Title": "Fixture 한글",
+      "Foreground": true
+    }
+  ],
+  "Elements": [
+    {
+      "Id": "root",
+      "Name": "Root",
+      "Rect": [
+        0,
+        0,
+        600,
+        400
+      ],
+      "Patterns": [],
+      "LocalizedControlType": "window"
+    },
+    {
+      "Id": "e0",
+      "Name": "Run",
+      "AutomationId": "id0",
+      "Rect": [
+        0,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e1",
+      "Name": "Run",
+      "AutomationId": "id1",
+      "Rect": [
+        5,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e2",
+      "Name": "Run",
+      "AutomationId": "id2",
+      "Rect": [
+        10,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e3",
+      "Name": "Run",
+      "AutomationId": "id3",
+      "Rect": [
+        15,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e4",
+      "Name": "Run",
+      "AutomationId": "id4",
+      "Rect": [
+        20,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e5",
+      "Name": "Run",
+      "AutomationId": "id5",
+      "Rect": [
+        25,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e6",
+      "Name": "Run",
+      "AutomationId": "id6",
+      "Rect": [
+        30,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e7",
+      "Name": "Run",
+      "AutomationId": "id7",
+      "Rect": [
+        35,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e8",
+      "Name": "Run",
+      "AutomationId": "id8",
+      "Rect": [
+        40,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e9",
+      "Name": "Run",
+      "AutomationId": "id9",
+      "Rect": [
+        45,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e10",
+      "Name": "Run",
+      "AutomationId": "id10",
+      "Rect": [
+        50,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e11",
+      "Name": "Run",
+      "AutomationId": "id11",
+      "Rect": [
+        55,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e12",
+      "Name": "Run",
+      "AutomationId": "id12",
+      "Rect": [
+        60,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e13",
+      "Name": "Run",
+      "AutomationId": "id13",
+      "Rect": [
+        65,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e14",
+      "Name": "Run",
+      "AutomationId": "id14",
+      "Rect": [
+        70,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e15",
+      "Name": "Run",
+      "AutomationId": "id15",
+      "Rect": [
+        75,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e16",
+      "Name": "Run",
+      "AutomationId": "id16",
+      "Rect": [
+        80,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e17",
+      "Name": "Run",
+      "AutomationId": "id17",
+      "Rect": [
+        85,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e18",
+      "Name": "Run",
+      "AutomationId": "id18",
+      "Rect": [
+        90,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e19",
+      "Name": "Run",
+      "AutomationId": "id19",
+      "Rect": [
+        95,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e20",
+      "Name": "Run",
+      "AutomationId": "id20",
+      "Rect": [
+        100,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e21",
+      "Name": "Run",
+      "AutomationId": "id21",
+      "Rect": [
+        105,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e22",
+      "Name": "Run",
+      "AutomationId": "id22",
+      "Rect": [
+        110,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e23",
+      "Name": "Run",
+      "AutomationId": "id23",
+      "Rect": [
+        115,
+        0,
+        40,
+        20
+      ]
+    },
+    {
+      "Id": "e24",
+      "Name": "Run",
+      "AutomationId": "id24",
+      "Rect": [
+        120,
+        0,
+        40,
+        20
+      ]
+    }
+  ],
+  "Descendants": [
+    "e0",
+    "e1",
+    "e2",
+    "e3",
+    "e4",
+    "e5",
+    "e6",
+    "e7",
+    "e8",
+    "e9",
+    "e10",
+    "e11",
+    "e12",
+    "e13",
+    "e14",
+    "e15",
+    "e16",
+    "e17",
+    "e18",
+    "e19",
+    "e20",
+    "e21",
+    "e22",
+    "e23",
+    "e24"
+  ],
+  "Name": "find-top5-equal-score"
+}

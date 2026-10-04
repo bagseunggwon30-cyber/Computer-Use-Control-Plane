@@ -1,12 +1,80 @@
 name: CUCP core
-on: [push, pull_request]
+on:
+  push:
+    branches-ignore:
+      - migration/python-csharp-runtime
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 jobs:
+  migration-family-scope:
+    runs-on: ubuntu-latest
+    outputs:
+      families: ${{ steps.select.outputs.families }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - id: select
+        run: python pcucp-next/packaging/migration_qualification.py available
+  migration-families:
+    needs: migration-family-scope
+    if: needs.migration-family-scope.outputs.families != '[]'
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        family: ${{ fromJSON(needs.migration-family-scope.outputs.families) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: python pcucp-next/packaging/migration_qualification.py run --family "${{ matrix.family }}" --log-dir ".migration-logs/${{ matrix.family }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qualification-${{ matrix.family }}
+          path: .migration-logs/${{ matrix.family }}
+          include-hidden-files: true
+          retention-days: 7
+  legacy-cdp-browser:
+    needs: migration-family-scope
+    if: contains(fromJSON(needs.migration-family-scope.outputs.families), 'cdp')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python pcucp-next/packaging/migration_qualification.py run --family cdp --browser --log-dir .migration-logs/cdp-browser
+        env:
+          PYTHONPATH: pcucp-next/python
+          CUCP_CHROME_TEST: '1'
+          CUCP_LEGACY_CDP_BROWSER_TEST: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qualification-cdp-browser
+          path: .migration-logs/cdp-browser
+          include-hidden-files: true
+          retention-days: 7
   core:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -26,30 +94,166 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - run: dotnet build pcucp-next/dotnet/PcuCp.NativeHost/PcuCp.NativeHost.csproj -c Release
+      - id: build_native
+        run: dotnet build pcucp-next/dotnet/PcuCp.NativeHost/PcuCp.NativeHost.csproj -c Release
       - run: dotnet run --project pcucp-next/dotnet/PcuCp.NativeHost.ContractTests -c Release
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Legacy boundary regressions (no live input)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $env:CUCP_NATIVE_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
+          Invoke-Pester -Path tests/cucp.LegacyRegression.Tests.ps1 -CI
+      - name: Installer Unicode and argv qualification (no actual install)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = Join-Path (Get-Location).Path 'pcucp-next/python'
+          python -m unittest discover -s tests/python -p test_install_runtime.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Native resident transport (no desktop input)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
         shell: pwsh
         run: |
           $env:PYTHONPATH = Join-Path (Get-Location).Path 'pcucp-next/python'
           $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
           python -m unittest discover -s tests/python -p test_native_session.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - shell: pwsh
+      - name: Legacy OCR pure algorithm and bridge differential
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
         run: |
-          Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
-          Invoke-Pester -Path tests/cucp.LegacyRegression.Tests.ps1 -CI
+          $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          python -m unittest discover -s tests/python -p test_legacy_ocr_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Legacy safety confirmation-policy differential
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          dotnet run --project pcucp-next/dotnet/PcuCp.LegacyPure.ContractTests -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          python -m unittest discover -s tests/python -p test_legacy_safety_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Legacy coordinate mapping differential (captured fixture inputs)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          python -m unittest discover -s tests/python -p test_legacy_coordinate_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Legacy strategy ranking differential (captured fixture inputs)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          python -m unittest discover -s tests/python -p test_legacy_strategy_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Workflow exact parsed-plan and candidate qualification (parser retained)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          python pcucp-next/packaging/migration_qualification.py run --family foundation --log-dir .migration-logs/foundation-full
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Retain full foundation qualification evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qualification-foundation-full
+          path: .migration-logs/foundation-full
+          include-hidden-files: true
+          retention-days: 7
+      - name: Legacy task preset recipe qualification (captured child plans)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          dotnet run --project pcucp-next/dotnet/PcuCp.LegacyTaskPreset.ContractTests -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CUCP_NATIVE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          python -m unittest discover -s tests/python -p test_legacy_task_preset_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Task and form planning qualification (captured child replies)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          dotnet run --project pcucp-next/dotnet/PcuCp.LegacyTaskForm.ContractTests -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CUCP_TASK_FORM_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          python -m unittest discover -s tests/python -p test_legacy_task_form_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smart-plan qualification (captured read-only probes)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          dotnet run --project pcucp-next/dotnet/PcuCp.LegacySmartPlan.ContractTests -c Release -- --self-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CUCP_SMART_PLAN_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          python -m unittest discover -s tests/python -p test_legacy_smart_plan_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compiled legacy interop API and ABI qualification
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          python pcucp-next/packaging/publish_legacy_interop.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CUCP_LEGACY_INTEROP_TEST_DLL = (Resolve-Path 'pcucp-next/bin/legacy/PcuCp.LegacyInterop.dll').Path
+          python -m unittest discover -s tests/python -p test_legacy_interop.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Legacy image decoder and pixel-diff qualification (generated files only)
+        if: ${{ !cancelled() && steps.build_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          python pcucp-next/packaging/publish_legacy_images.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CUCP_LEGACY_IMAGES_TEST_DLL = (Resolve-Path 'pcucp-next/bin/legacy/PcuCp.LegacyImages.dll').Path
+          python -m unittest discover -s tests/python -p test_legacy_images.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       # No interactive desktop input tests on hosted runners. See manual Windows checks.
+  windows-profile-candidate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build native app-profile bridge
+        id: build_profile_native
+        run: dotnet build pcucp-next/dotnet/PcuCp.NativeHost -c Release -warnaserror
+      - name: App-profile captured-reply and actual bridge qualification
+        if: ${{ !cancelled() && steps.build_profile_native.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $env:CUCP_APP_PROFILE_TEST_HOST = (Resolve-Path 'pcucp-next/dotnet/PcuCp.NativeHost/bin/Release/net8.0-windows10.0.19041.0/PcuCp.NativeHost.dll').Path
+          dotnet run --project pcucp-next/dotnet/PcuCp.LegacyAppProfile.ContractTests -c Release -- --self-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tests/python -p test_legacy_app_profile_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Explicit culture alias qualification (candidate only)
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests/python -p test_legacy_strategy_culture_alias_parity.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   windows-portable:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -84,3 +288,15 @@ jobs:
             dist/CUCP-0.4.0-win-x64.zip.sha256
           if-no-files-found: error
           retention-days: 30
+  browser-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fresh-profile headless browser protocol fixtures
+        run: python -m unittest discover -s tests/python -p test_cdp_browser.py -v
+        env:
+          PYTHONPATH: pcucp-next/python
+          CUCP_CHROME_TEST: '1'

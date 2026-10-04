@@ -1,0 +1,3 @@
+﻿[2026-10-03T08:48:06.731+00:00] WARNING: cli.mjs not found. Set CUCP_CLI_PATH env var or bundle cli/ into the skill folder. Read-only macros (windows, health-quick, icon-find) still work.
+[2026-10-03T08:48:06.810+00:00] WARN CUCP CLI를 찾지 못했습니다. native/read-only 매크로만 사용할 수 있습니다.
+[2026-10-03T08:48:07.032+00:00] ERROR Exception calling "Start" with "0" argument(s): "The system cannot find the file specified"

@@ -1,0 +1,592 @@
+# Python/C# migration milestone
+
+This remains a partial migration toward zero PowerShell source and execution.
+Work is on `migration/python-csharp-runtime`; main has not been merged or replaced.
+The provider-neutral core exposes 52 MCP/JSONL tools through Python and C# without
+PowerShell, Pi, or an authenticated model provider. The broader legacy surface
+still uses compatibility hosts and unported PowerShell acquisitions/actions.
+
+## Latest full automated checkpoint
+
+The latest **required core regression** checkpoint is
+`7b7e0d28bee82a7ae4818a0f9cfd753771ff8e5b`, tree
+`41fc1aa16e3de591f85d6c085887bac0e6eccc5d`, with all 14 active required core
+jobs passing in [run 37109440464, attempt 1](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37109440464),
+completed 2026-10-03 at 08:38:57 UTC. Four focused-only jobs were intentionally
+skipped. Windows Pester passed 22 tests and diagnostics passed 63, both without
+skips or failures. The independent helper action and lifecycle workflows at this
+commit failed and remain unqualified; the core result is not an all-CI-green claim.
+
+Benchmark's 5,389-byte original body is now qualified as a 128-byte delegate:
+**5,261 runtime bytes retired**, or 5,191 net in its isolated staging change after
+70 support bytes. All 668 production and direct-candidate records meet the closed
+contract (660 exact original agreements, eight pinned owned failures, zero
+terminal failures). All 410 benchmark and 258 audit production/direct pairs are
+exact. The 16 calendar and 72 Decimal/control cases meet their unchanged bounded
+functional criteria. The [benchmark qualification](benchmark-staged-cutover.md#qualified-fresh-full-gate)
+records the verified artifact/hash, source extents, and the earlier `bb98df41`
+full-gate failure. That failed run is retained, not relabeled successful.
+
+The exact green tree has **921,730 counted PS bytes in 35 files**, including
+**609,211 scripts-only runtime bytes**. Physical removal from the original
+1,013,478-byte baseline is 91,748 bytes; this includes counted helper staging and
+oracle source and does not establish whole-helper retirement. The current local
+`a7f0da28` source contains newer, unqualified helper probes: **933,222 counted
+bytes**, the same **609,211 runtime bytes**, and 80,256 bytes below baseline.
+The inventory records those current-source counts separately from the qualified
+benchmark evidence. Wrappers/effect adapters, final-zero and interactive Windows
+acceptance remain open; main remains `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`.
+
+### Previous audit-qualified checkpoint
+
+The preceding required core checkpoint was
+`3cbbaaad0cb7b48b866d7f3cbe3f282252b3115a`, tree
+`8d87343cf9e4c8add7967427200416b9bfd0a488`, with all 14 active jobs passing in
+[run 37103102449, attempt 2](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37103102449).
+Its only first-attempt failure was the existing installer compatibility test's
+15-second process deadline; the same job/source/deadline passed on retry.
+The independent helper candidate workflow still failed its original binding
+oracle and is not qualified by this core result.
+
+Audit's real production entry now passes 258 exact original/production/direct
+pairs, all 668 production records, and no-fallback/startup checks. Its 2,728-byte
+body became a 135-byte delegate: 2,593 runtime bytes retired, 2,535 net after
+58 fixture bytes. This checkpoint has 901,934 counted PS bytes and 607,665
+runtime bytes. Later counted diagnostic probes increase the current inventory;
+they are not runtime retirement. See the [audit qualification](audit-summary-staged-cutover.md).
+PowerShell wrappers and effect adapters remain; main and final-zero acceptance
+are unchanged.
+
+### Previous full checkpoint
+
+Published commit `f09e5200a37022fbdf1580b54a3fad232121950c`, tree
+`50c816c6d1153f23f20496ff31454c9649c6764c`, passed all 14 active jobs in
+[full run 37086869922](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37086869922)
+on 2026-10-03 UTC. Three focused-only jobs were intentionally skipped. All 367
+published blob hashes and modes match the reviewed tree. The first attempt had
+one 15-second timeout in a pinned-original image-fixture process; only that job
+was retried on the same commit. Attempt 2 passed with the same deadline and
+assertions. The other 13 successful jobs were retained, not rerun to hide failures.
+
+Seven unused private helpers were removed only after their public callers had
+qualified replacements. Original oracles and every existing assertion remain.
+Exact runtime deletion is 2,451 bytes; 151 fixture-guard bytes make the net total
+reduction 2,300 bytes from its parent. All 27 tracked PS files total **870,201
+bytes**: **610,258 runtime** and **259,943 other source/test bytes**. Reduction
+from the original 1,013,478-byte baseline is **143,277 bytes**. All temporary
+`.ps1`/`.psm1`/`.psd1` oracle files remain counted. Inline PowerShell test drivers
+in other source files are not part of this extension-based byte figure; the
+[final acceptance checklist](zero-powershell-acceptance.md) separately requires
+their removal and process-level proof of zero execution.
+
+The unchanged parser candidate separately passed all three active jobs in
+[focused run 37086299736](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37086299736)
+at `1e3d534a1d244bcc9ed6bfd318a1976b95c22eb0`: 48 Windows tests without skips and
+1,402 managed checks. Its complete 128-case raw capture still has 106 exact
+parsed/plan differences (eight normalized, 98 text-only); these overlapping
+corpora are not additive totals. Production still retains PSParser. The f09 full
+job used its established 11-test workflow selection; the same parser's expanded
+48-test evidence comes from the focused parent run. A subsequent CI hardening
+routes future full jobs through the complete shared foundation gate and retains
+its raw evidence, rather than retroactively claiming those tests ran in f09.
+
+The earlier diagnostic candidates below did not change production routing.
+The subsequent [audit-only cutover](audit-summary-staged-cutover.md) has now
+qualified its body replacement, followed by benchmark at the latest checkpoint
+above. History originals remain. Full zero-PowerShell and interactive Windows
+acceptance remain open; main is unchanged.
+
+## Local rejected-token diagnostic candidate (after 7b4f163)
+
+A bounded rejection-only candidate repairs 20 observed exact unsupported-token
+messages for group openers, comments, semicolons and pipeline/output-redirection
+punctuation. The complete 128-row raw Windows evidence from run 37086299736 is
+retained unchanged. Local replay checks the full parsed and plan objects: 20
+now match the oracle exactly and the other 108 prior candidate results are
+unchanged. Replay debt is 86 exact differences, including 78 text-only and the
+same eight normalized differences. No accepted input or token output changes.
+
+The existing mandatory diagnostic gate appends 24 inferred rejection probes
+without reordering its 128 prior rows; its explicit cap is now 152. Sixteen probes
+require exact detail/full-plan agreement and eight preserve syntax-error
+precedence. The strict raw parity flags, all historical fixtures, production
+PSParser route and NativeHost parser exclusion remain. Extension-counted/runtime
+PowerShell counts are unchanged. This is local historical replay, not a new
+Windows pass or publication. See the [evidence and remaining scope](../plans/evidence/workflow-token-kind-diagnostics-37086299736.md).
+
+### Subsequent exact-commit Windows result
+
+The rejection-only batch was published as
+`3e892ab02395bdc916a5814e39d4154efd1f6249`, with all 375 blobs/modes verified.
+All three active jobs passed in
+[focused run 37091346155](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37091346155):
+49 Windows workflow tests without skips, three inventory tests and 1,755 managed
+workflow checks. The verified raw capture contains all 152 inputs. The original
+128 retain 86 exact differences; the added 24 contribute eight text-only
+differences. The total is 94 exact differences: eight normalized and 86 text-only.
+Those categories overlap the separate literal/boundary corpus and are not
+additive capability totals. Production still uses the original parser.
+
+The first retained diagnostic candidate run instead failed on 12 of 332 inputs;
+its exact input/route/assertion counts and evidence limitation are recorded in
+the [Windows result](../plans/evidence/retained-diagnostics-ci-37090071710.md).
+This parser pass does not qualify those unrelated report candidates.
+
+### Integrated history candidate gate
+
+The four retained history reducers now have an explicit, candidate-only Windows
+gate with actual PS5.1/PS7 verification and six fresh differential runs. The
+integration preserves the six production family scopes, full foundation gate,
+all current original bodies and the new parser batch. Its only conflict was
+combining byte-preserving Git attributes for both independent fixture sets.
+Local integrated validation ran 609 Python tests: 484 passed and 125 environment
+skips. Independent review found no remaining blocker to collecting Windows
+candidate evidence; no actual Windows history parity is claimed yet.
+
+The openly tracked history oracle adds 10,672 PowerShell bytes. The candidate
+tree has 880,873 extension-counted bytes in 28 files (610,258 runtime and 270,615
+other bytes), 132,605 below the original extension-counted baseline. This is
+temporary qualification source, not hidden source or new retirement credit.
+Inline/encoded test drivers remain a separate final-zero audit requirement.
+
+The first history run at `514e74a5`,
+[37092069983](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37092069983),
+stopped at the PS5.1 singleton host observation, before any candidate comparison
+or PS7 observation. The original null value was correctly tagged, but nesting
+the no-output ConvertTo-Json result directly in a report serialized its sentinel
+as `{}`. Strict report validation rejected that shape. The exact old raw bytes
+remain pinned and rejected.
+
+The reviewed repair uses schema v2 to preserve zero or one emitted JSON strings
+explicitly, alongside the nullable compact string. It distinguishes PS5 null
+no-output from PS7's existing `null` string expectation and preserves nested
+null serialization. Eight real-host serializer probes are mandatory on each
+oracle invocation. All 465 fixture bytes and six fresh differential runs remain.
+The repair integrates without conflicts after the diagnostic evidence/conversion
+batch. Integrated local Python validation ran 627 tests: 501 passed and 126
+explicit skips. Windows qualification is still pending. Its 1,793 added oracle
+bytes bring the current extension count to 882,666, with runtime unchanged at
+610,258. Main and all retained production bodies remain unchanged.
+
+The second history run verified both actual PowerShell hosts and the null-output
+capture, then passed 34 of 35 Windows tests, including the owned CP949/1252 probe.
+One source-isolation test failed because an implicit CP1252 read encountered
+UTF-8 C# text; no full differential run occurred. The repaired check uses strict
+UTF-8 without removing its forbidden-dependency assertions. Eighteen source and
+metadata reads were made explicit, with real-path CP1252 regression coverage.
+
+The independent detached helper candidate is now integrated for its first
+Windows qualification alongside that history test repair. Its reviewed async
+wait/cancellation, bounded wire exchange, byte-exact lock cleanup and finite-JSON
+corrections remain candidate-only. The new source total is 896,443 bytes in 30
+tracked PowerShell files, including 13,777 explicitly counted helper oracle bytes;
+runtime remains 610,258 bytes. No helper original or production caller changed.
+
+The repaired diagnostic candidate separately passed all 472 four-route inputs
+in [run 37094100246](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37094100246)
+at `c2b927e3`, with complete raw evidence. Its remaining cutover review is recorded
+in the [diagnostic qualification report](retained-diagnostics-qualification.md).
+
+## Earlier qualified checkpoint (c414)
+
+Commit `c414f0240a6a3fde78719f4ae44baddaf990e92b`, tree
+`d4c9660d40c7e909f18afb166a8e846798f63b1d`, passed all 14 active jobs in
+[full run 37072046282](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37072046282)
+on 2026-10-02 UTC. Three focused-only jobs were intentionally skipped because
+that full gate ran. All 341 published blob hashes and modes match the reviewed
+local tree. The gate includes Windows native/contracts, all six migration
+families, profile, real-browser fixtures and relocated portable packaging.
+
+The execution job passed 43 tests with zero skips, including 121 completion cases
+and 259 strict integer cases under each of PS5.1 and PS7. Interaction passed 28
+tests with zero skips, including all 870 actual-adapter comparisons and the
+18-case ownership matrix under both shells. The original Windows boundary tests
+also passed. These are automated noninteractive results, not live GUI, IME,
+clipboard, focus-race, mixed-DPI or elevation acceptance.
+
+At this qualified checkpoint, 26 tracked PowerShell files total **867,162 bytes**:
+**612,709 runtime bytes** and **254,453 other source/test bytes**. All-source
+reduction from the 1,013,478-byte baseline is **146,316 bytes (14.44%)**. Compared
+with the older accepted `56be343c` milestone, runtime is 55,061 bytes lower, while
+temporary fixtures make total PS 44,084 bytes higher. The older 190,400-byte
+reduction is a dated milestone, not the current total. No files are hidden from
+language accounting, and zero-PowerShell completion remains open.
+
+### Literal-tokenizer candidate after the qualified checkpoint
+
+The first candidate `48bb1651499d0857b4886b3f5cd8b2ed04d5e8a0` passed the three
+active jobs in [focused run 37074340659](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37074340659).
+That Windows PS5.1 run confirmed six fixes, with 19 historical normalized gaps
+still open, and found 100 differences in its 202 inferred probes (70 valid-input
+rejections and 30 error-code differences). It established no newly accepted
+invalid syntax within those cases, not full parser parity.
+
+The first combined candidate covered embedded literal scanning, generic-token
+boundaries and syntax-error precedence. Local replay now matches all 25 original
+historical gaps and all 100 later observed results. At local source `fbba0fa`,
+972 managed checks passed; Python discovery ran 531 tests, with 413 passing and
+118 explicit platform skips. Before its Windows run, 652 separately labelled inferred contracts
+(388 literal, 213 boundary and 51 diagnostic) awaited fresh comparison. Exact raw diagnostic text and plan-message equality are separately
+captured and remain unqualified. Mode-sensitive or unknown syntax fails closed.
+The focused foundation gate now requires every workflow test suite and retains
+raw diagnostic evidence even if comparisons fail.
+
+This candidate does not replace production callers or retire any PSParser code.
+The NativeHost project still excludes it. Its explicitly tracked diagnostic
+oracle adds 3,818 PowerShell bytes: the initial combined candidate index had 27 `.ps1` files,
+870,980 total bytes (612,709 runtime and 258,271 other), a reduction of 142,498
+bytes from baseline. Temporary oracle source remains counted and must later be
+retired with equivalent provenance-backed coverage.
+
+The combined candidate `0e6e6748f475ee1526b82f3751f11da8ba42e64a` was tested in
+[focused run 37079778520](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37079778520).
+Fast contracts passed; the Windows foundation gate failed six assertions across
+27 tests. Five failures identified token-content mismatches for quoted stop-
+parsing markers and standalone physical-NUL boundaries. The diagnostic oracle
+failed at unavailable `Get-FileHash` lookup before any raw diagnostic capture;
+its module-discovery cause was not established. The full preserved comparison
+contains 33 boundary gaps (five accepted-token mismatches) and 94 embedded gaps
+(44 valid-input rejections and 50 rejection-code differences). No unsupported
+production parser was substituted. Follow-up fixes require a fresh Windows run.
+
+The staged follow-up at local source `05a1601` repairs all five token-content
+failures and the related quoted-marker preflight rule, yielding six exact
+recoveries among the 33 boundary rows. Exact-byte .NET hashing replaces the
+module-dependent fixture calls while preserving the source guard and hashes.
+The mode-aware embedded scanner recovers 72/94 recorded rows (24 valid spellings
+and 48 error-code corrections), preserving original source spelling as data.
+All original before/after observations remain unchanged and checksum-pinned.
+
+Integrated local verification passed 1,289 managed checks and ran 539 Python
+tests (420 passed, 119 platform skips). Candidate contracts now include 442
+literal, 234 boundary and 58 diagnostic rows, including 82 new inferred neighbors.
+The remaining 49 normalized historical differences are 35 valid-input rejections
+and 14 rejection-code differences; exact raw diagnostics remain separately open.
+This is historical replay plus local testing, not the next Windows result.
+
+The staged repair's explicit oracle totals 4,237 PowerShell bytes. All 27 tracked
+PS files total 871,399 bytes: 612,709 runtime and 258,690 other source/test bytes,
+a net reduction of 142,079 from baseline. No new production retirement is claimed.
+
+The repaired candidate was published as `accdc9c490a6e70eda426f3a6f45286962356bb5`
+and tested in [focused run 37081771939](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37081771939).
+Fast contracts passed. The Windows foundation suite ran 35 tests with one failed
+assertion: the raw diagnostic driver materialized the 101-item JSON input array
+as one PS5 pipeline object, producing one concatenated case. The strict expected
+count rejected it; its retained capture is marked `comparison_completed=false`
+and is not valid per-case diagnostic evidence. Exact-byte hashing and source
+provenance checks passed before that failure.
+
+All accepted-token/non-relaxation comparisons passed. The fresh normalized gap
+sets contain the same 49 previously recorded differences plus six newly observed
+conservative rejections among the new inferred probes: 27 boundary and 28 literal
+rows, 55 total. These input differences are separate from the single failed
+fixture assertion. The next fixture-only repair preserves all strict shape and
+identity checks and needs another Windows run before claiming diagnostic capture.
+
+The fixture-only follow-up at local `148f3c6` assigns the JSON root directly,
+requires one array level and exact object/string fields, and rejects duplicate
+ordinal IDs before tokenizing any case. One-case, multi-case and 18 invalid-shape
+protocol probes were added for both portable validation and actual PS5 execution.
+All original 101-case identity/provenance and strict diagnostic assertions remain.
+Local Python discovery ran 543 tests: 423 passed and 120 platform checks skipped.
+No candidate grammar or production code changed. Explicit oracle growth is fully
+counted: 27 PS files now total 872,501 bytes (612,709 runtime), 140,977 below baseline.
+
+At `9f6a2038e21bc90c0dcb9a3dcce7053af1bbb60c`,
+[focused run 37082726512](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37082726512)
+passed the one/many/18-invalid input protocol probes and captured all 101 raw
+cases with exact identity and provenance. The Windows suite ran 39 tests with
+three failed inferred grammar assertions: nested-comment handling, a named-block
+word after a semicolon, and a keyword in a parenthesized pipeline. Every one
+remains rejected by the candidate; the original and candidate disagree on error
+classification. The raw capture is complete, not qualified.
+
+Within that separate 101-case corpus, 84 parsed/plan pairs differ exactly: 73
+have only diagnostic message/detail differences, and 11 still differ after
+stripping those text fields. Stripping text is an analysis aid, never a strict
+qualification rule. This corpus overlaps the literal/boundary probes, so its
+counts must not be added to their 55 normalized differences. The strict raw-
+parity flags remain intact. The next bounded repair targets the three confirmed
+grammar assumptions while retaining all recorded original outputs unchanged.
+
+The bounded diagnostic repair at local `f0de396` changes exactly those three
+normalized historical results and adds no accepted input. Replay of the same
+101-record corpus now leaves eight normalized differences; all 84 exact parsed/
+plan differences remain. The original raw capture, its candidate outputs and its
+SHA-256 remain unchanged, with a narrowly scoped no-text-conversion attribute
+preserving the artifact's CRLF. No diff or language-statistics exclusion is used.
+Local verification passed 1,372 managed checks and ran 550 Python tests (428
+passed, 122 platform skips). The next Windows capture adds 23 labelled inferred
+rejection neighbors, for 124 bounded cases; a fresh result is still required.
+
+[Run 37084621275](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37084621275)
+on `fe3963929cebefd23b318f129a236d8ff7b5acb3` verified all three diagnostic
+corrections and 22 of the 23 new neighbors. Its 46-test Windows suite had one
+failure: the original accepts `macro windows` followed by a newline and `process`
+as three literal tokens, while the candidate conservatively rejected it. Its
+complete 124-record raw capture contains 107 exact differences: nine normalized
+and 98 text-only. These overlap earlier corpora and are not additive totals.
+
+The bounded follow-up at local `5cb9727` permits that named-block keyword family
+only in a later command position after an ordinary command. An explicit observed
+positive token/full-plan comparison replaces only the mistaken inferred-negative
+expectation; all other 22 rejection checks remain. Among 1,020 existing local
+fixtures, exactly that one result changes. Four live probes and ten managed-only
+inferred neighbors were added, reaching the unchanged 128-case live-capture cap.
+Local checks passed 1,402 managed assertions and 552 Python tests (429 passed,
+123 platform skips). Historical 124-case replay now has 106 exact differences,
+eight normalized and 98 text-only. Production still uses the retained parser;
+this requires a fresh Windows result and does not establish complete parity.
+
+### Local orphaned-helper cleanup after the candidate
+
+A bounded local cleanup removes seven unused private helper extents (2,451
+runtime bytes), retaining every public compatibility delegate and the production
+parser. Original-source oracle imports and historical assertions remain; only
+five current-source loaders omit the retired definitions. The two explicit
+diagnostic fixture guards add 151 PS bytes, so net retirement is 2,300 bytes.
+Integrated locally onto `14ccef5ba48e82041599698f809576040d6fc5c0`, the index
+contains 870,201 tracked PS bytes (610,258 under `scripts/` and 259,943 in other
+source/tests, including launchers), or 143,277 fewer than baseline. All parser
+code, diagnostic fixtures, goldens and `.gitattributes` remain unchanged. Integrated
+local Python discovery passed 432 of 555 tests with 123 explicit platform skips;
+eight managed contract projects passed 2,335 checks under local runtime10
+roll-forward. Fresh source/loader Windows qualification and a bundled full
+regression remain pending. See the
+[exact scope, evidence and acceptance gates](orphaned-pure-helper-retirement.md).
+
+## Actual source replacement
+
+The baseline is commit `9ffa354b9904235835a7bc6eb78ed8d3d76317c8`, tree
+`bf895d3120dd5e145f360cb1c41e1d79a061d048`.
+
+| Canonical Git source | Baseline | Prior verified `27400c98` | Accepted `56be343c` |
+| --- | ---: | ---: | ---: |
+| All tracked `.ps1` source/tests | 1,013,478 bytes | 921,614 bytes | 823,078 bytes |
+| Runtime scripts, including the new shared host | 858,937 bytes | 770,805 bytes | 667,770 bytes |
+| Actual all-source reduction | — | 91,864 bytes | **190,400 bytes (18.79%)** |
+
+The accepted batch removes another **98,536 bytes** relative to the prior
+verified checkpoint, including all adapter and test overhead. It replaces 53
+original function extents: 42 retain compatible delegates and 11 private helpers
+disappear. The duplicate adapter fixtures are removed; shared CDP host code is
+counted once as PowerShell. No original algorithm is copied into a runtime archive,
+renamed to hide its language, or excluded from statistics. Old source remains in
+normal Git history.
+
+These are source measurements, not a functional-completion percentage or GitHub
+Linguist estimate. Run `python pcucp-next/packaging/check_migration_inventory.py`
+to reproduce the current [inventory](legacy-function-inventory.json). Canonical
+index blobs avoid checkout line-ending differences. Review and stage PS changes
+before using `--update`.
+
+## Historical integration before the full gate
+
+The subsequent batch replaces 21 more original bodies: eight interaction macros,
+seven diagnostic macros and six image/OCR helpers. Benchmark and audit-summary
+retain their original bodies because unusual JSON conversion cases are not fully
+matched. The exact source/adapter comparisons passed at `7fb6c2f6`; its one failed
+job was a new clone-test setup error before assertions. That fixture is repaired
+without removing assertions, and remains part of the required bundled full gate.
+
+| Canonical Git source | Accepted `56be343c` | Published `7fb6c2f6` | Current integration |
+| --- | ---: | ---: | ---: |
+| All tracked `.ps1` source/tests | 823,078 | 930,801 | 849,829 |
+| Runtime files under `scripts/` | 667,770 | 711,375 | 611,370 |
+| Other PS source/tests | 155,308 | 219,426 | 238,459 |
+
+The integration removes 80,972 net PS bytes relative to `7fb6c2f6`. Relative to
+the prior fully accepted batch, runtime PS decreases by 56,400 bytes, while new
+reference and startup fixtures add 83,151 other PS bytes. Therefore total PS is
+currently **26,751 bytes higher** than that accepted milestone, despite genuine
+runtime migration. These fixtures remain visible, counted PowerShell; they must
+also be migrated or retired with equivalent regression coverage before zero is
+reached. Current total reduction from the original baseline is 163,649 bytes.
+
+New production-entry checks run a disposable copied main script with real module
+loading and public dispatch. Hash-checked copied acquisition leaves stop before
+any provider/native action, and only the final family entry is captured. The
+original 21 Pester assertions remain unchanged. The integrated checkpoint needs
+the complete Windows, browser, portable and regression gate; none of this is
+interactive desktop, clipboard or IME acceptance.
+
+## Historical integrated boundary repair
+
+The initial integration tree (`031bff14` remotely, `2cc712d` locally) failed the
+full run [37058066571](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37058066571):
+12 active jobs passed and two failed. Seven Pester boundary assertions rejected
+valid PS7 completion integers, and the interaction argv-ownership fixture found
+that casting a null argument array before cloning could produce a null receiver.
+All 21 original Pester assertions remain unchanged.
+
+The repair retains array ownership without that cast and accepts only Int32 or
+Int64 protocol integers within the original Int32/domain bounds. It adds actual
+PS5.1/PS7 completion and integer-guard matrices, including 25 malformed completion
+cases after one acknowledged inert possible-write dispatch. These require the
+same uncertainty marker, no automatic retry, and no premature output. Real
+Windows results for this repaired tree remain pending until its full gate passes.
+
+The first repaired index at `18807573` contains 26 tracked PowerShell files totaling **864,373 bytes**,
+including **612,709 runtime bytes** and **251,664 other source/test bytes**. That
+is 14,544 more than the initial integration, and 41,295 more than the last accepted
+`56be343c` checkpoint. These temporary regression fixtures are fully counted;
+they do not earn new accepted migration credit and must also be removed only
+after equivalent zero-PowerShell coverage exists.
+
+## Qualification and integration
+
+All focused jobs passed at `e9e015c6bc7b39d52999dccccf6bb4316a6c8dfe` in
+[run 37007340738](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37007340738):
+
+| Family | Evidence |
+| --- | --- |
+| Execution coordination | 370 managed checks, 56 startup checks, 35 Windows tests; both 462-case comparisons, including explicit uncertain-action cases |
+| Precision/history/cache | 509 managed checks, 21 Windows tests without skips; 174 candidate and 174 actual-adapter cases, 138 helper cases, eight filesystem cases |
+| Legacy CDP | 43 Windows tests; seven real-browser tests, including the 52-case native CSS escaping oracle and guarded-read tests |
+| Shared contracts | Cross-platform Python suite and strict transport/authority checks |
+
+Windows parser-derived function ranges and SHA-256 hashes were checked against
+all six source/draft files before promotion. The integrated hosts copy the exact
+qualified helper/delegate bodies and preserve bytes outside explicit replacement
+and initialization regions. Production source selection is now enabled for all
+three families. The integrated checkpoint `56be343c786027d27fa3dcb71732157caffc8de0`
+passed all 11 active jobs in [full run 37022764709](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37022764709);
+three focused-only jobs were intentionally skipped because the complete gate ran.
+All 283 published blob hashes and modes match tree
+`c0d15371b60ebf62be45bfa68b90282405f07273`. The gate includes all production
+adapters, prior Windows parity suites, Pester 21/21, relocated portable packaging,
+modern Chrome 8/8 and legacy Chrome 11/11. Core passed 355 tests with 89 explicit
+platform/browser skips; Windows CDP passed 55 with 11 browser-only skips.
+Subsequent implementation batches require their own exact-commit full gate.
+
+## What moved
+
+Python owns MCP/JSONL transport, schema validation, core workflows, observations,
+cancellation, installer/packaging logic and optional browser control. C# owns
+Windows UIA/OCR/input/application primitives and the migrated compatibility logic.
+
+Previously qualified replacements cover OCR matching with Windows NLS/UTF-16/tie
+semantics; compiled Win32 interop declarations; safety classification; coordinate
+math; workflow/task/form/preset/smart-plan assembly; app-profile assembly and its
+sole-use strategy score helper; and the user installer. Their retained adapters
+preserve acquisition, errors, formatting, explicit persistence and exit behavior.
+
+The current batch adds:
+
+- Workflow/task/form execution, SmartClick routing, watch and recovery coordination
+  in C#, with closed typed effects and immutable startup authority
+- Coordinate-anchor/point/target planning, history scoring and fixed-path cache/
+  history storage in C#, including prevalidated persistence and exact legacy output
+- Legacy CDP transport, page selection, DOM algorithms and wrapper construction in
+  Python/JavaScript, with one retained PowerShell host bridge and typed live startup
+
+Read-only browser evaluation keeps its side-effect guard; arbitrary evaluation
+and mutations need startup live permission. Control-looking text remains data.
+A failed read after possible mutation is terminal and cannot trigger retry or
+fallback. UTF-8 protocol decoding is independent of the Windows console code page.
+The large confirmation entry accepts only its existing pure confirmation operation;
+other pure operations retain their smaller request limit.
+
+## Remaining work and acceptance boundaries
+
+The accepted checkpoint still contains 823,078 PowerShell bytes. Major remaining
+work includes leaf UIA/OCR/window acquisition, IME/clipboard/drag/multi-edit,
+application/process/registry/system macros, recorder/audit/profile acquisition,
+helper lifecycle and IPC, optional vision/provider plumbing, the original workflow
+tokenizer, installer/elevation shims, Pester/reference tests and CI oracle calls.
+The image-diff candidate is separately qualified but not yet retired from its
+legacy caller. Shared normalization helpers still have retained callers.
+
+Compatibility parity is not a privacy or security proof. The CDP review found
+legacy form values and source-only subtree text entering search results and logs.
+The current integration intentionally removes those signals before matching,
+locator construction and output, while preserving ordinary labels and current
+visible button captions. Thirty-two original synthetic exposure cases and eleven additional textarea
+scenarios characterize that divergence; ordinary parity assertions and the read side-effect guard remain.
+Four legacy and one modern owned-browser privacy cases passed that full
+gate. The modern observation path also excludes textarea defaults from direct
+and ancestor text while keeping references, label matching and explicit typing.
+This focused
+correction does not establish privacy safety for every remaining legacy surface.
+
+Hosted protocol and generated-data checks do not establish interactive Windows
+acceptance. Outstanding checks include Korean IME composition, clipboard
+restoration, focus/modal races, held-input cleanup, mixed-DPI/multi-monitor
+coordinates, cross-integrity/UAC behavior, helper restart/crash handling and
+application-specific success. No user desktop, personal documents or account-
+connected model were used for these claims. An authorized isolated Windows fixture
+environment is required for those acceptance cases.
+
+Before the final zero-execution gate, replace temporary PowerShell oracle calls
+with provenance-backed expected fixtures and independent Python/C# tests. Linking
+the PowerShell SDK, retaining encoded bootstraps, or deleting unported operations
+does not satisfy the target. See [the zero-PowerShell gates](zero-powershell-acceptance.md).
+
+## Next bounded batch
+
+The next independent scopes contain 119,960 bytes of exact current function
+extents: interaction/target planners 55,093; diagnostics/report assembly 54,053;
+file-image/OCR processing 10,814. These are scope measurements, not promised net
+retirement. Shared OCR helpers keep their contracts for retained screen/fusion
+callers. Candidate code reuses the qualified typed effects, startup authority and
+chunked wire transport. Original bodies stay until candidate and actual-adapter
+gates pass; temporary qualification scripts remain counted in the inventory.
+
+The published `6fc7c882` candidate checkpoint adds 32,096 bytes of visible PowerShell oracle
+and adapter fixtures, while leaving the accepted production bodies intact. Its
+all-source total is 855,174 bytes (158,304 below baseline); the last accepted
+production cutover remains the 190,400-byte net reduction at `56be343c`. No new
+retirement is claimed from these candidates. Fixture overhead stays in the
+inventory and must be replaced or removed at its appropriate qualification gate.
+
+### Staged actual-adapter qualification
+
+Focused run [37037485035](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37037485035)
+passed fast contracts but failed the three new family gates. All 110 image-diff
+kernel/actual-adapter comparisons passed; two OCR fixture variable collisions
+blocked the remaining intended observations. Diagnostic source decoding and
+root-array nesting errors, six interaction compatibility causes, and a console
+preview encoding error have staged repairs. No failed comparison was removed.
+
+Interaction now requires the real NativeHost and shared PS host for all 870
+ordinary cases (the original 854 plus 16 numeric boundary cases), 12 uncertainty
+cases, and its forged-descriptor matrix. Diagnostics requires 321 complete cases,
+196 guard/filesystem/getter checks, and its fixed actual acquisition adapter.
+Both reuse the existing framed transport with closed family startup and immutable
+ceilings. Owned-state accounting covers cache/log writes without granting live
+input authority. Original production functions still remain in place.
+
+The diagnostic guard's case generation and assertions were genuinely moved to
+Python: its PS driver fell from 42,879 to 11,770 bytes, preserving all 196 checks.
+This is a reduction of temporary new test scaffolding, not additional legacy
+runtime retirement. Current staged tracked PS is **934,772 bytes**, or 78,706
+below the original baseline, including every adapter and test fixture. The last
+accepted production cutover remains `56be343c` with 823,078 bytes. These totals
+must be measured again after actual adapters qualify and original bodies retire.
+
+Local combined discovery passes 491 tests with 102 explicit platform/browser
+skips. The staged shared session has 994 managed checks, startup has 110, and
+interaction has 106 locally (109 on Windows). Windows actual-adapter checks are
+still pending; local results do not establish those gates or interactive GUI
+acceptance.
+
+## Historical guard-fixture follow-up
+
+Run [37066314234](https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37066314234)
+passed the previously failing original Windows boundary stage, but its new guard
+matrices found mismatched fixture wire containers, a custom-startup-reader gap,
+PS5 null/PS7 typed-binding assumptions, and a real PS7 buffered-string replay
+shape defect. The strict repairs retain all matrix cases and add raw CLR type
+and wire-readiness checks. Their exact Windows gate is still pending.
+
+This follow-up index contains **866,913 tracked PS bytes**, with the same runtime
+source footprint as the first repair and 2,540 extra temporary test-fixture
+bytes. No additional source retirement or zero-PowerShell completion is claimed.
+
+The subsequent depth-zero fixture correction preserves the native PS5/PS7
+renderer difference and actual non-JSON Silent completions. It retains the
+original 118 cases and adds three, including post-write formatter refusal. This
+and the explicit-null snapshot fix add 249 net temporary driver bytes, bringing
+tracked PS to **867,162 bytes**; runtime
+PS remains **612,709 bytes**. Exact Windows qualification is still pending.

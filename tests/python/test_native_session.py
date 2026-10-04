@@ -84,7 +84,7 @@ class NativeSessionTests(unittest.TestCase):
         thread = threading.Thread(target=lambda:result.append(worker('click', timeout_s=10)))
         thread.start()
         end = time.monotonic() + 2
-        while not self.log.exists() and time.monotonic() < end: time.sleep(.01)
+        while (not self.log.exists() or not self.log.read_bytes().endswith(b'\n')) and time.monotonic() < end: time.sleep(.01)
         self.assertTrue(self.log.exists())
         worker.close()
         thread.join(2)
@@ -99,7 +99,7 @@ class NativeSessionTests(unittest.TestCase):
         thread = threading.Thread(target=lambda:result.append(worker('click', timeout_s=10)))
         thread.start()
         end = time.monotonic() + 2
-        while not self.log.exists() and time.monotonic() < end: time.sleep(.01)
+        while (not self.log.exists() or not self.log.read_bytes().endswith(b'\n')) and time.monotonic() < end: time.sleep(.01)
         native_host.cancel_all_native()
         thread.join(2)
         self.assertFalse(thread.is_alive())

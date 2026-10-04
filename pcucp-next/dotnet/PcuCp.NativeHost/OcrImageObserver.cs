@@ -126,15 +126,21 @@ internal static class OcrImageObserver
         return languages.Count > 0 ? OcrEngine.TryCreateFromLanguage(languages[0]) : null;
     }
 
-    private static OcrImagePayload ConvertResult(string path, OcrEngine engine, OcrResult result)
+    internal static OcrImagePayload ConvertResult(string path, OcrEngine engine, OcrResult result, int maxWords = int.MaxValue, int maxCharacters = int.MaxValue)
     {
         var lines = new List<OcrLine>();
         var words = new List<OcrWord>();
+        long characters = 0;
         foreach (var line in result.Lines)
         {
+            characters += line.Text.Length;
+            if (characters > maxCharacters || lines.Count >= maxWords)
+                throw new NativeFailure("ocr_result_too_large", "OCR result exceeds the bounded text/line budget.");
             var lineWords = new List<OcrWord>();
             foreach (var word in line.Words)
             {
+                if (words.Count >= maxWords)
+                    throw new NativeFailure("ocr_result_too_large", "OCR result exceeds the bounded word budget.");
                 var rect = word.BoundingRect;
                 var item = new OcrWord(
                     word.Text,

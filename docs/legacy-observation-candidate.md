@@ -1,0 +1,393 @@
+# One-shot geometry/UIA observation candidate
+
+Status: staged, unqualified. Default execution and all original bodies remain.
+No original PowerShell retirement is claimed by this candidate.
+
+## Boundary and routing
+
+The separate net48 `PcuCp.LegacyObservation` library moves real read acquisition
+and decision work for the legacy one-shot helper. `WindowsObservationProvider`
+uses the exact existing `PcuCp.LegacyInterop` / `CucpNative` ABI and the framework
+`AutomationElement` APIs. It does not use the persistent helper's fast-find
+semantics, modern NativeHost UIA reference store, script callbacks, serialized
+UIA elements, a generic effect executor, or a new cache.
+
+`CUCP_LEGACY_OBSERVATION_CANDIDATE=1` selects the ordinary adapter from the real
+`scripts/cucp-native-helper.ps1` dispatch. Unset leaves the original functions
+active. Other nonempty values fail closed. `CUCP_LEGACY_OBSERVATION_DLL` may point
+to the separately built candidate. This selector is qualification-only. The
+portable installer/package defaults are unchanged.
+
+The original `_Ensure-Win32Native`, `_Ensure-UIA`, `_Emit`, parameter binding,
+outer catch/dispatch, `_Resolve-UiaElement`, mutation bodies, and OCR acquisition
+remain. Refinement's compiled provider loads UIA lazily in original assembly
+order; `SkipUia` hit-test performs no UIA reads. UIA tree/find retain their original
+PowerShell load gates. The closed provider has no input or pattern execution
+operation. `Current`, element, root and pattern objects remain in-process.
+
+## Source map and mapped equivalents
+
+Pinned source: public commit `8f3cdde59d2d9574cfd036bab0b4c0bae0940c89`, tree
+`c84b6c3963bb20f7f8f76562f0d0d8cc549beafb`; local equivalent
+`5232048f68300f3d536822f96713124fc13b3757`. The manifest under
+`tests/fixtures/legacy-observation/source-manifest.json` pins the raw Git blob,
+SHA-256, normalized hash, all UTF-16 extents, function hashes, exact UTF-8 sizes,
+and every permitted acquisition-type substitution. Windows qualification checks
+those extents against the actual PowerShell AST before loading definitions.
+
+| Retained original | UTF-8 bytes | Typed equivalent |
+| --- | ---: | --- |
+| `_Action-HitTest` | 2,895 | `ObservationActions.HitTest` |
+| `_Action-HitScan` | 6,103 | `ObservationActions.HitScan` |
+| `_Action-UiaTree` | 3,026 | `ObservationActions.UiaTree` |
+| `_Action-UiaFind` | 5,269 | `ObservationActions.UiaFind` |
+| `_Get-UiaSupportedPatternName` | 573 | `ObservationPrimitives.SupportedPattern` |
+| `_New-UiaMatchPayload` | 1,247 | `ObservationPrimitives.MatchPayload` |
+| `_Get-RoleWeight` | 355 | `ObservationPrimitives.RoleWeight` |
+| `_Clamp-UiaPointToRect` | 1,150 | `ObservationPrimitives.Clamp` |
+| `_Get-UiaPreferredClickPoint` | 704 | `ObservationPrimitives.PreferredClickPoint` |
+| `_Resolve-UiaPointRefinement` | 2,521 | `ObservationPrimitives.ResolvePoint` |
+| `_Test-CoordsInTarget` | 1,373 | `ObservationPrimitives.TestTarget` |
+| Total retained, not retired | 25,216 | |
+
+Original tests/oracles are neither removed nor rewritten. Three added PowerShell
+files are ordinary tracked files included in inventory totals: the adapter,
+pinned-source oracle driver, and typed-argv wrapper driver. The generated owned
+window is a checked-in C# fixture, not embedded PowerShell. The oracle also pins
+the unchanged `_Action-Click`, `_Find-SmallestUiaElementAtPoint`, and
+`_Resolve-OcrUiaFusionCandidate` functions.
+
+## Qualification gate
+
+Run `python pcucp-next/packaging/qualify_legacy_observation.py --windows` on a
+Windows host with Windows PowerShell 5.1, .NET Framework 4.8 and SDK 8. The dedicated
+`legacy-observation-candidate.yml` workflow retains raw process evidence before
+assertions, source/driver hashes, and a summary. It never changes defaults.
+
+1. Portable contracts exercise the four action ports and seven shared helpers
+   with an inert provider. These are logic contracts, not Windows proof.
+2. The Windows exact-source oracle compares 95 original/candidate pairs. It
+   retains full payloads, exit/status envelopes, ordered acquisition traces,
+   null/scalar/array shapes, and raw diagnostics. Cases cover failure/load order,
+   zero/negative/fractional geometry, Unicode/culture, title/class truncation,
+   absent/failed process reads, property/pattern faults, no-root fallback,
+   accepted-record budgets, duplicate/tied ranking, top-five/top-twelve shapes,
+   virtual-screen clipping and the admitted 16,641-sample maximum.
+3. The actual unchanged click function runs only with an inert native type seam.
+   Original target mismatch must stop before refinement and reach zero mutation
+   boundaries. Refined mismatch must recheck, restore the original point and clear
+   refinement before exactly one inert `SendMouseClick`. Successful and unguarded
+   cases also reach exactly one inert boundary. Pattern mutation tripwires count
+   an attempt before throwing, so catches cannot hide it. The unchanged fusion
+   resolver must preserve original element, current and root identity.
+4. An owned WinForms process supplies known PID/HWND/geometry, a unique Unicode
+   label, nested controls, duplicates, disabled and offscreen controls. The gate
+   compares 11 actual original/candidate helper entries and three actual wrapper
+   entries (`macro hit-test`, `macro hit-scan`, and `macro smart-plan --no-cdp`).
+   The smart-plan recommendation is inspected, never executed. Per-case expected
+   statuses and owned geometry must pass; equality between two failures is not
+   accepted. Missing-DLL and invalid-selector probes prove fail-closed candidate
+   entry routing. The actual-provider runs use `WindowsObservationProvider`, not
+   the inert test seam.
+5. TEMP/TMP and USERPROFILE are isolated to newly owned fixture directories.
+   Cleanup uses the retained owned process object and a private close request;
+   no process-name/PID search or unrelated window operation occurs. Readiness and
+   shutdown input/invocation/value-change counters must all be zero.
+
+A missing/unusable hosted desktop, wrong PowerShell version, empty UIA tree,
+provider failure, missing readiness, or missing cleanup evidence fails clearly.
+It is not converted into a skip or synthetic success. Every pair failure is
+retained; a synthetic mismatch does not suppress the separate actual-entry pass.
+
+### Equality policy
+
+Only root action `elapsed_ms` (or the oracle's `captured.payload.elapsed_ms`) is
+excluded from equality, after requiring a nonnegative integer. `_Emit` at
+`cucp-native-helper.ps1:704-720` stamps this stopwatch measurement, and wrapper
+hit-test/hit-scan pass the JSON through while SmartPlan stamps its own elapsed
+measurement. No decision uses that measurement in these selected routes. Raw
+stdout/stderr and timing remain retained. No diagnostic text, nested timing field,
+array order, source field, number, scalar/array shape or acquisition event is
+blanket-normalized. Uncaught method-wrapper diagnostic differences are currently
+unqualified, not accepted by assumption.
+
+Equal-key order specifically requires Windows PowerShell 5.1 evidence. The
+candidate uses full `List.Sort` with precisely the original numeric keys and no
+stable-index tie-break; portable .NET 8/10 ordering is not proof of the PS5/net48
+execution order. Actual one-shot oracle ties, not persistent-helper fast-find
+fixtures, decide acceptance.
+
+## Current validation and remaining acceptance
+
+Local Linux checks: net48 library, qualification assembly and owned WinForms
+fixture compile; the linked net8 contracts pass 195 assertions; the new Python
+structural/evidence tests pass 21 tests. Local net8 execution uses runtime 10
+roll-forward. These are not Windows acquisition or PowerShell qualification.
+Full local Python discovery ran 868 tests: 647 passed, 221 individual skips,
+zero failures/errors, plus two setup skips (223 total skip records). No skipped
+Windows tests earn proof. SDK 10.0.401/runtime 10.0.12 were used locally. The net48
+compile used cached framework reference assemblies with `NuGetAudit=false` after
+the environment denied the default vulnerability-cache write; this is not a
+package security audit. The checked-in Windows gate does not disable that audit.
+
+The candidate adds 12,397 counted PowerShell bytes (934,232 to 946,629). The
+baseline-wide census is 1,013,478 original bytes, 946,629 current bytes and 66,849
+net removed bytes from earlier qualified work. All 25,216 bytes targeted by this
+candidate are still present; this batch receives zero retirement credit.
+
+Independent source review found no remaining blocker for an opt-in unqualified
+candidate after repairing stale readiness-file reuse and exact negative-outcome
+assertions. It independently reran all 195 inert assertions and 21 Python tests.
+
+Still required before promotion or removal: the exact Windows gate above, review
+of raw pair/effect evidence, the full regression gate, and a fresh complete tracked
+PowerShell census. Third-party provider behavior/hangs, real clicking/typing/IME,
+mixed-DPI/multi-monitor, elevated/UIPI/session behavior, OCR acquisition and
+clipboard restoration remain later separate acceptance. This candidate does not
+perform or expand those effects.
+
+## First Windows run and bounded repair
+
+The first Windows run at public `bc23c4dc061d22a595ebc5d1cc1f51424280042e`
+(run 37115453026, artifact 11270329459, SHA-256
+`7a85036122b4c793a9beddc20df5bd12ef98f66f2386f9f644c8ab7732b39c83`)
+provided a usable owned desktop. Readiness and final input/invoke/value-change
+counters were all zero. This is retained real-acquisition evidence, not a passing
+compatibility result.
+
+- 85 of 95 pinned oracle pairs matched. The 23,308 acquisition count belongs only
+  to those successful pairs. All attempted raw oracle traces contain 23,493 calls
+  on the original side and 23,452 on the candidate side.
+- Ten mismatches establish Windows PowerShell 5.1 property-getter adaptation:
+  a throwing .NET property getter becomes null before assignment/casting. In
+  particular uncast roles become null, boolean casts become false, and refinement
+  continues to the parent after a Current/Bounds failure. The bounded repair
+  models these explicit property boundaries and preserves independent method and
+  arithmetic failures. It adds 25 exact value/trace contracts (220 total).
+- The next matrix retains all 95 cases and adds direct payload Bounds failure and
+  second-read Bounds failure, for 97 total. These two probes must still receive
+  Windows evidence.
+- Eleven helper pairs completed; three matched. Eight UIA-dependent pairs differ
+  materially: the original sees numeric HWND automation IDs/pane roles and no
+  Invoke pattern, while the candidate sees named IDs/button/edit roles and normal
+  patterns. Original offscreen inclusion also differs. No field/order/provider
+  normalization has been permitted.
+- Three wrapper original processes passed their entire argv as one string to the
+  wrapper because of the driver’s JSON-array shape. Their candidate processes
+  were never reached after JSON parsing failed. The driver now explicitly copies
+  decoded string elements into a typed string array. The gate collects both raw
+  process outputs before parsing, so future parse failures do not hide the other
+  side’s output.
+
+The provider implementation and original loaders remain unchanged pending exact
+runtime diagnosis. After all unchanged actual-entry pairs, three separate
+read-only diagnostic processes record original-first, candidate-first and actual
+original Current-to-compiled-boundary behavior. They capture loaded UIAutomation
+assembly identities, module IDs/locations, element/current type identities,
+provider descriptions and filtered first-chance UIA exception stacks. The probe
+assembly has no UIA/runtime project reference, does not register/change proxies,
+and does not initialize UIA on load. These diagnostics do not earn parity credit.
+
+One hypothesis is default-proxy initialization through the calling assembly’s
+stack frames; another is assembly selection. Both remain hypotheses until the
+runtime evidence distinguishes them. No newer provider was selected intentionally,
+no provider state was reset, and no original function/default was changed.
+
+Local bounded-repair validation: 220 portable C# assertions and 24 observation
+Python tests passed. Full local Python discovery ran 874 methods: 653 passed,
+221 individual skips, zero failures/errors, plus two setup skips (223 skip
+records). The net48 host/oracle assembly and dependency-free diagnostic probe
+compiled with zero warnings/errors. Windows requalification is pending. This
+repair adds 6,866 counted PowerShell bytes to the integrated 955,322-byte tree,
+for 962,188 current bytes and zero new retirement credit.
+
+A separate ProcessName boundary remains unproven: existing fixtures model a
+Get-Process acquisition failure, not a throwing ProcessName getter on its returned
+object. The provider's null/empty distinction at that latter boundary was not
+changed speculatively in this repair; it needs a focused type-seam observation.
+
+## Second Windows observation and corrected-intent tier
+
+At public `3abd20d2`, Windows run `37117757967` passed all 97 synthetic
+source/AST/type-seam pairs, with 23,528 matching acquisition calls. Its verified
+708-file artifact SHA-256 is
+`4592d6d9afce74b300c9b682f13ca216a0c232f71288b16b018bda0dd5414cbf`.
+The actual-entry tier still matched only three of 14 attempted groups. All raw
+original/candidate data, order, status and exit differences remain failures.
+
+The three isolated provider diagnostics establish the initialization difference:
+
+- Both callers resolve exactly the same framework 4.0 UIAutomationClient,
+  UIAutomationTypes and WindowsBase assemblies, locations and MVIDs. This is not
+  a framework-version or real-Current cast mismatch.
+- Original first acquisition raises a first-chance `NullReferenceException` in
+  `MS.Internal.Automation.ProxyManager.LoadDefaultProxies`. Client-side provider
+  assembly loading never occurs. Its seven raw descendants have HWND-derived
+  IDs and pane roles; the button has no Invoke pattern, and the offscreen button
+  reports `IsOffscreen=false`.
+- Candidate first acquisition loads `UIAutomationClientsideProviders` normally.
+  It sees 13 raw descendants (12 admitted tree records), named IDs, button/edit
+  roles, Invoke/Value patterns and the offscreen flag.
+- Acquiring the real original root/Current first, then passing those objects to
+  compiled Bounds/MatchPayload succeeds and preserves the old provider state.
+  This confirms both real type compatibility and process-local initialization
+  persistence. It does not qualify mutation routes.
+
+The public WPF [`ProxyManager.LoadDefaultProxies` source](https://github.com/dotnet/wpf/blob/main/src/Microsoft.DotNet.Wpf/src/UIAutomation/UIAutomationClient/MS/Internal/Automation/ProxyManager.cs) sets its one-shot flag
+before examining caller stack frames and dereferences `ReflectedType` without
+a null check. A typeless PowerShell-generated frame is the source-supported
+explanation for the observed null reference; the diagnostic now records public
+call-frame metadata for that exception to test the precise dereference. No
+framework private state is read or changed.
+
+Caller intent supports normal initialization. The original helper header
+promises UIA bounds/pattern discovery and ID-based fusion. Its unchanged find
+body reads Name/AutomationId/HelpText/AccessKey, localized role, offscreen state,
+Invoke/Toggle/SelectionItem and ValuePattern read-only state. SmartPlan's
+`LegacySmartPlanKernel.cs` selects `uia_pattern` with a score bonus and
+`mouse_moved=false` when those patterns exist; without them it proposes
+`uia_coord` with explicit mouse fallback. Thus IDs, roles, pattern support,
+offscreen admission, scan selection and subsequent planning are functional
+changes, never representation allowances.
+
+For qualification only, a separately named intended-initialization tier makes
+one fixed public `AutomationElement.FromHandle` call from a concrete compiled
+class, on the generated fixture's verified PID/HWND, before original dispatch.
+`legacy-observation-intended-initialization.ps1` is an ordinary counted source
+file. The derived oracle consists of the immutable original bytes plus exactly
+that one insertion; its original, inserted and derived SHA-256 values are saved.
+The shipping helper and provider do not load this fixture. There is no dynamic
+trampoline, proxy registration/reset, private reflection or output fabrication.
+
+The tier compares 16 actual observation groups in two fresh-process conditions:
+candidate cold startup and candidate startup after the same fixed public read.
+It retains exact later payload/status/order equality and existing positive
+functionality checks, adds ID/role/readonly-edit queries, and requires 48 owned
+initialization records. Two additional real-object diagnostics pass original
+button/edit AutomationElement and Current instances directly into compiled
+Bounds, Pattern, ValueReadOnly and MatchPayload; Win32 handles, owning PID and
+public `Automation.Compare` must agree. The shared owned fixture readiness
+changes are exactly those from `85d2c5a`; its observation-mode layout is unchanged.
+
+The raw-original tier remains failed. An intended tier pass cannot be labeled
+raw parity or retirement. The owned fixture's input/invoke/value counters must
+remain zero at cleanup, and the existing shared click/fusion tripwires remain.
+An advertised Invoke pattern also cannot yet be called a usable mutation route:
+a separate cold unchanged uia-invoke process still starts through the original
+resolver. Production activation requires an explicit startup compatibility
+decision and that specific cold mutation caller gate, under owned-fixture
+authority/identity/no-retry checks.
+
+The original wrapper SmartPlan process produced no output before its 180-second
+timeout. A separate 60-second diagnostic uses opt-in nonbreaking line breakpoints
+on the unchanged wrapper and retains flushed phase markers, shallow Raw/Err
+type/length/property names, and before/after-process source hashes. It tests the
+specific hypothesis that PS5 Get-Content string metadata recursively expands
+during compatibility serialization before the native process timeout starts.
+It does not lengthen the real deadline or change Raw/Err/Json. Intended SmartPlan
+parity stays explicitly blocked pending this diagnosis; the 32 observation pairs
+and identity checks cannot make the whole gate pass. No production scalar repair
+has been applied.
+
+Intended identity verdicts require the complete exact framework-qualified
+Element/Current/pattern types, every finite compiled bounds field, and every
+integer payload rectangle field. Both geometry representations must agree with
+the independently published owned button/edit bounds, not only with each other.
+Missing types/geometry, wrong types, empty rectangles and matching-but-shifted
+geometry fail. The phase diagnostic parses and checks the complete two successful
+compatibility calls, native read and third replay sequence. Only a complete valid
+public plan, or a bounded third-serialization timeout with captured PSDrive and
+PSProvider Raw metadata, is classified as captured evidence. Early driver exits,
+before-only traces, missing/reordered phases, source-hash changes and incomplete
+process evidence fail explicitly, while their raw logs remain available.
+
+Local validation of this diagnostic/corrected-oracle increment: 220 portable
+contract assertions; 37 focused Python checks; 887 full Python methods, with
+666 passed, 221 individual skips and two additional setup skips, zero failures
+or errors. The initializer, exception probe and reused owned WinForms fixture
+compile for net48 with zero warnings/errors. These Linux results do not execute
+Windows PowerShell or UIA. The ordinary counted PowerShell fixtures add 12,731
+bytes over `e806bb4`; no source retirement is credited. At that checkpoint the helper/wrapper
+production sources and `WindowsObservationProvider.cs` remained byte-identical.
+
+## Verified intended provider and scalar capture correction
+
+Public `bb46d12b`, run `37120978323`, passed all 32 intended observation pairs,
+both complete real Element/Current/type/geometry identity checks, and all 48
+owned initialization records. The verified 966-file artifact SHA-256 is
+`92ccf3d8f305b62fe9ab3fc1f927be668bb163afb3ecddcee2573a6ee25a74b4`.
+The raw tier remained 97/97 synthetic pairs and 3/14 actual groups. No input,
+pattern invocation or value mutation occurred. This establishes the bounded
+read-only intended provider behavior; the cold mutation caller remains a
+separate acceptance gate.
+
+Both SmartPlan traces completed two compatibility calls and the actual native
+read, then stalled at `compat.serialize.enter` with two captured replies. Their
+Raw values were strings of 2,347 and 2,379 UTF-16 code units, with Get-Content's
+PSDrive/PSProvider metadata. The native reads completed at about 1.4 seconds;
+the third serialization never completed before the separate 60-second probes
+were terminated. The full original wrapper still timed out at 180 seconds.
+The earlier trace verifier omitted PS5's visit to the native switch-clause line
+at captures=0, before the history capture. That marker is a clause observation,
+not a second native acquisition. The corrected parser requires the exact
+16-record sequence. Both immutable traces and raw process records are retained
+under `observed-smart-plan-37120978323`, with per-file provenance hashes; tests
+reject omission of every required phase.
+
+The only production change in this increment is two guarded copies immediately
+after Invoke-NativeHelper's actual stdout/stderr Get-Content reads:
+
+```powershell
+if ($raw -is [string]) { $raw = [string]::new($raw.ToCharArray()) }
+if ($err -is [string]) { $err = [string]::new($err.ToCharArray()) }
+```
+
+This boundary produces fresh scalar text before JSON parsing, hot-cache storage
+and reply capture. Null and non-string values pass through; empty string stays
+empty string; UTF-16 units are copied without normalization. Native macro
+forwarders consume Raw as Console.Out text, health diagnostics consume Err as
+text, and helper-client tests assert exact Raw/Err string content. SmartPlan
+captures the reply but its kernel consumes Json and ExitCode, not Raw/Err
+filesystem metadata. No in-repository consumer of those ETS properties was
+found. Metadata removal is therefore a specific acquisition-boundary correction,
+not an output-normalization permission. Existing JSON parse/status/exit rules,
+process ownership, input authority, no-retry and request/time budgets stay exact.
+
+The PS5 scalar fixture executes the exact pinned production read/copy/parse
+fragment, without loading the wrapper. Thirteen text/null cases and three
+non-string cases cover real decorated Raw and Err, missing versus empty files,
+CRLF, embedded NUL, Korean, surrogate pairs and lone surrogate code units.
+Twelve cases round-trip the unchanged depth-24 captured-reply serialization;
+lone surrogates remain in-memory and are reported as exact UTF-16 bytes.
+Non-string values retain type/value or object identity. The gate independently
+checks complete evidence, fresh references, exact UTF-16 bytes, removed metadata,
+parsed JSON, exit/status and coverage. Linux source inspection is not PS5 proof.
+
+`wrapper-source-manifest.json` pins pre-fix blob
+`dc4d420158f490000c85e0b8a0eb483f022dcc76`. Its CRLF materialization exactly
+reproduces the observed Windows wrapper SHA-256
+`e45d872e18d61e01027397bf72dc206c026f1fdcbe1c97d3bc8d2811a8f90729`.
+The unmodified-original tier continues to run those bytes. The separate corrected
+oracle uses unchanged original helper bodies after the reviewed initialization,
+and the explicitly corrected wrapper on both sides. It now requires 34 actual
+pairs including completed cold/warm SmartPlan, 51 initialization records, the
+scalar proof and all 210 current captured SmartPlan kernel/adapter cases. The
+candidate phase diagnostic must complete a valid plan; an expected timeout can
+qualify only the separately preserved original defect observation. All raw
+evidence remains, and the overall raw-parity gate remains failed. No observation
+default activation or PowerShell source retirement is part of this correction.
+
+The helper family's retained-body guard now requires its full pinned original
+Invoke-NativeHelper body plus exactly these two lines at the existing stderr
+read boundary. The original source/AST/hash assertions and other bodies remain
+unchanged; the new scalar fixture is the mapped behavioral check. No generic
+source or output normalization was introduced.
+
+Local validation for this increment: 41 observation tests and 12 helper-source
+tests pass. Full discovery runs 1,024 methods: 770 pass, 254 individual skips,
+two additional setup skips, zero failures/errors. Independent review found no
+production-code blocker; exact PS5 scalar execution and completed actual routes
+remain unqualified until the next Windows run. The two production lines and
+ordinary 245-line fixture add 16,872 counted PowerShell bytes over `8fafca8`,
+with zero new retirement credit. The existing 180-second actual-entry and
+60-second phase-diagnostic budgets are unchanged.

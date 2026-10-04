@@ -1,0 +1,6 @@
+C:\Users\runneradmin\AppData\Local\Temp\CUCP helper owned 한글 0ytmkxgf\published-server.ps1 : The term 'try' is not 
+recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if 
+a path was included, verify that the path is correct and try again.
+    + CategoryInfo          : ObjectNotFound: (try:String) [published-server.ps1], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException,published-server.ps1
+ 

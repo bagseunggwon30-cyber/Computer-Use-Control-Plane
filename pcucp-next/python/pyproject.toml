@@ -15,3 +15,6 @@ cucp = "pcucp_cli.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["pcucp_cli*"]
+
+[tool.setuptools.package-data]
+pcucp_cli = ["legacy_cdp_assets/*.js"]

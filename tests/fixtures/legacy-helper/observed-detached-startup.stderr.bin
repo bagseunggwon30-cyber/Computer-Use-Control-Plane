@@ -1,0 +1,6 @@
+
+Unhandled Exception: System.IO.IOException: The handle is invalid.
+
+   at System.IO.__Error.WinIOError(Int32 errorCode, String maybeFullPath)
+   at System.Console.set_OutputEncoding(Encoding value)
+   at PcuCp.LegacyHelper.Program.Main(String[] args)

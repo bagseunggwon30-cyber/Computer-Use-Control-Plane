@@ -1,0 +1,320 @@
+{
+  "schema": "cucp.workflow-token-kind-repair/v1",
+  "provenance": {
+    "evidence": "observed-windows-powershell-5.1-raw-diagnostics",
+    "run_id": "37086299736",
+    "run_url": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37086299736",
+    "tested_commit": "1e3d534a1d244bcc9ed6bfd318a1976b95c22eb0",
+    "raw_capture_file": "legacy-workflow-ps51-raw-diagnostics-37086299736.json",
+    "raw_capture_sha256": "c60e8e0a7d975b37090d434d9ced26f6acc37dd85a0a89a5c1ec0668572bfbb8",
+    "artifact_zip_sha256": "baf26d7a36c9fc56c570dbdef5d1434c329ac7b376e82d0e1c5f5de94af14b30",
+    "historical_raw_case_count": 128,
+    "historical_exact_gap_count": 106,
+    "historical_normalized_gap_count": 8,
+    "historical_text_only_gap_count": 98
+  },
+  "target_ids": [
+    "inferred_opaque_balanced_group",
+    "inferred_opaque_balanced_block",
+    "inferred_opaque_array",
+    "inferred_opaque_hashtable",
+    "inferred_opaque_block_comment",
+    "inferred_opaque_line_comment",
+    "inferred_opaque_pipeline",
+    "inferred_opaque_semicolon",
+    "inferred_opaque_output_redirect",
+    "inferred_later_semicolon_keyword",
+    "inferred_later_group_keyword",
+    "diagnostic_first_unsupported_pipeline",
+    "diagnostic_context_comment_second_opener_is_text",
+    "diagnostic_context_comment_then_line_comment",
+    "diagnostic_context_parenthesized_uppercase",
+    "diagnostic_context_parenthesized_nested",
+    "diagnostic_context_parenthesized_spaces",
+    "diagnostic_context_named_block_after_statement_uppercase",
+    "diagnostic_context_named_block_after_statement_begin",
+    "diagnostic_context_named_block_after_semicolon_newline"
+  ],
+  "inferred_live_neighbors": [
+    {
+      "id": "token_kind_group_parameter",
+      "step": "macro windows (more -Name value)",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'GroupStart'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_block_parameter",
+      "step": "macro windows { more -Name value }",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'GroupStart'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_array_parameter",
+      "step": "macro windows @('a', 'b') -Name value",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'GroupStart'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_hashtable_parameter",
+      "step": "macro windows @{key='value'} -Name value",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'GroupStart'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_comment_opaque",
+      "step": "macro windows <# $( ( { -Name \" #>",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'Comment'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_line_comment_opaque",
+      "step": "macro windows # $( ( { -Name \"",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'Comment'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_pipeline_first",
+      "step": "macro windows | more -Name value",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'Operator'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_redirect_first",
+      "step": "macro windows > result -Name value",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'Operator'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_semicolon_first",
+      "step": "macro windows; more -Name value",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'StatementSeparator'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_parameter_first_group",
+      "step": "macro windows -Name (more)",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'CommandParameter'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_parameter_first_comment",
+      "step": "macro windows -Name value # (",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'CommandParameter'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_quoted_punctuation_then_pipeline",
+      "step": "macro windows '(|;>#@{' | more",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'Operator'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_escaped_pipe_then_semicolon",
+      "step": "macro windows `|; more",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'StatementSeparator'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_leading_comment",
+      "step": "# comment",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'Comment'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_adjacent_semicolon",
+      "step": "macro windows;more",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'StatementSeparator'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_block_comment_before_parameter",
+      "step": "macro windows <# data #> -Name value",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "unsupported_token",
+        "detail": "unsupported token type 'Comment'",
+        "tokens": []
+      },
+      "comparison": "exact"
+    },
+    {
+      "id": "token_kind_unclosed_parenthesis",
+      "step": "macro windows -Name (more",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "comparison": "code-and-tokens"
+    },
+    {
+      "id": "token_kind_unclosed_brace",
+      "step": "macro windows -Name { more",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "comparison": "code-and-tokens"
+    },
+    {
+      "id": "token_kind_unclosed_array",
+      "step": "macro windows @('a'",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "comparison": "code-and-tokens"
+    },
+    {
+      "id": "token_kind_unclosed_hashtable",
+      "step": "macro windows @{key='value'",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "comparison": "code-and-tokens"
+    },
+    {
+      "id": "token_kind_unclosed_comment",
+      "step": "macro windows <# ( \"",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "comparison": "code-and-tokens"
+    },
+    {
+      "id": "token_kind_line_comment_then_unclosed",
+      "step": "macro windows # ignored (\n(",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "comparison": "code-and-tokens"
+    },
+    {
+      "id": "token_kind_quoted_open_then_unclosed",
+      "step": "macro windows '(' (",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "comparison": "code-and-tokens"
+    },
+    {
+      "id": "token_kind_escaped_open_then_unclosed",
+      "step": "macro windows `( (",
+      "evidence": "inferred-unqualified",
+      "candidate": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "comparison": "code-and-tokens"
+    }
+  ]
+}

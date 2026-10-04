@@ -12,11 +12,10 @@ param(
   [string[]]$CucpArgs
 )
 
-# If the caller passed "--" as the first token (POSIX stop-parsing convention),
-# strip it. Anything that follows is treated verbatim - this prevents
-# PowerShell from interpreting tokens like "--out" as parameter abbreviations
-# (e.g. -OutVariable). Callers that need to pass --out, --opt-name, etc. to
-# the CUCP CLI should always prefix their args with "--".
+# Strip a leading "--" only if it has already reached the argument array.
+# This cannot protect the native powershell.exe -File parameter-binding boundary.
+# Inside PowerShell, pass option-like data through the named -CucpArgs string array.
+# Internal planning queries use a fixed stdin bootstrap for that typed binding.
 if ($CucpArgs -and $CucpArgs.Count -gt 0 -and $CucpArgs[0] -eq "--") {
   if ($CucpArgs.Count -gt 1) {
     $CucpArgs = $CucpArgs[1..($CucpArgs.Count - 1)]
@@ -209,7 +208,7 @@ function Write-WrapperLog {
 # CUCP 전용 PowerShell helper 위치. Win32 + UIA + Screenshot을 직접 호출해서
 # 외부 windows-mcp 서버나 Codex 공식 helper에 의존하지 않습니다. 이 helper는
 # 스킬 폴더 안에 항상 같이 배포되므로 절대 경로 탐색 불필요.
-$Script:NativeHelperPath = Join-Path $PSScriptRoot "cucp-native-helper.ps1"
+$Script:NativeHelperPath = Join-Path $PSScriptRoot "cucp-native-helper.py"
 if (-not (Test-Path -LiteralPath $Script:NativeHelperPath)) {
   $Script:NativeHelperPath = ""
 }
@@ -249,236 +248,43 @@ if (-not $Script:NativeHelperPath) {
 $Script:HelperLockPath = Join-Path $Script:AuditDir "helper.pid"
 $Script:HelperServerScript = Join-Path $PSScriptRoot "cucp-helper-server.ps1"
 $Script:_HelperPipeReqId = 0
+. (Join-Path $PSScriptRoot 'cucp-staged-helper-adapter.ps1')
 # server 가 직접 처리 가능한 action 화이트리스트 (cucp-helper-server.ps1 v1.7.0 의 _Dispatch 와 일치)
 $Script:HelperServerSupported = @("windows", "health", "focused", "modal-detect", "ocr-screen-fast", "uia-find-fast")
 
 function _Read-LockSafely {
-  # 결과: hashtable {pid, pipe_name, started_at, helper_version} 또는 $null
-  if (-not (Test-Path -LiteralPath $Script:HelperLockPath)) { return $null }
-  try {
-    $raw = Get-Content -LiteralPath $Script:HelperLockPath -Raw -Encoding UTF8
-    if (-not $raw) { return $null }
-    $obj = $raw | ConvertFrom-Json -ErrorAction Stop
-    return $obj
-  } catch {
-    return $null
-  }
+  try { return (_Invoke-StagedHelper -Operation 'read') } catch { return $null }
 }
 
 function _Is-StaleLock {
   param($Lock)
-  if (-not $Lock) { return $true }
-  # v2.0.0 — multi-user 격리: 다른 user 의 lock 은 stale 처리하지 않고 무시.
-  # wrapper 가 자기 user 의 lock 만 정리하도록. owner_user 가 없으면 (legacy) 검사 skip.
-  try {
-    $myUser = [Environment]::UserName
-    if ($Lock.owner_user -and "$($Lock.owner_user)" -ne $myUser) {
-      # 남의 user 의 lock — stale 아니지만 우리는 사용 안 함. 호출자가 lock 을 무시할 수 있도록 stale 로 처리 (delete 안 함).
-      return $true
-    }
-  } catch { }
-  # 1. PID alive 검증
-  try {
-    $proc = Get-Process -Id ([int]$Lock.pid) -ErrorAction SilentlyContinue
-    if (-not $proc) { return $true }
-  } catch { return $true }
-  # 2. mtime 검증 (24h margin)
-  try {
-    $started = [DateTime]::Parse("$($Lock.started_at)")
-    $age = (Get-Date).ToUniversalTime() - $started.ToUniversalTime()
-    if ($age.TotalHours -gt 24) { return $true }
-  } catch { return $true }
-  # 3. pipe_name 형식 검증
-  $expectedPipe = "cucp-helper-$($Lock.pid)"
-  if ("$($Lock.pipe_name)" -ne $expectedPipe) { return $true }
-  # 4. helper_version SemVer 검증
-  if ("$($Lock.helper_version)" -notmatch '^\d+\.\d+\.\d+$') { return $true }
-  return $false
+  try { return [bool](_Invoke-StagedHelper -Operation 'stale' -Arguments @{snapshot=$Lock._cucp_staged_snapshot}) } catch { return $true }
 }
 
 function _Try-Delete-Lock {
-  # v2.0.0 — 자기 user 의 lock 만 삭제. 남의 lock 은 절대 삭제 안 함.
-  if (-not (Test-Path -LiteralPath $Script:HelperLockPath)) { return }
-  try {
-    $lock = _Read-LockSafely
-    if ($lock -and $lock.owner_user) {
-      $myUser = [Environment]::UserName
-      if ("$($lock.owner_user)" -ne $myUser) { return }
-    }
-    Remove-Item -LiteralPath $Script:HelperLockPath -Force -ErrorAction SilentlyContinue
-  } catch { }
+  param($ExpectedLock)
+  try { $null=_Invoke-StagedHelper -Operation 'delete' -Arguments @{snapshot=$ExpectedLock._cucp_staged_snapshot} } catch { }
 }
 
 function Get-HelperServerStatus {
-  # macro session helper-status 용. server up/down 둘 다 일관 envelope 반환.
-  $lock = _Read-LockSafely
-  if (-not $lock -or (_Is-StaleLock -Lock $lock)) {
-    return [pscustomobject]@{
-      schema = "cucp.helper-status/v1"
-      alive = $false
-      pid = $null
-      pipe_name = $null
-      started_at = $null
-      uptime_s = 0
-      request_count = 0
-      helper_version = $null
-    }
-  }
-  # server 살아있으면 health action 으로 추가 정보 가져옴
-  $extra = $null
-  try {
-    $resp = Invoke-HelperPipe -Action "health" -ArgsHash @{} -TimeoutMs 1500
-    if ($resp -and $resp.exit_code -eq 0) { $extra = $resp.result }
-  } catch { $extra = $null }
-  $upS = 0; $reqC = 0
-  if ($extra) {
-    if ($extra.uptime_s) { $upS = [int]$extra.uptime_s }
-    if ($extra.request_count) { $reqC = [int]$extra.request_count }
-  }
-  return [pscustomobject]@{
-    schema = "cucp.helper-status/v1"
-    alive = $true
-    pid = [int]$lock.pid
-    pipe_name = "$($lock.pipe_name)"
-    started_at = "$($lock.started_at)"
-    uptime_s = $upS
-    request_count = $reqC
-    helper_version = "$($lock.helper_version)"
-  }
+  return (_Invoke-StagedHelper -Operation 'status')
 }
 
 function Invoke-HelperPipe {
-  # JSON-line client. server 가 살아있다고 가정 (호출자가 lock 검증 후 사용).
-  # request: {id, action, args, timeout_ms?, trace_id?}
-  # response: {id, exit_code, result, error, ...}
-  # 실패 시 throw — 호출자가 catch 후 child fallback 으로 처리.
-  param(
-    [Parameter(Mandatory=$true)][string]$Action,
-    [hashtable]$ArgsHash = @{},
-    [int]$TimeoutMs = 30000
-  )
-  $lock = _Read-LockSafely
-  if (-not $lock) { throw "helper_lock_missing" }
-  $pipeName = "$($lock.pipe_name)"
-  if (-not $pipeName) { throw "helper_pipe_name_missing" }
-  $client = New-Object System.IO.Pipes.NamedPipeClientStream(
-    ".", $pipeName,
-    [System.IO.Pipes.PipeDirection]::InOut,
-    [System.IO.Pipes.PipeOptions]::Asynchronous
-  )
-  $reader = $null
-  $writer = $null
-  try {
-    $connectTimeout = [Math]::Min(2000, $TimeoutMs)
-    $client.Connect($connectTimeout)
-    if (-not $client.IsConnected) { throw "pipe_connect_failed" }
-    $reader = New-Object System.IO.StreamReader($client, [System.Text.Encoding]::UTF8)
-    $writer = New-Object System.IO.StreamWriter($client, [System.Text.Encoding]::UTF8)
-    $writer.AutoFlush = $true
-    $Script:_HelperPipeReqId++
-    $reqId = $Script:_HelperPipeReqId
-    $req = [ordered]@{
-      id = $reqId
-      action = $Action
-      args = $ArgsHash
-      timeout_ms = $TimeoutMs
-    }
-    $line = $req | ConvertTo-Json -Compress -Depth 8
-    $writer.WriteLine($line)
-    # async ReadLine 으로 timeout 통제
-    $task = [System.Threading.Tasks.Task]::Run([System.Func[string]] { $reader.ReadLine() })
-    $waited = $task.Wait($TimeoutMs)
-    if (-not $waited) { throw "pipe_read_timeout" }
-    $respLine = $task.Result
-    if (-not $respLine) { throw "pipe_empty_response" }
-    $resp = $respLine | ConvertFrom-Json -ErrorAction Stop
-    if ($resp.id -ne $reqId) { throw "pipe_id_mismatch (req=$reqId, resp=$($resp.id))" }
-    return $resp
-  } finally {
-    try { if ($reader) { $reader.Close() } } catch { }
-    try { if ($writer) { $writer.Close() } } catch { }
-    try { $client.Close() } catch { }
-    try { $client.Dispose() } catch { }
-  }
+  param([Parameter(Mandatory=$true)][string]$Action, [hashtable]$ArgsHash=@{}, [int]$TimeoutMs=30000, $ExpectedLock=$null)
+  if ($Script:_HelperPipeReqId -eq [int]::MaxValue) { $Script:_HelperPipeReqId=0 }
+  $Script:_HelperPipeReqId++
+  return (_Invoke-StagedHelper -Operation 'invoke' -Arguments @{action=$Action;args=$ArgsHash;timeout_ms=$TimeoutMs;request_id=$Script:_HelperPipeReqId;snapshot=$ExpectedLock._cucp_staged_snapshot})
 }
 
 function Start-HelperServer {
-  # idempotent — 이미 살아있는 server 가 있으면 그대로 reuse
-  param(
-    [int]$IdleTimeoutMs = 60000
-  )
-  $lock = _Read-LockSafely
-  if ($lock -and -not (_Is-StaleLock -Lock $lock)) {
-    return [pscustomobject]@{
-      status = "ok"
-      reused = $true
-      pid = [int]$lock.pid
-      pipe_name = "$($lock.pipe_name)"
-      started_at = "$($lock.started_at)"
-    }
-  }
-  if ($lock) { _Try-Delete-Lock }  # stale 정리
-  if (-not (Test-Path -LiteralPath $Script:HelperServerScript)) {
-    return [pscustomobject]@{
-      status = "error"
-      reason = "helper_server_script_missing"
-      path = $Script:HelperServerScript
-    }
-  }
-  $argList = @(
-    "-NoProfile", "-NoLogo", "-NonInteractive",
-    "-ExecutionPolicy", "Bypass",
-    "-File", $Script:HelperServerScript,
-    "-IdleTimeoutMs", "$IdleTimeoutMs"
-  )
-  $proc = Start-Process powershell.exe -ArgumentList $argList `
-    -WindowStyle Hidden -PassThru -ErrorAction Stop
-  # lock 등장 대기 (3s deadline, 50ms tick)
-  $deadline = (Get-Date).AddMilliseconds(3000)
-  while ((Get-Date) -lt $deadline) {
-    Start-Sleep -Milliseconds 50
-    $lock = _Read-LockSafely
-    if ($lock -and [int]$lock.pid -eq [int]$proc.Id -and -not (_Is-StaleLock -Lock $lock)) {
-      return [pscustomobject]@{
-        status = "ok"
-        reused = $false
-        pid = [int]$lock.pid
-        pipe_name = "$($lock.pipe_name)"
-        started_at = "$($lock.started_at)"
-      }
-    }
-  }
-  # 실패 → spawn 된 proc 정리
-  try { $proc.Kill() } catch { }
-  _Try-Delete-Lock
-  return [pscustomobject]@{
-    status = "error"
-    reason = "server_start_timeout"
-  }
+  param([int]$IdleTimeoutMs=60000)
+  return (_Invoke-StagedHelper -Operation 'start' -Arguments @{idle_timeout_ms=$IdleTimeoutMs})
 }
 
 function Stop-HelperServer {
   param([switch]$Force)
-  $lock = _Read-LockSafely
-  if (-not $lock) {
-    return [pscustomobject]@{ status = "ok"; reason = "no_helper_running" }
-  }
-  $oldPid = [int]$lock.pid
-  # A lock PID is not a process identity. Never terminate by an untrusted or
-  # stale PID: it may now belong to an unrelated application.
-  if (_Is-StaleLock -Lock $lock) {
-    _Try-Delete-Lock
-    return [pscustomobject]@{ status = "ok"; reason = "stale_lock_removed"; stopped_pid = $null; forced = $false }
-  }
-  try {
-    $resp = Invoke-HelperPipe -Action "shutdown" -ArgsHash @{} -TimeoutMs 1500
-    if (-not $resp -or $resp.exit_code -ne 0) { throw "shutdown_not_acknowledged" }
-  } catch {
-    return [pscustomobject]@{ status = "error"; reason = "shutdown_not_acknowledged_no_pid_kill"; stopped_pid = $null; forced = $false }
-  }
-  _Try-Delete-Lock
-  return [pscustomobject]@{ status = "ok"; reason = "shutdown_requested"; stopped_pid = $oldPid; forced = $false }
-
+  return (_Invoke-StagedHelper -Operation 'stop' -Arguments @{force=[bool]$Force})
 }
 
 # ============================================================================
@@ -507,6 +313,7 @@ function _Get-AutostartShimPath {
 function Install-HelperAutostart {
   # Startup 폴더에 helper-server 를 hidden 으로 기동하는 .cmd shim 생성 (idempotent).
   param([int]$IdleTimeoutMs = 28800000)  # 기본 8시간
+  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'autostart-install' -Arguments @{idle_timeout_ms=$IdleTimeoutMs}) }
   if (-not $Script:HelperServerScript -or -not (Test-Path -LiteralPath $Script:HelperServerScript)) {
     return [pscustomobject]@{ status = "error"; reason = "helper_server_script_missing"; path = $Script:HelperServerScript }
   }
@@ -537,6 +344,7 @@ function Install-HelperAutostart {
 }
 
 function Uninstall-HelperAutostart {
+  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'autostart-uninstall') }
   # Startup shim 제거. shim 없어도 graceful (status ok, removed=false).
   $shimPath = _Get-AutostartShimPath
   $removed = $false
@@ -553,6 +361,7 @@ function Uninstall-HelperAutostart {
 }
 
 function Get-HelperAutostartStatus {
+  if ($Script:StagedCompiledHelper) { return (_Invoke-StagedHelper -Operation 'autostart-status') }
   # shim 설치 여부 + 경로 반환.
   $shimPath = _Get-AutostartShimPath
   return [pscustomobject]@{
@@ -649,6 +458,7 @@ function _Read-CliVersion {
 }
 
 function _Read-HelperServerVersion {
+  if ($Script:StagedCompiledHelper) { try { return (_Invoke-StagedHelper -Operation 'version') } catch { return @{version=$null; error='helper_compiled_runtime_unavailable'} } }
   # cucp-helper-server.ps1 헤더 주석 또는 helper_version 라인에서 SemVer 추출.
   if (-not $Script:HelperServerScript -or -not (Test-Path -LiteralPath $Script:HelperServerScript)) {
     return @{ version = $null; error = "helper_server_script_missing" }
@@ -691,7 +501,8 @@ function Get-CucpVersionReport {
   }
   $hs = _Read-HelperServerVersion
   if ($hs.error) {
-    [void]$errs.Add((_Make-RecoverableError -Code $hs.error -Layer "helper_server" -RecommendedAction "Verify scripts/cucp-helper-server.ps1 헤더의 helper_version 표기"))
+    $helperRecommendation = if ($Script:StagedCompiledHelper) { 'Build and verify pcucp-next/bin/legacy-helper with packaging/publish_legacy_helper.py' } else { 'Verify scripts/cucp-helper-server.ps1 헤더의 helper_version 표기' }
+    [void]$errs.Add((_Make-RecoverableError -Code $hs.error -Layer "helper_server" -RecommendedAction $helperRecommendation))
   }
   $lock = _Read-LockSafely
   $helperMode = "child_only"
@@ -712,7 +523,7 @@ function Get-CucpVersionReport {
     sources = @{
       skill = "scripts/cucp.ps1::Script:SkillVersion"
       cli = $cli.package_path
-      helper_server = $Script:HelperServerScript
+      helper_server = if ($Script:StagedCompiledHelper) { 'pcucp-next/bin/legacy-helper/manifest.json' } else { $Script:HelperServerScript }
     }
     recoverable_errors = @($errs)
     generated_at = (_Now-Iso)
@@ -951,76 +762,7 @@ function Invoke-MacroRecorder {
 # allow / deny / require_confirm 세 결과 중 하나를 반환.
 # ============================================================================
 
-function Invoke-MacroAuditSummary {
-  param([string[]]$Rest)
-  $sinceMin = _Read-OptValue -Rest $Rest -Name "--since-minutes"
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $cutoff = $null
-  if ($sinceMin) {
-    try { $cutoff = (Get-Date).AddMinutes(-1 * [int]$sinceMin) } catch { $cutoff = $null }
-  }
-  $files = @()
-  if (Test-Path -LiteralPath $Script:AuditDir) {
-    $files = @(Get-ChildItem -LiteralPath $Script:AuditDir -Filter 'trajectory*.ndjson' -ErrorAction SilentlyContinue -Recurse | Sort-Object LastWriteTime -Descending | Select-Object -First 20)
-  }
-  $totalEvents = 0
-  $byMacro = @{}
-  $byExit = @{}
-  $sensitiveCount = 0
-  $blockedCount = 0
-  $earliest = $null
-  $latest = $null
-  foreach ($f in $files) {
-    try {
-      $lines = Get-Content -LiteralPath $f.FullName -Encoding UTF8 -ErrorAction SilentlyContinue
-      foreach ($line in @($lines)) {
-        if ([string]::IsNullOrWhiteSpace($line)) { continue }
-        try {
-          $ev = $line | ConvertFrom-Json -ErrorAction Stop
-        } catch { continue }
-        if ($cutoff -and $ev.ts) {
-          try { $evTs = [datetime]$ev.ts } catch { $evTs = $null }
-          if ($evTs -and $evTs -lt $cutoff) { continue }
-        }
-        $totalEvents++
-        $m = "$($ev.macro)"
-        if (-not $m) { $m = "$($ev.action)" }
-        if ($m) {
-          if (-not $byMacro.ContainsKey($m)) { $byMacro[$m] = 0 }
-          $byMacro[$m] = $byMacro[$m] + 1
-        }
-        $ec = "$($ev.exit_code)"
-        if ($ec) {
-          if (-not $byExit.ContainsKey($ec)) { $byExit[$ec] = 0 }
-          $byExit[$ec] = $byExit[$ec] + 1
-        }
-        if ($ev.sensitive -or "$($ev.reason)" -match 'sensitive') { $sensitiveCount++ }
-        if ($ev.status -eq "blocked" -or $ec -eq "3") { $blockedCount++ }
-        if ($ev.ts) {
-          if (-not $earliest -or "$($ev.ts)" -lt $earliest) { $earliest = "$($ev.ts)" }
-          if (-not $latest   -or "$($ev.ts)" -gt $latest)   { $latest   = "$($ev.ts)" }
-        }
-      }
-    } catch { }
-  }
-  $status = if ($totalEvents -eq 0) { "empty" } else { "ok" }
-  $out = [pscustomobject]@{
-    schema = "cucp.audit-summary/v1"
-    status = $status
-    file_count = @($files).Count
-    event_count = $totalEvents
-    earliest_ts = $earliest
-    latest_ts = $latest
-    by_macro = $byMacro
-    by_exit_code = $byExit
-    sensitive_count = $sensitiveCount
-    blocked_count = $blockedCount
-    since_cutoff = if ($cutoff) { $cutoff.ToString("yyyy-MM-ddTHH:mm:ss.fffK") } else { $null }
-  }
-  $briefLine = "$status audit-summary files=$($files.Count) events=$totalEvents sensitive=$sensitiveCount blocked=$blockedCount"
-  _Emit-Envelope -Envelope $out -BriefLine $briefLine -Depth 8 -ForceJson:$jsonOnly
-  return 0
-}
+function Invoke-MacroAuditSummary {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'audit-summary' -Rest $Rest}
 
 function Invoke-MacroPolicyCheck {
   param([string[]]$Rest)
@@ -1156,28 +898,26 @@ function _Vision-GateOrRecord {
 #   ElapsedMs int
 # }
 # ============================================================================
+$Script:LegacyCdpSourceRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+. (Join-Path $PSScriptRoot 'cucp-legacy-cdp-adapter.ps1')
+. (Join-Path $PSScriptRoot 'cucp-legacy-interaction-adapter.ps1')
+. (Join-Path $PSScriptRoot 'cucp-legacy-diagnostic-adapter.ps1')
+
 function Invoke-NativeHelper {
-  # ==========================================================================
-  # cucp-native-helper.ps1 을 child PowerShell 프로세스로 띄우고 결과 파싱.
-  # ==========================================================================
-  # 책임:
-  #   1. -File 모드로 helper 호출 (NoProfile / ExecutionPolicy Bypass)
-  #   2. 시간 초과 시 child kill + envelope ExitCode=124 반환
-  #   3. stdout/stderr 임시 파일 → 읽기 → JSON 파싱 → 반환
-  #   4. exit code 정확히 추정 (PS5 의 Start-Process bug 우회)
-  #
-  # exit code 추정 흐름 (v1.0.0 fix):
-  #   a. proc.Refresh() + [int]proc.ExitCode  ← 가장 정확
-  #   b. by-PID 재조회 ([Process]::GetProcessById)  ← (a) 가 InvalidOpEx 던질 때
-  #   c. JSON status 기반 보정 (partial → 2, error → 1) ← (b) 도 실패 시
-  # 이 3-tier fallback 이 없으면 partial(2) / error(1) 가 wrapper exit 0 으로
-  # 흘러 들어가는 잠재 버그 발생 (v0.6.0~0.8.0 까지 있던 버그).
-  # ==========================================================================
+  # Python owns cold native requests; C# performs Win32/UIA/OCR/input.
   param(
     [string[]]$ArgList,
     [int]$TimeoutMs = 0,
     [switch]$ForceChild
   )
+  if ($null -eq $ArgList -or $ArgList.Count -lt 2 -or
+      -not [string]::Equals($ArgList[0], '-Action', [StringComparison]::OrdinalIgnoreCase) -or
+      [string]::IsNullOrEmpty($ArgList[1])) {
+    throw 'Native helper requests must begin with -Action and a nonempty action value.'
+  }
+  if ($ArgList[1].StartsWith('cdp-', [StringComparison]::OrdinalIgnoreCase)) {
+    return (_Invoke-LegacyCdpNativeArgv -ArgList $ArgList -LiveAuthority:([bool]$AllowLiveControl))
+  }
   if (-not $Script:NativeHelperPath) {
     return [pscustomobject]@{
       ExitCode = 1
@@ -1217,7 +957,7 @@ function Invoke-NativeHelper {
         $tm = $TimeoutMs
         if ($tm -le 0) { $tm = $Script:InvokeTimeoutMs }
         try {
-          $resp = Invoke-HelperPipe -Action $hAction -ArgsHash $hArgs -TimeoutMs $tm
+          $resp = Invoke-HelperPipe -Action $hAction -ArgsHash $hArgs -TimeoutMs $tm -ExpectedLock $lock
           $ipcSw.Stop()
           if ($resp -and $resp.exit_code -ne 99) {
             # 정상 응답 — pipe 경로로 envelope 구성
@@ -1239,7 +979,7 @@ function Invoke-NativeHelper {
           # pipe broken / timeout / id mismatch → child fallback
           # stale 검사 한 번 더 (server 가 죽었을 수 있음)
           $lock2 = _Read-LockSafely
-          if ($lock2 -and (_Is-StaleLock -Lock $lock2)) { _Try-Delete-Lock }
+          if ($lock2 -and (_Is-StaleLock -Lock $lock2)) { _Try-Delete-Lock -ExpectedLock $lock }
           Write-WrapperLog -Message "PIPE FAILED ($($_.Exception.Message)) → child fallback for action=$hAction"
         }
       }
@@ -1294,62 +1034,13 @@ function Invoke-NativeHelper {
   if ($hotEligible) { $Script:HotCacheStats.misses++ }
   if ($TimeoutMs -le 0) { $TimeoutMs = $Script:InvokeTimeoutMs }
   $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $stdoutFile = Join-Path $Script:CacheDir ("native-" + [guid]::NewGuid().ToString("N") + ".json")
-  $stderrFile = $stdoutFile + ".err"
   try {
-    $allArgs = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$Script:NativeHelperPath) + $ArgList
-    $procArgs = ConvertTo-ProcessArgumentString -ArgList $allArgs
-    $proc = Start-Process -FilePath "powershell" -ArgumentList $procArgs `
-      -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile `
-      -NoNewWindow -PassThru
-    $exited = $proc.WaitForExit($TimeoutMs)
-    if (-not $exited) {
-      try { $proc.Kill() } catch { }
-      try { [void]$proc.WaitForExit(3000) } catch { }
-      $sw.Stop()
-      Write-WrapperLog -Message "NATIVE TIMEOUT $($ArgList -join ' ')"
-      return [pscustomobject]@{
-        ExitCode = 124
-        Json = $null
-        Raw = ""
-        Err = "TIMEOUT after ${TimeoutMs}ms"
-        ElapsedMs = [int]$sw.Elapsed.TotalMilliseconds
-      }
-    }
+    $reply = _Invoke-LegacyCdpBridge -Operation 'desktop-native' -Request @{argv=@($ArgList)} -LiveAuthority:([bool]$AllowLiveControl) -TimeoutMs $TimeoutMs
     $sw.Stop()
-    # Start-Process -PassThru 로 만든 Process 객체는 timeout-overload WaitForExit
-    # 후 ExitCode 속성이 InvalidOperationException 을 던질 수 있음 (Process.HasExited 이슈).
-    # 핸들 리프레시 후 [System.Diagnostics.Process]::GetProcessById 로 재조회.
-    $exitCode = 0
-    try {
-      $proc.Refresh()
-      $exitCode = [int]$proc.ExitCode
-    } catch {
-      # Process.ExitCode 가 throw 면 by-pid 로 다시 시도
-      try {
-        $pid2 = $proc.Id
-        $p2 = [System.Diagnostics.Process]::GetProcessById($pid2)
-        $exitCode = [int]$p2.ExitCode
-      } catch {
-        # 그래도 실패하면 stdout JSON 의 status 로 추정
-        $exitCode = 0
-      }
-    }
-    $raw = ""
-    $err = ""
-    if (Test-Path -LiteralPath $stdoutFile) { $raw = Get-Content -LiteralPath $stdoutFile -Raw -Encoding UTF8 }
-    if (Test-Path -LiteralPath $stderrFile) { $err = Get-Content -LiteralPath $stderrFile -Raw -Encoding UTF8 }
-    $json = $null
-    if ($raw -and $raw.Trim().Length -gt 0) {
-      try { $json = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
-    }
-    # ExitCode 추정 실패 시 JSON status 기반으로 보정
-    if ($exitCode -eq 0 -and $json) {
-      switch ("$($json.status)") {
-        "partial" { $exitCode = 2 }
-        "error"   { $exitCode = 1 }
-      }
-    }
+    $exitCode = [int]$reply.ExitCode
+    $json = $reply.Json
+    $raw = [string]$reply.Raw
+    $err = [string]$reply.Err
     # v1.5.0 Phase 1: hot cache write (정상 응답만, ok+JSON 있을 때, eligible action 만)
     if ($hotEligible -and $hotKey -and $exitCode -eq 0 -and $json) {
       try {
@@ -1381,16 +1072,13 @@ function Invoke-NativeHelper {
   } catch {
     $sw.Stop()
     return [pscustomobject]@{
-      ExitCode = 1
+      ExitCode = if ($_.Exception.Message -match '^(mutation_may_have_occurred=true; automatic_retry=false; )?(Desktop owner timed out;|Native bridge timed out;|Dependency timed out;)') { 124 } else { 1 }
       Json = $null
       Raw = ""
       Err = $_.Exception.Message
       ElapsedMs = [int]$sw.Elapsed.TotalMilliseconds
       Route = "child-error"
     }
-  } finally {
-    Remove-Item -LiteralPath $stdoutFile -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $stderrFile -Force -ErrorAction SilentlyContinue
   }
 }
 
@@ -1791,271 +1479,16 @@ $Script:_Win32Loaded = $false
 function _Ensure-Win32Loaded {
   if ($Script:_Win32Loaded) { return $true }
   try {
-    $sig = @"
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Text;
-
-public static class CucpWin32 {
-  public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
-
-  [DllImport("user32.dll")]
-  public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-
-  [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-  public static extern int GetWindowTextLength(IntPtr hWnd);
-
-  [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-  public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
-
-  [DllImport("user32.dll")]
-  public static extern bool IsWindowVisible(IntPtr hWnd);
-
-  [DllImport("user32.dll")]
-  public static extern bool IsIconic(IntPtr hWnd);
-
-  [DllImport("user32.dll", SetLastError = true)]
-  public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-
-  [DllImport("user32.dll")]
-  public static extern IntPtr GetForegroundWindow();
-
-  public const uint GA_ROOT = 2;
-
-  [StructLayout(LayoutKind.Sequential)]
-  public struct POINT { public int X; public int Y; }
-
-  [DllImport("user32.dll")]
-  public static extern IntPtr WindowFromPoint(POINT point);
-
-  [DllImport("user32.dll")]
-  public static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
-
-  [DllImport("user32.dll", CharSet = CharSet.Auto)]
-  public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
-
-  [StructLayout(LayoutKind.Sequential)]
-  public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
-
-  [DllImport("user32.dll")]
-  public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-
-  public class WindowInfo {
-    public IntPtr Hwnd;
-    public IntPtr ChildHwnd;
-    public string Title;
-    public string ClassName;
-    public uint Pid;
-    public string ProcessName;
-    public bool Visible;
-    public bool Minimized;
-    public bool Foreground;
-    public int X; public int Y; public int Width; public int Height;
-  }
-
-  public class MonitorInfo {
-    public string DeviceName;
-    public bool Primary;
-    public int X; public int Y; public int Width; public int Height;
-    public int WorkX; public int WorkY; public int WorkWidth; public int WorkHeight;
-    public uint DpiX; public uint DpiY;
-    public double ScaleX; public double ScaleY;
-  }
-
-  public class VirtualScreenInfo {
-    public int X; public int Y; public int Width; public int Height;
-    public int MonitorCount;
-    public bool SameDisplayFormat;
-  }
-
-  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-  public struct MONITORINFOEX {
-    public int cbSize;
-    public RECT rcMonitor;
-    public RECT rcWork;
-    public uint dwFlags;
-    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
-    public string szDevice;
-  }
-
-  public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
-
-  [DllImport("user32.dll")]
-  public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
-
-  [DllImport("user32.dll", CharSet = CharSet.Auto)]
-  public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFOEX lpmi);
-
-  [DllImport("user32.dll")]
-  public static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
-
-  [DllImport("user32.dll")]
-  public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
-
-  [DllImport("user32.dll")]
-  public static extern int GetSystemMetrics(int nIndex);
-
-  [DllImport("shcore.dll")]
-  public static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
-
-  [DllImport("user32.dll")]
-  public static extern uint GetDpiForWindow(IntPtr hwnd);
-
-  public static MonitorInfo BuildMonitorInfo(IntPtr hMonitor) {
-    var mi = new MONITORINFOEX();
-    mi.cbSize = Marshal.SizeOf(typeof(MONITORINFOEX));
-    if (!GetMonitorInfo(hMonitor, ref mi)) return null;
-    uint dx = 96, dy = 96;
-    try { GetDpiForMonitor(hMonitor, 0, out dx, out dy); } catch { dx = 96; dy = 96; }
-    return new MonitorInfo {
-      DeviceName = mi.szDevice,
-      Primary = ((mi.dwFlags & 1) == 1),
-      X = mi.rcMonitor.Left,
-      Y = mi.rcMonitor.Top,
-      Width = mi.rcMonitor.Right - mi.rcMonitor.Left,
-      Height = mi.rcMonitor.Bottom - mi.rcMonitor.Top,
-      WorkX = mi.rcWork.Left,
-      WorkY = mi.rcWork.Top,
-      WorkWidth = mi.rcWork.Right - mi.rcWork.Left,
-      WorkHeight = mi.rcWork.Bottom - mi.rcWork.Top,
-      DpiX = dx,
-      DpiY = dy,
-      ScaleX = Math.Round(dx / 96.0, 4),
-      ScaleY = Math.Round(dy / 96.0, 4)
-    };
-  }
-
-  public static List<MonitorInfo> EnumerateMonitors() {
-    var result = new List<MonitorInfo>();
-    EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, delegate (IntPtr hMonitor, IntPtr hdc, ref RECT rc, IntPtr data) {
-      try {
-        var info = BuildMonitorInfo(hMonitor);
-        if (info != null) result.Add(info);
-      } catch { }
-      return true;
-    }, IntPtr.Zero);
-    return result;
-  }
-
-  public static MonitorInfo MonitorFromScreenPointInfo(int x, int y) {
-    POINT pt = new POINT { X = x, Y = y };
-    IntPtr h = MonitorFromPoint(pt, 2);
-    if (h == IntPtr.Zero) return null;
-    return BuildMonitorInfo(h);
-  }
-
-  public static MonitorInfo MonitorFromWindowInfo(IntPtr hwnd) {
-    IntPtr h = MonitorFromWindow(hwnd, 2);
-    if (h == IntPtr.Zero) return null;
-    return BuildMonitorInfo(h);
-  }
-
-  public static uint GetWindowDpiValue(IntPtr hwnd) {
-    try { return GetDpiForWindow(hwnd); } catch { return 0; }
-  }
-
-  public static VirtualScreenInfo GetVirtualScreenInfo() {
-    return new VirtualScreenInfo {
-      X = GetSystemMetrics(76),
-      Y = GetSystemMetrics(77),
-      Width = GetSystemMetrics(78),
-      Height = GetSystemMetrics(79),
-      MonitorCount = GetSystemMetrics(80),
-      SameDisplayFormat = (GetSystemMetrics(81) != 0)
-    };
-  }
-
-  public static WindowInfo GetWindowInfo(IntPtr root, IntPtr child) {
-    if (root == IntPtr.Zero) return null;
-    int len = GetWindowTextLength(root);
-    var sb = new StringBuilder(Math.Max(256, len + 4));
-    GetWindowText(root, sb, sb.Capacity);
-    var title = sb.ToString();
-    var cb = new StringBuilder(256);
-    GetClassName(root, cb, cb.Capacity);
-    var cls = cb.ToString();
-    uint pid; GetWindowThreadProcessId(root, out pid);
-    string pname = "";
-    try { pname = Process.GetProcessById((int)pid).ProcessName; } catch { }
-    RECT r; GetWindowRect(root, out r);
-    return new WindowInfo {
-      Hwnd = root,
-      ChildHwnd = child,
-      Title = title,
-      ClassName = cls,
-      Pid = pid,
-      ProcessName = pname,
-      Visible = IsWindowVisible(root),
-      Minimized = IsIconic(root),
-      Foreground = (root == GetForegroundWindow()),
-      X = r.Left, Y = r.Top, Width = r.Right - r.Left, Height = r.Bottom - r.Top
-    };
-  }
-
-  public static WindowInfo WindowFromScreenPoint(int x, int y) {
-    POINT pt = new POINT { X = x, Y = y };
-    IntPtr child = WindowFromPoint(pt);
-    if (child == IntPtr.Zero) return null;
-    IntPtr root = GetAncestor(child, GA_ROOT);
-    if (root == IntPtr.Zero) root = child;
-    return GetWindowInfo(root, child);
-  }
-
-  public static List<WindowInfo> EnumerateTopLevel() {
-    var result = new List<WindowInfo>();
-    IntPtr fg = GetForegroundWindow();
-    EnumWindows(delegate (IntPtr hwnd, IntPtr lParam) {
-      try {
-        bool vis = IsWindowVisible(hwnd);
-        // skip non-visible windows for the default fast path. Caller can
-        // still enumerate hidden windows separately if needed.
-        if (!vis) return true;
-        int len = GetWindowTextLength(hwnd);
-        if (len <= 0) return true;
-        var sb = new StringBuilder(len + 4);
-        GetWindowText(hwnd, sb, sb.Capacity);
-        var title = sb.ToString();
-        if (string.IsNullOrWhiteSpace(title)) return true;
-        var cb = new StringBuilder(256);
-        GetClassName(hwnd, cb, cb.Capacity);
-        var cls = cb.ToString();
-        // skip well-known shell/system windows that pollute the list.
-        if (cls == "Progman" || cls == "WorkerW" || cls == "Shell_TrayWnd" ||
-            cls == "Shell_SecondaryTrayWnd" || cls == "TaskListThumbnailWnd" ||
-            cls == "ApplicationFrameWindow" && (title == "Settings" || title == "Microsoft Store") == false) {
-          // ApplicationFrameWindow는 UWP 컨테이너인데 진짜 사용자 창인 경우가 많아서
-          // title 기준으로만 제외하지 않음. Progman/WorkerW/Shell_TrayWnd만 hard skip.
-          if (cls == "Progman" || cls == "WorkerW" || cls == "Shell_TrayWnd" || cls == "Shell_SecondaryTrayWnd" || cls == "TaskListThumbnailWnd") {
-            return true;
-          }
-        }
-        uint pid; GetWindowThreadProcessId(hwnd, out pid);
-        string pname = "";
-        try { pname = Process.GetProcessById((int)pid).ProcessName; } catch { }
-        RECT r; GetWindowRect(hwnd, out r);
-        var info = new WindowInfo {
-          Hwnd = hwnd,
-          ChildHwnd = hwnd,
-          Title = title,
-          ClassName = cls,
-          Pid = pid,
-          ProcessName = pname,
-          Visible = vis,
-          Minimized = IsIconic(hwnd),
-          Foreground = (hwnd == fg),
-          X = r.Left, Y = r.Top, Width = r.Right - r.Left, Height = r.Bottom - r.Top
-        };
-        result.Add(info);
-      } catch { }
-      return true;
-    }, IntPtr.Zero);
-    return result;
-  }
-}
-"@
-    Add-Type -TypeDefinition $sig -Language CSharp -ErrorAction Stop
+    $interopPath = $env:CUCP_LEGACY_INTEROP_DLL
+    if (-not $interopPath) { $interopPath = Join-Path $PSScriptRoot '..\pcucp-next\bin\legacy\PcuCp.LegacyInterop.dll' }
+    $existing = 'CucpWin32' -as [type]
+    if ($existing -and $existing.Assembly.GetName().Name -ne 'PcuCp.LegacyInterop') {
+      throw 'A different legacy interop type is already loaded. Restart this PowerShell process with the matching runtime.'
+    }
+    if (-not $existing) {
+      if (-not (Test-Path -LiteralPath $interopPath -PathType Leaf)) { throw 'Legacy interop DLL missing. Run python pcucp-next/packaging/publish_legacy_interop.py or set CUCP_LEGACY_INTEROP_DLL.' }
+      Add-Type -LiteralPath $interopPath -ErrorAction Stop
+    }
     $Script:_Win32Loaded = $true
     return $true
   } catch {
@@ -2444,7 +1877,7 @@ function Invoke-Macro {
     "mouse-verify","cdp-prosemirror-insert","ime-paste","safe-type-ime",
     "recovery-run"
   )
-  if ($AllowLiveControl -and ($directSafetyLiveMacros -contains $sub) -and -not (_Read-Switch -Rest $rest -Name "--confirm-sensitive")) {
+  if ($AllowLiveControl -and ($directSafetyLiveMacros -contains $sub) -and -not (_Read-StandaloneConfirmation -Rest $rest)) {
     $directSafety = _Classify-SafetyFromText -Text ((@($sub) + @($rest)) -join " ") -MacroName $sub
     if ($directSafety.requires_explicit_confirmation) {
       $payload = [pscustomobject]@{
@@ -2610,6 +2043,14 @@ function _Read-AllOptValues { param([string[]]$Rest, [string]$Name)
 }
 
 function _Read-Switch { param([string[]]$Rest, [string]$Name)
+  # cucp.execution-sensitive-ceiling/v1: trusted child context never comes from argv.
+  if ($Name -eq '--confirm-sensitive') {
+    $ceiling = Get-Variable -Name 'CUCP_EXECUTION_SENSITIVE_CEILING' -Scope Global -ErrorAction SilentlyContinue
+    if ($null -ne $ceiling -and ($ceiling.Value -isnot [bool] -or -not $ceiling.Value -or
+        -not ($ceiling.Options -band [System.Management.Automation.ScopedItemOptions]::Constant))) {
+      return $false
+    }
+  }
   return ($Rest -contains $Name)
 }
 
@@ -2641,98 +2082,88 @@ function _Macro-NotImplemented {
   return 1
 }
 
-function _Safety-Truncate {
-  param([string]$Value, [int]$Max = 180)
-  if ($null -eq $Value) { return "" }
-  $s = "$Value"
-  if ($s.Length -le $Max) { return $s }
-  return $s.Substring(0, $Max) + "..."
+function _Read-StandaloneConfirmation {
+  param([string[]]$Rest)
+  # Arity-aware consent is evaluated from this invocation's original argv.
+  # An immutable parent ceiling can restrict it, never grant it by itself.
+  $ceiling = Get-Variable -Name 'CUCP_EXECUTION_SENSITIVE_CEILING' -Scope Global -ErrorAction SilentlyContinue
+  if ($null -ne $ceiling -and ($ceiling.Value -isnot [bool] -or -not $ceiling.Value -or
+      -not ($ceiling.Options -band [System.Management.Automation.ScopedItemOptions]::Constant))) { return $false }
+  $result = _Invoke-LegacyCompatibility -Operation 'execution-confirmation' -Arguments @{original_argv=@($Rest)}
+  if ($null -eq $result -or $result.confirmed -isnot [bool]) { throw 'Invalid startup confirmation result.' }
+  return [bool]$result.confirmed
+}
+
+function _Invoke-LegacyCompatibility {
+  param([ValidateSet('execution-confirmation','safety-classify','coord-map','workflow-plan-from-parsed','task-preset-prepare','task-preset-complete','task-plan-prepare','task-plan-assemble','task-plan-complete','form-plan-prepare','form-plan-complete','smart-plan-advance','app-profile-advance')][string]$Operation, [hashtable]$Arguments, [switch]$PreserveInvalidArguments)
+  # Compatibility only: pure logic now lives in bounded C# kernels. No shell or desktop calls.
+  $native = $env:CUCP_NATIVE_HOST
+  if (-not $native) { $native = Join-Path $PSScriptRoot '..\pcucp-next\bin\native\PcuCp.NativeHost.exe' }
+  $native = [System.IO.Path]::GetFullPath($native)
+  if (-not (Test-Path -LiteralPath $native -PathType Leaf)) {
+    throw 'Matching native runtime missing. Publish pcucp-next/packaging/publish_native.py or set CUCP_NATIVE_HOST to the matching executable/DLL.'
+  }
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $entry = if ($Operation -eq 'execution-confirmation') { 'legacy-execution-confirmation' } else { 'legacy-compat' }
+  $extension = [System.IO.Path]::GetExtension($native).ToLowerInvariant()
+  if ($extension -eq '.dll') {
+    $dotnet = Get-Command dotnet.exe -CommandType Application -ErrorAction Stop
+    if ($native.Contains('"') -or $native.Contains("`r") -or $native.Contains("`n")) { throw 'Invalid native DLL path' }
+    $psi.FileName = $dotnet.Source
+    $psi.Arguments = '"' + $native + '" ' + $entry
+  } elseif ($extension -eq '.exe') {
+    $psi.FileName = $native
+    $psi.Arguments = $entry
+  } else { throw 'CUCP_NATIVE_HOST must be an executable or DLL, never a shell script.' }
+  $payload = @{schema='cucp.legacy-compat/v1'; operation=$Operation; args=$Arguments; culture=[Globalization.CultureInfo]::CurrentCulture.Name} | ConvertTo-Json -Depth 24 -Compress
+  $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
+  $bytes = $utf8.GetBytes($payload)
+  $requestLimit = if ($Operation -eq 'execution-confirmation') { 33554432 } else { 1048576 }
+  if ($bytes.Length -gt $requestLimit) {
+    if ($Operation -eq 'execution-confirmation') { throw 'Execution confirmation request exceeds 32 MiB.' }
+    throw 'Legacy compatibility request exceeds 1 MiB.'
+  }
+  $psi.UseShellExecute = $false
+  $psi.CreateNoWindow = $true
+  $psi.RedirectStandardInput = $true
+  $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError = $true
+  $psi.StandardOutputEncoding = $utf8
+  $psi.StandardErrorEncoding = $utf8
+  $process = New-Object System.Diagnostics.Process
+  $process.StartInfo = $psi
+  try {
+    [void]$process.Start()
+    $stdout = $process.StandardOutput.ReadToEndAsync()
+    $stderr = $process.StandardError.ReadToEndAsync()
+    $process.StandardInput.BaseStream.Write($bytes, 0, $bytes.Length)
+    $process.StandardInput.Close()
+    if (-not $process.WaitForExit(15000)) {
+      try { $process.Kill() } catch { }
+      throw 'Legacy compatibility operation timed out; no retry was attempted.'
+    }
+    $out = $stdout.GetAwaiter().GetResult()
+    $err = $stderr.GetAwaiter().GetResult()
+    if ($out.Length -gt 16777216 -or $err.Length -gt 65536) { throw 'Legacy compatibility response exceeds the protocol budget.' }
+    $response = $out | ConvertFrom-Json -ErrorAction Stop
+    if ($process.ExitCode -ne 0 -or $response.status -ne 'ok' -or $null -eq $response.data) {
+      $nativeErrors = @($response.errors)
+      if ($PreserveInvalidArguments -and $process.ExitCode -ne 0 -and $response.schema -eq 'pcucp.native/v1' -and $response.kind -eq 'legacy-compat' -and $response.status -eq 'error' -and $nativeErrors.Count -eq 1 -and $nativeErrors[0].code -eq 'invalid_arguments' -and $nativeErrors[0].message -is [string]) {
+        throw $nativeErrors[0].message
+      }
+      throw ('Legacy compatibility operation failed; rebuild matching native runtime. ' + ($response.errors | ConvertTo-Json -Compress))
+    }
+    return $response.data
+  } finally { $process.Dispose() }
 }
 
 function _Classify-SafetyFromText {
   param([string]$Text, [string]$MacroName)
-
-  $raw = if ($Text) { "$Text" } else { "" }
-  $hay = ("$MacroName $raw").ToLowerInvariant()
-  $categories = New-Object System.Collections.ArrayList
-  $evidenceMatches = New-Object System.Collections.ArrayList
-  $score = 0
-
-  function _SafetyAdd {
-    param([string]$Category, [int]$Weight, [string]$Pattern, [string]$Reason)
-    if (-not $Category) { return }
-    $exists = $false
-    foreach ($c in @($categories)) {
-      if ("$($c.category)" -eq $Category) { $exists = $true; break }
-    }
-    if (-not $exists) {
-      [void]$categories.Add([pscustomobject]@{
-        category = $Category
-        weight = [int]$Weight
-        reason = $Reason
-      })
-    }
-    [void]$evidenceMatches.Add([pscustomobject]@{
-      category = $Category
-      pattern = $Pattern
-      reason = $Reason
-    })
-    $script:__cucpSafetyScore = [Math]::Max([int]$script:__cucpSafetyScore, [int]$Weight)
+  $result = _Invoke-LegacyCompatibility -Operation 'safety-classify' -Arguments @{text=$Text; macro=$MacroName}
+  if ($result.schema -ne 'cucp.safety-classify/v1' -or $result.status -ne 'ok' -or $result.requires_explicit_confirmation -isnot [bool] -or $result.blocked_by_default -isnot [bool]) {
+    throw 'Invalid safety classification response; live control remains blocked.'
   }
-
-  $script:__cucpSafetyScore = 0
-  $rules = @(
-    @{ category="credentials"; weight=85; pattern="password|passcode|otp|2fa|mfa|api[-_ ]?key|secret|token|private key|비밀번호|암호|인증번호|일회용|토큰|시크릿|api키|api 키"; reason="credential_or_secret_entry" },
-    @{ category="payment"; weight=80; pattern="payment|pay now|checkout|purchase|buy|subscribe|billing|credit card|card number|결제|구매|구독|카드|청구|계좌|입금|출금"; reason="payment_or_billing_action" },
-    @{ category="destructive"; weight=85; pattern="delete|remove|uninstall|format|wipe|factory reset|reset account|close account|deactivate|cancel subscription|drop database|삭제|제거|초기화|포맷|탈퇴|해지|폐기|영구|복구 불가"; reason="destructive_or_irreversible_action" },
-    @{ category="external_send"; weight=55; pattern="send|submit|post|publish|email|mail|telegram|slack|discord|dm|upload|share|발송|전송|제출|게시|공개|업로드|공유|메일|문자|카톡|텔레그램"; reason="external_send_or_publish_action" },
-    @{ category="identity_or_privacy"; weight=80; pattern="ssn|social security|passport|driver.?license|id card|resident registration|주민등록|여권|운전면허|신분증|개인정보|민감정보"; reason="identity_or_private_data" },
-    @{ category="system_change"; weight=70; pattern="registry|regedit|firewall|permission|admin|administrator|environment variable|system settings|레지스트리|방화벽|권한|관리자|환경변수"; reason="system_or_permission_change" },
-    @{ category="app_settings"; weight=50; pattern="settings|preferences|configuration|설정|환경설정|구성"; reason="application_settings_change" }
-  )
-  foreach ($rule in $rules) {
-    if ($hay -match $rule.pattern) {
-      _SafetyAdd -Category $rule.category -Weight ([int]$rule.weight) -Pattern "$($rule.pattern)" -Reason "$($rule.reason)"
-    }
-  }
-
-  switch ($MacroName) {
-    "registry" { _SafetyAdd -Category "system_change" -Weight 80 -Pattern "macro:registry" -Reason "registry_macro" }
-    "process" { _SafetyAdd -Category "system_change" -Weight 65 -Pattern "macro:process" -Reason "process_control_macro" }
-    "app-close" {
-      if ($hay -match "--force|force") { _SafetyAdd -Category "destructive" -Weight 70 -Pattern "macro:app-close --force" -Reason "forced_app_close" }
-    }
-    "notify" { _SafetyAdd -Category "external_send" -Weight 45 -Pattern "macro:notify" -Reason "notification_macro" }
-  }
-
-  foreach ($c in @($categories)) {
-    $score += [int]$c.weight
-  }
-  if ($score -gt 100) { $score = 100 }
-  if ($script:__cucpSafetyScore -gt $score) { $score = [int]$script:__cucpSafetyScore }
-  Remove-Variable -Name __cucpSafetyScore -Scope Script -ErrorAction SilentlyContinue
-
-  $risk = "none"
-  if ($score -ge 80) { $risk = "critical" }
-  elseif ($score -ge 65) { $risk = "high" }
-  elseif ($score -ge 45) { $risk = "medium" }
-  elseif ($score -gt 0) { $risk = "low" }
-
-  $requires = ($score -ge 45)
-  return [pscustomobject]@{
-    schema = "cucp.safety-classify/v1"
-    status = "ok"
-    macro = $MacroName
-    risk_level = $risk
-    risk_score = [int]$score
-    requires_explicit_confirmation = [bool]$requires
-    blocked_by_default = [bool]$requires
-    confirmation_flag = "--confirm-sensitive"
-    categories = @($categories)
-    matches = @($evidenceMatches)
-    input_preview = (_Safety-Truncate -Value $raw -Max 180)
-    recommended_action = if ($requires) { "Require explicit user confirmation before live control; prefer --dry-run/read-only planning first." } else { "No sensitive-action confirmation required by the local classifier." }
-  }
+  return $result
 }
 
 function Invoke-MacroSafetyClassify {
@@ -3176,28 +2607,6 @@ function _CoordMap-ResolveWindow {
   return $null
 }
 
-function _CoordMap-Rect {
-  param([int]$X, [int]$Y, [int]$Width, [int]$Height)
-  return [pscustomobject]@{ x=$X; y=$Y; width=$Width; height=$Height }
-}
-
-function _CoordMap-ClipRect {
-  param($Rect, $Virtual)
-  if (-not $Rect -or -not $Virtual) { return $null }
-  $left = [Math]::Max([int]$Rect.x, [int]$Virtual.x)
-  $top = [Math]::Max([int]$Rect.y, [int]$Virtual.y)
-  $right = [Math]::Min(([int]$Rect.x + [int]$Rect.width), [int]$Virtual.right)
-  $bottom = [Math]::Min(([int]$Rect.y + [int]$Rect.height), [int]$Virtual.bottom)
-  $width = [Math]::Max(0, $right - $left)
-  $height = [Math]::Max(0, $bottom - $top)
-  return (_CoordMap-Rect -X $left -Y $top -Width $width -Height $height)
-}
-
-function _CoordMap-MakePoint {
-  param([double]$X, [double]$Y)
-  return [pscustomobject]@{ x=[int][Math]::Round($X); y=[int][Math]::Round($Y) }
-}
-
 function _Build-CoordMap {
   param(
     [string]$From,
@@ -3234,120 +2643,25 @@ function _Build-CoordMap {
       if ($hit -and [int64]$hit.root_hwnd -gt 0) { $win = _CoordProfile-WindowFromPrecheck -Precheck $hit }
     } catch { }
   }
-  if (-not $win) {
-    $sw.Stop()
-    return [pscustomobject]@{
-      schema = "cucp.coord-map/v1"
-      status = "partial"
-      reason = "target_window_not_found"
-      from = $From
-      target_hwnd = $TargetHwnd
-      target_match = $TargetMatch
-      virtual_screen = $virtual
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      next_step = "Provide --target-match or --target-hwnd, or use --from screen with a point inside the target window."
-    }
+  $result = _Invoke-LegacyCompatibility -Operation 'coord-map' -Arguments @{
+    from=$From; x=$X; y=$Y; norm_x=$NormX; norm_y=$NormY; has_norm=$HasNorm
+    target_hwnd=$TargetHwnd; target_match=$TargetMatch; virtual_screen=$virtual; selected_window=$win
   }
-
-  $rect = $win.rect
-  $visible = _CoordMap-ClipRect -Rect $rect -Virtual $virtual
-  $screenPoint = $null
-  $windowPoint = $null
-  $visibleWindowPoint = $null
-  $normalizedPoint = $null
-  $insideWindow = $false
-  $insideVisibleClip = $false
-  $roundingWarning = $false
-
-  switch ($From) {
-    "screen" {
-      $screenPoint = _CoordMap-MakePoint -X $X -Y $Y
-      $windowPoint = _CoordMap-MakePoint -X ($screenPoint.x - [int]$rect.x) -Y ($screenPoint.y - [int]$rect.y)
-      $visibleWindowPoint = if ($visible) { _CoordMap-MakePoint -X ($screenPoint.x - [int]$visible.x) -Y ($screenPoint.y - [int]$visible.y) } else { $null }
-    }
-    "window" {
-      $windowPoint = _CoordMap-MakePoint -X $X -Y $Y
-      $screenPoint = _CoordMap-MakePoint -X ([int]$rect.x + $windowPoint.x) -Y ([int]$rect.y + $windowPoint.y)
-      $visibleWindowPoint = if ($visible) { _CoordMap-MakePoint -X ($screenPoint.x - [int]$visible.x) -Y ($screenPoint.y - [int]$visible.y) } else { $null }
-    }
-    "visible-window" {
-      $visibleWindowPoint = _CoordMap-MakePoint -X $X -Y $Y
-      if (-not $visible -or [int]$visible.width -le 0 -or [int]$visible.height -le 0) {
-        $sw.Stop()
-        return [pscustomobject]@{ schema="cucp.coord-map/v1"; status="partial"; reason="window_not_visible_in_virtual_screen"; from=$From; selected_window=$win; virtual_screen=$virtual; elapsed_ms=[int]$sw.Elapsed.TotalMilliseconds }
-      }
-      $screenPoint = _CoordMap-MakePoint -X ([int]$visible.x + $visibleWindowPoint.x) -Y ([int]$visible.y + $visibleWindowPoint.y)
-      $windowPoint = _CoordMap-MakePoint -X ($screenPoint.x - [int]$rect.x) -Y ($screenPoint.y - [int]$rect.y)
-    }
-    "normalized" {
-      if (-not $HasNorm) { $NormX = $X; $NormY = $Y }
-      $normalizedPoint = [pscustomobject]@{ x=[Math]::Round($NormX, 6); y=[Math]::Round($NormY, 6) }
-      $screenPoint = _CoordMap-MakePoint -X ([int]$rect.x + ($NormX * [int]$rect.width)) -Y ([int]$rect.y + ($NormY * [int]$rect.height))
-      $windowPoint = _CoordMap-MakePoint -X ($screenPoint.x - [int]$rect.x) -Y ($screenPoint.y - [int]$rect.y)
-      $visibleWindowPoint = if ($visible) { _CoordMap-MakePoint -X ($screenPoint.x - [int]$visible.x) -Y ($screenPoint.y - [int]$visible.y) } else { $null }
-      $roundingWarning = $true
-    }
-    "visible-normalized" {
-      if (-not $HasNorm) { $NormX = $X; $NormY = $Y }
-      if (-not $visible -or [int]$visible.width -le 0 -or [int]$visible.height -le 0) {
-        $sw.Stop()
-        return [pscustomobject]@{ schema="cucp.coord-map/v1"; status="partial"; reason="window_not_visible_in_virtual_screen"; from=$From; selected_window=$win; virtual_screen=$virtual; elapsed_ms=[int]$sw.Elapsed.TotalMilliseconds }
-      }
-      $normalizedPoint = [pscustomobject]@{ x=[Math]::Round($NormX, 6); y=[Math]::Round($NormY, 6) }
-      $screenPoint = _CoordMap-MakePoint -X ([int]$visible.x + ($NormX * [int]$visible.width)) -Y ([int]$visible.y + ($NormY * [int]$visible.height))
-      $visibleWindowPoint = _CoordMap-MakePoint -X ($screenPoint.x - [int]$visible.x) -Y ($screenPoint.y - [int]$visible.y)
-      $windowPoint = _CoordMap-MakePoint -X ($screenPoint.x - [int]$rect.x) -Y ($screenPoint.y - [int]$rect.y)
-      $roundingWarning = $true
-    }
-    default {
-      $sw.Stop()
-      return [pscustomobject]@{ schema="cucp.coord-map/v1"; status="partial"; reason="unsupported_from"; from=$From; supported_from=@("screen","window","visible-window","normalized","visible-normalized"); elapsed_ms=[int]$sw.Elapsed.TotalMilliseconds }
-    }
+  if ($result.schema -ne 'cucp.coord-map/v1' -or $result.status -notin @('ok','partial')) {
+    throw 'Invalid coordinate mapping response; no action was attempted.'
   }
-
-  if (-not $normalizedPoint -and $windowPoint -and [int]$rect.width -gt 0 -and [int]$rect.height -gt 0) {
-    $normalizedPoint = [pscustomobject]@{
-      x = [Math]::Round(([double]$windowPoint.x / [double]$rect.width), 6)
-      y = [Math]::Round(([double]$windowPoint.y / [double]$rect.height), 6)
-    }
-  }
-  if ($screenPoint) {
-    $insideWindow = ($screenPoint.x -ge [int]$rect.x -and $screenPoint.x -lt ([int]$rect.x + [int]$rect.width) -and $screenPoint.y -ge [int]$rect.y -and $screenPoint.y -lt ([int]$rect.y + [int]$rect.height))
-    if ($visible) {
-      $insideVisibleClip = ($screenPoint.x -ge [int]$visible.x -and $screenPoint.x -lt ([int]$visible.x + [int]$visible.width) -and $screenPoint.y -ge [int]$visible.y -and $screenPoint.y -lt ([int]$visible.y + [int]$visible.height))
-    }
-  }
-  $profile = if ($screenPoint) { _Build-CoordProfile -HasPoint $true -X $screenPoint.x -Y $screenPoint.y -TargetHwnd ([int64]$win.hwnd) -TargetMatch $null } else { $null }
-  $warnings = New-Object System.Collections.ArrayList
-  if (-not $insideWindow) { [void]$warnings.Add("mapped_point_outside_window") }
-  if (-not $insideVisibleClip) { [void]$warnings.Add("mapped_point_outside_visible_clip") }
-  if ($roundingWarning) { [void]$warnings.Add("normalized_point_rounded_to_integer_screen_pixel") }
-  if ($profile -and $profile.coordinate_risk -eq "high") {
-    [void]$warnings.Add("coordinate_profile_high_risk")
-    foreach ($pw in @($profile.warnings)) {
-      if ($pw) { [void]$warnings.Add("$pw") }
+  # Discovery remains local to the compatibility adapter; pure pixel math is C#.
+  if ($result.status -eq 'ok' -and $result.screen_point) {
+    $profile = _Build-CoordProfile -HasPoint $true -X $result.screen_point.x -Y $result.screen_point.y -TargetHwnd ([int64]$win.hwnd) -TargetMatch $null
+    $result.coordinate_profile = $profile
+    if ($profile -and $profile.coordinate_risk -eq 'high') {
+      $result.warnings += 'coordinate_profile_high_risk'
+      foreach ($warning in @($profile.warnings)) { if ($warning) { $result.warnings += "$warning" } }
     }
   }
   $sw.Stop()
-  return [pscustomobject]@{
-    schema = "cucp.coord-map/v1"
-    status = "ok"
-    from = $From
-    input = [pscustomobject]@{ x=$X; y=$Y; norm_x=if ($HasNorm) { $NormX } else { $null }; norm_y=if ($HasNorm) { $NormY } else { $null } }
-    selected_window = [pscustomobject]@{ hwnd=[int64]$win.hwnd; title="$($win.title)"; process="$($win.process)"; class="$($win.class)"; rect=$rect }
-    virtual_screen = $virtual
-    visible_window_clip = $visible
-    screen_point = $screenPoint
-    window_point = $windowPoint
-    visible_window_point = $visibleWindowPoint
-    normalized_window_point = $normalizedPoint
-    inside_window = [bool]$insideWindow
-    inside_visible_clip = [bool]$insideVisibleClip
-    coordinate_profile = $profile
-    warnings = @($warnings)
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    next_step = "Use screen_point with point-plan or click-point after read-only verification; use normalized_window_point to persist a layout-relative target."
-  }
+  $result.elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
+  return $result
 }
 
 function Invoke-MacroCoordMap {
@@ -3381,297 +2695,280 @@ function Invoke-MacroCoordMap {
   return 2
 }
 
-function _AnchorHistory-Read {
-  param([int]$Last = 500)
-  if ($Last -le 0) { $Last = 500 }
-  if (-not $Script:AnchorHistoryFile -or -not (Test-Path -LiteralPath $Script:AnchorHistoryFile)) { return @() }
-  $lines = @(Get-Content -LiteralPath $Script:AnchorHistoryFile -Encoding UTF8 -ErrorAction SilentlyContinue)
-  if (-not $lines -or $lines.Count -eq 0) { return @() }
-  $start = [Math]::Max(0, $lines.Count - $Last)
-  $records = New-Object System.Collections.ArrayList
-  foreach ($line in @($lines | Select-Object -Skip $start)) {
-    if (-not "$line".Trim()) { continue }
-    try { [void]$records.Add(($line | ConvertFrom-Json -ErrorAction Stop)) } catch { }
-  }
-  return @($records)
+function _Precision-EncodeWire($Value) {
+  if($null -eq $Value){return @{kind='scalar';value=$null}}
+  if($Value -is [string] -or $Value -is [ValueType]){return @{kind='scalar';value=$Value}}
+  if($Value -is [System.Collections.IDictionary]){return @{kind='object';properties=@(foreach($key in $Value.Keys){@{name=[string]$key;value=(_Precision-EncodeWire $Value[$key])}})}}
+  if($Value -is [System.Collections.IEnumerable]){return @{kind='array';items=@(foreach($item in $Value){_Precision-EncodeWire $item})}}
+  return @{kind='object';properties=@(foreach($p in $Value.PSObject.Properties){@{name=$p.Name;value=(_Precision-EncodeWire $p.Value)}})}
 }
 
-function _AnchorHistory-NormDistance {
-  param($A, $B)
-  if (-not $A -or -not $B) { return [double]::MaxValue }
-  try {
-    $dx = [double]$A.x - [double]$B.x
-    $dy = [double]$A.y - [double]$B.y
-    return [Math]::Sqrt(($dx * $dx) + ($dy * $dy))
-  } catch { return [double]::MaxValue }
+function _Precision-Require($Condition,[string]$Message) {
+  if (-not $Condition) { $failure=New-Object InvalidOperationException -ArgumentList $Message;$failure.Data['precision_protocol']=$true;throw $failure }
 }
+
+function _Precision-Fields($Value,[string[]]$Names) {
+  _Precision-Require ($null -ne $Value -and $Value -isnot [array] -and $Value -isnot [string] -and $Value -isnot [ValueType]) 'Expected an precision protocol object.'
+  $properties=@($Value.PSObject.Properties)
+  _Precision-Require ($properties.Count -eq $Names.Count -and @($properties | Where-Object {$_.Name -cnotin $Names}).Count -eq 0) 'Unexpected precision protocol fields.'
+}
+
+function _Precision-DecodeWire($Wire) {
+  _Precision-Require ($null -ne $Wire -and $Wire.kind -is [string]) 'Missing precision wire tag.'
+  switch -CaseSensitive ($Wire.kind) {
+    'scalar' {
+      _Precision-Fields $Wire @('kind','value')
+      _Precision-Require ($null -eq $Wire.value -or $Wire.value -is [string] -or $Wire.value -is [ValueType]) 'Invalid scalar wire value.'
+      return ,$Wire.value
+    }
+    'array' {
+      _Precision-Fields $Wire @('kind','items');_Precision-Require ($Wire.items -is [array]) 'Wire array items must be an array.'
+      $items=New-Object Collections.ArrayList
+      foreach($item in $Wire.items){[void]$items.Add((_Precision-DecodeWire $item))}
+      return ,([object[]]$items.ToArray())
+    }
+    'object' {
+      _Precision-Fields $Wire @('kind','properties');_Precision-Require ($Wire.properties -is [array]) 'Wire object properties must be an array.'
+      $object=[ordered]@{}
+      foreach($property in $Wire.properties){
+        _Precision-Fields $property @('name','value');_Precision-Require ($property.name -is [string] -and -not $object.Contains($property.name)) 'Invalid or duplicate wire property.'
+        $object[$property.name]=_Precision-DecodeWire $property.value
+      }
+      return ,([pscustomobject]$object)
+    }
+    default {throw 'Unknown precision wire kind.'}
+  }
+}
+
+function _Precision-WriteChunks($Writer,[long]$Id,[string]$Target,$Value) {
+  $utf8=New-Object Text.UTF8Encoding($false,$true)
+  $bytes=$utf8.GetBytes((ConvertTo-Json -InputObject $Value -Depth 100 -Compress))
+  for($offset=0;$offset -lt $bytes.Length;$offset+=49152){
+    $count=[Math]::Min(49152,$bytes.Length-$offset)
+    $frame=[ordered]@{kind='part';id=$Id;data=[Convert]::ToBase64String($bytes,$offset,$count)}
+    if($Target){$frame['target']=$Target}
+    $Writer.WriteLine((ConvertTo-Json -InputObject $frame -Compress))
+  }
+  $end=[ordered]@{kind='end';id=$Id};if($Target){$end['target']=$Target}
+  $Writer.WriteLine((ConvertTo-Json -InputObject $end -Compress));$Writer.Flush()
+}
+
+function _Precision-StartProcess {
+  param([switch]$Storage)
+  $command=if($Storage){"legacy-precision-storage"}else{"legacy-precision-session"}
+  $native=$env:CUCP_NATIVE_HOST
+  if(-not $native){$native=Join-Path $PSScriptRoot '..\pcucp-next\bin\native\PcuCp.NativeHost.exe'}
+  $native=[IO.Path]::GetFullPath($native)
+  if(-not (Test-Path -LiteralPath $native -PathType Leaf)){throw 'Matching native precision runtime missing.'}
+  $psi=New-Object Diagnostics.ProcessStartInfo
+  switch([IO.Path]::GetExtension($native).ToLowerInvariant()){
+    '.dll' {if($native.Contains('"') -or $native.Contains("`r") -or $native.Contains("`n")){throw 'Invalid native DLL path.'};$psi.FileName=(Get-Command dotnet.exe -CommandType Application -ErrorAction Stop).Source;$psi.Arguments='"'+$native+'" '+$command}
+    '.exe' {$psi.FileName=$native;$psi.Arguments=$command}
+    default {throw 'Native precision runtime must be an executable or DLL.'}
+  }
+  $utf8=New-Object Text.UTF8Encoding($false,$true)
+  $psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.RedirectStandardInput=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true
+  $psi.StandardOutputEncoding=$utf8;$psi.StandardErrorEncoding=$utf8
+  $process=New-Object Diagnostics.Process;$process.StartInfo=$psi
+  [void]$process.Start()
+  return $process
+}
+
+function _Precision-ReadMessage($Reader,[long]$ExpectedId){
+  $buffer=New-Object IO.MemoryStream;$target=$null
+  try{
+    while($true){
+      $line=$Reader.ReadLine();if($null -eq $line){throw 'Precision session closed; terminal outcome may be uncertain. No write is retried.'}
+      if($line.Length -gt 70000){throw 'Precision output frame exceeds its bound.'}
+      $frame=$line|ConvertFrom-Json -ErrorAction Stop
+      if($frame.kind -ceq 'part'){_Precision-Fields $frame @('kind','target','id','data')}elseif($frame.kind -ceq 'end'){_Precision-Fields $frame @('kind','target','id')}else{throw ('Invalid precision output frame: '+$line.Substring(0,[Math]::Min(2048,$line.Length)))}
+      _Precision-Require ($frame.id -is [int] -or $frame.id -is [long]) 'Invalid precision frame id.'
+      _Precision-Require ([long]$frame.id -eq $ExpectedId -and $frame.target -is [string]) 'Precision message does not match outstanding sequence.'
+      if($null -eq $target){$target=$frame.target}else{_Precision-Require ($target -ceq $frame.target) 'Interleaved precision messages.'}
+      if($frame.kind -ceq 'end'){break}
+      _Precision-Require ($frame.data -is [string]) 'Invalid precision frame data.'
+      $bytes=[Convert]::FromBase64String($frame.data);_Precision-Require ($bytes.Length -le 49152) 'Oversized precision data chunk.'
+      $buffer.Write($bytes,0,$bytes.Length)
+    }
+    $wire=(New-Object Text.UTF8Encoding($false,$true)).GetString($buffer.ToArray())|ConvertFrom-Json -ErrorAction Stop
+    return [pscustomobject]@{target=$target;id=$ExpectedId;value=(_Precision-DecodeWire $wire)}
+  }finally{$buffer.Dispose()}
+}
+
+function _Precision-Reply($Writer,[long]$Id,$Value,$ErrorMessage){
+  $reply=if($null -ne $ErrorMessage){@{state='error';message=$ErrorMessage}}else{@{state='ok';value=$Value}}
+  _Precision-WriteChunks $Writer $Id '' (_Precision-EncodeWire $reply)
+}
+
+function _Precision-AssertArgv($Actual,[string[]]$Expected){
+  _Precision-Require ($Actual -is [array] -and $Actual.Count -eq $Expected.Count) 'Invalid precision argv shape.'
+  for($i=0;$i -lt $Expected.Count;$i++){_Precision-Require ($Actual[$i] -is [string] -and $Actual[$i] -ceq $Expected[$i]) 'Precision argv changed.'}
+}
+
+function _Precision-ReadEffect($Effect,$State){
+  _Precision-Fields $Effect @('kind','args');_Precision-Require ($Effect.kind -is [string]) 'Invalid precision read kind.'
+  $p=$Effect.args;$rest=$State.rest
+  if($Effect.kind -ceq 'json-string'){
+    _Precision-Fields $p @('value')
+    return [Management.Automation.LanguagePrimitives]::ConvertTo($p.value,[string],[Globalization.CultureInfo]::InvariantCulture)
+  }
+  $x=[int](_Read-OptValue -Rest $rest -Name '--x');$y=[int](_Read-OptValue -Rest $rest -Name '--y')
+  $tm=_Read-OptValue -Rest $rest -Name '--target-match';if(-not $tm){$tm=_Read-OptValue -Rest $rest -Name '--match'};if(-not $tm){$tm=_Read-OptValue -Rest $rest -Name '--window'}
+  $th=[int64](_Read-OptValue -Rest $rest -Name '--target-hwnd')
+  if($Effect.kind -cin @('coord-map','hit-test','coord-profile')){
+    $fields=@('x','y','target_hwnd','target_match');if($Effect.kind -eq 'coord-map'){$fields+=@('from','norm_x','norm_y','has_norm')};if($Effect.kind -eq 'coord-profile'){$fields+='has_point'}
+    _Precision-Fields $p $fields
+    _Precision-Require (($p.x -is [int] -or $p.x -is [long]) -and $p.x -ge [int]::MinValue -and $p.x -le [int]::MaxValue -and ($p.y -is [int] -or $p.y -is [long]) -and $p.y -ge [int]::MinValue -and $p.y -le [int]::MaxValue -and ($p.target_hwnd -is [int] -or $p.target_hwnd -is [long]) -and $p.target_match -is [string]) 'Invalid precision target types.'
+    _Precision-Require ($p.x -eq $x -and $p.y -eq $y -and [int64]$p.target_hwnd -eq $th -and $p.target_match -ceq [string]$tm) 'Precision target changed.'
+  }
+  switch -CaseSensitive ($Effect.kind){
+    'coord-map' {
+      _Precision-Require ($State.operation -eq 'coord-anchor' -and $State.reads -eq 0 -and $p.from -ceq 'screen' -and $p.has_norm -is [bool] -and -not $p.has_norm -and $p.norm_x -eq 0 -and $p.norm_y -eq 0) 'Invalid coordinate-map read.'
+      return _Build-CoordMap -From 'screen' -X $x -Y $y -NormX 0 -NormY 0 -HasNorm $false -TargetHwnd $th -TargetMatch $tm
+    }
+    'hit-test' {
+      _Precision-Require ($State.operation -eq 'point-plan' -and $State.reads -eq 0) 'Invalid hit-test order.'
+      $reply=_Native-HitTestPoint -X $x -Y $y -TargetHwnd $th -TargetMatch $tm;$State.precheck=$reply;return $reply
+    }
+    'coord-profile' {
+      _Precision-Require ($State.operation -eq 'point-plan' -and $State.reads -eq 1 -and $p.has_point -is [bool] -and $p.has_point) 'Invalid coordinate-profile order.'
+      $reply=_Build-CoordProfile -HasPoint $true -X $x -Y $y -TargetHwnd $th -TargetMatch $tm;$State.profile=$reply;return $reply
+    }
+    'history-lines' {
+      _Precision-Fields $p @('path');_Precision-Require ($p.path -is [string] -and $p.path -ceq $State.history_file -and $State.operation -eq 'coord-anchor' -and $State.reads -eq 1 -and $rest -notcontains '--no-history') 'Invalid history read.'
+      return ,([object[]]@(_Precision-HistoryLines -Path $State.history_file))
+    }
+    {$_ -cin @('hit-scan','point-plan-child','cache-read')} {
+      $radiusRaw=_Read-OptValue -Rest $rest -Name '--radius';$stepRaw=_Read-OptValue -Rest $rest -Name '--step';$ttlRaw=_Read-OptValue -Rest $rest -Name '--cache-ttl'
+      $radius=if($null -ne $radiusRaw -and "$radiusRaw" -ne ''){[int]$radiusRaw}else{6};$radius=[Math]::Min(64,[Math]::Max(0,$radius))
+      $step=if($null -ne $stepRaw -and "$stepRaw" -ne ''){[int]$stepRaw}else{2};if($step -le 0){$step=2};$step=[Math]::Min(16,$step)
+      $inset=[int](_Read-OptValue -Rest $rest -Name '--click-inset');if($inset -le 0){$inset=2}
+      $ttl=if($null -ne $ttlRaw -and "$ttlRaw" -ne ''){[int]$ttlRaw}else{$State.cache_seconds};$ttl=[Math]::Max(0,$ttl);if($rest -contains '--no-cache'){$ttl=0}
+      if($Effect.kind -ceq 'point-plan-child'){
+        _Precision-Require ($State.operation -eq 'target-validate' -and $State.reads -eq 0) 'Invalid child planner order.'
+        $argv=@('--x',"$x",'--y',"$y",'--radius',"$radius",'--step',"$step",'--click-inset',"$inset",'--cache-ttl',"$ttl")
+        if($tm){$argv+=@('--target-match',$tm)};if($th -gt 0){$argv+=@('--target-hwnd',"$th")};if($rest -contains '--no-cache'){$argv+='--no-cache'}
+        _Precision-Fields $p @('argv');_Precision-AssertArgv $p.argv $argv
+        return _TargetValidate-InvokePointPlanJson -PointPlanArgs $argv
+      }
+      _Precision-Require ($State.operation -eq 'point-plan' -and $State.reads -in @(2,3) -and ((-not $tm -and $th -le 0) -or [bool]$State.precheck.matched)) 'Target guard forbids this read.'
+      if($Effect.kind -ceq 'cache-read'){
+        _Precision-Fields $p @('directory','key','max_age_seconds')
+        _Precision-Require ($State.reads -eq 2 -and $p.directory -is [string] -and $p.directory -ceq $State.cache_dir -and $p.key -is [string] -and ($p.max_age_seconds -is [int] -or $p.max_age_seconds -is [long]) -and $p.max_age_seconds -ge [int]::MinValue -and $p.max_age_seconds -le [int]::MaxValue -and $p.max_age_seconds -eq $ttl) 'Invalid cache read.'
+        $key=_PointPlan-CacheKey -X $x -Y $y -Radius $radius -Step $step -ClickInset $inset -TargetHwnd $th -TargetMatch $tm -Precheck $State.precheck -CoordSignature ([string]$State.profile.coord_signature)
+        _Precision-Require ($p.key -ceq $key) 'Cache key changed.'
+        $reply=_PointPlan-ReadCache -Key $key -MaxAgeSeconds $ttl
+        $State.cache_key=$key;$State.cache_hit=[bool]($reply -and $reply.Json)
+        return ,$reply
+      }
+      $argv=@('-Action','hit-scan','-X',"$x",'-Y',"$y",'-ClickInset',"$inset",'-ScanRadius',"$radius",'-ScanStep',"$step")
+      if($tm){$argv+=@('-TargetMatch',$tm)};if($th -gt 0){$argv+=@('-TargetHwnd',"$th")}
+      _Precision-Fields $p @('argv');_Precision-AssertArgv $p.argv $argv
+      return Invoke-NativeHelper -ArgList $argv
+    }
+    default {_Precision-Require $false 'Unsupported precision read effect.'}
+  }
+}
+
+function _Invoke-LegacyPrecisionSession {
+  param([string]$Operation,[hashtable]$Arguments,[switch]$Storage)
+  $planner=$Operation -in @('coord-anchor','point-plan','target-validate') -and -not $Storage
+  $state=@{operation=$Operation;rest=@($Arguments.rest);cache_seconds=[int]$Arguments.cache_seconds;history_file=[string]$Arguments.history_file;history_max=[int]$Arguments.history_max;cache_dir=[string]$Arguments.cache_dir;reads=0;precheck=$null;profile=$null;planner=$planner;cache_hit=$false;cache_key=$null}
+  $startupArgs=$Arguments
+  $schema=if($Storage){'cucp.precision-storage/v1'}else{'cucp.precision-session/v1'}
+  $startup=@{schema=$schema;operation=$Operation;args=(_Precision-EncodeWire $startupArgs);culture=[Globalization.CultureInfo]::CurrentCulture.Name}
+  $startupJson=ConvertTo-Json -InputObject $startup -Depth 100 -Compress
+  _Precision-Require ($startupJson.Length -le 4194304) 'Precision startup exceeds its bound.'
+  $process=_Precision-StartProcess -Storage:$Storage;$writer=$null
+  try{
+    $stderr=$process.StandardError.ReadToEndAsync()
+    $writer=New-Object IO.StreamWriter -ArgumentList @($process.StandardInput.BaseStream,(New-Object Text.UTF8Encoding($false,$true)));$writer.AutoFlush=$true
+    $writer.WriteLine($startupJson);$id=1;$prepared=$null;$rendered=$null;$successJson=$null;$failureJson=$null;$serialized=$null
+    while($true){
+      $message=_Precision-ReadMessage $process.StandardOutput $id;$id++
+      if($message.target -ceq 'error'){throw [string]$message.value.error}
+      if($message.target -ceq 'read'){
+        $reply=$null;$errorText=$null
+        try{$reply=_Precision-ReadEffect $message.value $state}catch{if($_.Exception.Data.Contains("precision_protocol")){throw};$errorText=$_.Exception.Message}
+        if($message.value.kind -cne 'json-string'){$state.reads++}
+        _Precision-Reply $writer $message.id $reply $errorText;continue
+      }
+      if($message.target -cin @('complete','prepare')){
+        $prepared=$message.value
+        _Precision-Fields $prepared @('state','payload','exit','brief','json_depth','queries','effects')
+        # Legacy cache hits keep the stored object's schema, including no schema.
+        # Accept that only after the matching observed read and with no writes.
+        $cacheCompletion=$Operation -ceq 'point-plan' -and $message.target -ceq 'complete' -and $state.reads -eq 3 -and $state.cache_hit -and $prepared.payload.from_cache -is [bool] -and $prepared.payload.from_cache -and $prepared.payload.cache_key -ceq $state.cache_key -and $prepared.effects -is [array] -and $prepared.effects.Count -eq 0
+        _Precision-Require ($prepared.state -ceq 'complete' -and (-not $planner -or $prepared.payload.schema -ceq "cucp.$Operation/v1" -or $cacheCompletion) -and $prepared.exit -in @(0,1,2) -and $prepared.json_depth -in @(2,4,8,12,14,18,32,64,100) -and $prepared.effects -is [array] -and $prepared.effects.Count -le 1) 'Invalid precision completion.'
+        $rendered=if(-not $planner){$null}elseif($null -ne $prepared.brief){[string]$prepared.brief}else{$prepared.payload|ConvertTo-Json -Depth ([int]$prepared.json_depth)}
+        if($message.target -ceq 'complete'){_Precision-Require ($prepared.effects.Count -eq 0) 'Uncommitted precision effect.';break}
+        _Precision-Require ($planner -and $prepared.effects.Count -eq 1) 'Missing precision terminal effect.'
+        $Rest=$Arguments.rest
+        $effect=$prepared.effects[0]
+        if($effect.kind -ceq 'history-append'){
+          _Precision-Require ($Operation -eq 'coord-anchor' -and ($Rest -contains '--record-history' -or $Rest -contains '--learn-history') -and $Rest -notcontains '--no-history' -and $effect.args.path -ceq $state.history_file -and $effect.args.max -eq $state.history_max -and $effect.bind -ceq 'reuse_history.recorded') 'Invalid terminal history effect.'
+          $serialized=$effect.args.record|ConvertTo-Json -Compress -Depth 10
+          $prepared.payload.reuse_history.recorded=$true;$successJson=$prepared.payload|ConvertTo-Json -Depth ([int]$prepared.json_depth)
+          $prepared.payload.reuse_history.recorded=$false;$failureJson=$prepared.payload|ConvertTo-Json -Depth ([int]$prepared.json_depth)
+        }elseif($effect.kind -ceq 'cache-write'){
+          _Precision-Require ($Operation -eq 'point-plan' -and $effect.args.directory -ceq $state.cache_dir -and $effect.args.key -ceq $prepared.payload.cache_key -and $effect.bind -ceq 'payload' -and $prepared.payload.cache_ttl_seconds -gt 0) 'Invalid terminal cache effect.'
+          $serialized=$prepared.payload|ConvertTo-Json -Depth 14
+        }else{throw 'Unknown precision terminal effect.'}
+        _Precision-Reply $writer $message.id @{serialized=$serialized} $null;continue
+      }
+      if($message.target -ceq 'commit-ready'){
+        _Precision-Require ($null -ne $prepared -and $null -ne $serialized) 'Unexpected precision commit request.'
+        _Precision-Fields $message.value @('receipt')
+        $hash=[Security.Cryptography.SHA256]::Create();try{$expected=([BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes($serialized)))).Replace('-','').ToLowerInvariant()}finally{$hash.Dispose()}
+        _Precision-Require ($message.value.receipt -is [string] -and $message.value.receipt -ceq $expected) 'Precision commit receipt differs from rendered bytes.'
+        _Precision-Reply $writer $message.id @{receipt=$expected} $null;continue
+      }
+      if($message.target -ceq 'committed'){
+        _Precision-Require ($null -ne $prepared) 'Unexpected precision commit outcome.';_Precision-Fields $message.value @('recorded')
+        if($prepared.effects[0].kind -ceq 'history-append'){
+          _Precision-Require ($message.value.recorded -is [bool]) 'Missing history append outcome.'
+          $prepared.payload.reuse_history.recorded=$message.value.recorded
+          if($null -eq $prepared.brief){$rendered=if($message.value.recorded){$successJson}else{$failureJson}}
+        }else{_Precision-Require ($null -eq $message.value.recorded) 'Unexpected cache append outcome.'}
+        break
+      }
+      throw 'Unknown precision session message.'
+    }
+    $writer.Close();$process.WaitForExit()
+    _Precision-Require ($process.ExitCode -eq [int]$prepared.exit) 'Precision session failed; no terminal write is retried.'
+    return [pscustomobject]@{state=$prepared;console=$rendered}
+  }finally{if($writer){$writer.Dispose()};try{if(-not $process.HasExited){$process.Kill()}}catch{};$process.Dispose()}
+}
+
+function _Invoke-LegacyPrecision {
+  param([ValidateSet('coord-anchor','point-plan','target-validate')][string]$Operation,[string[]]$Rest)
+  $arguments=@{rest=@($Rest);cache_seconds=[int]$CacheSeconds;brief=[bool]$Brief;elapsed_ms=0;now=(Get-Date).ToString('o');history_file=[string]$Script:AnchorHistoryFile;history_max=[int]$Script:AnchorHistoryMax;cache_dir=[string]$Script:CacheDir}
+  $completed=_Invoke-LegacyPrecisionSession -Operation $Operation -Arguments $arguments
+  [Console]::Out.WriteLine($completed.console)
+  return [int]$completed.state.exit
+}
+
+function _Invoke-LegacyPrecisionValue {
+  param([string]$Operation,[hashtable]$Arguments,[switch]$Storage)
+  $completed=_Invoke-LegacyPrecisionSession -Operation $Operation -Arguments $Arguments -Storage:$Storage
+  return ,$completed.state.payload
+}
+
+function _Precision-HistoryLines {param([string]$Path) $result=_Invoke-LegacyPrecisionValue -Storage -Operation 'history-lines' -Arguments @{history_file=$Path};return @($result)}
+
+function _AnchorHistory-Read {param([int]$Last=500) $result=_Invoke-LegacyPrecisionValue -Storage -Operation 'history-file-read' -Arguments @{history_file=[string]$Script:AnchorHistoryFile;last=$Last};return @($result)}
+
+function _AnchorHistory-NormDistance {param($A,$B) _Invoke-LegacyPrecisionValue -Operation 'history-distance' -Arguments @{a=$A;b=$B}}
 
 function _AnchorHistory-Append {
   param($Record)
-  if (-not $Record) { return $false }
-  try {
-    $dir = Split-Path -Parent $Script:AnchorHistoryFile
-    if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-    $line = ($Record | ConvertTo-Json -Compress -Depth 10)
-    Add-Content -LiteralPath $Script:AnchorHistoryFile -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue
-    if (Test-Path -LiteralPath $Script:AnchorHistoryFile) {
-      $all = @(Get-Content -LiteralPath $Script:AnchorHistoryFile -Encoding UTF8 -ErrorAction SilentlyContinue)
-      $max = if ($Script:AnchorHistoryMax -gt 0) { [int]$Script:AnchorHistoryMax } else { 500 }
-      if ($all.Count -gt $max) {
-        $keep = [Math]::Max(50, [int]($max * 0.8))
-        $tail = $all[($all.Count - $keep)..($all.Count - 1)]
-        [System.IO.File]::WriteAllLines($Script:AnchorHistoryFile, $tail, (New-Object System.Text.UTF8Encoding($true)))
-      }
-    }
-    return $true
-  } catch { return $false }
+  if(-not $Record){return $false}
+  try{$line=$Record|ConvertTo-Json -Compress -Depth 10;return [bool](_Invoke-LegacyPrecisionValue -Storage -Operation 'history-append' -Arguments @{history_file=[string]$Script:AnchorHistoryFile;maximum=[int]$Script:AnchorHistoryMax;serialized=$line})}catch{return $false}
 }
 
-function _AnchorHistory-Score {
-  param(
-    $Record,
-    [double]$Tolerance = 0.012
-  )
-  if (-not $Record) {
-    return [pscustomobject]@{
-      schema = "cucp.anchor-reuse-score/v1"
-      enabled = $true
-      status = "partial"
-      reason = "missing_anchor_record"
-      score = 0
-      confidence = "none"
-      recorded = $false
-    }
-  }
-  if ($Tolerance -le 0) { $Tolerance = 0.012 }
-  if ($Tolerance -gt 0.1) { $Tolerance = 0.1 }
-  $records = @(_AnchorHistory-Read -Last 500)
-  $exact = New-Object System.Collections.ArrayList
-  $near = New-Object System.Collections.ArrayList
-  $recordTarget = "$($Record.target_match)"
-  $recordProcess = "$($Record.process)"
-  $recordClass = "$($Record.class)"
-  foreach ($r in @($records)) {
-    $isExact = ($r.anchor_id -and "$($r.anchor_id)" -eq "$($Record.anchor_id)")
-    if ($isExact) { [void]$exact.Add($r) }
-    $sameSurface = $false
-    if ($recordTarget -and "$($r.target_match)" -eq $recordTarget) { $sameSurface = $true }
-    elseif ($recordProcess -and $recordClass -and "$($r.process)" -eq $recordProcess -and "$($r.class)" -eq $recordClass) { $sameSurface = $true }
-    if ($sameSurface) {
-      $dist = _AnchorHistory-NormDistance -A $r.normalized_window_point -B $Record.normalized_window_point
-      if ($dist -le $Tolerance) { [void]$near.Add($r) }
-    }
-  }
+function _AnchorHistory-Score {param($Record,[double]$Tolerance=0.012) _Invoke-LegacyPrecisionValue -Storage -Operation 'history-file-score' -Arguments @{history_file=[string]$Script:AnchorHistoryFile;record=$Record;tolerance=$Tolerance}}
 
-  $matches = @($exact)
-  foreach ($n in @($near)) {
-    $seen = $false
-    foreach ($e in @($matches)) {
-      if ($e.anchor_id -and $n.anchor_id -and "$($e.anchor_id)" -eq "$($n.anchor_id)") { $seen = $true; break }
-    }
-    if (-not $seen) { $matches += $n }
-  }
-
-  $last = if ($matches.Count -gt 0) { $matches[$matches.Count - 1] } else { $null }
-  $safeMatches = @($matches | Where-Object { $_.safe_to_reuse -eq $true })
-  $safeRate = 0
-  if ($matches.Count -gt 0) { $safeRate = [Math]::Round(([double]$safeMatches.Count / [double]$matches.Count), 3) }
-  $signatureMatch = $false
-  if ($last -and $last.coord_signature -and $Record.coord_signature) {
-    $signatureMatch = ("$($last.coord_signature)" -eq "$($Record.coord_signature)")
-  }
-
-  $score = if ($Record.safe_to_reuse -eq $true) { 30 } else { 5 }
-  switch ("$($Record.coordinate_risk)") {
-    "low" { $score += 15 }
-    "medium" { $score += 5 }
-    "high" { $score -= 25 }
-    default { }
-  }
-  $score += [Math]::Min(25, ($exact.Count * 7))
-  $score += [Math]::Min(15, ($near.Count * 3))
-  if ($matches.Count -gt 0) { $score += [int][Math]::Round($safeRate * 10) }
-  if ($matches.Count -gt 0 -and $signatureMatch) { $score += 10 }
-  elseif ($matches.Count -gt 0 -and -not $signatureMatch) { $score -= 8 }
-  if ($score -lt 0) { $score = 0 }
-  if ($score -gt 100) { $score = 100 }
-
-  $confidence = "none"
-  if ($score -ge 80) { $confidence = "high" }
-  elseif ($score -ge 60) { $confidence = "medium" }
-  elseif ($score -ge 35) { $confidence = "low" }
-
-  $warnings = New-Object System.Collections.ArrayList
-  if ($records.Count -eq 0) { [void]$warnings.Add("no_anchor_history") }
-  elseif ($matches.Count -eq 0) { [void]$warnings.Add("no_matching_anchor_history") }
-  if ($matches.Count -gt 0 -and -not $signatureMatch) { [void]$warnings.Add("coord_signature_changed_since_last_match") }
-  if ($Record.safe_to_reuse -ne $true) { [void]$warnings.Add("current_anchor_not_safe_to_reuse") }
-  if ("$($Record.coordinate_risk)" -eq "high") { [void]$warnings.Add("coordinate_risk_high") }
-
-  return [pscustomobject]@{
-    schema = "cucp.anchor-reuse-score/v1"
-    enabled = $true
-    status = "ok"
-    history_file = $Script:AnchorHistoryFile
-    score = [int]$score
-    confidence = $confidence
-    recorded = $false
-    total_records = [int]$records.Count
-    exact_match_count = [int]$exact.Count
-    near_match_count = [int]$near.Count
-    matched_record_count = [int]$matches.Count
-    safe_match_count = [int]$safeMatches.Count
-    safe_match_rate = [double]$safeRate
-    tolerance_norm = [double]$Tolerance
-    signature_match = [bool]$signatureMatch
-    last_seen = if ($last) { "$($last.ts)" } else { "" }
-    last_screen_point = if ($last) { $last.screen_point } else { $null }
-    last_coord_signature = if ($last) { "$($last.coord_signature)" } else { "" }
-    warnings = @($warnings)
-    recommendation = if ($score -ge 80 -and $Record.safe_to_reuse -eq $true) { "reuse_ok_after_target_validate" } elseif ($score -ge 45) { "verify_with_target_validate_before_live_click" } else { "re_ground_before_reuse" }
-  }
-}
-
-function Invoke-MacroCoordAnchor {
-  param([string[]]$Rest)
-  $x = [int](_Read-OptValue -Rest $Rest -Name "--x")
-  $y = [int](_Read-OptValue -Rest $Rest -Name "--y")
-  $tm = _Read-OptValue -Rest $Rest -Name "--target-match"
-  if (-not $tm) { $tm = _Read-OptValue -Rest $Rest -Name "--match" }
-  if (-not $tm) { $tm = _Read-OptValue -Rest $Rest -Name "--window" }
-  $th = [int64](_Read-OptValue -Rest $Rest -Name "--target-hwnd")
-  $radiusRaw = _Read-OptValue -Rest $Rest -Name "--radius"
-  $stepRaw = _Read-OptValue -Rest $Rest -Name "--step"
-  $recordHistory = (_Read-Switch -Rest $Rest -Name "--record-history") -or (_Read-Switch -Rest $Rest -Name "--learn-history")
-  $noHistory = _Read-Switch -Rest $Rest -Name "--no-history"
-  $historyToleranceRaw = _Read-OptValue -Rest $Rest -Name "--history-tolerance"
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $radius = 6
-  $step = 2
-  $historyTolerance = 0.012
-  if ($null -ne $radiusRaw -and "$radiusRaw" -ne "") { $radius = [int]$radiusRaw }
-  if ($null -ne $stepRaw -and "$stepRaw" -ne "") { $step = [int]$stepRaw }
-  if ($null -ne $historyToleranceRaw -and "$historyToleranceRaw" -ne "") { $historyTolerance = [double]$historyToleranceRaw }
-  if ($x -le 0 -or $y -le 0) { throw "macro coord-anchor requires --x and --y" }
-  if ($radius -lt 0) { $radius = 0 }
-  if ($step -le 0) { $step = 2 }
-  if ($historyTolerance -le 0) { $historyTolerance = 0.012 }
-  if ($historyTolerance -gt 0.1) { $historyTolerance = 0.1 }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $map = _Build-CoordMap -From "screen" -X $x -Y $y -NormX 0 -NormY 0 -HasNorm $false -TargetHwnd $th -TargetMatch $tm
-  if (-not $map -or $map.status -ne "ok") {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.coord-anchor/v1"
-      status = "partial"
-      reason = if ($map -and $map.reason) { "$($map.reason)" } else { "coord_map_failed" }
-      source_point = [pscustomobject]@{ x=$x; y=$y }
-      coord_map = $map
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      next_step = "Run coord-map with a target window or first re-ground the target via app-profile/windows."
-    }
-    if ($Brief -and -not $jsonOnly) { [Console]::Out.WriteLine("partial coord-anchor reason=$($payload.reason) elapsed_ms=$($payload.elapsed_ms)") }
-    else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 12)) }
-    return 2
-  }
-
-  $selected = $map.selected_window
-  $targetMatch = if ($tm) { $tm } elseif ($selected.title) { "$($selected.title)" } elseif ($selected.process) { "$($selected.process)" } else { "" }
-  $norm = $map.normalized_window_point
-  $visibleNorm = $null
-  if ($map.visible_window_clip -and $map.visible_window_point -and [int]$map.visible_window_clip.width -gt 0 -and [int]$map.visible_window_clip.height -gt 0) {
-    $visibleNorm = [pscustomobject]@{
-      x = [Math]::Round(([double]$map.visible_window_point.x / [double]$map.visible_window_clip.width), 6)
-      y = [Math]::Round(([double]$map.visible_window_point.y / [double]$map.visible_window_clip.height), 6)
-    }
-  }
-
-  $restoreByMatch = @("macro","coord-map","--from","normalized","--norm-x","$($norm.x)","--norm-y","$($norm.y)")
-  if ($targetMatch) { $restoreByMatch += @("--target-match",$targetMatch) }
-  $restoreByHwnd = @("macro","coord-map","--from","normalized","--norm-x","$($norm.x)","--norm-y","$($norm.y)","--target-hwnd","$([int64]$selected.hwnd)")
-  $pointPlan = @("macro","point-plan","--x","$($map.screen_point.x)","--y","$($map.screen_point.y)","--radius","$radius","--step","$step")
-  if ($targetMatch) { $pointPlan += @("--target-match",$targetMatch) }
-  $immediatePointPlanByHwnd = @("macro","point-plan","--x","$($map.screen_point.x)","--y","$($map.screen_point.y)","--target-hwnd","$([int64]$selected.hwnd)","--radius","$radius","--step","$step")
-
-  $risk = if ($map.coordinate_profile) { "$($map.coordinate_profile.coordinate_risk)" } else { "unknown" }
-  $safeToReuse = ($map.inside_window -and $map.inside_visible_clip -and $risk -ne "high")
-  $anchorIdSource = "$($selected.process)|$($selected.class)|$targetMatch|$($norm.x),$($norm.y)"
-  $anchorId = Get-CacheKey -Match $anchorIdSource
-  $anchorRecord = [pscustomobject]@{
-    ts = (Get-Date).ToString("o")
-    anchor_id = $anchorId
-    anchor_type = "window_normalized_point"
-    target_match = $targetMatch
-    target_hwnd_current = [int64]$selected.hwnd
-    process = "$($selected.process)"
-    class = "$($selected.class)"
-    title = "$($selected.title)"
-    source_point = [pscustomobject]@{ x=$x; y=$y }
-    screen_point = $map.screen_point
-    normalized_window_point = $norm
-    visible_normalized_point = $visibleNorm
-    safe_to_reuse = [bool]$safeToReuse
-    coordinate_risk = $risk
-    coord_signature = if ($map.coordinate_profile) { "$($map.coordinate_profile.coord_signature)" } else { "" }
-    window_rect = $selected.rect
-  }
-  $reuseHistory = if ($noHistory) {
-    [pscustomobject]@{
-      schema = "cucp.anchor-reuse-score/v1"
-      enabled = $false
-      status = "skipped"
-      reason = "disabled_by_no_history"
-      score = 0
-      confidence = "none"
-      recorded = $false
-    }
-  } else {
-    _AnchorHistory-Score -Record $anchorRecord -Tolerance $historyTolerance
-  }
-  if ($recordHistory -and -not $noHistory) {
-    $recorded = _AnchorHistory-Append -Record $anchorRecord
-    try { $reuseHistory | Add-Member -NotePropertyName recorded -NotePropertyValue ([bool]$recorded) -Force } catch { }
-  }
-  $sw.Stop()
-  $payload = [pscustomobject]@{
-    schema = "cucp.coord-anchor/v1"
-    status = "ok"
-    anchor_id = $anchorId
-    anchor_type = "window_normalized_point"
-    source_point = [pscustomobject]@{ x=$x; y=$y }
-    safe_to_reuse = [bool]$safeToReuse
-    coordinate_risk = $risk
-    selected_window = $selected
-    anchor = [pscustomobject]@{
-      target_match = $targetMatch
-      target_hwnd_current = [int64]$selected.hwnd
-      process = "$($selected.process)"
-      class = "$($selected.class)"
-      normalized_window_point = $norm
-      visible_normalized_point = $visibleNorm
-      coord_signature = if ($map.coordinate_profile) { "$($map.coordinate_profile.coord_signature)" } else { "" }
-    }
-    restore_coord_map_command = @($restoreByMatch)
-    restore_coord_map_command_line = _TaskPlan-StepString -Command $restoreByMatch
-    immediate_restore_by_hwnd_command = @($restoreByHwnd)
-    immediate_point_plan_command = @($pointPlan)
-    immediate_point_plan_command_line = _TaskPlan-StepString -Command $pointPlan
-    immediate_point_plan_by_hwnd_command = @($immediatePointPlanByHwnd)
-    reuse_history = $reuseHistory
-    anchor_history_record = if ($recordHistory -and -not $noHistory) { $anchorRecord } else { $null }
-    coord_map = $map
-    warnings = @($map.warnings)
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    next_step = "Persist anchor.normalized_window_point with target_match; later run restore_coord_map_command, then target-validate or point-plan on its screen_point before live control. Use --record-history after verified reuse to improve reuse_history.score."
-  }
-  if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine("ok coord-anchor id=$anchorId risk=$risk safe_to_reuse=$safeToReuse reuse_score=$($reuseHistory.score) reuse_confidence=$($reuseHistory.confidence) norm=($($norm.x),$($norm.y)) elapsed_ms=$($payload.elapsed_ms)")
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 14))
-  }
-  return 0
-}
+function Invoke-MacroCoordAnchor {param([string[]]$Rest) _Invoke-LegacyPrecision -Operation 'coord-anchor' -Rest $Rest}
 
 function _Native-Screenshot {
   param([string]$OutPath, [string]$Window)
@@ -3884,452 +3181,9 @@ function Invoke-MacroWaitLabel {
   return 1
 }
 
-function Invoke-MacroFindLabel {
-  # macro find-label -- read-only label resolver.
-  #
-  # Selector ranking (explained when --explain is given):
-  #   1. exact text match (case-insensitive, normalized whitespace) ->  +100
-  #   2. substring match  ->  +60..+100 (shorter target = higher score)
-  #   3. role/window filter agreement
-  #   4. source confidence (uia high > fused medium > ocr low)
-  #   5. visibility / rect non-empty hard requirement
-  #
-  # Modes:
-  #   default       : fast lookup, no vision fallback (read-only).
-  #   --explain     : returns top-N candidates with score breakdown, no action.
-  #   --fast        : Win32-first short-circuit. If no window matches --window
-  #                   /--match, skip the expensive appshot/UIA/OCR/vision pipeline
-  #                   entirely and return partial(2) with no_window evidence.
-  #                   Designed for perf-suite measurements and quick gating.
-  #   --no-vision   : disables codex vision fallback (currently click-label only;
-  #                   kept here for parity in --fast mode and downstream callers).
-  #
-  # Ambiguity:
-  #   If two candidates score within --ambiguity-window (default 10) of each
-  #   other, return status="partial" (exit 2) and surface ranked candidates.
-  param([string[]]$Rest)
-  $label  = _Read-OptValue -Rest $Rest -Name "--label"
-  $window = _Read-OptValue -Rest $Rest -Name "--window"
-  $match  = _Read-OptValue -Rest $Rest -Name "--match"
-  $role   = _Read-OptValue -Rest $Rest -Name "--role"
-  $explain = _Read-Switch -Rest $Rest -Name "--explain"
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $fast    = _Read-Switch -Rest $Rest -Name "--fast"
-  $noVision = _Read-Switch -Rest $Rest -Name "--no-vision"
-  $ambWin = [int](_Read-OptValue -Rest $Rest -Name "--ambiguity-window")
-  if ($ambWin -le 0) { $ambWin = 10 }
-  if (-not $label) { throw "macro find-label requires --label" }
-  if (-not $match) { $match = $window }
+function Invoke-MacroFindLabel {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'find-label' -Rest $Rest -ScriptPath $PSCommandPath}
 
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-
-  # --fast short-circuit: Win32-only window check first. If --window or
-  # --match is set and no top-level visible window matches, return partial
-  # immediately without touching helper/appshot/UIA. This brings perf
-  # find_label_no_match from ~9s into ~30-100ms for the common no-match case.
-  if ($fast -and $match) {
-    $w32 = _Enumerate-Win32Windows -Match $match
-    $visible = @($w32 | Where-Object { $_.visible -and -not $_.minimized })
-    if ($visible.Count -eq 0) {
-      $sw.Stop()
-      $elapsedFast = [int]$sw.Elapsed.TotalMilliseconds
-      $envFast = _New-ObservationEnvelope `
-        -Kind "find-label" -Status "partial" `
-        -ElapsedMs $elapsedFast `
-        -Sources @("win32") `
-        -Data ([pscustomobject]@{
-          label = $label; match = $match; window = $window; role = $role
-          fast_path = $true
-          ambiguous = $false
-          ambiguity_window = $ambWin
-          top = $null
-          candidates = @()
-          candidate_count = 0
-        }) `
-        -RecoverableErrors @([pscustomobject]@{
-          code = "no_window"
-          message = "fast-path: no visible window matches '$match'"
-          recommended_action = "Verify the app is running with 'cucp macro windows --match `"$match`"', or drop --fast to engage UIA/OCR fallback."
-        }) `
-        -Confidence "high"
-      if ($Brief -and -not $jsonOnly) {
-        [Console]::Out.WriteLine(("partial find-label '{0}' fast no_window match='{1}' elapsed_ms={2}" -f $label, $match, $elapsedFast))
-      } else {
-        [Console]::Out.WriteLine(($envFast | ConvertTo-Json -Depth 8))
-      }
-      return 2
-    }
-  }
-
-  $shot = Invoke-Appshot -Match $match -Semantic:$true
-  if (-not $shot) {
-    # appshot failure: keep wrapper deterministic by emitting envelope-flavored
-    # error and a recovery hint instead of throwing into the dispatch catch.
-    $hintCmd = "cucp macro windows --match '" + $match + "'"
-    $env_ = _New-ObservationEnvelope `
-      -Kind "find-label" -Status "partial" `
-      -ElapsedMs ([int]$sw.Elapsed.TotalMilliseconds) `
-      -Sources @("appshot") `
-      -Data ([pscustomobject]@{ label = $label; match = $match; observed = 0 }) `
-      -RecoverableErrors @([pscustomobject]@{
-        code = "appshot_failed"
-        message = "observe appshot returned no usable artifact"
-        recommended_action = "Run 'cucp macro ensure-helper' or retry; verify '$match' window exists with $hintCmd"
-      })
-    if ($Brief -and -not $jsonOnly) {
-      [Console]::Out.WriteLine("partial find-label '$label' appshot_failed")
-    } else {
-      [Console]::Out.WriteLine(($env_ | ConvertTo-Json -Depth 8))
-    }
-    return 2
-  }
-
-  # Build candidate pool from grounded + fused + items, normalized into a
-  # single shape so scoring is consistent.
-  $needle = $label.Trim().ToLowerInvariant()
-  $needleNorm = ($needle -replace '\s+',' ').Trim()
-  $cands = New-Object System.Collections.ArrayList
-
-  function _AddPool { param($Pool, [string]$Tier, [int]$BaseConf)
-    foreach ($el in $Pool) {
-      if (-not $el) { continue }
-      if (-not $el.text) { continue }
-      if (-not $el.rect) { continue }
-      if ($Window -and $el.window -and ($el.window.ToLowerInvariant() -notmatch [regex]::Escape($Window.ToLowerInvariant()))) { continue }
-      if ($Role -and $el.role -and ($el.role.ToLowerInvariant() -ne $Role.ToLowerInvariant())) { continue }
-      $hay = $el.text.ToString().ToLowerInvariant().Trim()
-      $hayNorm = ($hay -replace '\s+',' ').Trim()
-      $score = 0
-      $reason = ""
-      if ($hayNorm -eq $needleNorm) { $score = 100; $reason = "exact" }
-      elseif ($hayNorm -match [regex]::Escape($needleNorm)) {
-        $diff = [Math]::Abs($hayNorm.Length - $needleNorm.Length)
-        $score = 60 + [Math]::Max(0, 40 - $diff); $reason = "substring"
-      } elseif ($needleNorm.Length -ge 3 -and $hayNorm.IndexOf($needleNorm.Substring(0, [Math]::Min(3, $needleNorm.Length))) -ge 0) {
-        $score = 20; $reason = "prefix"
-      } else { continue }
-      $confBoost = $BaseConf
-      if ($el.confidence) {
-        if ($el.confidence -is [string]) {
-          switch ($el.confidence.ToLowerInvariant()) {
-            "high"   { $confBoost += 4 }
-            "medium" { $confBoost += 2 }
-            "low"    { $confBoost += 1 }
-          }
-        } elseif ($el.confidence -is [double] -or $el.confidence -is [int]) {
-          $confBoost += [int]([double]$el.confidence * 5)
-        }
-      }
-      $score += $confBoost
-      [void]$cands.Add([pscustomobject]@{
-        text = $el.text
-        normalized = $hayNorm
-        role = $el.role
-        window = $el.window
-        rect = $el.rect
-        affordance_id = $el.affordance_id
-        score = $score
-        tier = $Tier
-        match_reason = $reason
-        confidence_boost = $confBoost
-        sources = if ($el.sources) { @($el.sources) } else { @($Tier) }
-      })
-    }
-  }
-
-  _AddPool -Pool $shot.Grounded      -Tier "grounded" -BaseConf 4
-  _AddPool -Pool $shot.FusedElements -Tier "fused"    -BaseConf 2
-  _AddPool -Pool $shot.Items         -Tier "items"    -BaseConf 0
-
-  $ranked = @($cands | Sort-Object -Property score -Descending)
-  $sw.Stop()
-  $elapsed = [int]$sw.Elapsed.TotalMilliseconds
-
-  $top = if ($ranked.Count -gt 0) { $ranked[0] } else { $null }
-  $second = if ($ranked.Count -gt 1) { $ranked[1] } else { $null }
-  $ambiguous = $false
-  if ($top -and $second) {
-    if (($top.score - $second.score) -lt $ambWin) { $ambiguous = $true }
-  }
-
-  $sources = @("appshot")
-  if ($shot.Grounded -and $shot.Grounded.Count -gt 0) { $sources += "uia" }
-  if ($shot.FromCache) { $sources += "cache" }
-
-  $cache = [pscustomobject]@{
-    hit = [bool]$shot.FromCache
-    age_ms = $null
-    max_age_ms = ($CacheSeconds * 1000)
-    key = "appshot::match=$match"
-    reason = if ($shot.FromCache) { "cache_fresh" } else { "live_capture" }
-  }
-
-  $foreground = $null
-  if ($shot.FocusedWindow) {
-    $foreground = [pscustomobject]@{ title = $shot.FocusedWindow }
-  }
-
-  if ($explain) {
-    $explainStatus = "partial"
-    if ($top -and -not $ambiguous) { $explainStatus = "ok" }
-    $explainConf = "low"
-    if ($top) {
-      if ($top.score -ge 100) { $explainConf = "high" }
-      elseif ($top.score -ge 60) { $explainConf = "medium" }
-    }
-    $explainRecover = @()
-    if (-not $top) {
-      $explainRecover = @([pscustomobject]@{
-        code = "no_match"
-        message = "no candidate matched '$label'"
-        recommended_action = "Try 'cucp macro list-affordances --window `"$match`" --limit 30' to see available labels."
-      })
-    } elseif ($ambiguous) {
-      $explainRecover = @([pscustomobject]@{
-        code = "ambiguous_target"
-        message = "top two candidates within ${ambWin} score points"
-        recommended_action = "Narrow with --window or --role, or use the affordance_id from the candidates list."
-      })
-    }
-    $envelope = _New-ObservationEnvelope `
-      -Kind "find-label" -Status $explainStatus `
-      -ElapsedMs $elapsed `
-      -Sources $sources `
-      -ObservationId $shot.ObservationId `
-      -Foreground $foreground `
-      -Data ([pscustomobject]@{
-        label = $label
-        window = $window
-        role = $role
-        ambiguous = $ambiguous
-        ambiguity_window = $ambWin
-        top = $top
-        candidates = ($ranked | Select-Object -First 8)
-        candidate_count = $ranked.Count
-      }) `
-      -Cache $cache `
-      -Confidence $explainConf `
-      -RecoverableErrors $explainRecover
-    if ($Brief -and -not $jsonOnly) {
-      if ($top) {
-        $tag = if ($ambiguous) { "partial" } else { "ok" }
-        [Console]::Out.WriteLine(("{0} find-label '{1}' top='{2}' score={3} reason={4} ambiguous={5} candidates={6} elapsed_ms={7}" -f `
-          $tag, $label, $top.text, $top.score, $top.match_reason, $ambiguous, $ranked.Count, $elapsed))
-      } else {
-        [Console]::Out.WriteLine(("partial find-label '{0}' no_match candidates=0 elapsed_ms={1}" -f $label, $elapsed))
-      }
-    } else {
-      [Console]::Out.WriteLine(($envelope | ConvertTo-Json -Depth 8))
-    }
-    if (-not $top) { return 2 }
-    if ($ambiguous) { return 2 }
-    return 0
-  }
-
-  # Default (non-explain) path retains backwards-compatible shape with a
-  # status field, so existing parsers still work, but adds candidates+cache.
-  $result = if ($top -and -not $ambiguous) {
-    $center = Get-ElementCenter -Element $top
-    [pscustomobject]@{
-      status = "ok"
-      schema = "cucp.find-label/v2"
-      label = $label
-      window = $top.window
-      role = $top.role
-      text = $top.text
-      rect = $top.rect
-      center = $center
-      observation_id = $shot.ObservationId
-      from_cache = [bool]$shot.FromCache
-      sources = $sources
-      score = $top.score
-      candidates = ($ranked | Select-Object -First 5)
-      elapsed_ms = $elapsed
-    }
-  } elseif ($top -and $ambiguous) {
-    [pscustomobject]@{
-      status = "partial"
-      schema = "cucp.find-label/v2"
-      label = $label
-      reason = "ambiguous_target"
-      candidates = ($ranked | Select-Object -First 5)
-      observation_id = $shot.ObservationId
-      from_cache = [bool]$shot.FromCache
-      sources = $sources
-      ambiguity_window = $ambWin
-      elapsed_ms = $elapsed
-      recommended_action = "Narrow with --window or --role, or pick by affordance_id."
-    }
-  } else {
-    [pscustomobject]@{
-      status = "not_found"
-      schema = "cucp.find-label/v2"
-      label = $label
-      window = $window
-      observation_id = $shot.ObservationId
-      from_cache = [bool]$shot.FromCache
-      sources = $sources
-      candidates_text = ($shot.FusedElements | Select-Object -First 20 | ForEach-Object { $_.text }) -join " | "
-      elapsed_ms = $elapsed
-      recommended_action = "Try 'cucp macro list-affordances --window `"$match`"' or relax --window/--role."
-    }
-  }
-
-  if ($Brief -and -not $jsonOnly) {
-    if ($result.status -eq "ok") {
-      [Console]::Out.WriteLine("ok find-label '$label' @($($result.center.X),$($result.center.Y)) win='$($result.window)' score=$($result.score)")
-    } elseif ($result.status -eq "partial") {
-      [Console]::Out.WriteLine("partial find-label '$label' ambiguous candidates=$($result.candidates.Count)")
-    } else {
-      [Console]::Out.WriteLine("err find-label '$label' not_found")
-    }
-  } else {
-    [Console]::Out.WriteLine(($result | ConvertTo-Json -Depth 8))
-  }
-  if ($result.status -eq "ok") { return 0 }
-  if ($result.status -eq "partial") { return 2 }
-  # not_found: keep historical exit semantic (1) for back-compat.
-  return 1
-}
-
-function Invoke-MacroClickLabel {
-  param([string[]]$Rest, [switch]$Double, [switch]$RightClick)
-  $label  = _Read-OptValue -Rest $Rest -Name "--label"
-  $window = _Read-OptValue -Rest $Rest -Name "--window"
-  $match  = _Read-OptValue -Rest $Rest -Name "--match"
-  $role   = _Read-OptValue -Rest $Rest -Name "--role"
-  $offsetX = [int](_Read-OptValue -Rest $Rest -Name "--offset-x")
-  $offsetY = [int](_Read-OptValue -Rest $Rest -Name "--offset-y")
-  $noVision = _Read-Switch -Rest $Rest -Name "--no-vision"
-  if (-not $label) { throw "macro click-label requires --label" }
-  if (-not $match) { $match = $window }
-  if (-not $AllowLiveControl) {
-    Write-Notice -Level "ERROR" -Message "라이브 클릭은 -AllowLiveControl이 필요합니다."
-    throw "Live click requires -AllowLiveControl"
-  }
-
-  $shot = Invoke-Appshot -Match $match -Semantic:$true -NoCache
-  if (-not $shot) { throw "appshot failed" }
-
-  $el = Find-Element -Appshot $shot -Label $label -Window $window -Role $role
-  if (-not $el) {
-    # Fallback chain (small icons especially): icon-find via UIA crawl ->
-    # codex vision -> error. icon-find catches toolbar icons whose Name is
-    # empty but AutomationId/HelpText/AccessKey carries the label.
-    $iconHit = $null
-    try {
-      $captured = ""
-      $oldOut = [Console]::Out
-      $sb = New-Object System.IO.StringWriter
-      [Console]::SetOut($sb)
-      try {
-        Invoke-MacroIconFind -Rest @("--label", $label, "--match", $match, "--window", $window, "--max-size", "96", "--limit", "5", "--json-only") | Out-Null
-      } finally { [Console]::SetOut($oldOut) }
-      $captured = $sb.ToString()
-      $env_ = $captured | ConvertFrom-Json -ErrorAction SilentlyContinue
-      if ($env_ -and $env_.status -eq "ok" -and $env_.top) {
-        $iconHit = $env_.top
-      }
-    } catch { }
-
-    if ($iconHit) {
-      $x = [int]$iconHit.center.x + $offsetX
-      $y = [int]$iconHit.center.y + $offsetY
-      $clickKind = if ($RightClick) { "right-click" } else { "click" }
-      $cucpArgs = @("act", $clickKind, "--x", "$x", "--y", "$y", "--after", $shot.ObservationId)
-      if ($iconHit.window) { $cucpArgs += @("--target-window", $iconHit.window) }
-      $r = Invoke-Cucp -ArgList $cucpArgs
-      if ($Double -and $r.ExitCode -eq 0) { Invoke-Cucp -ArgList $cucpArgs | Out-Null }
-      _Trajectory-Append -Kind "click" -Payload @{
-        label = $label
-        window = $iconHit.window
-        source = "icon_find_fallback"
-        confidence = "$($iconHit.confidence)"
-        x = $x; y = $y
-        rect_w = [int]$iconHit.rect.width
-        rect_h = [int]$iconHit.rect.height
-        observation_id = $shot.ObservationId
-        exit = $r.ExitCode
-      }
-      if ($Brief) {
-        if ($r.ExitCode -eq 0) {
-          Write-Output ("ok click-label '$label' @($x,$y) via=icon-find size=$([int]$iconHit.rect.width)x$([int]$iconHit.rect.height) score=$($iconHit.score)")
-        } else {
-          Write-Output "err click-label '$label' exit=$($r.ExitCode)"
-        }
-      }
-      return $r.ExitCode
-    }
-
-    # UIA/OCR fusion didn't match. Optionally fall back to codex vision
-    # which can read arbitrary UIs (browser canvas, games, custom dialogs).
-    if (-not $noVision) {
-      Write-Notice -Level "WARN" -Message "라벨 fusion + icon-find 실패 - codex vision으로 fallback: '$label'"
-      $visionDesc = $label
-      if ($window) { $visionDesc = "$label ($window 창 안)" }
-      $vision = _Invoke-CodexVision -ScreenshotPath $shot.ScreenshotPath -Description $visionDesc
-      if ($vision.status -eq "ok") {
-        $x = [int]$vision.x + $offsetX
-        $y = [int]$vision.y + $offsetY
-        $clickKind = if ($RightClick) { "right-click" } else { "click" }
-        $cucpArgs = @("act", $clickKind, "--x", "$x", "--y", "$y", "--after", $shot.ObservationId)
-        if ($window) { $cucpArgs += @("--target-window", $window) }
-        $r = Invoke-Cucp -ArgList $cucpArgs
-        if ($Double -and $r.ExitCode -eq 0) { Invoke-Cucp -ArgList $cucpArgs | Out-Null }
-        _Trajectory-Append -Kind "click" -Payload @{
-          label = $label
-          window = $window
-          source = "vision_fallback"
-          confidence = "$($vision.confidence)"
-          x = $x; y = $y
-          observation_id = $shot.ObservationId
-          exit = $r.ExitCode
-        }
-        if ($Brief) {
-          if ($r.ExitCode -eq 0) { Write-Output "ok click-label '$label' @($x,$y) via=vision conf=$($vision.confidence)" }
-          else { Write-Output "err click-label '$label' exit=$($r.ExitCode)" }
-        }
-        return $r.ExitCode
-      } else {
-        Write-Notice -Level "ERROR" -Message "vision fallback도 실패: $($vision.status) $($vision.reason)"
-      }
-    }
-    Write-Notice -Level "ERROR" -Message "라벨을 찾지 못했습니다: '$label' (window='$window'). 후보: $((($shot.FusedElements | Select-Object -First 10 | ForEach-Object { $_.text }) -join ' | '))"
-    throw "Label not found: $label"
-  }
-
-  $center = Get-ElementCenter -Element $el
-  $x = $center.X + $offsetX
-  $y = $center.Y + $offsetY
-
-  $clickKind = if ($RightClick) { "right-click" } elseif ($Double) { "click" } else { "click" }
-  $clickArgs = @("act", $clickKind, "--x", "$x", "--y", "$y", "--after", $shot.ObservationId)
-  if ($el.window) { $clickArgs += @("--target-window", $el.window) }
-
-  $r = Invoke-Cucp -ArgList $clickArgs
-  if ($Double -and $r.ExitCode -eq 0) {
-    # second click (no fresh observation needed within freshness window)
-    Invoke-Cucp -ArgList $clickArgs | Out-Null
-  }
-
-  _Trajectory-Append -Kind "click" -Payload @{
-    label = $label
-    window = $el.window
-    role = $el.role
-    x = $x
-    y = $y
-    observation_id = $shot.ObservationId
-    exit = $r.ExitCode
-    double = [bool]$Double
-    right = [bool]$RightClick
-  }
-
-  if ($Brief) {
-    if ($r.ExitCode -eq 0) { Write-Output "ok click-label '$label' @($x,$y) win='$($el.window)'" }
-    else { Write-Output "err click-label '$label' exit=$($r.ExitCode)" }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroClickLabel {param([string[]]$Rest,[switch]$Double,[switch]$RightClick) return _Invoke-LegacyInteractionFamily -Operation 'click-label' -Rest $Rest -ScriptPath $PSCommandPath -Double ([bool]$Double) -RightClick ([bool]$RightClick)}
 
 function Invoke-MacroFillLabel {
   param([string[]]$Rest)
@@ -4535,158 +3389,9 @@ function Invoke-MacroGoal {
   return 0
 }
 
-function Invoke-MacroSelfTest {
-  param([string[]]$Rest)
-  # Self-test exercises the safe, read-only paths that prove the wrapper +
-  # CUCP CLI + helper backend are wired correctly. It does NOT actuate.
-  #
-  # Tests are categorized:
-  #  - wrapper: pure wrapper logic (no helper needed)
-  #  - cli:     CUCP CLI roundtrip (no helper needed)
-  #  - helper:  Windows-MCP HTTP helper required
-  #  - uia:     PowerShell UIAutomation fallback (deep only)
-  #
-  # If the helper is not running, helper-tier tests are reported as
-  # "skipped" (not failed) and the wrapper tier still gets a clean pass.
-  $deep = _Read-Switch -Rest $Rest -Name "--deep"
-  $strict = _Read-Switch -Rest $Rest -Name "--strict"
+function Invoke-MacroSelfTest {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'self-test' -Rest $Rest}
 
-  function _AddResult { param([string]$Name, [string]$Tier, [string]$Outcome, [string]$Detail = "")
-    # outcome: ok | fail | skipped
-    $script:_selfTestResults += [pscustomobject]@{ name=$Name; tier=$Tier; outcome=$Outcome; detail=$Detail }
-  }
-  $script:_selfTestResults = @()
 
-  Write-Notice -Level "INFO" -Message "self-test 시작 (deep=$deep, strict=$strict)"
-
-  # ---- Tier: wrapper -------------------------------------------------------
-  # 1. live-control gate (pure wrapper logic)
-  try {
-    $blocked = $false
-    try {
-      Assert-Authorized -ArgList @("act", "click", "--x", "0", "--y", "0", "--after", "fake")
-    } catch { $blocked = $true }
-    _AddResult "live_gate_blocks" "wrapper" (_Iif { $blocked } "ok" "fail") "blocked-without-AllowLiveControl"
-  } catch { _AddResult "live_gate_blocks" "wrapper" "fail" $_.Exception.Message }
-
-  # 2. coord-without-after gate
-  try {
-    $blocked = $false
-    try {
-      Assert-Authorized -ArgList @("act", "click", "--x", "100", "--y", "100")
-    } catch { $blocked = $true }
-    _AddResult "coord_gate_requires_after" "wrapper" (_Iif { $blocked } "ok" "fail") "blocked-without-after"
-  } catch { _AddResult "coord_gate_requires_after" "wrapper" "fail" $_.Exception.Message }
-
-  # ---- Tier: cli (no helper required) --------------------------------------
-  # 3. version
-  $cliOk = $false
-  try {
-    $r = Invoke-Cucp -ArgList @("version") -CaptureJson
-    $cliOk = ($r.ExitCode -eq 0 -and $r.Json.status -eq "ok")
-    _AddResult "cli_version" "cli" (_Iif { $cliOk } "ok" "fail") ("v" + $r.Json.version)
-  } catch { _AddResult "cli_version" "cli" "fail" $_.Exception.Message }
-
-  # ---- Tier: helper (helper HTTP server required) --------------------------
-  # 4. tools (probes helper)
-  $helperReachable = $false
-  try {
-    $r = Invoke-Cucp -ArgList @("tools") -CaptureJson
-    if ($r.ExitCode -eq 0 -and $r.Json.status -eq "ok") {
-      $helperReachable = $true
-      _AddResult "helper_tools" "helper" "ok" "tools available"
-    } else {
-      $errType = if ($r.Json.error_type) { $r.Json.error_type } else { "unreachable" }
-      $detail = "helper not running ($errType) - run 'cucp start' to enable helper-tier tests"
-      _AddResult "helper_tools" "helper" "skipped" $detail
-    }
-  } catch { _AddResult "helper_tools" "helper" "skipped" $_.Exception.Message }
-
-  # 5. observe windows (only if helper reachable)
-  if ($helperReachable) {
-    try {
-      $r = Invoke-Cucp -ArgList @("observe", "windows") -CaptureJson
-      $ok = ($r.ExitCode -eq 0 -and $r.Json.status -eq "ok")
-      _AddResult "observe_windows" "helper" (_Iif { $ok } "ok" "fail") ("status=" + $r.Json.status)
-    } catch { _AddResult "observe_windows" "helper" "fail" $_.Exception.Message }
-
-    # 6. cache write/read (uses appshot which uses helper)
-    # We bypass the time-based freshness check and verify the cache file
-    # itself was written and is reused. This avoids a flaky 2-second window
-    # when the helper takes longer than CacheSeconds to respond.
-    try {
-      $shotA = Invoke-Appshot -Match "selftest-cache" -Semantic:$false -NoCache
-      $cacheKey = Get-CacheKey -Match "selftest-cache"
-      $cachePath = Join-Path $Script:CacheDir "appshot-$cacheKey.json"
-      $cacheExists = Test-Path -LiteralPath $cachePath
-      if (-not $cacheExists) {
-        _AddResult "cache_hit" "helper" "fail" "cache file not written: $cachePath"
-      } else {
-        # Force generous cache window for the read so the test isn't sensitive
-        # to overall appshot latency.
-        $shotB = Invoke-Appshot -Match "selftest-cache" -Semantic:$false -CacheMaxSeconds 600
-        $ok = ($shotB -ne $null -and $shotB.FromCache -eq $true)
-        _AddResult "cache_hit" "helper" (_Iif { $ok } "ok" "fail") ("from_cache=" + $shotB.FromCache + " cacheFile=" + $cacheExists)
-      }
-    } catch { _AddResult "cache_hit" "helper" "fail" $_.Exception.Message }
-  } else {
-    _AddResult "observe_windows" "helper" "skipped" "skipped: helper not running"
-    _AddResult "cache_hit" "helper" "skipped" "skipped: helper not running"
-  }
-
-  # ---- Tier: uia (PowerShell UIAutomation fallback) ------------------------
-  if ($deep) {
-    # 7. UIA fallback alone (no helper needed)
-    try {
-      $uia = _Get-UIAffordances -FocusedWindow "" -MaxElements 50
-      $count = (@($uia)).Count
-      $ok = ($count -gt 0)
-      _AddResult "uia_fallback" "uia" (_Iif { $ok } "ok" "fail") "uia_affordances=$count"
-    } catch { _AddResult "uia_fallback" "uia" "fail" $_.Exception.Message }
-
-    # 8. appshot full-screen (helper required, otherwise skipped)
-    if ($helperReachable) {
-      try {
-        $shot = Invoke-Appshot -Match "" -Semantic:$true -NoCache
-        $ok = ($null -ne $shot -and $shot.ObservationId)
-        $count = if ($shot.Affordances) { $shot.Affordances.Count } else { 0 }
-        _AddResult "appshot_fullscreen" "helper" (_Iif { $ok } "ok" "fail") ("affordances=" + $count + " obs_id=" + $shot.ObservationId)
-      } catch { _AddResult "appshot_fullscreen" "helper" "fail" $_.Exception.Message }
-    } else {
-      _AddResult "appshot_fullscreen" "helper" "skipped" "skipped: helper not running"
-    }
-  }
-
-  # ---- Aggregate -----------------------------------------------------------
-  $all = @($script:_selfTestResults)
-  $passed = @($all | Where-Object { $_.outcome -eq "ok" }).Count
-  $failed = @($all | Where-Object { $_.outcome -eq "fail" }).Count
-  $skipped = @($all | Where-Object { $_.outcome -eq "skipped" }).Count
-  $total = $all.Count
-  $required = if ($strict) { $passed -eq $total } else { $failed -eq 0 }
-  $status = if ($required) { "ok" } else { "fail" }
-
-  $report = [pscustomobject]@{
-    status = $status
-    summary = if ($status -eq "ok" -and $skipped -gt 0) { "wrapper/cli/uia tiers passing; $skipped helper-tier test(s) skipped (run 'cucp start' to include)" } elseif ($status -eq "ok") { "all tiers passing" } else { "$failed test(s) failed" }
-    passed = $passed
-    failed = $failed
-    skipped = $skipped
-    total = $total
-    helper_running = $helperReachable
-    deep = $deep
-    strict = $strict
-    results = $all
-  }
-  if ($Brief) {
-    [Console]::Out.WriteLine(("{0} self-test passed={1}/{2} skipped={3} failed={4}" -f $status, $passed, $total, $skipped, $failed))
-  } else {
-    [Console]::Out.WriteLine(($report | ConvertTo-Json -Depth 6))
-  }
-  if ($status -eq "ok") { return 0 } else { return 1 }
-}
-
-function _Iif { param([scriptblock]$Cond, $Then, $Else) if (& $Cond) { $Then } else { $Else } }
 
 function Invoke-MacroTrajectory {
   param([string[]]$Rest)
@@ -5463,536 +4168,11 @@ function Invoke-MacroFocusVerify {
   if ($verified) { return 0 } else { return 2 }
 }
 
-function Invoke-MacroHealthQuick {
-  # macro health-quick: lightweight health surface that avoids the heavy
-  # `tools list` HTTP probe. Reports node/cli/audit dir + Win32 enumerator
-  # availability. ~50-150ms target.
-  param([string[]]$Rest)
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
+function Invoke-MacroHealthQuick {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'health-quick' -Rest $Rest}
 
-  $report = [ordered]@{
-    status = "checking"
-    collected_at = (Get-Date).ToString("o")
-    components = [ordered]@{}
-  }
+function Invoke-MacroLogTail {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'log-tail' -Rest $Rest}
 
-  # 1. Node
-  $nodeOk = $false; $nodeVer = ""
-  try {
-    $nv = & node --version 2>&1
-    if ($LASTEXITCODE -eq 0 -and $nv) { $nodeOk = $true; $nodeVer = "$nv".Trim() }
-  } catch { }
-  $report.components.node = [pscustomobject]@{ ok = $nodeOk; version = $nodeVer }
-
-  # 2. CLI present
-  $cliOk = $Script:CliPath -and (Test-Path -LiteralPath $Script:CliPath)
-  $report.components.cli = [pscustomobject]@{ ok = $cliOk; path = $Script:CliPath }
-
-  # 3. Audit dir writable (cheap probe)
-  $auditOk = $false
-  try {
-    if (-not (Test-Path $Script:AuditDir)) { New-Item -ItemType Directory -Path $Script:AuditDir -Force | Out-Null }
-    $probe = Join-Path $Script:AuditDir ".health-quick-probe-$([guid]::NewGuid())"
-    Set-Content -LiteralPath $probe -Value "ok" -Encoding UTF8
-    Remove-Item -LiteralPath $probe -Force
-    $auditOk = $true
-  } catch { }
-  $report.components.audit_dir = [pscustomobject]@{ ok = $auditOk; path = $Script:AuditDir }
-
-  # 4. Win32 enumerator (deterministic fallback)
-  $win32Ok = _Ensure-Win32Loaded
-  $report.components.win32_enum = [pscustomobject]@{ ok = $win32Ok }
-
-  # 5. Temp/cache pressure (cheap stat-only counts; no log read)
-  $tempPressureOk = $true
-  $tempFileCount = 0
-  $cacheFileCount = 0
-  $logBytes = [int64]0
-  try {
-    if (Test-Path -LiteralPath $Script:CacheDir) {
-      $cacheFileCount = @(Get-ChildItem -LiteralPath $Script:CacheDir -File -ErrorAction SilentlyContinue).Count
-    }
-    if (Test-Path -LiteralPath $Script:AuditDir) {
-      $tempFileCount = @(Get-ChildItem -LiteralPath $Script:AuditDir -Recurse -File -ErrorAction SilentlyContinue).Count
-    }
-    if (Test-Path -LiteralPath $Script:WrapperLog) {
-      $logBytes = [int64](Get-Item -LiteralPath $Script:WrapperLog).Length
-    }
-    if ($cacheFileCount -gt 1000 -or $tempFileCount -gt 2000 -or $logBytes -gt 64MB) {
-      $tempPressureOk = $false
-    }
-  } catch { }
-  $report.components.temp_pressure = [pscustomobject]@{
-    ok = $tempPressureOk
-    cache_files = $cacheFileCount
-    temp_files = $tempFileCount
-    wrapper_log_bytes = $logBytes
-    tip = if ($tempPressureOk) { "" } else { "Run 'cucp macro cleanup --dry-run' to preview, then '--execute'." }
-  }
-
-  # 6. Recent timeout count: read only the last 64KB of the wrapper log.
-  $recentTimeoutCount = 0
-  $tailOk = $true
-  if (Test-Path -LiteralPath $Script:WrapperLog) {
-    try {
-      $fs = [System.IO.File]::Open($Script:WrapperLog, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
-      try {
-        $len = [int64]$fs.Length
-        $start = [int64][Math]::Max(0, $len - 65536)
-        [void]$fs.Seek($start, [System.IO.SeekOrigin]::Begin)
-        $buf = New-Object byte[] ([int]([Math]::Min($len - $start, [int64]65536)))
-        $n = $fs.Read($buf, 0, $buf.Length)
-        $tailStr = [System.Text.Encoding]::UTF8.GetString($buf, 0, $n)
-        $matches = [regex]::Matches($tailStr, 'TIMEOUT')
-        $recentTimeoutCount = $matches.Count
-      } finally { $fs.Dispose() }
-    } catch { $tailOk = $false }
-  }
-  $report.components.recent_timeouts = [pscustomobject]@{
-    ok = ($tailOk -and $recentTimeoutCount -le 5)
-    count = $recentTimeoutCount
-    sample_bytes = 65536
-    tip = if ($recentTimeoutCount -gt 5) { "Run 'cucp macro ensure-helper' or raise -InvokeTimeoutMs." } else { "" }
-  }
-
-  $sw.Stop()
-  $required = @("node","cli","audit_dir","win32_enum")
-  $allOk = $true
-  foreach ($k in $required) { if (-not $report.components[$k].ok) { $allOk = $false } }
-  # Pressure/timeouts are advisory only — don't fail health-quick on them.
-  $report.status = if ($allOk) { "ok" } else { "fail" }
-  $report.elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-  $report.note = "lightweight surface; for helper/codex/uia checks use macro health-detail"
-  $payload = [pscustomobject]$report
-
-  if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine(("{0} health-quick node={1} cli={2} audit={3} win32={4} cache={5} timeouts={6} elapsed_ms={7}" -f `
-      $report.status, $nodeOk, $cliOk, $auditOk, $win32Ok, $cacheFileCount, $recentTimeoutCount, $report.elapsed_ms))
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 6))
-  }
-  if ($allOk) { return 0 } else { return 1 }
-}
-
-function Invoke-MacroLogTail {
-  # macro log-tail [--lines <n>] [--max-bytes <n>] [--path <file>] [--errors-only] [--json-only]
-  # Read-only diagnostics over the wrapper audit log. Sensitive content
-  # (auth/password/credit/token/secret/key) is redacted before emission.
-  #
-  # Performance contract:
-  #   - O(tail bytes), not O(full log size). Default --max-bytes 262144 (256KB).
-  #   - Regex patterns compiled once with Compiled+IgnoreCase, bounded
-  #     `\S{1,256}` to avoid catastrophic backtracking.
-  #   - Operates only on the emitted tail window; never scans full file.
-  #   - --path lets tests target a small synthetic file so the test suite
-  #     never touches the production wrapper log.
-  param([string[]]$Rest)
-  $linesArg = [int](_Read-OptValue -Rest $Rest -Name "--lines")
-  if ($linesArg -le 0) { $linesArg = 50 }
-  $maxBytes = [int](_Read-OptValue -Rest $Rest -Name "--max-bytes")
-  if ($maxBytes -le 0) { $maxBytes = 262144 }
-  $pathOverride = _Read-OptValue -Rest $Rest -Name "--path"
-  $errorsOnly = _Read-Switch -Rest $Rest -Name "--errors-only"
-  $jsonOnly   = _Read-Switch -Rest $Rest -Name "--json-only"
-
-  $logPath = if ($pathOverride) { $pathOverride } else { $Script:WrapperLog }
-  if (-not (Test-Path -LiteralPath $logPath)) {
-    if ($Brief -and -not $jsonOnly) {
-      [Console]::Out.WriteLine("partial log-tail no-log-file path='$logPath'")
-    } else {
-      $envEmpty = _New-ObservationEnvelope `
-        -Kind "log-tail" -Status "partial" `
-        -ElapsedMs 0 -Sources @("file") `
-        -Data ([pscustomobject]@{ path = $logPath; lines = @() }) `
-        -RecoverableErrors @([pscustomobject]@{
-          code = "log_missing"
-          message = "log not found: $logPath"
-          recommended_action = "Run any cucp command first to materialize the audit log, or pass --path <file>."
-        })
-      [Console]::Out.WriteLine(($envEmpty | ConvertTo-Json -Depth 6))
-    }
-    return 2
-  }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-
-  # Stream-tail: open as binary, seek to end - maxBytes, read tail, decode.
-  # This is O(maxBytes) regardless of file size.
-  $tailText = ""
-  $totalBytes = 0
-  $tailBytes = 0
-  try {
-    $fs = [System.IO.File]::Open($logPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
-    try {
-      $totalBytes = [int64]$fs.Length
-      $start = [int64][Math]::Max(0, $totalBytes - $maxBytes)
-      [void]$fs.Seek($start, [System.IO.SeekOrigin]::Begin)
-      $tailBytes = [int]([Math]::Min($totalBytes - $start, [int64]$maxBytes))
-      $buf = New-Object byte[] $tailBytes
-      $read = $fs.Read($buf, 0, $tailBytes)
-      $tailText = [System.Text.Encoding]::UTF8.GetString($buf, 0, $read)
-    } finally { $fs.Dispose() }
-  } catch {
-    if ($Brief -and -not $jsonOnly) {
-      [Console]::Out.WriteLine("partial log-tail read_failed: $($_.Exception.Message)")
-    } else {
-      $envErr = _New-ObservationEnvelope `
-        -Kind "log-tail" -Status "partial" -ElapsedMs ([int]$sw.Elapsed.TotalMilliseconds) `
-        -Sources @("file") `
-        -Data ([pscustomobject]@{ path = $logPath }) `
-        -RecoverableErrors @([pscustomobject]@{
-          code = "log_read_failed"; message = $_.Exception.Message
-          recommended_action = "Verify file is readable and not exclusively locked."
-        })
-      [Console]::Out.WriteLine(($envErr | ConvertTo-Json -Depth 6))
-    }
-    return 2
-  }
-
-  # If we started mid-line (totalBytes > maxBytes), drop the (potentially
-  # partial) first line so reported lines are always whole.
-  $startedMidLine = ($totalBytes -gt $tailBytes)
-  $allLines = @($tailText -split "(?:\r\n|\n|\r)")
-  if ($startedMidLine -and $allLines.Count -gt 0) {
-    $allLines = $allLines | Select-Object -Skip 1
-  }
-  # Drop trailing empty string from final newline split
-  $allLines = @($allLines | Where-Object { $_ -ne "" -or $false })
-  # Take last N lines
-  $rawLines = if ($allLines.Count -gt $linesArg) { $allLines[($allLines.Count - $linesArg)..($allLines.Count - 1)] } else { $allLines }
-
-  if ($errorsOnly) {
-    $errFilter = [regex]::new('ERROR|TIMEOUT|FAIL|throw|exit\s+(?:1|2|3|124)', [System.Text.RegularExpressions.RegexOptions]::Compiled)
-    $rawLines = @($rawLines | Where-Object { $errFilter.IsMatch($_) })
-  }
-
-  # ---- Redaction ---------------------------------------------------------
-  # Compile redaction patterns ONCE (Compiled + IgnoreCase). Bounded \S{1,256}
-  # avoids catastrophic backtracking. JWT pattern requires literal `eyJ` so
-  # cost is constant on non-token lines.
-  if (-not $Script:_LogRedactRegex) {
-    $opts = [System.Text.RegularExpressions.RegexOptions]::Compiled -bor `
-            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
-    $patterns = @(
-      'password\s*=\s*\S{1,256}',
-      'passwd\s*=\s*\S{1,256}',
-      'pwd\s*=\s*\S{1,256}',
-      'secret\s*=\s*\S{1,256}',
-      'token\s*=\s*\S{1,256}',
-      'apikey\s*=\s*\S{1,256}',
-      'api_key\s*=\s*\S{1,256}',
-      'authorization:\s*\S{1,256}',
-      'Bearer\s+\S{1,256}',
-      'eyJ[A-Za-z0-9_\-]{20,512}\.[A-Za-z0-9_\-]{1,512}\.[A-Za-z0-9_\-]{1,512}'
-    )
-    $list = New-Object System.Collections.ArrayList
-    foreach ($p in $patterns) { [void]$list.Add([regex]::new($p, $opts)) }
-    $Script:_LogRedactRegex = $list.ToArray()
-  }
-
-  $redactedCount = 0
-  $cleanedList = New-Object System.Collections.ArrayList
-  foreach ($line in $rawLines) {
-    $cur = $line
-    foreach ($rgx in $Script:_LogRedactRegex) {
-      if ($rgx.IsMatch($cur)) {
-        $cur = $rgx.Replace($cur, '[redacted]')
-        $redactedCount++
-      }
-    }
-    [void]$cleanedList.Add($cur)
-  }
-  $cleaned = $cleanedList.ToArray()
-
-  $errorPattern = [regex]::new('ERROR|TIMEOUT|FAIL', [System.Text.RegularExpressions.RegexOptions]::Compiled)
-  $errorCount = 0
-  foreach ($l in $cleaned) { if ($errorPattern.IsMatch($l)) { $errorCount++ } }
-  $sw.Stop()
-  $elapsed = [int]$sw.Elapsed.TotalMilliseconds
-
-  if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine(("ok log-tail lines={0} bytes_read={1} errors={2} redacted={3} elapsed_ms={4}" -f `
-      $cleaned.Count, $tailBytes, $errorCount, $redactedCount, $elapsed))
-    foreach ($l in $cleaned) { [Console]::Out.WriteLine("  | " + $l) }
-  } else {
-    $envelope = _New-ObservationEnvelope `
-      -Kind "log-tail" -Status "ok" `
-      -ElapsedMs $elapsed -Sources @("file") `
-      -Data ([pscustomobject]@{
-        path = $logPath
-        total_bytes = $totalBytes
-        bytes_read = $tailBytes
-        max_bytes = $maxBytes
-        requested_lines = $linesArg
-        returned_lines = $cleaned.Count
-        errors_only = [bool]$errorsOnly
-        error_count = $errorCount
-        redacted_count = $redactedCount
-        lines = $cleaned
-      }) `
-      -Confidence "high"
-    [Console]::Out.WriteLine(($envelope | ConvertTo-Json -Depth 6))
-  }
-  return 0
-}
-
-function Invoke-MacroDiagnoseLag {
-  # macro diagnose-lag [--sample-ms <n>] [--json-only]
-  #
-  # Read-only runtime load report intended to explain why the Codex/Electron app
-  # desktop app feels laggy during long CUCP sessions.
-  #
-  # Reports for selected processes (Codex, Electron app, node, powershell, Chrome,
-  # CUCP helper if detectable):
-  #   - count, total memory (MB), median private memory
-  #   - CPU delta over a short sample window (default 3000ms, capped 8000ms)
-  #   - basic priority class
-  #   - oldest process age (seconds)
-  # Plus host snapshots:
-  #   - %TEMP%\computer-use-control-plane file count + size
-  #   - wrapper-cache file count + size
-  #   - wrapper log size (no full read)
-  #   - foreground window title
-  #
-  # Warnings (non-blocking):
-  #   - high_memory_total > 8GB across selected processes
-  #   - electron_child_count > 25
-  #   - cucp_temp_files > 1000
-  #   - wrapper_log_bytes > 64MB
-  #   - cpu_delta_pct > 60% on any single tracked process
-  #
-  # Returns recommended_action entries; never kills processes or alters
-  # priority. The user / Codex agent decides what to do.
-  param([string[]]$Rest)
-  $sampleMs = [int](_Read-OptValue -Rest $Rest -Name "--sample-ms")
-  if ($sampleMs -le 0) { $sampleMs = 3000 }
-  if ($sampleMs -gt 8000) { $sampleMs = 8000 }
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-
-  # Process groups we care about. Names are case-insensitive.
-  $groups = @(
-    @{ id = "codex";       names = @("codex","Codex") },
-    @{ id = "electron";    names = @("electron","Code","Cursor","Windsurf") },
-    @{ id = "node";        names = @("node") },
-    @{ id = "powershell";  names = @("powershell","pwsh") },
-    @{ id = "chrome";      names = @("chrome","msedge","brave","whale") },
-    @{ id = "cucp_helper"; names = @("cucp-helper","windows-mcp-helper") }
-  )
-
-  function _SnapProcs {
-    $all = Get-Process -ErrorAction SilentlyContinue
-    if (-not $all) { return @() }
-    return $all
-  }
-
-  $procsT0 = _SnapProcs
-  if ($sampleMs -gt 0) { Start-Sleep -Milliseconds $sampleMs }
-  $procsT1 = _SnapProcs
-
-  $byPidT0 = @{}
-  foreach ($p in $procsT0) { $byPidT0[$p.Id] = $p }
-
-  $now = Get-Date
-  $cpuCount = [Environment]::ProcessorCount
-  $report = New-Object System.Collections.ArrayList
-  $totalMemBytes = [int64]0
-
-  foreach ($g in $groups) {
-    $matching = @($procsT1 | Where-Object {
-      $n = $_.ProcessName
-      foreach ($candidate in $g.names) {
-        if ($n -ieq $candidate) { return $true }
-      }
-      return $false
-    })
-    if ($matching.Count -eq 0) { continue }
-
-    $count = $matching.Count
-    $sumMem = [int64]0
-    $oldestAgeSec = 0
-    $cpuDeltaSum = [double]0
-    $priCounts = @{}
-    foreach ($p in $matching) {
-      try {
-        $sumMem += [int64]$p.PrivateMemorySize64
-      } catch { }
-      try {
-        $age = ($now - $p.StartTime).TotalSeconds
-        if ($age -gt $oldestAgeSec) { $oldestAgeSec = $age }
-      } catch { }
-      try {
-        $prev = $byPidT0[$p.Id]
-        if ($prev) {
-          $delta = ($p.TotalProcessorTime.TotalMilliseconds - $prev.TotalProcessorTime.TotalMilliseconds)
-          if ($delta -lt 0) { $delta = 0 }
-          $cpuDeltaSum += $delta
-        }
-      } catch { }
-      try {
-        $pri = "$($p.PriorityClass)"
-        if ([string]::IsNullOrWhiteSpace($pri)) { $pri = "unknown" }
-        if ($priCounts.ContainsKey($pri)) { $priCounts[$pri]++ } else { $priCounts[$pri] = 1 }
-      } catch { }
-    }
-    $totalMemBytes += $sumMem
-
-    # CPU% across selected processes in this group, normalized by CPU count.
-    $cpuPct = 0
-    if ($sampleMs -gt 0 -and $cpuCount -gt 0) {
-      $cpuPct = [Math]::Round(($cpuDeltaSum / $sampleMs) * (100.0 / $cpuCount), 1)
-    }
-    [void]$report.Add([pscustomobject]@{
-      group = $g.id
-      count = $count
-      memory_mb = [Math]::Round($sumMem / 1MB, 1)
-      cpu_delta_pct = $cpuPct
-      oldest_age_sec = [int]$oldestAgeSec
-      priority_classes = $priCounts
-      pids = ($matching | ForEach-Object { $_.Id })
-    })
-  }
-
-  # Foreground window
-  $fgTitle = ""
-  $fg = _Enumerate-Win32Windows -Match $null | Where-Object { $_.foreground } | Select-Object -First 1
-  if ($fg) { $fgTitle = "$($fg.title)" }
-
-  # Temp/cache pressure
-  $tempRoot = Join-Path $env:TEMP "computer-use-control-plane"
-  $tempFileCount = 0
-  $tempBytes = [int64]0
-  $cacheFileCount = 0
-  $cacheBytes = [int64]0
-  $logBytes = [int64]0
-  if (Test-Path -LiteralPath $tempRoot) {
-    $stats = Get-ChildItem -LiteralPath $tempRoot -Recurse -File -ErrorAction SilentlyContinue
-    foreach ($f in $stats) { $tempFileCount++; $tempBytes += [int64]$f.Length }
-    if (Test-Path -LiteralPath $Script:CacheDir) {
-      $cacheStats = Get-ChildItem -LiteralPath $Script:CacheDir -File -ErrorAction SilentlyContinue
-      foreach ($f in $cacheStats) { $cacheFileCount++; $cacheBytes += [int64]$f.Length }
-    }
-    if (Test-Path -LiteralPath $Script:WrapperLog) {
-      try { $logBytes = [int64](Get-Item -LiteralPath $Script:WrapperLog).Length } catch { }
-    }
-  }
-
-  # Recent timeout count from a tail of the log (without reading full log)
-  $recentTimeoutCount = 0
-  if (Test-Path -LiteralPath $Script:WrapperLog) {
-    try {
-      $fs = [System.IO.File]::Open($Script:WrapperLog, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
-      try {
-        $len = [int64]$fs.Length
-        $start = [int64][Math]::Max(0, $len - 65536)
-        [void]$fs.Seek($start, [System.IO.SeekOrigin]::Begin)
-        $buf = New-Object byte[] ([int]([Math]::Min($len - $start, [int64]65536)))
-        $n = $fs.Read($buf, 0, $buf.Length)
-        $tailStr = [System.Text.Encoding]::UTF8.GetString($buf, 0, $n)
-        $matches = [regex]::Matches($tailStr, 'TIMEOUT')
-        $recentTimeoutCount = $matches.Count
-      } finally { $fs.Dispose() }
-    } catch { }
-  }
-
-  # Warnings
-  $warnings = New-Object System.Collections.ArrayList
-  $recommended = New-Object System.Collections.ArrayList
-
-  $totalMemMb = [Math]::Round($totalMemBytes / 1MB, 1)
-  if ($totalMemBytes -gt 8GB) {
-    [void]$warnings.Add("high_memory_total: tracked processes use ${totalMemMb}MB (>8GB)")
-  }
-
-  $electronChildCount = 0
-  foreach ($r in $report) {
-    if ($r.group -eq "electron" -or $r.group -eq "codex" -or $r.group -eq "chrome") {
-      $electronChildCount += $r.count
-    }
-  }
-  if ($electronChildCount -gt 25) {
-    [void]$warnings.Add("electron_child_count=$electronChildCount (>25). Heavy multi-window load.")
-    [void]$recommended.Add([pscustomobject]@{
-      code = "electron_pressure"
-      message = "Many Electron child processes detected"
-      recommended_action = "Close unused Electron app/Codex/Chrome windows; consider lowering Electron app priority manually if Codex is the active focus."
-    })
-  }
-
-  if ($tempFileCount -gt 1000) {
-    [void]$warnings.Add("cucp_temp_files=$tempFileCount (>1000). Cleanup recommended.")
-    [void]$recommended.Add([pscustomobject]@{
-      code = "temp_pressure"
-      message = "CUCP temp directory has $tempFileCount files"
-      recommended_action = "Run 'cucp macro cleanup --dry-run' to preview, then '--execute' to remove stale files."
-    })
-  }
-
-  if ($logBytes -gt 64MB) {
-    [void]$warnings.Add("wrapper_log_bytes=$logBytes (>64MB). Use 'macro log-tail' (bounded) instead of full read.")
-  }
-
-  foreach ($r in $report) {
-    if ($r.cpu_delta_pct -gt 60) {
-      [void]$warnings.Add(("{0} cpu_delta_pct={1}% (>60% over {2}ms sample)" -f $r.group, $r.cpu_delta_pct, $sampleMs))
-    }
-  }
-
-  if ($recentTimeoutCount -gt 0) {
-    [void]$warnings.Add("recent_timeout_count=$recentTimeoutCount in last 64KB of wrapper log")
-    [void]$recommended.Add([pscustomobject]@{
-      code = "recent_timeouts"
-      message = "$recentTimeoutCount TIMEOUT entries in recent log tail"
-      recommended_action = "Run 'cucp macro ensure-helper' or increase -InvokeTimeoutMs."
-    })
-  }
-
-  $sw.Stop()
-  $elapsed = [int]$sw.Elapsed.TotalMilliseconds
-
-  $payload = [pscustomobject]@{
-    schema = "cucp.diagnose-lag/v1"
-    status = "ok"
-    collected_at = (Get-Date).ToString("o")
-    elapsed_ms = $elapsed
-    sample_ms = $sampleMs
-    cpu_count = $cpuCount
-    foreground_title = $fgTitle
-    processes = @($report)
-    totals = [pscustomobject]@{
-      memory_mb = $totalMemMb
-      electron_child_count = $electronChildCount
-    }
-    storage = [pscustomobject]@{
-      temp_root = $tempRoot
-      temp_file_count = $tempFileCount
-      temp_bytes = $tempBytes
-      cache_dir = $Script:CacheDir
-      cache_file_count = $cacheFileCount
-      cache_bytes = $cacheBytes
-      wrapper_log_bytes = $logBytes
-      recent_timeout_count = $recentTimeoutCount
-    }
-    warnings = @($warnings)
-    recommended_actions = @($recommended)
-  }
-
-  if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine(("ok diagnose-lag groups={0} mem_mb={1} electron={2} temp_files={3} log_mb={4} warnings={5} elapsed_ms={6}" -f `
-      $report.Count, $totalMemMb, $electronChildCount, $tempFileCount,
-      [Math]::Round($logBytes / 1MB, 1), $warnings.Count, $elapsed))
-    foreach ($r in $report) {
-      [Console]::Out.WriteLine(("  {0,-12} count={1,3} mem_mb={2,7} cpu_pct={3,5} oldest_s={4,5}" -f `
-        $r.group, $r.count, $r.memory_mb, $r.cpu_delta_pct, $r.oldest_age_sec))
-    }
-    foreach ($w in $warnings) { [Console]::Out.WriteLine("  [WARN] " + $w) }
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 6))
-  }
-  return 0
-}
+function Invoke-MacroDiagnoseLag {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'diagnose-lag' -Rest $Rest}
 
 function Invoke-MacroCleanup {
   # macro cleanup --dry-run | --execute
@@ -6196,270 +4376,9 @@ function Invoke-MacroCleanup {
   return 0
 }
 
-function Invoke-MacroIconFind {
-  # macro icon-find -- read-only finder optimized for small toolbar icons.
-  #
-  # When Codex/agent needs to click a tiny icon (16-32px toolbar button,
-  # close [X], minimize, send arrow, settings gear, etc.), regular
-  # find-label often misses because:
-  #   1. Name property is empty (icon-only buttons)
-  #   2. Vision model can't see fine detail in a 1920x1080 screenshot
-  #
-  # icon-find solves both:
-  #   - synonym mining from Name + AutomationId + HelpText (tooltip) +
-  #     AccessKey + ItemStatus (already done by enhanced _Get-UIAffordances)
-  #   - --max-size filter (default 64) filters out large containers
-  #   - --near-rect/--in-window narrows search region
-  #   - returns ranked candidates with size/distance hints so Codex can
-  #     pick one with confidence
-  #
-  # Args:
-  #   --label <text>          required. matches against Name/AutomationId/HelpText/AccessKey
-  #   --window <title>        optional. case-insensitive substring of focused window
-  #   --match <title>         alias of --window for appshot match
-  #   --role <role>           optional UIA control type filter
-  #   --max-size <px>         maximum bounding-box edge to keep (default 64)
-  #   --min-size <px>         minimum bounding-box edge (default 6)
-  #   --near-x / --near-y     optional anchor; results sorted by distance to anchor
-  #   --near-radius <px>      max distance from anchor (default unlimited)
-  #   --limit <n>             max candidates to return (default 8)
-  #   --explain / --json-only / --brief
-  param([string[]]$Rest)
-  $label   = _Read-OptValue -Rest $Rest -Name "--label"
-  $window  = _Read-OptValue -Rest $Rest -Name "--window"
-  $match   = _Read-OptValue -Rest $Rest -Name "--match"
-  $role    = _Read-OptValue -Rest $Rest -Name "--role"
-  $maxSize = [int](_Read-OptValue -Rest $Rest -Name "--max-size")
-  $minSize = [int](_Read-OptValue -Rest $Rest -Name "--min-size")
-  $nearX   = [int](_Read-OptValue -Rest $Rest -Name "--near-x")
-  $nearY   = [int](_Read-OptValue -Rest $Rest -Name "--near-y")
-  $nearR   = [int](_Read-OptValue -Rest $Rest -Name "--near-radius")
-  $limit   = [int](_Read-OptValue -Rest $Rest -Name "--limit")
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  if (-not $label) { throw "macro icon-find requires --label" }
-  if (-not $match) { $match = $window }
-  if ($maxSize -le 0) { $maxSize = 64 }
-  if ($minSize -le 0) { $minSize = 6 }
-  if ($limit -le 0) { $limit = 8 }
-  $hasNear = ($nearX -gt 0 -or $nearY -gt 0)
+function Invoke-MacroIconFind {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'icon-find' -Rest $Rest -ScriptPath $PSCommandPath}
 
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-
-  # Use UIA crawl directly (bypasses helper appshot for speed). The enhanced
-  # _Get-UIAffordances now indexes synonyms + small icons.
-  $allAff = _Get-UIAffordances -FocusedWindow $match -MaxElements 800
-  $needle = $label.Trim().ToLowerInvariant()
-  $needleNorm = ($needle -replace '\s+', ' ').Trim()
-
-  $cands = New-Object System.Collections.ArrayList
-  foreach ($el in $allAff) {
-    if (-not $el.text -or -not $el.rect) { continue }
-    if ($el.rect.width -gt $maxSize -or $el.rect.height -gt $maxSize) { continue }
-    if ($el.rect.width -lt $minSize -or $el.rect.height -lt $minSize) { continue }
-    if ($role -and $el.role -and ($el.role.ToLowerInvariant() -ne $role.ToLowerInvariant())) { continue }
-    if ($window -and $el.window -and ($el.window.ToLowerInvariant() -notmatch [regex]::Escape($window.ToLowerInvariant()))) { continue }
-
-    # Build haystack from Name + synonyms + tooltip
-    $hays = New-Object System.Collections.Generic.List[string]
-    [void]$hays.Add(("$($el.text)").ToLowerInvariant())
-    if ($el.synonyms) {
-      foreach ($s in $el.synonyms) {
-        if (-not [string]::IsNullOrWhiteSpace($s)) {
-          $sl = $s.ToString().ToLowerInvariant()
-          if (-not $hays.Contains($sl)) { [void]$hays.Add($sl) }
-        }
-      }
-    }
-    if ($el.tooltip) {
-      $tl = $el.tooltip.ToString().ToLowerInvariant()
-      if (-not $hays.Contains($tl)) { [void]$hays.Add($tl) }
-    }
-
-    $score = 0
-    $reason = ""
-    foreach ($hay in $hays) {
-      $hayNorm = ($hay -replace '\s+', ' ').Trim()
-      $local = 0
-      $rsn = ""
-      if ($hayNorm -eq $needleNorm) { $local = 100; $rsn = "exact" }
-      elseif ($hayNorm -match [regex]::Escape($needleNorm)) {
-        $diff = [Math]::Abs($hayNorm.Length - $needleNorm.Length)
-        $local = 60 + [Math]::Max(0, 40 - $diff); $rsn = "substring"
-      } elseif ($needleNorm.Length -ge 2 -and $hayNorm.IndexOf($needleNorm.Substring(0, [Math]::Min(2, $needleNorm.Length))) -ge 0) {
-        $local = 15; $rsn = "prefix"
-      }
-      if ($local -gt $score) { $score = $local; $reason = $rsn }
-    }
-    if ($score -le 0) { continue }
-
-    # Confidence boost
-    if ($el.confidence -is [string]) {
-      switch ($el.confidence.ToLowerInvariant()) {
-        "high"   { $score += 6 }
-        "medium" { $score += 3 }
-        "low"    { $score += 1 }
-        default  { }
-      }
-    }
-
-    $cx = [int]($el.rect.x + $el.rect.width / 2)
-    $cy = [int]($el.rect.y + $el.rect.height / 2)
-    $dist = $null
-    if ($hasNear) {
-      $dx = $cx - $nearX
-      $dy = $cy - $nearY
-      $dist = [int][Math]::Sqrt($dx * $dx + $dy * $dy)
-      if ($nearR -gt 0 -and $dist -gt $nearR) { continue }
-      # closer to anchor = higher rank
-      $score += [Math]::Max(0, 50 - ($dist / 10))
-    }
-
-    [void]$cands.Add([pscustomobject]@{
-      affordance_id = $el.affordance_id
-      text = $el.text
-      synonyms = $el.synonyms
-      role = $el.role
-      window = $el.window
-      class_name = $el.class_name
-      rect = $el.rect
-      center = [pscustomobject]@{ x = $cx; y = $cy }
-      area = $el.area
-      small_icon = $el.small_icon
-      enabled = $el.enabled
-      tooltip = $el.tooltip
-      score = [int]$score
-      match_reason = $reason
-      distance_px = $dist
-      confidence = $el.confidence
-    })
-  }
-
-  $ranked = @($cands | Sort-Object -Property score -Descending)
-  if ($ranked.Count -gt $limit) { $ranked = $ranked[0..($limit - 1)] }
-  $sw.Stop()
-  $elapsed = [int]$sw.Elapsed.TotalMilliseconds
-
-  $top = if ($ranked.Count -gt 0) { $ranked[0] } else { $null }
-  $second = if ($ranked.Count -gt 1) { $ranked[1] } else { $null }
-  $ambiguous = $false
-  if ($top -and $second) {
-    if (($top.score - $second.score) -lt 8) { $ambiguous = $true }
-  }
-
-  $status = "ok"
-  $recoverable = New-Object System.Collections.ArrayList
-  if (-not $top) {
-    $status = "partial"
-    [void]$recoverable.Add([pscustomobject]@{
-      code = "no_icon"
-      message = "no icon (size <= ${maxSize}px) matched '$label' under window '$match'"
-      recommended_action = "Try '--max-size 96' or 'cucp macro list-affordances --window `"$match`" --limit 50' to inspect."
-    })
-  } elseif ($ambiguous) {
-    $status = "partial"
-    [void]$recoverable.Add([pscustomobject]@{
-      code = "ambiguous_icon"
-      message = "top two icon candidates within 8 score points"
-      recommended_action = "Add --near-x/--near-y to anchor near a known reference point, or pick by affordance_id."
-    })
-  }
-
-  $payload = [pscustomobject]@{
-    schema = "cucp.icon-find/v1"
-    status = $status
-    collected_at = (Get-Date).ToString("o")
-    elapsed_ms = $elapsed
-    label = $label
-    window = $window
-    match = $match
-    max_size = $maxSize
-    min_size = $minSize
-    near = if ($hasNear) { [pscustomobject]@{ x = $nearX; y = $nearY; radius = $nearR } } else { $null }
-    candidate_count = $ranked.Count
-    ambiguous = $ambiguous
-    top = $top
-    candidates = $ranked
-    recoverable_errors = $recoverable
-  }
-
-  if ($Brief -and -not $jsonOnly) {
-    if ($top) {
-      $tag = if ($ambiguous) { "partial" } else { "ok" }
-      [Console]::Out.WriteLine(("{0} icon-find '{1}' top='{2}' @({3},{4}) {5}x{6} score={7} reason={8} candidates={9} elapsed_ms={10}" -f `
-        $tag, $label, $top.text, $top.center.x, $top.center.y, $top.rect.width, $top.rect.height,
-        $top.score, $top.match_reason, $ranked.Count, $elapsed))
-    } else {
-      [Console]::Out.WriteLine(("partial icon-find '{0}' no_icon match='{1}' max_size={2} elapsed_ms={3}" -f `
-        $label, $match, $maxSize, $elapsed))
-    }
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 8))
-  }
-  if ($status -eq "ok") { return 0 }
-  return 2
-}
-
-function Invoke-MacroIconClick {
-  # macro icon-click -- live click on a small icon resolved by icon-find.
-  # Same args as icon-find; requires -AllowLiveControl. Refuses when ambiguous
-  # (returns exit 2 with candidates) so we never click the wrong tiny target.
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro icon-click requires -AllowLiveControl" }
-
-  # Reuse icon-find logic by capturing its envelope in-process.
-  $oldOut = [Console]::Out
-  $sb = New-Object System.IO.StringWriter
-  [Console]::SetOut($sb)
-  $rc = 1
-  try {
-    # Force JSON output for parsing regardless of caller's -Brief.
-    $forced = @($Rest) + "--json-only"
-    $rc = Invoke-MacroIconFind -Rest $forced
-  } finally { [Console]::SetOut($oldOut) }
-  $raw = $sb.ToString()
-  $env_ = $null
-  try { $env_ = $raw | ConvertFrom-Json } catch { }
-  if (-not $env_) {
-    if ($Brief) { [Console]::Out.WriteLine("err icon-click parse_failed") }
-    return 1
-  }
-  if ($env_.status -ne "ok" -or -not $env_.top) {
-    if ($Brief) {
-      $rsn = if ($env_.recoverable_errors -and $env_.recoverable_errors.Count -gt 0) {
-        $env_.recoverable_errors[0].code
-      } else { "no_icon" }
-      [Console]::Out.WriteLine("partial icon-click '$($env_.label)' $rsn candidates=$($env_.candidate_count)")
-    } else {
-      [Console]::Out.WriteLine(($env_ | ConvertTo-Json -Depth 8))
-    }
-    return 2
-  }
-
-  # Capture an observation for --after safety (bypass cache for fresh hwnd).
-  $shot = Invoke-Appshot -Match ($env_.match) -Semantic:$true -NoCache
-  $obsId = $null
-  if ($shot) { $obsId = $shot.ObservationId }
-  if (-not $obsId) {
-    # Fallback: synth a fresh observation_id-like string. We still pass
-    # --after so the CLI safety gate is satisfied.
-    $obsId = "icon-click-" + [guid]::NewGuid().ToString("N").Substring(0, 12)
-  }
-
-  $cx = [int]$env_.top.center.x
-  $cy = [int]$env_.top.center.y
-  $args = @("act", "click", "--x", "$cx", "--y", "$cy", "--after", $obsId)
-  if ($env_.top.window) { $args += @("--target-window", $env_.top.window) }
-  $r = Invoke-Cucp -ArgList $args
-  if ($Brief) {
-    if ($r.ExitCode -eq 0) {
-      [Console]::Out.WriteLine(("ok icon-click '{0}' @({1},{2}) win='{3}' score={4}" -f `
-        $env_.label, $cx, $cy, $env_.top.window, $env_.top.score))
-    } else {
-      [Console]::Out.WriteLine(("err icon-click '{0}' exit={1}" -f $env_.label, $r.ExitCode))
-    }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroIconClick {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'icon-click' -Rest $Rest -ScriptPath $PSCommandPath}
 
 function _Crop-Bitmap {
   # Internal helper: crop a PNG screenshot to a rect, save under cache dir,
@@ -6600,328 +4519,9 @@ function Invoke-MacroVisionClickPrecise {
   return 0
 }
 
-function Invoke-MacroPerf {
-  # macro perf - read-only deterministic timing of representative commands.
-  # Runs each target command N times in-process and reports min/avg/max ms.
-  # Designed for diagnostics dashboards and Codex regression measurement.
-  #
-  # Supports three timing kinds:
-  #   - cli   : node cli.mjs <args>           (out-of-process, native)
-  #   - macro : Invoke-Macro<X> -Rest @()     (in-process ps1 function)
-  #   - cold  : run once after clearing the appshot cache (deterministic cold)
-  #             paired with a warm sample taken right after.
-  #
-  # Default targets cover: version/release/health (cli native), macro_metrics,
-  # windows-fast (Win32 enum, no helper), windows-rich (helper round-trip),
-  # appshot no-match (helper miss path), find-label no-match (label miss path),
-  # screenshot (single capture), context (focused window). All read-only.
-  #
-  # Flags:
-  #   --iters <n>     Iterations per target (default 3)
-  #   --json-only     Suppress brief table, emit JSON only
-  #   --quick         Skip the slow targets (helper rich, screenshot, appshot)
-  #   --include-live-ish    Include cold-path appshot timings (still read-only)
-  #   --warn-fast-ms <n>    Warn if windows-fast avg exceeds threshold (default 800)
-  param([string[]]$Rest)
-  $iters = [int](_Read-OptValue -Rest $Rest -Name "--iters")
-  if ($iters -le 0) { $iters = 3 }
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $quick    = _Read-Switch -Rest $Rest -Name "--quick"
-  $includeColdAppshot = _Read-Switch -Rest $Rest -Name "--include-live-ish"
-  $warnFastMs = [int](_Read-OptValue -Rest $Rest -Name "--warn-fast-ms")
-  if ($warnFastMs -le 0) { $warnFastMs = 800 }
+function Invoke-MacroPerf {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'perf' -Rest $Rest}
 
-  function _PerfRun {
-    param([string]$Id, [string]$Kind, [scriptblock]$Block, [int[]]$AcceptedExits = @(0,2))
-    $samples = @()
-    $exits = @()
-    for ($i = 0; $i -lt $iters; $i++) {
-      $sw = [System.Diagnostics.Stopwatch]::StartNew()
-      $exit = 1
-      try {
-        $exit = & $Block
-      } catch {
-        $exit = 1
-      }
-      $sw.Stop()
-      $samples += [int]$sw.Elapsed.TotalMilliseconds
-      $exits += $exit
-    }
-    $min = ($samples | Measure-Object -Minimum).Minimum
-    $max = ($samples | Measure-Object -Maximum).Maximum
-    $avg = [int](($samples | Measure-Object -Average).Average)
-    $exitOk = $true
-    foreach ($e in $exits) { if ($AcceptedExits -notcontains $e) { $exitOk = $false } }
-    return [pscustomobject]@{
-      id = $Id
-      kind = $Kind
-      iters = $iters
-      min_ms = [int]$min
-      avg_ms = $avg
-      max_ms = [int]$max
-      samples_ms = $samples
-      exit_codes = $exits
-      accepted_exits = $AcceptedExits
-      exit_ok = $exitOk
-    }
-  }
-
-  # Helper to invoke a ps1 macro function while suppressing its stdout
-  function _CapturedMacro { param([scriptblock]$M)
-    $oldOut = [Console]::Out
-    $sb = New-Object System.IO.StringWriter
-    [Console]::SetOut($sb)
-    try { return & $M } finally { [Console]::SetOut($oldOut) }
-  }
-
-  $results = New-Object System.Collections.ArrayList
-
-  # CLI native targets (lightweight)
-  [void]$results.Add((_PerfRun -Id "version" -Kind "cli" -Block {
-    (Invoke-Cucp -ArgList @("version") -CaptureJson).ExitCode
-  } -AcceptedExits @(0)))
-  [void]$results.Add((_PerfRun -Id "release" -Kind "cli" -Block {
-    (Invoke-Cucp -ArgList @("release") -CaptureJson).ExitCode
-  } -AcceptedExits @(0)))
-
-  # Macro in-process targets
-  [void]$results.Add((_PerfRun -Id "macro_metrics" -Kind "macro" -Block {
-    _CapturedMacro { Invoke-MacroMetrics -Rest @() }
-  } -AcceptedExits @(0)))
-
-  [void]$results.Add((_PerfRun -Id "macro_health_quick" -Kind "macro" -Block {
-    _CapturedMacro { Invoke-MacroHealthQuick -Rest @() }
-  } -AcceptedExits @(0,1)))
-
-  [void]$results.Add((_PerfRun -Id "windows_fast" -Kind "macro" -Block {
-    _CapturedMacro { Invoke-MacroWindows -Rest @() }
-  } -AcceptedExits @(0)))
-
-  [void]$results.Add((_PerfRun -Id "windows_no_match" -Kind "macro" -Block {
-    _CapturedMacro { Invoke-MacroWindows -Rest @("--match", "unlikely-perf-target-window") }
-  } -AcceptedExits @(0,2)))
-
-  # find-label fast no-match path: Win32 short-circuit, no helper round-trip.
-  [void]$results.Add((_PerfRun -Id "find_label_no_match_fast" -Kind "macro" -Block {
-    $rc = 0
-    try {
-      $rc = _CapturedMacro {
-        Invoke-MacroFindLabel -Rest @("--label","__cucp_unlikely_label__","--match","unlikely-perf-target-window","--fast")
-      }
-    } catch { $rc = 2 }
-    $rc
-  } -AcceptedExits @(0,1,2)))
-
-  if (-not $quick) {
-    # Heavier helper-bound targets
-    [void]$results.Add((_PerfRun -Id "health" -Kind "cli" -Block {
-      (Invoke-Cucp -ArgList @("health") -CaptureJson).ExitCode
-    } -AcceptedExits @(0)))
-
-    [void]$results.Add((_PerfRun -Id "windows_rich" -Kind "macro" -Block {
-      _CapturedMacro { Invoke-MacroWindows -Rest @("--rich") }
-    } -AcceptedExits @(0)))
-
-    [void]$results.Add((_PerfRun -Id "context" -Kind "cli" -Block {
-      (Invoke-Cucp -ArgList @("observe","context") -CaptureJson).ExitCode
-    } -AcceptedExits @(0)))
-
-    [void]$results.Add((_PerfRun -Id "screenshot" -Kind "cli" -Block {
-      (Invoke-Cucp -ArgList @("observe","screenshot") -CaptureJson).ExitCode
-    } -AcceptedExits @(0)))
-
-    [void]$results.Add((_PerfRun -Id "appshot_no_match" -Kind "cli" -Block {
-      $r = Invoke-Cucp -ArgList @("observe","appshot","--match","unlikely-perf-target-window") -CaptureJson
-      $r.ExitCode
-    } -AcceptedExits @(0,1,2)))
-
-    [void]$results.Add((_PerfRun -Id "find_label_no_match" -Kind "macro" -Block {
-      $rc = 0
-      try {
-        $rc = _CapturedMacro {
-          Invoke-MacroFindLabel -Rest @("--label","__cucp_unlikely_label__","--match","unlikely-perf-target-window")
-        }
-      } catch { $rc = 2 }
-      $rc
-    } -AcceptedExits @(0,1,2)))
-  }
-
-  if ($includeColdAppshot) {
-    # Cold/warm pair — clear cache, then measure first capture (cold) and
-    # immediate next capture (warm). Single iteration regardless of $iters.
-    try {
-      Get-ChildItem -LiteralPath $Script:CacheDir -Filter "appshot-*.json" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-    } catch { }
-    $coldRun = _PerfRun -Id "appshot_cold" -Kind "cold" -Block {
-      $r = Invoke-Cucp -ArgList @("observe","appshot") -CaptureJson
-      $r.ExitCode
-    } -AcceptedExits @(0,1,2)
-    $warmRun = _PerfRun -Id "appshot_warm" -Kind "cli" -Block {
-      $r = Invoke-Cucp -ArgList @("observe","appshot") -CaptureJson
-      $r.ExitCode
-    } -AcceptedExits @(0,1,2)
-    [void]$results.Add($coldRun)
-    [void]$results.Add($warmRun)
-  }
-
-  # Soft warnings (no flaky hard failures). Thresholds are advisory, not gates.
-  $thresholds = [pscustomobject]@{
-    windows_fast_warn_ms          = $warnFastMs
-    windows_no_match_warn_ms      = 500
-    health_quick_warn_ms          = 1000
-    find_label_no_match_fast_warn_ms = 800
-  }
-  $warnings = @()
-  $fast = $results | Where-Object { $_.id -eq "windows_fast" }
-  if ($fast -and $fast.avg_ms -gt $warnFastMs) {
-    $warnings += ("windows_fast avg={0}ms exceeded warn threshold {1}ms" -f $fast.avg_ms, $warnFastMs)
-  }
-  $nm = $results | Where-Object { $_.id -eq "windows_no_match" }
-  if ($nm -and $nm.avg_ms -gt 500) {
-    $warnings += ("windows_no_match avg={0}ms exceeded warn threshold 500ms" -f $nm.avg_ms)
-  }
-  $hq = $results | Where-Object { $_.id -eq "macro_health_quick" }
-  if ($hq -and $hq.avg_ms -gt 1000) {
-    $warnings += ("macro_health_quick avg={0}ms exceeded warn threshold 1000ms" -f $hq.avg_ms)
-  }
-  $flFast = $results | Where-Object { $_.id -eq "find_label_no_match_fast" }
-  if ($flFast -and $flFast.avg_ms -gt 800) {
-    $warnings += ("find_label_no_match_fast avg={0}ms exceeded warn threshold 800ms" -f $flFast.avg_ms)
-  }
-
-  # Build SLO/budget section: pass/warn/fail per tracked target (advisory).
-  function _SloEval { param($Target, [int]$WarnMs, [int]$FailMs)
-    if (-not $Target) { return [pscustomobject]@{ id = ""; avg_ms = 0; status = "n/a"; warn_ms = $WarnMs; fail_ms = $FailMs } }
-    $st = "pass"
-    if ($Target.avg_ms -gt $FailMs) { $st = "fail" }
-    elseif ($Target.avg_ms -gt $WarnMs) { $st = "warn" }
-    return [pscustomobject]@{ id = $Target.id; avg_ms = $Target.avg_ms; status = $st; warn_ms = $WarnMs; fail_ms = $FailMs }
-  }
-  $slo = @(
-    (_SloEval -Target $fast    -WarnMs $warnFastMs -FailMs ($warnFastMs * 4)),
-    (_SloEval -Target $nm      -WarnMs 500         -FailMs 2000),
-    (_SloEval -Target $hq      -WarnMs 1000        -FailMs 3000),
-    (_SloEval -Target $flFast  -WarnMs 800         -FailMs 3000)
-  )
-  # Surface attribution hints for slow-path commands so caller can decide
-  # whether helper restart / vision disable / cache use is worth trying.
-  $regressionHints = @()
-  $appshotNm = $results | Where-Object { $_.id -eq "appshot_no_match" }
-  if ($appshotNm -and $appshotNm.avg_ms -gt 5000) {
-    $regressionHints += "appshot_no_match avg=$($appshotNm.avg_ms)ms; helper response slow. Consider 'cucp macro ensure-helper'."
-  }
-  $findLabelNm = $results | Where-Object { $_.id -eq "find_label_no_match" }
-  if ($findLabelNm -and $findLabelNm.avg_ms -gt 8000) {
-    $regressionHints += "find_label_no_match avg=$($findLabelNm.avg_ms)ms; vision fallback may be active. Try '--no-vision' for fast-path measurement."
-  }
-
-  $payload = [pscustomobject]@{
-    status = "ok"
-    schema = "cucp.macro.perf/v2"
-    collected_at = (Get-Date).ToString("o")
-    iters = $iters
-    quick = [bool]$quick
-    include_cold_appshot = [bool]$includeColdAppshot
-    thresholds = $thresholds
-    slo = @($slo)
-    warnings = @($warnings)
-    regression_hints = @($regressionHints)
-    targets = @($results)
-  }
-
-  if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine(("ok perf iters={0} targets={1} warnings={2} quick={3}" -f `
-      $iters, $results.Count, $warnings.Count, $quick))
-    foreach ($r in $results) {
-      [Console]::Out.WriteLine(("  {0,-22} {1,-5} min={2,5}ms avg={3,5}ms max={4,5}ms" -f `
-        $r.id, $r.kind, $r.min_ms, $r.avg_ms, $r.max_ms))
-    }
-    if ($warnings.Count -gt 0) {
-      foreach ($w in $warnings) { [Console]::Out.WriteLine(("  [WARN] " + $w)) }
-    }
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 6))
-  }
-  return 0
-}
-
-function Invoke-MacroHealthDetail {
-  param([string[]]$Rest)
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-
-  $report = [ordered]@{
-    status = "checking"
-    collected_at = (Get-Date).ToString("o")
-    components = [ordered]@{}
-  }
-
-  # 1. Node.js
-  $nodeOk = $false; $nodeVer = ""
-  try {
-    $nv = & node --version 2>&1
-    if ($LASTEXITCODE -eq 0 -and $nv) { $nodeOk = $true; $nodeVer = "$nv".Trim() }
-  } catch { }
-  $report.components.node = [pscustomobject]@{ ok = $nodeOk; version = $nodeVer }
-
-  # 2. CUCP CLI present
-  $cliOk = $Script:CliPath -and (Test-Path -LiteralPath $Script:CliPath)
-  $report.components.cli = [pscustomobject]@{ ok = $cliOk; path = $Script:CliPath }
-
-  # 3. CUCP version envelope
-  $verOk = $false; $verNum = ""
-  try {
-    $r = Invoke-Cucp -ArgList @("version") -CaptureJson
-    if ($r.Json -and $r.Json.status -eq "ok") { $verOk = $true; $verNum = "$($r.Json.version)" }
-  } catch { }
-  $report.components.cucp_version = [pscustomobject]@{ ok = $verOk; version = $verNum }
-
-  # 4. Helper HTTP server
-  $helperOk = _Helper-IsUp
-  $report.components.helper = [pscustomobject]@{ ok = $helperOk; tip = if ($helperOk) { "" } else { "run 'cucp ensure-helper' or 'cucp start'" } }
-
-  # 5. UIA fallback
-  $uiaOk = _Ensure-UIALoaded
-  $report.components.uia_fallback = [pscustomobject]@{ ok = $uiaOk }
-
-  # 6. Codex vision (optional)
-  $codexPath = _Find-CodexCli
-  $codexOk = $codexPath -ne $null
-  $report.components.codex_vision = [pscustomobject]@{ ok = $codexOk; cli = $codexPath; tip = if ($codexOk) { "" } else { "install codex CLI for vision fallback" } }
-
-  # 7. Audit log writeability
-  $auditOk = $false
-  try {
-    if (-not (Test-Path $Script:AuditDir)) { New-Item -ItemType Directory -Path $Script:AuditDir -Force | Out-Null }
-    $probe = Join-Path $Script:AuditDir ".health-probe-$([guid]::NewGuid())"
-    Set-Content -LiteralPath $probe -Value "ok" -Encoding UTF8
-    Remove-Item -LiteralPath $probe -Force
-    $auditOk = $true
-  } catch { }
-  $report.components.audit_dir = [pscustomobject]@{ ok = $auditOk; path = $Script:AuditDir }
-
-  $okCount = 0; $totalCount = 0
-  foreach ($k in $report.components.Keys) { $totalCount++; if ($report.components[$k].ok) { $okCount++ } }
-  # Required: node, cli, cucp_version, audit_dir. Helper/UIA/codex are optional.
-  $required = @("node","cli","cucp_version","audit_dir")
-  $allRequiredOk = $true
-  foreach ($k in $required) { if (-not $report.components[$k].ok) { $allRequiredOk = $false } }
-  $report.status = if ($allRequiredOk) { if ($okCount -eq $totalCount) { "ok" } else { "ok_partial_optional" } } else { "fail" }
-  $report.required_ok = $allRequiredOk
-  $report.optional_ok = ($okCount -eq $totalCount)
-  $report.passed = $okCount
-  $report.total = $totalCount
-
-  $payload = [pscustomobject]$report
-
-  if ($Brief -and -not $jsonOnly) {
-    $line = "{0} health passed={1}/{2} helper={3} codex={4}" -f `
-      $report.status, $okCount, $totalCount, $helperOk, $codexOk
-    [Console]::Out.WriteLine($line)
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 6))
-  }
-  if ($allRequiredOk) { return 0 } else { return 1 }
-}
+function Invoke-MacroHealthDetail {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'health-detail' -Rest $Rest}
 
 # ============================================================================
 # App Lifecycle macros (모든 앱 자유자재 운영)
@@ -7405,314 +5005,7 @@ function Invoke-MacroNativeScreenshot {
   return $r.ExitCode
 }
 
-function Invoke-MacroClickPoint {
-  # macro click-point --x <n> --y <n> [--button left|right|middle|double]
-  #                   [--target-match <s>|--target-hwnd <n>] [--refine uia-safe]
-  # 좌표 기반 클릭 (UIA / vision 우회). -AllowLiveControl 필수.
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro click-point requires -AllowLiveControl" }
-  $xRaw = _Read-OptValue -Rest $Rest -Name "--x"
-  $yRaw = _Read-OptValue -Rest $Rest -Name "--y"
-  if ($null -eq $xRaw -or "$xRaw" -eq "" -or $null -eq $yRaw -or "$yRaw" -eq "") {
-    throw "macro click-point requires --x and --y"
-  }
-  $x = [int]$xRaw
-  $y = [int]$yRaw
-  $btn = _Read-OptValue -Rest $Rest -Name "--button"
-  $targetMatch = _Read-OptValue -Rest $Rest -Name "--target-match"
-  if (-not $targetMatch) { $targetMatch = _Read-OptValue -Rest $Rest -Name "--match" }
-  if (-not $targetMatch) { $targetMatch = _Read-OptValue -Rest $Rest -Name "--window" }
-  $targetHwnd = [int](_Read-OptValue -Rest $Rest -Name "--target-hwnd")
-  $refine = _Read-OptValue -Rest $Rest -Name "--refine"
-  if (-not $refine) { $refine = _Read-OptValue -Rest $Rest -Name "--click-refine" }
-  if (_Read-Switch -Rest $Rest -Name "--uia-safe") { $refine = "uia-safe" }
-  $clickInset = [int](_Read-OptValue -Rest $Rest -Name "--click-inset")
-  $noFastGuard = _Read-Switch -Rest $Rest -Name "--no-fast-guard"
-  $noMicroRefine = _Read-Switch -Rest $Rest -Name "--no-micro-refine"
-  $noAnchorHistory = _Read-Switch -Rest $Rest -Name "--no-anchor-history"
-  $microRefine = (_Read-Switch -Rest $Rest -Name "--micro-refine") -or (_Read-Switch -Rest $Rest -Name "--precision")
-  $allowUnrefined = _Read-Switch -Rest $Rest -Name "--allow-unrefined"
-  $precisionRadiusRaw = _Read-OptValue -Rest $Rest -Name "--precision-radius"
-  if (-not $precisionRadiusRaw) { $precisionRadiusRaw = _Read-OptValue -Rest $Rest -Name "--micro-radius" }
-  $precisionStepRaw = _Read-OptValue -Rest $Rest -Name "--precision-step"
-  if (-not $precisionStepRaw) { $precisionStepRaw = _Read-OptValue -Rest $Rest -Name "--micro-step" }
-  $pointCacheTtlRaw = _Read-OptValue -Rest $Rest -Name "--cache-ttl"
-  $pointNoCache = _Read-Switch -Rest $Rest -Name "--no-cache"
-  $precisionRadius = 6
-  $precisionStep = 2
-  $pointCacheTtl = $CacheSeconds
-  if ($null -ne $precisionRadiusRaw -and "$precisionRadiusRaw" -ne "") { $precisionRadius = [int]$precisionRadiusRaw }
-  if ($null -ne $precisionStepRaw -and "$precisionStepRaw" -ne "") { $precisionStep = [int]$precisionStepRaw }
-  if ($null -ne $pointCacheTtlRaw -and "$pointCacheTtlRaw" -ne "") { $pointCacheTtl = [int]$pointCacheTtlRaw }
-  if (-not $btn) { $btn = "left" }
-  if ($clickInset -le 0) { $clickInset = 3 }
-  if ($precisionRadius -lt 0) { $precisionRadius = 0 }
-  if ($precisionRadius -gt 64) { $precisionRadius = 64 }
-  if ($precisionStep -le 0) { $precisionStep = 2 }
-  if ($precisionStep -gt 16) { $precisionStep = 16 }
-  if ($pointCacheTtl -lt 0) { $pointCacheTtl = 0 }
-  if ($pointNoCache) { $pointCacheTtl = 0 }
-  $targetGuardSpecified = (($targetHwnd -gt 0) -or $targetMatch)
-  $autoMicroRefine = $false
-  if (-not $microRefine -and -not $noMicroRefine -and $targetGuardSpecified) {
-    $microRefine = $true
-    $autoMicroRefine = $true
-  }
-
-  $precheck = $null
-  $originalX = $x
-  $originalY = $y
-  $microRefineEvidence = $null
-  $anchorReuseEvidence = $null
-  if ($targetGuardSpecified -and -not $noFastGuard) {
-    $preSw = [System.Diagnostics.Stopwatch]::StartNew()
-    $precheck = _Native-HitTestPoint -X $x -Y $y -TargetHwnd $targetHwnd -TargetMatch $targetMatch
-    $preSw.Stop()
-    $precheck | Add-Member -NotePropertyName elapsed_ms -NotePropertyValue ([int]$preSw.Elapsed.TotalMilliseconds) -Force
-    if (-not [bool]$precheck.matched) {
-      $payload = [pscustomobject]@{
-        schema = "cucp.click-point/v1"
-        status = "blocked"
-        reason = "fast_guard_mismatch"
-        x = $x
-        y = $y
-        button = $btn
-        target_hwnd = $targetHwnd
-        target_match = $targetMatch
-        precheck = $precheck
-      }
-      _Trajectory-Append -Kind "click" -Payload @{
-        source = "native_click_point"
-        x = $x; y = $y; button = $btn
-        target_match = $targetMatch
-        target_hwnd = $targetHwnd
-        exit = 3
-        reason = "fast_guard_mismatch"
-      }
-      if ($Brief) {
-        [Console]::Out.WriteLine("blocked click-point @($x,$y) target_mismatch actual='$($precheck.root_title)' process=$($precheck.process_name) reason=$($precheck.match_reason)")
-      } else {
-        [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 8))
-      }
-      return 3
-    }
-  }
-
-  if ($microRefine) {
-    $scan = $null
-    $microFromCache = $false
-    $microCacheAgeMs = 0
-    $microCacheKey = $null
-    $microPointPayload = $null
-    if ($precheck -and $pointCacheTtl -gt 0) {
-      $microCacheKey = _PointPlan-CacheKey -X $x -Y $y -Radius $precisionRadius -Step $precisionStep -ClickInset $clickInset -TargetHwnd $targetHwnd -TargetMatch $targetMatch -Precheck $precheck
-      $cacheHit = _PointPlan-ReadCache -Key $microCacheKey -MaxAgeSeconds $pointCacheTtl
-      if ($cacheHit -and $cacheHit.Json -and $cacheHit.Json.status -eq "ok" -and $cacheHit.Json.recommended_point) {
-        $microPointPayload = $cacheHit.Json
-        $microFromCache = $true
-        $microCacheAgeMs = [int]$cacheHit.AgeMs
-      }
-    }
-    if (-not $microPointPayload) {
-      $scanArgs = @("-Action","hit-scan","-X","$x","-Y","$y","-ClickInset","$clickInset","-ScanRadius","$precisionRadius","-ScanStep","$precisionStep")
-      if ($targetMatch) { $scanArgs += @("-TargetMatch", $targetMatch) }
-      if ($targetHwnd -gt 0) { $scanArgs += @("-TargetHwnd", "$targetHwnd") }
-      $scan = Invoke-NativeHelper -ArgList $scanArgs
-      if ($scan.Json -and $scan.Json.status -eq "ok" -and $scan.Json.recommended_point) {
-        $microPointPayload = [pscustomobject]@{
-          schema = "cucp.point-plan/v1"
-          status = "ok"
-          mode = "coordinate_click"
-          source = "click_point_micro_refine"
-          x = $x
-          y = $y
-          radius = $precisionRadius
-          step = $precisionStep
-          click_inset = $clickInset
-          target_hwnd = $targetHwnd
-          target_match = $targetMatch
-          from_cache = $false
-          cache_ttl_seconds = $pointCacheTtl
-          cache_key = $microCacheKey
-          confidence = "$($scan.Json.recommended_point.confidence)"
-          safe_to_act = $true
-          mouse_moved = $true
-          reason = ""
-          precheck = $precheck
-          best = $scan.Json.best
-          recommended_point = $scan.Json.recommended_point
-          recommended_command = $null
-          checks = @(
-            [pscustomobject]@{ source="win32_fast_guard"; status=$precheck.status; matched=[bool]$precheck.matched; reason="$($precheck.match_reason)"; evidence=$precheck },
-            [pscustomobject]@{ source="hit_scan"; status="ok"; reason=""; exit=[int]$scan.ExitCode; elapsed_ms=[int]$scan.ElapsedMs }
-          )
-          scan = $scan.Json
-        }
-        if ($microCacheKey -and $pointCacheTtl -gt 0) { _PointPlan-WriteCache -Key $microCacheKey -Payload $microPointPayload }
-      }
-    }
-    if ($microPointPayload -and $microPointPayload.status -eq "ok" -and $microPointPayload.recommended_point) {
-      $rp = $microPointPayload.recommended_point
-      $rx = [int]$rp.x
-      $ry = [int]$rp.y
-      $microRefineEvidence = [pscustomobject]@{
-        status = "ok"
-        original_x = $originalX
-        original_y = $originalY
-        refined_x = $rx
-        refined_y = $ry
-        confidence = "$($rp.confidence)"
-        point_source = "$($rp.point_source)"
-        native_clickable = [bool]$rp.native_clickable
-        sample_count = if ($microPointPayload.scan) { [int]$microPointPayload.scan.sample_count } else { 0 }
-        candidate_count = if ($microPointPayload.scan) { [int]$microPointPayload.scan.candidate_count } else { 0 }
-        from_cache = [bool]$microFromCache
-        cache_age_ms = $microCacheAgeMs
-        cache_key = $microCacheKey
-        elapsed_ms = if ($scan) { [int]$scan.ElapsedMs } else { 0 }
-      }
-      $x = $rx
-      $y = $ry
-    } elseif (-not $allowUnrefined) {
-      $reason = if ($scan.Json -and $scan.Json.reason) { "$($scan.Json.reason)" } else { "micro_refine_failed" }
-      $payload = [pscustomobject]@{
-        schema = "cucp.click-point/v1"
-        status = "blocked"
-        reason = "micro_refine_failed"
-        detail = $reason
-        x = $originalX
-        y = $originalY
-        button = $btn
-        target_hwnd = $targetHwnd
-        target_match = $targetMatch
-        precheck = $precheck
-        scan = if ($scan.Json) { $scan.Json } else { $null }
-      }
-      _Trajectory-Append -Kind "click" -Payload @{
-        source = "native_click_point"
-        x = $originalX; y = $originalY; button = $btn
-        target_match = $targetMatch
-        target_hwnd = $targetHwnd
-        refine = "micro"
-        exit = 3
-        reason = "micro_refine_failed"
-      }
-      if ($Brief) {
-        [Console]::Out.WriteLine("blocked click-point @($originalX,$originalY) micro_refine_failed reason=$reason")
-      } else {
-        [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 10))
-      }
-      return 3
-    } else {
-      $microRefineEvidence = [pscustomobject]@{
-        status = "partial"
-        reason = if ($scan.Json -and $scan.Json.reason) { "$($scan.Json.reason)" } else { "micro_refine_failed" }
-        allowed_unrefined = $true
-      }
-    }
-  }
-
-  if ($targetGuardSpecified -and -not $noAnchorHistory) {
-    try {
-      $coordProfile = _Build-CoordProfile -HasPoint $true -X $x -Y $y -TargetHwnd ([int64]$targetHwnd) -TargetMatch $targetMatch
-      if ($coordProfile -and $coordProfile.status -eq "ok" -and $coordProfile.target_window -and $coordProfile.point_window_relative) {
-        $norm = [pscustomobject]@{
-          x = [double]$coordProfile.point_window_relative.norm_x
-          y = [double]$coordProfile.point_window_relative.norm_y
-        }
-        $targetWin = $coordProfile.target_window
-        $risk = "$($coordProfile.coordinate_risk)"
-        $safeToReuse = ([bool]$coordProfile.point_inside_target_window -and $risk -ne "high")
-        $anchorIdSource = "$($targetWin.process)|$($targetWin.class)|$targetMatch|$([Math]::Round($norm.x,4)),$([Math]::Round($norm.y,4))"
-        $anchorRecord = [pscustomobject]@{
-          ts = (Get-Date).ToString("o")
-          anchor_id = Get-CacheKey -Match $anchorIdSource
-          anchor_type = "click_point_live_route"
-          target_match = $targetMatch
-          target_hwnd_current = [int64]$targetWin.hwnd
-          process = "$($targetWin.process)"
-          class = "$($targetWin.class)"
-          title = "$($targetWin.title)"
-          source_point = [pscustomobject]@{ x=$originalX; y=$originalY }
-          screen_point = [pscustomobject]@{ x=$x; y=$y }
-          normalized_window_point = $norm
-          visible_normalized_point = $norm
-          safe_to_reuse = [bool]$safeToReuse
-          coordinate_risk = $risk
-          coord_signature = "$($coordProfile.coord_signature)"
-          window_rect = $targetWin.rect
-        }
-        $reuse = _AnchorHistory-Score -Record $anchorRecord
-        $anchorReuseEvidence = [pscustomobject]@{
-          status = "ok"
-          auto_record_after_success = $true
-          record = $anchorRecord
-          reuse_history = $reuse
-          coordinate_profile = $coordProfile
-        }
-      }
-    } catch {
-      $anchorReuseEvidence = [pscustomobject]@{
-        status = "partial"
-        reason = "anchor_reuse_score_failed"
-        detail = $_.Exception.Message
-      }
-    }
-  } elseif ($targetGuardSpecified -and $noAnchorHistory) {
-    $anchorReuseEvidence = [pscustomobject]@{
-      status = "skipped"
-      reason = "disabled_by_no_anchor_history"
-    }
-  }
-
-  $argList = @("-Action","click","-X","$x","-Y","$y","-Button",$btn)
-  if ($targetMatch) { $argList += @("-TargetMatch", $targetMatch) }
-  if ($targetHwnd -gt 0) { $argList += @("-TargetHwnd", "$targetHwnd") }
-  if ($refine) { $argList += @("-ClickRefine", $refine) }
-  if ($clickInset -gt 0) { $argList += @("-ClickInset", "$clickInset") }
-  $r = Invoke-NativeHelper -ArgList $argList
-  if ($r.Json -and $r.Json.status -eq "ok" -and $anchorReuseEvidence -and $anchorReuseEvidence.status -eq "ok" -and $anchorReuseEvidence.record) {
-    $recorded = _AnchorHistory-Append -Record $anchorReuseEvidence.record
-    try { $anchorReuseEvidence.reuse_history | Add-Member -NotePropertyName recorded -NotePropertyValue ([bool]$recorded) -Force } catch { }
-  }
-  _Trajectory-Append -Kind "click" -Payload @{
-    source = "native_click_point"
-    x = $x; y = $y; button = $btn
-    target_match = $targetMatch
-    target_hwnd = $targetHwnd
-    refine = $refine
-    micro_refine = $microRefineEvidence
-    auto_micro_refine = [bool]$autoMicroRefine
-    anchor_reuse = if ($anchorReuseEvidence) { $anchorReuseEvidence.reuse_history } else { $null }
-    exit = $r.ExitCode
-  }
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      $guardSuffix = ""
-      if ($precheck) { $guardSuffix = " fast_guard=$($precheck.match_reason)" }
-      $refineSuffix = ""
-      if ($r.Json.refined_by) { $refineSuffix = " refined=($($r.Json.x),$($r.Json.y)) source=$($r.Json.refined_point_source)" }
-      $microSuffix = ""
-      if ($microRefineEvidence -and $microRefineEvidence.status -eq "ok") { $microSuffix = " micro_refine=($originalX,$originalY)->($($microRefineEvidence.refined_x),$($microRefineEvidence.refined_y)) confidence=$($microRefineEvidence.confidence)" }
-      [Console]::Out.WriteLine("ok click-point @($x,$y) button=$btn elapsed_ms=$($r.ElapsedMs)$guardSuffix$microSuffix$refineSuffix")
-    } else {
-      [Console]::Out.WriteLine("err click-point exit=$($r.ExitCode)")
-    }
-  } else {
-    if ($r.Json) {
-      $out = $r.Json
-      try { $out | Add-Member -NotePropertyName schema -NotePropertyValue "cucp.click-point/v1" -Force } catch { }
-      try { $out | Add-Member -NotePropertyName wrapper_action -NotePropertyValue "click-point" -Force } catch { }
-      try { $out | Add-Member -NotePropertyName original_point -NotePropertyValue ([pscustomobject]@{ x=$originalX; y=$originalY }) -Force } catch { }
-      try { $out | Add-Member -NotePropertyName precheck -NotePropertyValue $precheck -Force } catch { }
-      try { $out | Add-Member -NotePropertyName micro_refine -NotePropertyValue $microRefineEvidence -Force } catch { }
-      try { $out | Add-Member -NotePropertyName auto_micro_refine -NotePropertyValue ([bool]$autoMicroRefine) -Force } catch { }
-      try { $out | Add-Member -NotePropertyName anchor_reuse -NotePropertyValue $anchorReuseEvidence -Force } catch { }
-      [Console]::Out.WriteLine(($out | ConvertTo-Json -Depth 12))
-    } elseif ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $r.ExitCode
-}
+function Invoke-MacroClickPoint {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'click-point' -Rest $Rest -ScriptPath $PSCommandPath}
 
 function Invoke-MacroTypeNative {
   # macro type-native --text <s> [--clear] [--enter]
@@ -8082,642 +5375,46 @@ function Invoke-MacroHitScan {
   return $exitCode
 }
 
-function _Set-ObjectProperty {
-  param($Object, [string]$Name, $Value)
-  if (-not $Object) { return }
-  if ($Object.PSObject.Properties[$Name]) { $Object.$Name = $Value }
-  else { $Object | Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force }
-}
+
 
 function _PointPlan-CacheKey {
-  param(
-    [int]$X,
-    [int]$Y,
-    [int]$Radius,
-    [int]$Step,
-    [int]$ClickInset,
-    [int]$TargetHwnd,
-    [string]$TargetMatch,
-    $Precheck,
-    [string]$CoordSignature
-  )
-  $rootHwnd = if ($Precheck) { [int64]$Precheck.root_hwnd } else { 0 }
-  $rootTitle = if ($Precheck) { "$($Precheck.root_title)" } else { "" }
-  $proc = if ($Precheck) { "$($Precheck.process_name)" } else { "" }
-  $base = "point-plan|x=$X|y=$Y|r=$Radius|s=$Step|inset=$ClickInset|th=$TargetHwnd|tm=$TargetMatch|root=$rootHwnd|title=$rootTitle|proc=$proc|coord=$CoordSignature"
-  return (Get-CacheKey -Match $base)
+  param([int]$X,[int]$Y,[int]$Radius,[int]$Step,[int]$ClickInset,[int]$TargetHwnd,[string]$TargetMatch,$Precheck,[string]$CoordSignature)
+  _Invoke-LegacyPrecisionValue -Operation 'cache-key' -Arguments @{x=$X;y=$Y;radius=$Radius;step=$Step;click_inset=$ClickInset;target_hwnd=$TargetHwnd;target_match=$TargetMatch;precheck=$Precheck;coord_signature=$CoordSignature}
 }
 
-function _PointPlan-CachePath {
-  param([string]$Key)
-  return (Join-Path $Script:CacheDir "point-plan-$Key.json")
-}
+function _PointPlan-CachePath {param([string]$Key) _Invoke-LegacyPrecisionValue -Storage -Operation 'cache-path' -Arguments @{cache_dir=[string]$Script:CacheDir;key=$Key}}
 
-function _PointPlan-ReadCache {
-  param([string]$Key, [int]$MaxAgeSeconds)
-  if (-not $Key -or $MaxAgeSeconds -le 0) { return $null }
-  $path = _PointPlan-CachePath -Key $Key
-  if (-not (Test-Path -LiteralPath $path)) { return $null }
-  $info = Get-Item -LiteralPath $path
-  $age = (Get-Date) - $info.LastWriteTime
-  if ($age.TotalSeconds -gt $MaxAgeSeconds) { return $null }
-  try {
-    $json = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
-    return [pscustomobject]@{
-      Json = $json
-      Path = $path
-      AgeMs = [int]$age.TotalMilliseconds
-    }
-  } catch { return $null }
-}
+function _PointPlan-ReadCache {param([string]$Key,[int]$MaxAgeSeconds) if(-not $Key -or $MaxAgeSeconds -le 0){return $null};_Invoke-LegacyPrecisionValue -Storage -Operation 'cache-read' -Arguments @{cache_dir=[string]$Script:CacheDir;key=$Key;max_age_seconds=$MaxAgeSeconds}}
 
-function _PointPlan-WriteCache {
-  param([string]$Key, $Payload)
-  if (-not $Key -or -not $Payload) { return }
-  $path = _PointPlan-CachePath -Key $Key
-  try {
-    ($Payload | ConvertTo-Json -Depth 14) | Set-Content -LiteralPath $path -Encoding UTF8
-  } catch { }
-}
+function _PointPlan-WriteCache {param([string]$Key,$Payload) if(-not $Key -or -not $Payload){return};try{$text=$Payload|ConvertTo-Json -Depth 14;$null=_Invoke-LegacyPrecisionValue -Storage -Operation 'cache-write' -Arguments @{cache_dir=[string]$Script:CacheDir;key=$Key;serialized=$text}}catch{}}
 
-function Invoke-MacroPointPlan {
-  param([string[]]$Rest)
-  $x = [int](_Read-OptValue -Rest $Rest -Name "--x")
-  $y = [int](_Read-OptValue -Rest $Rest -Name "--y")
-  $tm = _Read-OptValue -Rest $Rest -Name "--target-match"
-  if (-not $tm) { $tm = _Read-OptValue -Rest $Rest -Name "--match" }
-  if (-not $tm) { $tm = _Read-OptValue -Rest $Rest -Name "--window" }
-  $th = [int](_Read-OptValue -Rest $Rest -Name "--target-hwnd")
-  $clickInset = [int](_Read-OptValue -Rest $Rest -Name "--click-inset")
-  $radiusRaw = _Read-OptValue -Rest $Rest -Name "--radius"
-  $stepRaw = _Read-OptValue -Rest $Rest -Name "--step"
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $noCache = _Read-Switch -Rest $Rest -Name "--no-cache"
-  $cacheTtlRaw = _Read-OptValue -Rest $Rest -Name "--cache-ttl"
-  $radius = 6
-  $step = 2
-  $cacheTtl = $CacheSeconds
-  if ($null -ne $radiusRaw -and "$radiusRaw" -ne "") { $radius = [int]$radiusRaw }
-  if ($null -ne $stepRaw -and "$stepRaw" -ne "") { $step = [int]$stepRaw }
-  if ($null -ne $cacheTtlRaw -and "$cacheTtlRaw" -ne "") { $cacheTtl = [int]$cacheTtlRaw }
-  if ($x -le 0 -or $y -le 0) { throw "macro point-plan requires --x and --y" }
-  if ($clickInset -le 0) { $clickInset = 2 }
-  if ($radius -lt 0) { $radius = 0 }
-  if ($radius -gt 64) { $radius = 64 }
-  if ($step -le 0) { $step = 2 }
-  if ($step -gt 16) { $step = 16 }
-  if ($cacheTtl -lt 0) { $cacheTtl = 0 }
-  if ($noCache) { $cacheTtl = 0 }
+function Invoke-MacroPointPlan {param([string[]]$Rest) _Invoke-LegacyPrecision -Operation 'point-plan' -Rest $Rest}
 
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $checks = New-Object System.Collections.ArrayList
-  $precheck = $null
-  $coordProfile = $null
-  try {
-    $precheck = _Native-HitTestPoint -X $x -Y $y -TargetHwnd $th -TargetMatch $tm
-    [void]$checks.Add([pscustomobject]@{
-      source = "win32_fast_guard"
-      status = $precheck.status
-      matched = [bool]$precheck.matched
-      reason = "$($precheck.match_reason)"
-      evidence = $precheck
-    })
-  } catch {
-    [void]$checks.Add([pscustomobject]@{
-      source = "win32_fast_guard"
-      status = "error"
-      matched = $false
-      reason = "$($_.Exception.Message)"
-    })
-  }
-  try {
-    $coordProfile = _Build-CoordProfile -HasPoint $true -X $x -Y $y -TargetHwnd ([int64]$th) -TargetMatch $tm
-    [void]$checks.Add([pscustomobject]@{
-      source = "coord_profile"
-      status = $coordProfile.status
-      risk = $coordProfile.coordinate_risk
-      warnings = @($coordProfile.warnings)
-      elapsed_ms = [int]$coordProfile.elapsed_ms
-    })
-  } catch {
-    [void]$checks.Add([pscustomobject]@{
-      source = "coord_profile"
-      status = "error"
-      reason = "$($_.Exception.Message)"
-    })
-  }
+function _TargetValidate-ConfidenceRank {param([string]$Confidence) _Invoke-LegacyPrecisionValue -Operation 'confidence-rank' -Arguments @{value=$Confidence}}
 
-  $targetSpecified = (($th -gt 0) -or $tm)
-  $guardMatched = ($precheck -and [bool]$precheck.matched)
-  $cacheKey = $null
-  if ($precheck -and (-not $targetSpecified -or $guardMatched)) {
-    $coordSignature = if ($coordProfile -and $coordProfile.coord_signature) { "$($coordProfile.coord_signature)" } else { "" }
-    $cacheKey = _PointPlan-CacheKey -X $x -Y $y -Radius $radius -Step $step -ClickInset $clickInset -TargetHwnd $th -TargetMatch $tm -Precheck $precheck -CoordSignature $coordSignature
-    $cacheHit = _PointPlan-ReadCache -Key $cacheKey -MaxAgeSeconds $cacheTtl
-    if ($cacheHit -and $cacheHit.Json) {
-      $sw.Stop()
-      $payload = $cacheHit.Json
-      $cacheChecks = New-Object System.Collections.ArrayList
-      foreach ($c in @($checks)) { [void]$cacheChecks.Add($c) }
-      [void]$cacheChecks.Add([pscustomobject]@{
-        source = "point_plan_cache"
-        status = "hit"
-        age_ms = [int]$cacheHit.AgeMs
-        path = "$($cacheHit.Path)"
-      })
-      _Set-ObjectProperty -Object $payload -Name "from_cache" -Value $true
-      _Set-ObjectProperty -Object $payload -Name "cache_age_ms" -Value ([int]$cacheHit.AgeMs)
-      _Set-ObjectProperty -Object $payload -Name "cache_ttl_seconds" -Value $cacheTtl
-      _Set-ObjectProperty -Object $payload -Name "cache_key" -Value $cacheKey
-      _Set-ObjectProperty -Object $payload -Name "elapsed_ms" -Value ([int]$sw.Elapsed.TotalMilliseconds)
-      _Set-ObjectProperty -Object $payload -Name "precheck" -Value $precheck
-      _Set-ObjectProperty -Object $payload -Name "coordinate_profile" -Value $coordProfile
-      _Set-ObjectProperty -Object $payload -Name "checks" -Value @($cacheChecks)
-      if ($Brief -and -not $jsonOnly) {
-        if ($payload.status -eq "ok" -and $payload.recommended_point) {
-          [Console]::Out.WriteLine("ok point-plan @($x,$y) cached recommended=($($payload.recommended_point.x),$($payload.recommended_point.y)) confidence=$($payload.confidence) age_ms=$($cacheHit.AgeMs) elapsed_ms=$($payload.elapsed_ms)")
-        } else {
-          [Console]::Out.WriteLine("partial point-plan @($x,$y) cached reason=$($payload.reason) age_ms=$($cacheHit.AgeMs) elapsed_ms=$($payload.elapsed_ms)")
-        }
-      } else {
-        [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 12))
-      }
-      if ($payload.status -eq "ok") { return 0 }
-      return 2
-    }
-  }
-  $scan = $null
-  if (-not $targetSpecified -or $guardMatched) {
-    $scanArgs = @("-Action","hit-scan","-X","$x","-Y","$y","-ClickInset","$clickInset","-ScanRadius","$radius","-ScanStep","$step")
-    if ($tm) { $scanArgs += @("-TargetMatch", $tm) }
-    if ($th -gt 0) { $scanArgs += @("-TargetHwnd", "$th") }
-    $scan = Invoke-NativeHelper -ArgList $scanArgs
-    $scanStatus = if ($scan.Json) { "$($scan.Json.status)" } else { "error" }
-    $scanReason = if ($scan.Json -and $scan.Json.reason) { "$($scan.Json.reason)" } else { "" }
-    [void]$checks.Add([pscustomobject]@{
-      source = "hit_scan"
-      status = $scanStatus
-      reason = $scanReason
-      exit = [int]$scan.ExitCode
-      elapsed_ms = [int]$scan.ElapsedMs
-    })
-  }
+function _TargetValidate-SizeClass {param($Rect,[int]$Area) _Invoke-LegacyPrecisionValue -Operation 'size-class' -Arguments @{rect=$Rect;area=$Area}}
 
-  $best = $null
-  $recommendedPoint = $null
-  $recommendedCommand = $null
-  $confidence = "low"
-  $status = "partial"
-  $reason = ""
-
-  if ($targetSpecified -and -not $guardMatched) {
-    $reason = "fast_guard_mismatch"
-  } elseif ($scan -and $scan.Json -and $scan.Json.status -eq "ok" -and $scan.Json.recommended_point) {
-    $best = $scan.Json.best
-    $rp = $scan.Json.recommended_point
-    $confidence = "$($rp.confidence)"
-    $recommendedPoint = [pscustomobject]@{
-      x = [int]$rp.x
-      y = [int]$rp.y
-      confidence = $confidence
-      point_source = "$($rp.point_source)"
-      native_clickable = [bool]$rp.native_clickable
-    }
-    $cmd = @(
-      "macro","click-point",
-      "--x","$($recommendedPoint.x)",
-      "--y","$($recommendedPoint.y)",
-      "--refine","uia-safe",
-      "--click-inset","$clickInset",
-      "--micro-refine",
-      "--precision-radius","$radius",
-      "--precision-step","$step"
-    )
-    if ($tm) { $cmd += @("--target-match",$tm) }
-    if ($th -gt 0) { $cmd += @("--target-hwnd","$th") }
-    $recommendedCommand = [object[]]@($cmd)
-    $status = "ok"
-  } else {
-    $reason = if ($scan -and $scan.Json -and $scan.Json.reason) { "$($scan.Json.reason)" } else { "no_scan_candidate" }
-  }
-
-  $sw.Stop()
-  $payload = [pscustomobject]@{
-    schema = "cucp.point-plan/v1"
-    status = $status
-    mode = "coordinate_click"
-    source = "win32_fast_guard+hit_scan"
-    x = $x
-    y = $y
-    radius = $radius
-    step = $step
-    click_inset = $clickInset
-    target_hwnd = $th
-    target_match = $tm
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    from_cache = $false
-    cache_ttl_seconds = $cacheTtl
-    cache_key = $cacheKey
-    confidence = $confidence
-    safe_to_act = ($status -eq "ok")
-    mouse_moved = $false
-    reason = $reason
-    precheck = $precheck
-    coordinate_profile = $coordProfile
-    best = $best
-    recommended_point = $recommendedPoint
-    recommended_command = $recommendedCommand
-    checks = @($checks)
-    scan = if ($scan -and $scan.Json) { $scan.Json } else { $null }
-    next_step = if ($status -eq "ok") { "Run recommended_command with -AllowLiveControl only after user authorization; it will re-run micro-refine before the live click." } else { "Try a narrower --target-match/--target-hwnd, a slightly larger --radius, or prefer smart-plan/CDP for web UI." }
-  }
-  if ($cacheKey -and $cacheTtl -gt 0 -and (-not $targetSpecified -or $guardMatched)) {
-    _PointPlan-WriteCache -Key $cacheKey -Payload $payload
-  }
-
-  if ($Brief -and -not $jsonOnly) {
-    if ($status -eq "ok") {
-      [Console]::Out.WriteLine("ok point-plan @($x,$y) recommended=($($recommendedPoint.x),$($recommendedPoint.y)) confidence=$confidence source=$($recommendedPoint.point_source) samples=$($scan.Json.sample_count) elapsed_ms=$($payload.elapsed_ms)")
-    } else {
-      [Console]::Out.WriteLine("partial point-plan @($x,$y) reason=$reason elapsed_ms=$($payload.elapsed_ms)")
-    }
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 12))
-  }
-  if ($status -eq "ok") { return 0 }
-  return 2
-}
-
-function _TargetValidate-ConfidenceRank {
-  param([string]$Confidence)
-  switch ("$Confidence".ToLowerInvariant()) {
-    "high" { return 3 }
-    "medium" { return 2 }
-    "low" { return 1 }
-    default { return 0 }
-  }
-}
-
-function _TargetValidate-SizeClass {
-  param($Rect, [int]$Area)
-  $width = 0
-  $height = 0
-  if ($Rect) {
-    try { $width = [int]$Rect.width } catch { $width = 0 }
-    try { $height = [int]$Rect.height } catch { $height = 0 }
-  }
-  if ($Area -le 0 -and $width -gt 0 -and $height -gt 0) { $Area = $width * $height }
-  if ($width -le 0 -or $height -le 0 -or $Area -le 0) { return "unknown" }
-  if ($width -le 20 -or $height -le 20 -or $Area -le 900) { return "tiny" }
-  if ($width -le 44 -or $height -le 32 -or $Area -le 2200) { return "small" }
-  if ($width -le 140 -and $height -le 100) { return "medium" }
-  return "large"
-}
-
-function _TargetValidate-PointEdgeDistance {
-  param($Point, $Rect)
-  if (-not $Point -or -not $Rect) { return $null }
-  $x = [int]$Point.x
-  $y = [int]$Point.y
-  $rx = [int]$Rect.x
-  $ry = [int]$Rect.y
-  $rw = [int]$Rect.width
-  $rh = [int]$Rect.height
-  if ($rw -le 0 -or $rh -le 0) { return $null }
-  $right = $rx + $rw
-  $bottom = $ry + $rh
-  return [pscustomobject]@{
-    left = [int]($x - $rx)
-    top = [int]($y - $ry)
-    right = [int]($right - $x - 1)
-    bottom = [int]($bottom - $y - 1)
-    min = [int]([Math]::Min([Math]::Min($x - $rx, $y - $ry), [Math]::Min($right - $x - 1, $bottom - $y - 1)))
-  }
-}
+function _TargetValidate-PointEdgeDistance {param($Point,$Rect) _Invoke-LegacyPrecisionValue -Operation 'edge-distance' -Arguments @{point=$Point;rect=$Rect}}
 
 function _TargetValidate-InvokePointPlanJson {
   param([string[]]$PointPlanArgs)
-  $args = @("-Quiet","macro","point-plan") + @($PointPlanArgs) + @("--json-only")
-  $rawLines = & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args 2>&1
-  $exitCode = $LASTEXITCODE
-  $raw = (($rawLines | ForEach-Object { $_.ToString() }) -join "`n")
-  $obj = $null
-  try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
-  return [pscustomobject]@{ exit=[int]$exitCode; raw=$raw; json=$obj }
+  $writer=New-Object IO.StringWriter;$previous=[Console]::Out;$exitCode=1
+  try{
+    [Console]::SetOut($writer)
+    try{$exitCode=Invoke-MacroPointPlan -Rest (@($PointPlanArgs)+@('--json-only'))}
+    catch{$exitCode=if($_.Exception.Message -match 'AllowLiveControl|Live (desktop )?control|Live click|requires -AllowLiveControl|Coordinate-based act|requires --after|Label not found|affordance_id not found'){3}else{1}}
+  }finally{[Console]::SetOut($previous)}
+  $raw=$writer.ToString().Replace("`r`n","`n");$writer.Dispose();if($raw.EndsWith("`n")){$raw=$raw.Substring(0,$raw.Length-1)}
+  _Invoke-LegacyPrecisionValue -Operation 'child-plan-envelope' -Arguments @{raw_lines=@($raw -split "`n");exit_code=[int]$exitCode}
 }
 
-function Invoke-MacroTargetValidate {
-  param([string[]]$Rest)
-  $x = [int](_Read-OptValue -Rest $Rest -Name "--x")
-  $y = [int](_Read-OptValue -Rest $Rest -Name "--y")
-  $tm = _Read-OptValue -Rest $Rest -Name "--target-match"
-  if (-not $tm) { $tm = _Read-OptValue -Rest $Rest -Name "--match" }
-  if (-not $tm) { $tm = _Read-OptValue -Rest $Rest -Name "--window" }
-  $th = [int](_Read-OptValue -Rest $Rest -Name "--target-hwnd")
-  $clickInset = [int](_Read-OptValue -Rest $Rest -Name "--click-inset")
-  $radiusRaw = _Read-OptValue -Rest $Rest -Name "--radius"
-  $stepRaw = _Read-OptValue -Rest $Rest -Name "--step"
-  $cacheTtlRaw = _Read-OptValue -Rest $Rest -Name "--cache-ttl"
-  $minConfidence = _Read-OptValue -Rest $Rest -Name "--min-confidence"
-  $allowLargeSurface = _Read-Switch -Rest $Rest -Name "--allow-large-surface"
-  $noCache = _Read-Switch -Rest $Rest -Name "--no-cache"
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $radius = 6
-  $step = 2
-  $cacheTtl = $CacheSeconds
-  if ($null -ne $radiusRaw -and "$radiusRaw" -ne "") { $radius = [int]$radiusRaw }
-  if ($null -ne $stepRaw -and "$stepRaw" -ne "") { $step = [int]$stepRaw }
-  if ($null -ne $cacheTtlRaw -and "$cacheTtlRaw" -ne "") { $cacheTtl = [int]$cacheTtlRaw }
-  if (-not $minConfidence) { $minConfidence = "medium" }
-  $minConfidence = "$minConfidence".ToLowerInvariant()
-  if (@("low","medium","high") -notcontains $minConfidence) { throw "macro target-validate --min-confidence must be low, medium, or high" }
-  if ($x -le 0 -or $y -le 0) { throw "macro target-validate requires --x and --y" }
-  if ($clickInset -le 0) { $clickInset = 2 }
-  if ($radius -lt 0) { $radius = 0 }
-  if ($radius -gt 64) { $radius = 64 }
-  if ($step -le 0) { $step = 2 }
-  if ($step -gt 16) { $step = 16 }
-  if ($cacheTtl -lt 0) { $cacheTtl = 0 }
-  if ($noCache) { $cacheTtl = 0 }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $planArgs = @("--x","$x","--y","$y","--radius","$radius","--step","$step","--click-inset","$clickInset","--cache-ttl","$cacheTtl")
-  if ($tm) { $planArgs += @("--target-match",$tm) }
-  if ($th -gt 0) { $planArgs += @("--target-hwnd","$th") }
-  if ($noCache) { $planArgs += "--no-cache" }
-  $planResult = _TargetValidate-InvokePointPlanJson -PointPlanArgs $planArgs
-  $plan = $planResult.json
-
-  $warnings = New-Object System.Collections.ArrayList
-  $errors = New-Object System.Collections.ArrayList
-  if (-not $plan) {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.target-validate/v1"
-      status = "error"
-      reason = "point_plan_unparseable"
-      x = $x
-      y = $y
-      safe_to_click = $false
-      point_plan_exit = [int]$planResult.exit
-      point_plan_raw = $planResult.raw
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      next_step = "Re-run point-plan directly, then re-ground the target window before live control."
-    }
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 8))
-    return 1
-  }
-
-  $targetSpecified = (($th -gt 0) -or $tm)
-  if (-not $targetSpecified) { [void]$warnings.Add("no_target_guard_specified") }
-  $pointPlanOk = ($plan.status -eq "ok" -and [bool]$plan.safe_to_act -and $plan.recommended_point -and $plan.recommended_command)
-  $guardMatched = $false
-  try { $guardMatched = [bool]$plan.precheck.matched } catch { $guardMatched = $false }
-  if (-not $guardMatched) { [void]$warnings.Add("target_guard_not_matched") }
-  $coordinateRisk = "unknown"
-  try { if ($plan.coordinate_profile.coordinate_risk) { $coordinateRisk = "$($plan.coordinate_profile.coordinate_risk)" } } catch { }
-  if ($coordinateRisk -eq "high") { [void]$warnings.Add("coordinate_profile_high_risk") }
-  foreach ($cw in @($plan.coordinate_profile.warnings)) {
-    if ($cw -and (@($warnings) -notcontains "$cw")) { [void]$warnings.Add("$cw") }
-  }
-
-  $confidence = if ($plan.confidence) { "$($plan.confidence)".ToLowerInvariant() } else { "low" }
-  $confidenceOk = ((_TargetValidate-ConfidenceRank -Confidence $confidence) -ge (_TargetValidate-ConfidenceRank -Confidence $minConfidence))
-  if (-not $confidenceOk) { [void]$warnings.Add("confidence_below_minimum") }
-
-  $best = $plan.best
-  $match = if ($best -and $best.match) { $best.match } else { $null }
-  $rect = if ($match -and $match.rect) { $match.rect } else { $null }
-  $area = 0
-  try { $area = [int]$best.area } catch { $area = 0 }
-  if ($area -le 0) { try { $area = [int]$match.area } catch { $area = 0 } }
-  $targetSizeClass = _TargetValidate-SizeClass -Rect $rect -Area $area
-  $targetWidth = 0
-  $targetHeight = 0
-  if ($rect) {
-    try { $targetWidth = [int]$rect.width } catch { $targetWidth = 0 }
-    try { $targetHeight = [int]$rect.height } catch { $targetHeight = 0 }
-  }
-  $support = 0
-  try { $support = [int]$best.support } catch { $support = 0 }
-  $nativeClickable = $false
-  try { $nativeClickable = [bool]$plan.recommended_point.native_clickable } catch { $nativeClickable = $false }
-  $pointSource = ""
-  try { $pointSource = "$($plan.recommended_point.point_source)" } catch { }
-  $role = ""
-  try { $role = "$($best.role)" } catch { }
-  $pattern = ""
-  try { $pattern = "$($best.pattern)" } catch { }
-  $edgeDistance = _TargetValidate-PointEdgeDistance -Point $plan.recommended_point -Rect $rect
-  $nearElementEdge = $false
-  if ($edgeDistance -and [int]$edgeDistance.min -ge 0 -and [int]$edgeDistance.min -lt $clickInset) {
-    $nearElementEdge = $true
-    [void]$warnings.Add("recommended_point_near_element_edge")
-  }
-  $recommendedInsideRect = $true
-  if ($edgeDistance -and [int]$edgeDistance.min -lt 0) {
-    $recommendedInsideRect = $false
-    [void]$warnings.Add("recommended_point_outside_element_rect")
-  }
-
-  $tinyTarget = ($targetSizeClass -eq "tiny")
-  $smallTarget = ($targetSizeClass -eq "tiny" -or $targetSizeClass -eq "small")
-  $tinyTargetOk = $true
-  if ($tinyTarget) {
-    $tinyTargetOk = ($nativeClickable -or $support -ge 2 -or ((_TargetValidate-ConfidenceRank -Confidence $confidence) -ge 3))
-    if (-not $tinyTargetOk) { [void]$warnings.Add("tiny_target_needs_more_support_or_native_clickable_point") }
-  }
-  $largeSurface = ($targetSizeClass -eq "large")
-  $largeSurfaceOk = (-not $largeSurface -or $allowLargeSurface -or $nativeClickable -or $pattern)
-  if (-not $largeSurfaceOk) { [void]$warnings.Add("large_surface_without_pattern_or_native_clickable_point") }
-  if ($targetSizeClass -eq "unknown") { [void]$warnings.Add("target_size_unknown") }
-
-  $safeToClick = (
-    $pointPlanOk -and
-    $targetSpecified -and
-    $guardMatched -and
-    $coordinateRisk -ne "high" -and
-    $confidenceOk -and
-    $tinyTargetOk -and
-    $largeSurfaceOk -and
-    $recommendedInsideRect
-  )
-  if (-not $pointPlanOk) { [void]$errors.Add([pscustomobject]@{ code="point_plan_not_safe"; message="point-plan did not produce a safe recommended point"; reason="$($plan.reason)" }) }
-  if (-not $targetSpecified) { [void]$errors.Add([pscustomobject]@{ code="missing_target_guard"; message="target-validate requires --target-match or --target-hwnd for safe_to_click=true" }) }
-  if ($coordinateRisk -eq "high") { [void]$errors.Add([pscustomobject]@{ code="high_coordinate_risk"; message="coordinate profile reports high risk" }) }
-
-  $sw.Stop()
-  $recommendedCommand = if ($safeToClick) { $plan.recommended_command } else { $null }
-  $payload = [pscustomobject]@{
-    schema = "cucp.target-validate/v1"
-    status = if ($safeToClick) { "ok" } else { "partial" }
-    mode = "pre_click_validation"
-    x = $x
-    y = $y
-    radius = $radius
-    step = $step
-    click_inset = $clickInset
-    target_hwnd = $th
-    target_match = $tm
-    guard_level = if ($targetSpecified) { "target_guarded" } else { "unguarded" }
-    safe_to_click = [bool]$safeToClick
-    confidence = $confidence
-    min_confidence = $minConfidence
-    coordinate_risk = $coordinateRisk
-    target_size_class = $targetSizeClass
-    tiny_target = [bool]$tinyTarget
-    small_target = [bool]$smallTarget
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    point_plan_exit = [int]$planResult.exit
-    point_plan = $plan
-    validation = [pscustomobject]@{
-      point_plan_ok = [bool]$pointPlanOk
-      target_guard_specified = [bool]$targetSpecified
-      guard_matched = [bool]$guardMatched
-      coordinate_ok = [bool]($coordinateRisk -ne "high")
-      confidence_ok = [bool]$confidenceOk
-      tiny_target_ok = [bool]$tinyTargetOk
-      large_surface_ok = [bool]$largeSurfaceOk
-      has_recommended_point = [bool]($plan.recommended_point)
-      has_recommended_command = [bool]($plan.recommended_command)
-      target_size_class = $targetSizeClass
-      target_width = [int]$targetWidth
-      target_height = [int]$targetHeight
-      target_area = [int]$area
-      support = [int]$support
-      native_clickable = [bool]$nativeClickable
-      point_source = $pointSource
-      role = $role
-      pattern = $pattern
-      recommended_point_inside_rect = [bool]$recommendedInsideRect
-      near_element_edge = [bool]$nearElementEdge
-      edge_distance = $edgeDistance
-    }
-    recommended_command = $recommendedCommand
-    recommended_command_line = if ($safeToClick -and $recommendedCommand) { _TaskPlan-StepString -Command @($recommendedCommand) } else { "" }
-    warnings = @($warnings | Sort-Object -Unique)
-    errors = @($errors)
-    next_step = if ($safeToClick) { "Run recommended_command with -AllowLiveControl only after user authorization, then verify with wait-label/windows/screenshot-diff." } else { "Do not live-click yet. Re-ground with app-profile/smart-plan, add --target-match or --target-hwnd, increase --radius, or prefer DOM/UIA pattern routes." }
-  }
-  if ($Brief -and -not $jsonOnly) {
-    if ($safeToClick) {
-      [Console]::Out.WriteLine("ok target-validate @($x,$y) size=$targetSizeClass confidence=$confidence support=$support native=$nativeClickable elapsed_ms=$($payload.elapsed_ms)")
-    } else {
-      [Console]::Out.WriteLine("partial target-validate @($x,$y) safe=false size=$targetSizeClass confidence=$confidence warnings=$(@($payload.warnings).Count) errors=$(@($payload.errors).Count) elapsed_ms=$($payload.elapsed_ms)")
-    }
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 18))
-  }
-  if ($safeToClick) { return 0 }
-  return 2
-}
+function Invoke-MacroTargetValidate {param([string[]]$Rest) _Invoke-LegacyPrecision -Operation 'target-validate' -Rest $Rest}
 
 # macro safe-type --text "..." --target-match <unique window title> | --target-hwnd N
 # [--click-x N --click-y N] [--enter | --ctrl-enter] [--max-attempts N]
 # Legacy --probe/--skip-probe arguments remain accepted but no text is inserted as a probe.
 # Only focus preparation is retried; uncertain clicks or text insertion are never replayed.
-function Invoke-MacroSafeType {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro safe-type requires -AllowLiveControl" }
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  $tm = _Read-OptValue -Rest $Rest -Name "--target-match"
-  $targetHwnd = [int64](_Read-OptValue -Rest $Rest -Name "--target-hwnd")
-  $clickXRaw = _Read-OptValue -Rest $Rest -Name "--click-x"
-  $clickYRaw = _Read-OptValue -Rest $Rest -Name "--click-y"
-  $hasClickX = ($null -ne $clickXRaw -and "$clickXRaw" -ne "")
-  $hasClickY = ($null -ne $clickYRaw -and "$clickYRaw" -ne "")
-  $sendEnter = _Read-Switch -Rest $Rest -Name "--enter"
-  $sendCtrlEnter = _Read-Switch -Rest $Rest -Name "--ctrl-enter"
-  $maxAttempts = [int](_Read-OptValue -Rest $Rest -Name "--max-attempts")
-  if (-not $text) { throw "macro safe-type requires --text" }
-  if (-not $tm -and $targetHwnd -le 0) { throw "macro safe-type requires --target-match or --target-hwnd" }
-  if ($hasClickX -ne $hasClickY) { throw "macro safe-type requires both --click-x and --click-y" }
-  if ($sendEnter -and $sendCtrlEnter) { throw "choose --enter or --ctrl-enter, not both" }
-  if ($maxAttempts -le 0) { $maxAttempts = 1 }
-  if ($maxAttempts -gt 10) { $maxAttempts = 10 }
-  if ($hasClickX) { $clickX = [int]$clickXRaw; $clickY = [int]$clickYRaw }
-
-  # Resolve ambiguous titles before touching any window. An explicit HWND pins the target.
-  $rWindows = Invoke-NativeHelper -ArgList @("-Action", "windows")
-  $candidates = @()
-  if ($rWindows.ExitCode -eq 0 -and $rWindows.Json -and $rWindows.Json.status -eq "ok") {
-    $candidates = @($rWindows.Json.windows | Where-Object {
-      ($targetHwnd -le 0 -or [int64]$_.hwnd -eq $targetHwnd) -and
-      (-not $tm -or ($_.title -and $_.title.IndexOf($tm, [StringComparison]::OrdinalIgnoreCase) -ge 0))
-    })
-  }
-  $lastReason = ""
-  $attempt = 0
-  $success = $false
-  $textDispatched = $false
-  if ($candidates.Count -ne 1) {
-    $lastReason = if ($candidates.Count -gt 1) { "ambiguous_target" } else { "target_unavailable" }
-  } else {
-    $targetHwnd = [int64]$candidates[0].hwnd
-    while ($attempt -lt $maxAttempts -and -not $success) {
-      $attempt++
-      $rFocus = Invoke-NativeHelper -ArgList @("-Action", "focus", "-WindowHwnd", "$targetHwnd")
-      if (-not ($rFocus.ExitCode -eq 0 -and $rFocus.Json -and $rFocus.Json.verified -and
-          [int64]$rFocus.Json.target_hwnd -eq $targetHwnd)) {
-        $lastReason = "focus_failed"
-        continue
-      }
-      if ($hasClickX) {
-        $rClick = Invoke-NativeHelper -ArgList @(
-          "-Action", "click", "-X", "$clickX", "-Y", "$clickY", "-TargetHwnd", "$targetHwnd"
-        )
-        if (-not ($rClick.ExitCode -eq 0 -and $rClick.Json -and $rClick.Json.status -eq "ok")) {
-          $lastReason = "click_blocked_or_failed"
-          # Click may have partly executed: do not replay it automatically.
-          break
-        }
-      }
-      # The helper checks foreground identity immediately before injecting text.
-      $textDispatched = $null # Failed injection may have delivered only part of the text.
-      $rType = Invoke-NativeHelper -ArgList @(
-        "-Action", "type", "-Text", $text, "-TargetHwnd", "$targetHwnd"
-      )
-      if (-not ($rType.ExitCode -eq 0 -and $rType.Json -and $rType.Json.status -eq "ok")) {
-        $lastReason = "main_type_blocked_or_failed"
-        break
-      }
-      $textDispatched = $true
-      if ($sendEnter -or $sendCtrlEnter) {
-        $sendKeys = if ($sendCtrlEnter) { "ctrl+enter" } else { "enter" }
-        $rSend = Invoke-NativeHelper -ArgList @(
-          "-Action", "shortcut", "-Keys", $sendKeys, "-TargetHwnd", "$targetHwnd"
-        )
-        if (-not ($rSend.ExitCode -eq 0 -and $rSend.Json -and $rSend.Json.status -eq "ok")) {
-          $lastReason = "send_blocked_or_failed"
-          break
-        }
-      }
-      $success = $true
-    }
-  }
-  $status = if ($success) { "ok" } else { "partial" }
-  $payload = [ordered]@{
-    schema = "cucp.safe-type/v1"
-    status = $status
-    reason = $lastReason
-    target_match = $tm
-    target_hwnd = $targetHwnd
-    attempts = $attempt
-    probe = $null
-    probe_mode = "disabled"
-    text_dispatched = $textDispatched
-    # Input dispatch is not proof that an application accepted or saved the text.
-    application_result_verified = $false
-    send = if ($sendCtrlEnter) { "ctrl+enter" } elseif ($sendEnter) { "enter" } else { "none" }
-  }
-  if ($Brief) {
-    [Console]::Out.WriteLine("$status safe-type target='$tm' attempts=$attempt reason=$lastReason")
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 4))
-  }
-  if ($success) { return 0 }
-  return 2
-}
+function Invoke-MacroSafeType {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'safe-type' -Rest $Rest -ScriptPath $PSCommandPath}
 
 # ============================================================================
 # v1.3.0 — Electron CDP wrapper macros
@@ -8766,390 +5463,40 @@ function Test-CdpPortQuick {
   return $isOpen
 }
 
-function New-CdpDomBridgePlan {
-  param(
-    [ValidateSet("click", "type", "find")]
-    [string]$DomAction,
-    [string]$Query,
-    [int]$Port = 9222,
-    [string]$PageMatch,
-    [string]$TextToType,
-    [bool]$Clear,
-    [bool]$Enter
-  )
-  $readOnlyAction = if ($DomAction -eq "type") { "cdp-smart-type-find" } else { "cdp-smart-find" }
-  $liveAction = if ($DomAction -eq "type") { "cdp-smart-type" } else { "cdp-smart-click" }
-  $readOnlyCommand = @("macro", $readOnlyAction)
-  $liveCommand = @("macro", $liveAction)
-  if ($DomAction -eq "type") {
-    $readOnlyCommand += @("--label", $Query)
-    $liveCommand += @("--label", $Query)
-    if ($TextToType) { $liveCommand += @("--text", $TextToType) }
-    if ($Clear) { $liveCommand += "--clear-first" }
-    if ($Enter) { $liveCommand += "--press-enter" }
-  } else {
-    $readOnlyCommand += @("--text", $Query)
-    $liveCommand += @("--text", $Query)
-  }
-  $readOnlyCommand += @("--port", "$Port")
-  $liveCommand += @("--port", "$Port")
-  if ($PageMatch) {
-    $readOnlyCommand += @("--page-match", $PageMatch)
-    $liveCommand += @("--page-match", $PageMatch)
-  }
-  return [ordered]@{
-    schema = "cucp.cdp-dom-bridge-plan/v1"
-    route = "cdp_dom"
-    dom_action = $DomAction
-    query = $Query
-    port = $Port
-    page_match = $PageMatch
-    read_only_command = $readOnlyCommand
-    live_command = $liveCommand
-    selector_ranking = @(
-      [ordered]@{ signal="test_id_or_data_attr"; priority=100 },
-      [ordered]@{ signal="aria_label_or_label_control"; priority=94 },
-      [ordered]@{ signal="role_plus_accessible_name"; priority=90 },
-      [ordered]@{ signal="placeholder_or_name"; priority=82 },
-      [ordered]@{ signal="visible_text"; priority=70 },
-      [ordered]@{ signal="css_fallback"; priority=50 }
-    )
-    fallback_order = @("cdp_dom", "uia_pattern", "ocr_uia", "target_validate_precision_point", "vision")
-  }
-}
 
-function Emit-CdpPortClosed {
-  param([string]$Action, [int]$Port, [string]$BriefSubject, $DomBridgePlan = $null)
-  if (-not $BriefSubject) { $BriefSubject = $Action }
-  if ($Brief) {
-    [Console]::Out.WriteLine("partial $BriefSubject reason=cdp_port_closed")
-  } else {
-    $payload = [ordered]@{
-      action = $Action
-      status = "partial"
-      reason = "cdp_port_closed"
-      port = $Port
-      detail = "tcp_port_closed_or_timeout"
-      source = "wrapper_preflight"
-    }
-    if ($DomBridgePlan) { $payload["dom_bridge_plan"] = $DomBridgePlan }
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 8))
-  }
-  return 2
-}
+
+
 
 # macro cdp-detect [--port N]
 # 9222 포트 + 페이지 목록 (read-only)
-function Invoke-MacroCdpDetect {
-  param([string[]]$Rest)
-  $port = [int](_Read-OptValue -Rest $Rest -Name "--port")
-  if ($port -le 0) { $port = 9222 }
-  if (-not (Test-CdpPortQuick -Port $port -TimeoutMs 120)) {
-    return (Emit-CdpPortClosed -Action "cdp-detect" -Port $port -BriefSubject "cdp-detect port=$port")
-  }
-  $argList = @("-Action","cdp-detect","-CdpPort","$port")
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok cdp-detect port=$($r.Json.port) pages=$($r.Json.page_count) browser='$($r.Json.browser)' protocol=$($r.Json.protocol_version)")
-    } else {
-      $reason = if ($r.Json) { $r.Json.reason } else { "helper_failed" }
-      [Console]::Out.WriteLine("partial cdp-detect port=$port reason=$reason")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
+
 
 # macro cdp-eval --expr "<javascript>" [--expr-b64 <base64>] [--page-match Electron app] [--port 9222]
 # Arbitrary JavaScript can mutate a page; use the same live-control boundary as other actions.
-function Invoke-MacroCdpEval {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro cdp-eval requires -AllowLiveControl" }
-  $expr = _Read-OptValue -Rest $Rest -Name "--expr"
-  $exprB64 = _Read-OptValue -Rest $Rest -Name "--expr-b64"
-  $pm = _Read-OptValue -Rest $Rest -Name "--page-match"
-  $port = [int](_Read-OptValue -Rest $Rest -Name "--port")
-  if (-not $expr -and -not $exprB64) { throw "macro cdp-eval requires --expr or --expr-b64" }
-  if ($port -le 0) { $port = 9222 }
-  if (-not (Test-CdpPortQuick -Port $port -TimeoutMs 120)) {
-    return (Emit-CdpPortClosed -Action "cdp-eval" -Port $port -BriefSubject "cdp-eval")
-  }
-  $argList = @("-Action","cdp-eval","-CdpPort","$port")
-  if ($expr) { $argList += @("-CdpExpr", $expr) }
-  else { $argList += @("-CdpExprB64", $exprB64) }
-  if ($pm) { $argList += @("-CdpPageMatch", $pm) }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      $val = "$($r.Json.result_value)"
-      if ($val.Length -gt 80) { $val = $val.Substring(0, 77) + "..." }
-      [Console]::Out.WriteLine("ok cdp-eval result_type=$($r.Json.result_type) value='$val' page='$($r.Json.page_title)'")
-    } else {
-      $reason = if ($r.Json) { $r.Json.reason } else { "helper_failed" }
-      [Console]::Out.WriteLine("partial cdp-eval reason=$reason")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
+
 
 # macro cdp-type --selector "<css>" --text "<msg>" [--page-match Electron app] [--port 9222]
 #                [--press-enter] [--clear-first]
 # DOM selector 의 element 에 focus + value set + dispatchEvent.
 # -AllowLiveControl 필수 (실제 actuation).
-function Invoke-MacroCdpType {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro cdp-type requires -AllowLiveControl" }
-  $selector = _Read-OptValue -Rest $Rest -Name "--selector"
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  $pm = _Read-OptValue -Rest $Rest -Name "--page-match"
-  $port = [int](_Read-OptValue -Rest $Rest -Name "--port")
-  $pressEnter = _Read-Switch -Rest $Rest -Name "--press-enter"
-  $clearFirst = _Read-Switch -Rest $Rest -Name "--clear-first"
-  if (-not $selector) { throw "macro cdp-type requires --selector" }
-  if ($port -le 0) { $port = 9222 }
-  if (-not (Test-CdpPortQuick -Port $port -TimeoutMs 120)) {
-    _Trajectory-Append -Kind "type" -Payload @{
-      source = "cdp_type"
-      selector = $selector
-      text_length = if ($text) { $text.Length } else { 0 }
-      sent_enter = [bool]$pressEnter
-      exit = 2
-      reason = "cdp_port_closed"
-    }
-    return (Emit-CdpPortClosed -Action "cdp-type" -Port $port -BriefSubject "cdp-type selector='$selector'")
-  }
-  $argList = @("-Action","cdp-type","-CdpSelector",$selector,"-CdpPort","$port")
-  if ($text) { $argList += @("-Text", $text) }
-  if ($pm) { $argList += @("-CdpPageMatch", $pm) }
-  if ($pressEnter) { $argList += "-PressEnter" }
-  if ($clearFirst) { $argList += "-ClearFirst" }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-  _Trajectory-Append -Kind "click" -Payload @{
-    source = "cdp_type"
-    selector = $selector
-    text_length = if ($text) { $text.Length } else { 0 }
-    sent_enter = [bool]$pressEnter
-    page_id = "$($r.Json.page_id)"
-    exit = $exitCode
-  }
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok cdp-type selector='$selector' tag=$($r.Json.tag_name) ce=$($r.Json.is_content_editable) input=$($r.Json.is_input) value_len=$($r.Json.current_value_length) sent_enter=$($r.Json.sent_enter) page='$($r.Json.page_title)'")
-    } else {
-      $reason = if ($r.Json) { $r.Json.reason } else { "helper_failed" }
-      [Console]::Out.WriteLine("partial cdp-type selector='$selector' reason=$reason")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
+
 
 # macro cdp-click --selector "<css>" [--page-match Electron app] [--port 9222]
 # DOM selector 의 element.click(). 마우스 좌표 안 씀.
 # -AllowLiveControl 필수.
-function Invoke-MacroCdpClick {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro cdp-click requires -AllowLiveControl" }
-  $selector = _Read-OptValue -Rest $Rest -Name "--selector"
-  $pm = _Read-OptValue -Rest $Rest -Name "--page-match"
-  $port = [int](_Read-OptValue -Rest $Rest -Name "--port")
-  if (-not $selector) { throw "macro cdp-click requires --selector" }
-  if ($port -le 0) { $port = 9222 }
-  if (-not (Test-CdpPortQuick -Port $port -TimeoutMs 120)) {
-    _Trajectory-Append -Kind "click" -Payload @{
-      source = "cdp_click"
-      selector = $selector
-      exit = 2
-      reason = "cdp_port_closed"
-    }
-    return (Emit-CdpPortClosed -Action "cdp-click" -Port $port -BriefSubject "cdp-click selector='$selector'")
-  }
-  $argList = @("-Action","cdp-click","-CdpSelector",$selector,"-CdpPort","$port")
-  if ($pm) { $argList += @("-CdpPageMatch", $pm) }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-  _Trajectory-Append -Kind "click" -Payload @{
-    source = "cdp_click"
-    selector = $selector
-    page_id = "$($r.Json.page_id)"
-    exit = $exitCode
-  }
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok cdp-click selector='$selector' tag=$($r.Json.tag_name) page='$($r.Json.page_title)'")
-    } else {
-      $reason = if ($r.Json) { $r.Json.reason } else { "helper_failed" }
-      [Console]::Out.WriteLine("partial cdp-click selector='$selector' reason=$reason")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
+
 
 # macro cdp-smart-click --text "<visible label>" [--page-match Electron app] [--port 9222]
 # DOM visible text / aria-label / title / placeholder 기반 element.click().
-function Invoke-MacroCdpSmartFind {
-  param([string[]]$Rest)
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  $pm = _Read-OptValue -Rest $Rest -Name "--page-match"
-  $port = [int](_Read-OptValue -Rest $Rest -Name "--port")
-  if (-not $text) { throw "macro cdp-smart-find requires --text" }
-  if ($port -le 0) { $port = 9222 }
-  if (-not (Test-CdpPortQuick -Port $port -TimeoutMs 120)) {
-    $plan = New-CdpDomBridgePlan -DomAction "click" -Query $text -Port $port -PageMatch $pm
-    return (Emit-CdpPortClosed -Action "cdp-smart-find" -Port $port -BriefSubject "cdp-smart-find text='$text'" -DomBridgePlan $plan)
-  }
-  $argList = @("-Action","cdp-smart-find","-CdpText",$text,"-CdpPort","$port")
-  if ($pm) { $argList += @("-CdpPageMatch", $pm) }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok cdp-smart-find text='$text' matched='$($r.Json.matched_text)' score=$($r.Json.score) tag=$($r.Json.tag_name) page='$($r.Json.page_title)'")
-    } else {
-      $reason = if ($r.Json) { $r.Json.reason } else { "helper_failed" }
-      [Console]::Out.WriteLine("partial cdp-smart-find text='$text' reason=$reason")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
 
-function Invoke-MacroCdpSmartTypeFind {
-  param([string[]]$Rest)
-  $label = _Read-OptValue -Rest $Rest -Name "--label"
-  $pm = _Read-OptValue -Rest $Rest -Name "--page-match"
-  $port = [int](_Read-OptValue -Rest $Rest -Name "--port")
-  if (-not $label) { throw "macro cdp-smart-type-find requires --label" }
-  if ($port -le 0) { $port = 9222 }
-  if (-not (Test-CdpPortQuick -Port $port -TimeoutMs 120)) {
-    $plan = New-CdpDomBridgePlan -DomAction "type" -Query $label -Port $port -PageMatch $pm
-    return (Emit-CdpPortClosed -Action "cdp-smart-type-find" -Port $port -BriefSubject "cdp-smart-type-find label='$label'" -DomBridgePlan $plan)
-  }
-  $argList = @("-Action","cdp-smart-type-find","-CdpText",$label,"-CdpPort","$port")
-  if ($pm) { $argList += @("-CdpPageMatch", $pm) }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok cdp-smart-type-find label='$label' matched='$($r.Json.matched_text)' score=$($r.Json.score) tag=$($r.Json.tag_name) page='$($r.Json.page_title)'")
-    } else {
-      $reason = if ($r.Json) { $r.Json.reason } else { "helper_failed" }
-      [Console]::Out.WriteLine("partial cdp-smart-type-find label='$label' reason=$reason")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
 
-function Invoke-MacroCdpSmartClick {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro cdp-smart-click requires -AllowLiveControl" }
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  $pm = _Read-OptValue -Rest $Rest -Name "--page-match"
-  $port = [int](_Read-OptValue -Rest $Rest -Name "--port")
-  if (-not $text) { throw "macro cdp-smart-click requires --text" }
-  if ($port -le 0) { $port = 9222 }
-  if (-not (Test-CdpPortQuick -Port $port -TimeoutMs 120)) {
-    _Trajectory-Append -Kind "click" -Payload @{
-      source = "cdp_smart_click"
-      text = $text
-      exit = 2
-      reason = "cdp_port_closed"
-    }
-    $plan = New-CdpDomBridgePlan -DomAction "click" -Query $text -Port $port -PageMatch $pm
-    return (Emit-CdpPortClosed -Action "cdp-smart-click" -Port $port -BriefSubject "cdp-smart-click text='$text'" -DomBridgePlan $plan)
-  }
-  $argList = @("-Action","cdp-smart-click","-CdpText",$text,"-CdpPort","$port")
-  if ($pm) { $argList += @("-CdpPageMatch", $pm) }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-  _Trajectory-Append -Kind "click" -Payload @{
-    source = "cdp_smart_click"
-    text = $text
-    matched_text = "$($r.Json.matched_text)"
-    score = $r.Json.score
-    page_id = "$($r.Json.page_id)"
-    exit = $exitCode
-  }
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok cdp-smart-click text='$text' matched='$($r.Json.matched_text)' score=$($r.Json.score) tag=$($r.Json.tag_name) page='$($r.Json.page_title)'")
-    } else {
-      $reason = if ($r.Json) { $r.Json.reason } else { "helper_failed" }
-      [Console]::Out.WriteLine("partial cdp-smart-click text='$text' reason=$reason")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
+
+
+
 
 # macro cdp-smart-type --label "<field label>" --text "<msg>" [--page-match Electron app] [--port 9222]
 # DOM visible label / placeholder 기반 input/contenteditable 직접 입력.
-function Invoke-MacroCdpSmartType {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro cdp-smart-type requires -AllowLiveControl" }
-  $label = _Read-OptValue -Rest $Rest -Name "--label"
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  $pm = _Read-OptValue -Rest $Rest -Name "--page-match"
-  $port = [int](_Read-OptValue -Rest $Rest -Name "--port")
-  $pressEnter = _Read-Switch -Rest $Rest -Name "--press-enter"
-  $clearFirst = _Read-Switch -Rest $Rest -Name "--clear-first"
-  if (-not $label) { throw "macro cdp-smart-type requires --label" }
-  if (-not $text -and -not $clearFirst -and -not $pressEnter) { throw "macro cdp-smart-type requires --text or --clear-first/--press-enter" }
-  if ($port -le 0) { $port = 9222 }
-  if (-not (Test-CdpPortQuick -Port $port -TimeoutMs 120)) {
-    _Trajectory-Append -Kind "type" -Payload @{
-      source = "cdp_smart_type"
-      label = $label
-      text_length = if ($text) { $text.Length } else { 0 }
-      sent_enter = [bool]$pressEnter
-      exit = 2
-      reason = "cdp_port_closed"
-    }
-    $plan = New-CdpDomBridgePlan -DomAction "type" -Query $label -Port $port -PageMatch $pm -TextToType $text -Clear ([bool]$clearFirst) -Enter ([bool]$pressEnter)
-    return (Emit-CdpPortClosed -Action "cdp-smart-type" -Port $port -BriefSubject "cdp-smart-type label='$label'" -DomBridgePlan $plan)
-  }
-  $argList = @("-Action","cdp-smart-type","-CdpText",$label,"-CdpPort","$port")
-  if ($text) { $argList += @("-Text", $text) }
-  if ($pm) { $argList += @("-CdpPageMatch", $pm) }
-  if ($pressEnter) { $argList += "-PressEnter" }
-  if ($clearFirst) { $argList += "-ClearFirst" }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $exitCode = [int]$r.ExitCode
-  _Trajectory-Append -Kind "type" -Payload @{
-    source = "cdp_smart_type"
-    label = $label
-    matched_text = "$($r.Json.matched_text)"
-    text_length = if ($text) { $text.Length } else { 0 }
-    sent_enter = [bool]$pressEnter
-    page_id = "$($r.Json.page_id)"
-    exit = $exitCode
-  }
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok cdp-smart-type label='$label' matched='$($r.Json.matched_text)' score=$($r.Json.score) tag=$($r.Json.tag_name) len=$($r.Json.text_length) sent_enter=$($r.Json.sent_enter) page='$($r.Json.page_title)'")
-    } else {
-      $reason = if ($r.Json) { $r.Json.reason } else { "helper_failed" }
-      [Console]::Out.WriteLine("partial cdp-smart-type label='$label' reason=$reason")
-    }
-  } else {
-    if ($r.Raw) { [Console]::Out.Write($r.Raw) }
-  }
-  return $exitCode
-}
+
 
 # ============================================================================
 # v1.1.0 — macro history: smart-click 학습 데이터 조회/관리
@@ -9267,336 +5614,99 @@ function Invoke-MacroHistory {
 
 function Invoke-MacroSmartPlan {
   param([string[]]$Rest)
-  $label = _Read-OptValue -Rest $Rest -Name "--label"
-  $typeText = _Read-OptValue -Rest $Rest -Name "--type-text"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $window = _Read-OptValue -Rest $Rest -Name "--window"
-  $role = _Read-OptValue -Rest $Rest -Name "--role"
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $includeOcr = _Read-Switch -Rest $Rest -Name "--include-ocr"
-  $ocrMatch = _Read-OptValue -Rest $Rest -Name "--ocr-match"
-  $ocrLang = _Read-OptValue -Rest $Rest -Name "--ocr-language"
-  $disableCdp = _Read-Switch -Rest $Rest -Name "--no-cdp"
-  $allowCdp = _Read-Switch -Rest $Rest -Name "--allow-cdp"
-  $cdpPageMatch = _Read-OptValue -Rest $Rest -Name "--cdp-page-match"
-  $cdpPortRaw = _Read-OptValue -Rest $Rest -Name "--cdp-port"
-  $cdpPort = [int]$cdpPortRaw
-  $pressEnter = _Read-Switch -Rest $Rest -Name "--press-enter"
-  $clearFirst = _Read-Switch -Rest $Rest -Name "--clear-first"
-  $precisionPoints = (_Read-Switch -Rest $Rest -Name "--precision-points") -or (_Read-Switch -Rest $Rest -Name "--point-plan")
-  $precisionRadiusRaw = _Read-OptValue -Rest $Rest -Name "--precision-radius"
-  if (-not $precisionRadiusRaw) { $precisionRadiusRaw = _Read-OptValue -Rest $Rest -Name "--point-radius" }
-  $precisionStepRaw = _Read-OptValue -Rest $Rest -Name "--precision-step"
-  if (-not $precisionStepRaw) { $precisionStepRaw = _Read-OptValue -Rest $Rest -Name "--point-step" }
-  $pointCacheTtlRaw = _Read-OptValue -Rest $Rest -Name "--point-cache-ttl"
-  if (-not $pointCacheTtlRaw) { $pointCacheTtlRaw = _Read-OptValue -Rest $Rest -Name "--cache-ttl" }
-  $precisionRadius = 6
-  $precisionStep = 2
-  $pointCacheTtl = $CacheSeconds
-  if (-not $label) { throw "macro smart-plan requires --label" }
-  if (-not $match) { $match = $window }
-  if (-not $ocrMatch) { $ocrMatch = "contains" }
-  if ($cdpPort -le 0) { $cdpPort = 9222 }
-  if ($null -ne $precisionRadiusRaw -and "$precisionRadiusRaw" -ne "") { $precisionRadius = [int]$precisionRadiusRaw }
-  if ($null -ne $precisionStepRaw -and "$precisionStepRaw" -ne "") { $precisionStep = [int]$precisionStepRaw }
-  if ($null -ne $pointCacheTtlRaw -and "$pointCacheTtlRaw" -ne "") { $pointCacheTtl = [int]$pointCacheTtlRaw }
-  if ($precisionRadius -lt 0) { $precisionRadius = 0 }
-  if ($precisionRadius -gt 64) { $precisionRadius = 64 }
-  if ($precisionStep -le 0) { $precisionStep = 2 }
-  if ($precisionStep -gt 16) { $precisionStep = 16 }
-  if ($pointCacheTtl -lt 0) { $pointCacheTtl = 0 }
-  $cdpStageEnabled = (-not $disableCdp) -and ($allowCdp -or $cdpPageMatch -or $cdpPortRaw)
+  $captures = New-Object System.Collections.ArrayList
+  $arguments = @{rest=@($Rest); cache_seconds=[int]$CacheSeconds; brief=[bool]$Brief; elapsed_ms=0; captured_replies=@()}
+  # Input parsing/semantic errors happen before any probe or stopwatch, as originally.
+  $state = _Invoke-LegacyCompatibility -Operation 'smart-plan-advance' -Arguments $arguments
+  if ($state.state -eq 'error') { throw [string]$state.error }
+
+  $label = _Read-OptValue -Rest $Rest -Name '--label'
+  $match = _Read-OptValue -Rest $Rest -Name '--match'
+  if (-not $match) { $match = _Read-OptValue -Rest $Rest -Name '--window' }
+  $role = _Read-OptValue -Rest $Rest -Name '--role'
+  $typeText = _Read-OptValue -Rest $Rest -Name '--type-text'
   $typeMode = ($null -ne $typeText)
-  $precisionPolicy = [pscustomobject]@{
-    enabled = [bool]$precisionPoints
-    live_click_default_micro_refine = $true
-    live_click_anchor_history = $true
-    target_validate_before_live_click = [bool]$precisionPoints
-    disable_flags = @("--no-micro-refine", "--no-anchor-history")
-    default_click_point_flags = @("--target-match/--target-hwnd", "--micro-refine", "--cache-ttl", "--precision-radius", "--precision-step")
+  $page = _Read-OptValue -Rest $Rest -Name '--cdp-page-match'
+  $portRaw = _Read-OptValue -Rest $Rest -Name '--cdp-port'
+  $port = [int]$portRaw
+  if ($port -le 0) { $port = 9222 }
+  $cdpEnabled = (-not (_Read-Switch -Rest $Rest -Name '--no-cdp')) -and ((_Read-Switch -Rest $Rest -Name '--allow-cdp') -or $page -or $portRaw)
+  $ocrMatch = _Read-OptValue -Rest $Rest -Name '--ocr-match'
+  if (-not $ocrMatch) { $ocrMatch = 'contains' }
+  $ocrLanguage = _Read-OptValue -Rest $Rest -Name '--ocr-language'
+
+  # A locally reconstructed closed schedule authorizes only the old read-only calls.
+  # No descriptor argv is ever forwarded to a shell, scriptblock, or plan actuator.
+  $expected = New-Object System.Collections.ArrayList
+  [void]$expected.Add(@{kind='history';argv=@("$label","$match",'5')})
+  if ($cdpEnabled) { [void]$expected.Add(@{kind='cdp_port';argv=@("$port",'120')}) }
+  $uiaArgs=@('-Action','uia-find','-Label',$label)
+  if ($match) { $uiaArgs+=@('-Match',$match) }
+  if ($role) { $uiaArgs+=@('-Role',$role) }
+  [void]$expected.Add(@{kind='native';argv=$uiaArgs})
+  if ((_Read-Switch -Rest $Rest -Name '--include-ocr') -and -not $typeMode) {
+    $ocrArgs=@('-Action','ocr-uia-fuse','-OcrText',$label,'-OcrMatch',$ocrMatch)
+    if ($match) { $ocrArgs+=@('-Match',$match) }
+    if ($ocrLanguage) { $ocrArgs+=@('-OcrLanguage',$ocrLanguage) }
+    [void]$expected.Add(@{kind='native';argv=$ocrArgs})
   }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $candidates = New-Object System.Collections.ArrayList
-  $checks = New-Object System.Collections.ArrayList
-  $hintedStrategy = $null
-  try { $hintedStrategy = _History-PickBestStrategy -Label $label -Match $match -LookbackN 5 } catch { }
-
-  function _AddPlanCandidate {
-    param(
-      [string]$Route,
-      [int]$Stage,
-      [int]$Score,
-      [bool]$SafeToAct,
-      [bool]$MouseMoved,
-      [string[]]$Command,
-      $Evidence,
-      [string]$Reason = ""
-    )
-    $rank = (1000 - ($Stage * 100)) + $Score
-    [void]$candidates.Add([pscustomobject]@{
-      route = $Route
-      stage = $Stage
-      score = $Score
-      rank = $rank
-      safe_to_act = $SafeToAct
-      mouse_moved = $MouseMoved
-      command = @($Command)
-      reason = $Reason
-      evidence = $Evidence
-    })
-  }
-
-  function _AddPlanCheck {
-    param([string]$Source, [string]$Status, [string]$Reason = "", [int]$ExitCode = 0, $Evidence = $null)
-    [void]$checks.Add([pscustomobject]@{
-      source = $Source
-      status = $Status
-      reason = $Reason
-      exit = $ExitCode
-      evidence = $Evidence
-    })
-  }
-
-  if ($cdpStageEnabled) {
-    if (Test-CdpPortQuick -Port $cdpPort -TimeoutMs 120) {
-      $cdpAction = if ($typeMode) { "cdp-smart-type-find" } else { "cdp-smart-find" }
-      $cdpArgs = @("-Action",$cdpAction,"-CdpText",$label,"-CdpPort","$cdpPort")
-      if ($cdpPageMatch) { $cdpArgs += @("-CdpPageMatch", $cdpPageMatch) }
-      elseif ($match) { $cdpArgs += @("-CdpPageMatch", $match) }
-      $rCdp = Invoke-NativeHelper -ArgList $cdpArgs
-      if ($rCdp.Json -and $rCdp.Json.status -eq "ok") {
-        if ($typeMode) {
-          $cmd = @("macro","cdp-smart-type","--label",$label,"--text",$typeText,"--port","$cdpPort")
-          if ($pressEnter) { $cmd += "--press-enter" }
-          if ($clearFirst) { $cmd += "--clear-first" }
-        } else {
-          $cmd = @("macro","cdp-smart-click","--text",$label,"--port","$cdpPort")
-        }
-        if ($cdpPageMatch) { $cmd += @("--page-match", $cdpPageMatch) }
-        elseif ($match) { $cmd += @("--page-match", $match) }
-        $cdpRoute = if ($typeMode) { "cdp_smart_type" } else { "cdp_smart_click" }
-        $cdpReason = if ($typeMode) { "DOM input candidate matched for direct value/event typing" } else { "DOM text/aria candidate matched without coordinates" }
-        _AddPlanCandidate -Route $cdpRoute -Stage 0 -Score ([int]$rCdp.Json.score) -SafeToAct $true -MouseMoved $false -Command $cmd -Evidence ([pscustomobject]@{
-          matched_text = "$($rCdp.Json.matched_text)"
-          tag_name = "$($rCdp.Json.tag_name)"
-          role = "$($rCdp.Json.role)"
-          page_title = "$($rCdp.Json.page_title)"
-          rect = $rCdp.Json.rect
-        }) -Reason $cdpReason
-      } else {
-        $reason = if ($rCdp.Json) { "$($rCdp.Json.reason)" } else { "helper_failed" }
-        _AddPlanCheck -Source "cdp" -Status "partial" -Reason $reason -ExitCode ([int]$rCdp.ExitCode)
-      }
-    } else {
-      _AddPlanCheck -Source "cdp" -Status "skipped" -Reason "cdp_port_closed"
+  function _SmartPlan-ValidateDescriptor {
+    param($Actual,$Expected)
+    if ($null -eq $Actual -or $Actual.kind -isnot [string] -or $Actual.argv -isnot [array]) { throw 'Invalid SmartPlan query descriptor.' }
+    $names=@($Actual.PSObject.Properties.Name)
+    if ($names.Count -ne 2 -or $names -notcontains 'kind' -or $names -notcontains 'argv') { throw 'Invalid SmartPlan query fields.' }
+    if ($Actual.kind -cne $Expected.kind -or $Actual.argv.Count -ne $Expected.argv.Count) { throw 'SmartPlan query does not match original acquisition schedule.' }
+    for ($j=0;$j -lt $Expected.argv.Count;$j++) {
+      if ($Actual.argv[$j] -isnot [string] -or $Actual.argv[$j] -cne $Expected.argv[$j]) { throw 'SmartPlan query argv does not match original acquisition schedule.' }
     }
-  } else {
-    _AddPlanCheck -Source "cdp" -Status "skipped" -Reason "not_requested"
   }
-
-  $uiaArgs = @("-Action","uia-find","-Label",$label)
-  if ($match) { $uiaArgs += @("-Match", $match) }
-  if ($role) { $uiaArgs += @("-Role", $role) }
-  $rUia = Invoke-NativeHelper -ArgList $uiaArgs
-  if ($rUia.Json -and $rUia.Json.top) {
-    $top = $rUia.Json.top
-    $ambiguous = [bool]$rUia.Json.ambiguous
-    if ($rUia.Json.status -eq "ok" -and -not $ambiguous) {
-      $score = [int]$top.score
-      if ($typeMode) {
-        $hasValuePattern = [bool]$top.value_pattern
-        $valueReadonly = $false
-        try { $valueReadonly = [bool]$top.value_readonly } catch { $valueReadonly = $false }
-        if ($hasValuePattern -and -not $valueReadonly) {
-          $cmd = @("macro","uia-set-value","--label",$label,"--value",$typeText)
-          if ($match) { $cmd += @("--match",$match) }
-          if ($role) { $cmd += @("--role",$role) }
-          _AddPlanCandidate -Route "uia_set_value" -Stage 1 -Score ($score + 45) -SafeToAct $true -MouseMoved $false -Command $cmd -Evidence ([pscustomobject]@{
-            matched_text = "$($top.text)"
-            role = "$($top.role)"
-            automation_id = "$($top.automation_id)"
-            value_pattern = $top.value_pattern
-            value_readonly = $top.value_readonly
-            rect = $top.rect
-          }) -Reason "UIA ValuePattern can set text without keyboard simulation"
-        } elseif ($match -and $top.click_point) {
-          $cmd = @("macro","safe-type","--target-match",$match,"--text",$typeText)
-          if ($top.click_point.x -and $top.click_point.y) { $cmd += @("--click-x","$($top.click_point.x)","--click-y","$($top.click_point.y)") }
-          if ($pressEnter) { $cmd += "--enter" }
-          _AddPlanCandidate -Route "safe_type_guarded" -Stage 3 -Score $score -SafeToAct $true -MouseMoved $true -Command $cmd -Evidence ([pscustomobject]@{
-            matched_text = "$($top.text)"
-            role = "$($top.role)"
-            automation_id = "$($top.automation_id)"
-            click_point = $top.click_point
-            rect = $top.rect
-          }) -Reason "UIA field candidate exists; safe-type can focus target and use guarded click/type"
-        } else {
-          _AddPlanCheck -Source "uia_type" -Status "partial" -Reason "no_value_pattern_or_target_match" -ExitCode ([int]$rUia.ExitCode) -Evidence $top
-        }
-      } else {
-        $pattern = "$($top.invoke_pattern)"
-        $safePattern = -not [string]::IsNullOrWhiteSpace($pattern)
-        if ($safePattern) {
-          $cmd = @("macro","uia-invoke","--label",$label)
-          if ($match) { $cmd += @("--match",$match) }
-          if ($role) { $cmd += @("--role",$role) }
-          _AddPlanCandidate -Route "uia_pattern" -Stage 1 -Score ($score + 40) -SafeToAct $true -MouseMoved $false -Command $cmd -Evidence ([pscustomobject]@{
-            matched_text = "$($top.text)"
-            role = "$($top.role)"
-            automation_id = "$($top.automation_id)"
-            invoke_pattern = $pattern
-            rect = $top.rect
-            click_point = $top.click_point
-          }) -Reason "UIA pattern can invoke without mouse movement"
-        } else {
-          $precisionAdded = $false
-          if ($precisionPoints -and $match -and $top.click_point -and $top.click_point.x -and $top.click_point.y) {
-            $targetValidateCmd = @(
-              "macro","target-validate",
-              "--x","$($top.click_point.x)",
-              "--y","$($top.click_point.y)",
-              "--target-match",$match,
-              "--radius","$precisionRadius",
-              "--step","$precisionStep"
-            )
-            $pcmd = @(
-              "macro","click-point",
-              "--x","$($top.click_point.x)",
-              "--y","$($top.click_point.y)",
-              "--target-match",$match,
-              "--refine","uia-safe",
-              "--micro-refine",
-              "--precision-radius","$precisionRadius",
-              "--precision-step","$precisionStep",
-              "--cache-ttl","$pointCacheTtl"
-            )
-            _AddPlanCandidate -Route "uia_precision_point" -Stage 2 -Score ($score + 25) -SafeToAct $true -MouseMoved $true -Command $pcmd -Evidence ([pscustomobject]@{
-              matched_text = "$($top.text)"
-              role = "$($top.role)"
-              automation_id = "$($top.automation_id)"
-              rect = $top.rect
-              click_point = $top.click_point
-              precision_radius = $precisionRadius
-              precision_step = $precisionStep
-              cache_ttl_seconds = $pointCacheTtl
-              target_validate_command = @($targetValidateCmd)
-              target_validate_command_line = _TaskPlan-StepString -Command $targetValidateCmd
-              click_point_defaults = [pscustomobject]@{
-                micro_refine = "enabled_by_default_when_target_guard_present"
-                anchor_reuse_history = "scored_before_click_and_recorded_after_success"
-              }
-            }) -Reason "UIA label matched; validate target, then use guarded click-point with default micro-refine and short TTL point cache"
-            _AddPlanCheck -Source "point_precision" -Status "ready" -Reason "recommended_micro_refine_click_point"
-            $precisionAdded = $true
-          } elseif ($precisionPoints) {
-            _AddPlanCheck -Source "point_precision" -Status "skipped" -Reason "requires_target_match_and_click_point"
+  $sw=[Diagnostics.Stopwatch]::StartNew()
+  for ($probe=0;$probe -le 5;$probe++) {
+    if ($state.state -eq 'error') { throw [string]$state.error }
+    if ($state.state -eq 'complete') {
+      if ($probe -ne $expected.Count -or @($state.queries).Count -ne $probe) { throw 'SmartPlan completed before original acquisition schedule.' }
+      for ($i=0;$i -lt $probe;$i++) { _SmartPlan-ValidateDescriptor $state.queries[$i] $expected[$i] }
+      $sw.Stop();$elapsed=[int]$sw.Elapsed.TotalMilliseconds
+      if ($null -eq $state.payload -or $state.payload.schema -cne 'cucp.smart-plan/v1' -or $state.payload.safe_to_act -isnot [bool] -or $state.payload.status -notin @('ok','partial') -or $state.exit -notin @(0,2) -or (($state.payload.status -eq 'ok') -ne $state.payload.safe_to_act) -or (($state.exit -eq 0) -ne $state.payload.safe_to_act)) { throw 'Invalid SmartPlan completion envelope.' }
+      $state.payload.elapsed_ms=$elapsed
+      if ($Brief -and -not (_Read-Switch -Rest $Rest -Name '--json-only')) {
+        if ($state.brief -isnot [string]) { throw 'Missing SmartPlan brief output.' }
+        [Console]::Out.WriteLine(($state.brief -replace 'elapsed_ms=\d+$',"elapsed_ms=$elapsed"))
+      } else { [Console]::Out.WriteLine(($state.payload | ConvertTo-Json -Depth 12)) }
+      return [int]$state.exit
+    }
+    if ($probe -ge 5 -or $probe -ge $expected.Count -or $state.state -cne 'query') { throw 'SmartPlan exceeded the original five-probe bound.' }
+    if (@($state.queries).Count -ne ($probe+1)) { throw 'Invalid SmartPlan query trace length.' }
+    for ($i=0;$i -le $probe;$i++) { _SmartPlan-ValidateDescriptor $state.queries[$i] $expected[$i] }
+    _SmartPlan-ValidateDescriptor $state.query $expected[$probe]
+    $descriptor=$expected[$probe]
+    $capture=@{kind=$descriptor.kind;argv=@($descriptor.argv)}
+    try {
+      switch -CaseSensitive ($descriptor.kind) {
+        'history' { $capture.result = _History-PickBestStrategy -Label $label -Match $match -LookbackN 5 }
+        'cdp_port' {
+          $capture.result = Test-CdpPortQuick -Port $port -TimeoutMs 120
+          if ($capture.result) {
+            $action=if ($typeMode) { 'cdp-smart-type-find' } else { 'cdp-smart-find' }
+            $cdpArgs=@('-Action',$action,'-CdpText',$label,'-CdpPort',"$port")
+            if ($page) { $cdpArgs+=@('-CdpPageMatch',$page) } elseif ($match) { $cdpArgs+=@('-CdpPageMatch',$match) }
+            $expected.Insert($probe+1,@{kind='native';argv=$cdpArgs})
           }
-          $cmd = @("macro","smart-click","--label",$label,"--allow-mouse-fallback")
-          if ($match) { $cmd += @("--match",$match) }
-          if ($role) { $cmd += @("--role",$role) }
-          _AddPlanCandidate -Route "uia_coord" -Stage 2 -Score $(if ($precisionAdded) { $score - 10 } else { $score }) -SafeToAct $true -MouseMoved $true -Command $cmd -Evidence ([pscustomobject]@{
-            matched_text = "$($top.text)"
-            role = "$($top.role)"
-            automation_id = "$($top.automation_id)"
-            rect = $top.rect
-            click_point = $top.click_point
-          }) -Reason $(if ($precisionAdded) { "Fallback if precision point route is not desired" } else { "UIA label matched; use guarded coordinate fallback" })
         }
+        'native' { $capture.result = Invoke-NativeHelper -ArgList $descriptor.argv }
+        default { throw 'Unsupported SmartPlan query kind.' }
       }
-    } else {
-      _AddPlanCheck -Source "uia" -Status "partial" -Reason "ambiguous_or_partial" -ExitCode ([int]$rUia.ExitCode) -Evidence ([pscustomobject]@{
-        top = $top
-        ambiguous = $ambiguous
-        candidates = $rUia.Json.candidates
-      })
+    } catch {
+      # Preserve swallowed history errors and propagated native/port failures via
+      # the same replay error envelope. A failed query is never retried.
+      [void]$capture.Remove('result');$capture.error=$_.Exception.Message
     }
-  } else {
-    $reason = if ($rUia.Json) { "$($rUia.Json.reason)" } else { "helper_failed" }
-    _AddPlanCheck -Source "uia" -Status "partial" -Reason $reason -ExitCode ([int]$rUia.ExitCode)
+    [void]$captures.Add($capture)
+    $arguments.captured_replies=@($captures)
+    $arguments.elapsed_ms=[int]$sw.Elapsed.TotalMilliseconds
+    $state=_Invoke-LegacyCompatibility -Operation 'smart-plan-advance' -Arguments $arguments
   }
-
-  if ($includeOcr -and -not $typeMode) {
-    $ocrArgs = @("-Action","ocr-uia-fuse","-OcrText",$label,"-OcrMatch",$ocrMatch)
-    if ($match) { $ocrArgs += @("-Match", $match) }
-    if ($ocrLang) { $ocrArgs += @("-OcrLanguage", $ocrLang) }
-    $rOcr = Invoke-NativeHelper -ArgList $ocrArgs
-    if ($rOcr.Json -and $rOcr.Json.status -eq "ok") {
-      $rec = "$($rOcr.Json.recommendation)"
-      $ocrScore = 0
-      try { $ocrScore = [int]$rOcr.Json.ocr_top.score } catch { }
-      if ($rec -eq "uia_invoke") {
-        $cmd = @("macro","ocr-uia-invoke","--text",$label,"--match",$ocrMatch)
-        if ($match) { $cmd += @("--match-window",$match) }
-        if ($ocrLang) { $cmd += @("--language",$ocrLang) }
-        _AddPlanCandidate -Route "fusion_uia_invoke" -Stage 4 -Score ($ocrScore + 30) -SafeToAct $true -MouseMoved $false -Command $cmd -Evidence ([pscustomobject]@{
-          ocr_top = $rOcr.Json.ocr_top
-          uia_match = $rOcr.Json.uia_match
-          invoke_pattern = "$($rOcr.Json.invoke_pattern)"
-        }) -Reason "OCR text sits on invokable UIA element"
-      } elseif ($rec -eq "ocr_click" -and $ocrScore -ge 70) {
-        $cmd = @("macro","ocr-click","--text",$label,"--match",$ocrMatch)
-        if ($match) { $cmd += @("--target-match",$match) }
-        if ($ocrLang) { $cmd += @("--language",$ocrLang) }
-        _AddPlanCandidate -Route "ocr_text" -Stage 5 -Score $ocrScore -SafeToAct $true -MouseMoved $true -Command $cmd -Evidence ([pscustomobject]@{
-          ocr_top = $rOcr.Json.ocr_top
-          region = $rOcr.Json.region
-        }) -Reason "OCR candidate high enough for guarded text click"
-      } else {
-        _AddPlanCheck -Source "ocr" -Status "partial" -Reason $rec -ExitCode ([int]$rOcr.ExitCode) -Evidence $rOcr.Json
-      }
-    } else {
-      $reason = if ($rOcr.Json) { "$($rOcr.Json.reason)" } else { "helper_failed" }
-      _AddPlanCheck -Source "ocr" -Status "partial" -Reason $reason -ExitCode ([int]$rOcr.ExitCode)
-    }
-  } else {
-    $ocrSkipReason = if ($typeMode) { "not_supported_for_type_plan" } else { "not_requested" }
-    _AddPlanCheck -Source "ocr" -Status "skipped" -Reason $ocrSkipReason
-  }
-
-  $safeCandidates = @($candidates | Where-Object { $_.safe_to_act } | Sort-Object -Property rank -Descending)
-  $best = if ($safeCandidates.Count -gt 0) { $safeCandidates[0] } else { $null }
-  $sw.Stop()
-  $elapsed = [int]$sw.Elapsed.TotalMilliseconds
-  $status = if ($best) { "ok" } else { "partial" }
-  $confidence = "low"
-  if ($best) {
-    if ($best.stage -le 1 -and $best.score -ge 100) { $confidence = "high" }
-    elseif ($best.score -ge 70) { $confidence = "medium" }
-  }
-  $recommendedCommand = $null
-  if ($best) { $recommendedCommand = [object[]]@($best.command) }
-  $payload = [pscustomobject]@{
-    schema = "cucp.smart-plan/v1"
-    status = $status
-    mode = if ($typeMode) { "type" } else { "click" }
-    label = $label
-    match = $match
-    role = $role
-    type_text_length = if ($typeMode) { $typeText.Length } else { 0 }
-    elapsed_ms = $elapsed
-    confidence = $confidence
-    history_hint = $hintedStrategy
-    best_route = if ($best) { $best.route } else { $null }
-    safe_to_act = [bool]($null -ne $best)
-    recommended_command = $recommendedCommand
-    best = $best
-    candidates = @($candidates | Sort-Object -Property rank -Descending)
-    checks = @($checks)
-    precision_policy = $precisionPolicy
-    next_step = if ($best) { "Run recommended_command with -AllowLiveControl only after user authorization, then verify with wait-label/windows/screenshot-diff." } else { "No safe route. Narrow with --match/--role, enable --include-ocr, or inspect list-affordances." }
-  }
-  if ($Brief -and -not $jsonOnly) {
-    if ($best) {
-      [Console]::Out.WriteLine("ok smart-plan '$label' route=$($best.route) confidence=$confidence mouse_moved=$($best.mouse_moved) candidates=$($candidates.Count) elapsed_ms=$elapsed")
-    } else {
-      [Console]::Out.WriteLine("partial smart-plan '$label' no_safe_route checks=$($checks.Count) elapsed_ms=$elapsed")
-    }
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 12))
-  }
-  if ($best) { return 0 }
-  return 2
+  throw 'SmartPlan did not finish within the original query bound.'
 }
 
 function _Parse-WorkflowStepTokens {
@@ -9657,117 +5767,16 @@ function _Read-WorkflowStepSpecs {
 
 function _Build-WorkflowPlan {
   param([string[]]$Rest)
-  $stepSpecs = @(_Read-WorkflowStepSpecs -Rest $Rest)
-  $name = _Read-OptValue -Rest $Rest -Name "--name"
-  if ($stepSpecs.Count -eq 0) { throw "macro workflow-plan/run requires --step `"macro <name> ...`"" }
-
-  $readOnlyMacros = @(
-    "windows","native-windows","wait-window","wait-label","find-label","list-affordances",
-    "health-quick","health-detail","native-health","metrics","perf","log-tail","diagnose-lag",
-    "session","trajectory","history","screenshot","native-screenshot",
-    "safety-classify","coord-profile","coord-map","coord-anchor","hit-test","hit-test-batch","hit-scan","point-plan","target-validate","smart-plan","app-profile","task-preset","task-plan","form-plan",
-    "cdp-detect","cdp-smart-find","cdp-smart-type-find",
-    "ocr-screen","ocr-image","ocr-find-text","ocr-uia-fuse","screenshot-diff",
-    "cdp-deep-find","modal-detect","recovery-plan","precision-validate","benchmark","release-notes"
-  )
-  $liveMacros = @(
-    "app-launch","app-close","with-app","focus-window","focus-verify",
-    "click-label","double-click-label","right-click-label","click-id","click-point",
-    "fill-label","shortcut","shortcut-native","type-native","uia-click-label",
-    "uia-invoke","uia-set-value","uia-toggle","safe-type","smart-click","form-run",
-    "icon-click","vision-click","vision-click-precise","click-and-verify",
-    "click-and-verify-screen","ocr-click","ocr-uia-invoke","cdp-type","cdp-click",
-    "cdp-eval","cdp-smart-click","cdp-smart-type","auto-do","goal","notify","multi-select",
-    "multi-edit","clipboard","process","registry",
-    "ime-paste","safe-type-ime","recovery-run"
-  )
-  $blockedMacros = @("workflow-plan","workflow-run")
-  $steps = New-Object System.Collections.ArrayList
-  $errors = New-Object System.Collections.ArrayList
-  $index = 0
-
-  foreach ($raw in $stepSpecs) {
-    $index++
-    $parsed = _Parse-WorkflowStepTokens -Step "$raw"
-    if (-not $parsed.ok) {
-      [void]$errors.Add([pscustomobject]@{ index=$index; code=$parsed.error; message=$parsed.detail; step="$raw" })
-      continue
-    }
-    $cmd = @($parsed.tokens)
-    if ($cmd.Count -eq 0) {
-      [void]$errors.Add([pscustomobject]@{ index=$index; code="empty_step"; message="empty workflow step"; step="$raw" })
-      continue
-    }
-    if ($cmd[0] -ne "macro") { $cmd = @("macro") + $cmd }
-    if ($cmd.Count -lt 2) {
-      [void]$errors.Add([pscustomobject]@{ index=$index; code="missing_macro_name"; message="step must name a macro"; step="$raw" })
-      continue
-    }
-    $macroName = "$($cmd[1])"
-    $allowed = $false
-    $liveRequired = $false
-    $reason = ""
-    if ($blockedMacros -contains $macroName) {
-      $allowed = $false
-      $reason = "recursive_workflow_blocked"
-    } elseif ($macroName -eq "session") {
-      $sessionAction = if ($cmd.Count -ge 3) { "$($cmd[2])" } else { "info" }
-      $allowed = $sessionAction -in @("info", "helper-status", "autostart-status")
-      $liveRequired = -not $allowed
-      $reason = if ($allowed) { "read_only_session_action" } else { "mutating_session_action_not_in_workflow_allowlist" }
-    } elseif ($readOnlyMacros -contains $macroName) {
-      $allowed = $true
-      $liveRequired = $false
-      $reason = "read_only_macro"
-    } elseif ($liveMacros -contains $macroName) {
-      $allowed = $true
-      $liveRequired = $true
-      $reason = "live_macro"
-    } else {
-      $allowed = $false
-      $reason = "macro_not_in_workflow_allowlist"
-    }
-    if (-not $allowed) {
-      [void]$errors.Add([pscustomobject]@{ index=$index; code=$reason; message="workflow step macro is not allowed"; macro=$macroName; step="$raw" })
-    }
-    $safety = _Classify-SafetyFromText -Text ((@($cmd) -join " ")) -MacroName $macroName
-    $requiresSensitiveConfirmation = ([bool]$liveRequired -and [bool]$safety.requires_explicit_confirmation)
-    [void]$steps.Add([pscustomobject]@{
-      index = $index
-      raw = "$raw"
-      macro = $macroName
-      command = @($cmd)
-      allowed = [bool]$allowed
-      live_required = [bool]$liveRequired
-      reason = $reason
-      safety = $safety
-      requires_sensitive_confirmation = [bool]$requiresSensitiveConfirmation
-    })
+  # Retain the exact legacy PSParser language; only policy/plan assembly is C#.
+  $parsed = New-Object System.Collections.ArrayList
+  foreach ($spec in @(_Read-WorkflowStepSpecs -Rest $Rest)) {
+    [void]$parsed.Add((_Parse-WorkflowStepTokens -Step "$spec"))
   }
-
-  $allowedCount = @($steps | Where-Object { $_.allowed }).Count
-  $liveCount = @($steps | Where-Object { $_.live_required }).Count
-  $sensitiveCount = @($steps | Where-Object { $_.requires_sensitive_confirmation }).Count
-  $safeToRun = ($steps.Count -gt 0 -and $allowedCount -eq $steps.Count -and $errors.Count -eq 0)
-  return [pscustomobject]@{
-    schema = "cucp.workflow-plan/v1"
-    status = if ($safeToRun) { "ok" } else { "partial" }
-    name = $name
-    step_count = $steps.Count
-    allowed_count = $allowedCount
-    live_step_count = $liveCount
-    sensitive_step_count = $sensitiveCount
-    requires_sensitive_confirmation = [bool]($sensitiveCount -gt 0)
-    safe_to_run = [bool]$safeToRun
-    safety_policy = [pscustomobject]@{
-      schema = "cucp.safety-policy/v1"
-      confirmation_flag = "--confirm-sensitive"
-      levels_requiring_confirmation = @("medium","high","critical")
-      categories_requiring_confirmation = @("credentials","payment","destructive","external_send","identity_or_privacy","system_change","app_settings")
-    }
-    steps = @($steps)
-    errors = @($errors)
+  $result = _Invoke-LegacyCompatibility -Operation 'workflow-plan-from-parsed' -Arguments @{rest=@($Rest); parsed_steps=@($parsed)}
+  if ($result.schema -ne 'cucp.workflow-plan/v1' -or $result.status -notin @('ok','partial') -or $result.safe_to_run -isnot [bool] -or $result.requires_sensitive_confirmation -isnot [bool]) {
+    throw 'Invalid workflow plan response; execution remains blocked.'
   }
+  return $result
 }
 
 function Invoke-MacroWorkflowPlan {
@@ -9783,423 +5792,396 @@ function Invoke-MacroWorkflowPlan {
   return 2
 }
 
-function Invoke-MacroWorkflowRun {
-  param([string[]]$Rest)
-  $dryRun = _Read-Switch -Rest $Rest -Name "--dry-run"
-  $continueOnError = _Read-Switch -Rest $Rest -Name "--continue-on-error"
-  $includePlan = _Read-Switch -Rest $Rest -Name "--include-plan"
-  $confirmSensitive = _Read-Switch -Rest $Rest -Name "--confirm-sensitive"
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $settleMsRaw = _Read-OptValue -Rest $Rest -Name "--settle-ms"
-  $observeAfterStep = _Read-Switch -Rest $Rest -Name "--observe-after-step"
-  $verifyAfterStep = _Read-Switch -Rest $Rest -Name "--verify-after-step"
-  $observeMatch = _Read-OptValue -Rest $Rest -Name "--observe-match"
-  $verifyMatch = _Read-OptValue -Rest $Rest -Name "--verify-match"
-  $verifyLabelAfterStep = _Read-OptValue -Rest $Rest -Name "--verify-label-after-step"
-  if (-not $verifyLabelAfterStep) { $verifyLabelAfterStep = _Read-OptValue -Rest $Rest -Name "--verify-after-label" }
-  $verifyLabelWindow = _Read-OptValue -Rest $Rest -Name "--verify-label-window"
-  $verifyLabelTimeoutRaw = _Read-OptValue -Rest $Rest -Name "--verify-label-timeout-ms"
-  $verifyLabelIntervalRaw = _Read-OptValue -Rest $Rest -Name "--verify-label-interval-ms"
-  $retryFailedRaw = _Read-OptValue -Rest $Rest -Name "--retry-failed-step"
-  $retryDelayRaw = _Read-OptValue -Rest $Rest -Name "--retry-delay-ms"
-  $retryLiveSteps = _Read-Switch -Rest $Rest -Name "--retry-live-steps"
-  if (-not $observeMatch -and $verifyMatch) { $observeMatch = $verifyMatch }
-  if ($verifyAfterStep) { $observeAfterStep = $true }
-  $settleMs = 0
-  if ($settleMsRaw) { $settleMs = [int]$settleMsRaw }
-  if ($settleMs -lt 0) { $settleMs = 0 }
-  if ($settleMs -gt 10000) { $settleMs = 10000 }
-  $retryFailedStep = 0
-  $retryDelayMs = 0
-  if ($retryFailedRaw) { $retryFailedStep = [int]$retryFailedRaw }
-  if ($retryDelayRaw) { $retryDelayMs = [int]$retryDelayRaw }
-  if ($retryFailedStep -lt 0) { $retryFailedStep = 0 }
-  if ($retryFailedStep -gt 5) { $retryFailedStep = 5 }
-  if ($retryDelayMs -lt 0) { $retryDelayMs = 0 }
-  if ($retryDelayMs -gt 10000) { $retryDelayMs = 10000 }
-  $verifyLabelTimeout = 1500
-  $verifyLabelInterval = 250
-  if ($verifyLabelTimeoutRaw) { $verifyLabelTimeout = [int]$verifyLabelTimeoutRaw }
-  if ($verifyLabelIntervalRaw) { $verifyLabelInterval = [int]$verifyLabelIntervalRaw }
-  if ($verifyLabelTimeout -lt 100) { $verifyLabelTimeout = 100 }
-  if ($verifyLabelTimeout -gt 30000) { $verifyLabelTimeout = 30000 }
-  if ($verifyLabelInterval -lt 50) { $verifyLabelInterval = 50 }
-  if ($verifyLabelInterval -gt 5000) { $verifyLabelInterval = 5000 }
-
-  function _WorkflowPlanArgs {
-    param([string[]]$InputArgs)
-    $skip = @{"--dry-run"=$true; "--continue-on-error"=$true; "--include-plan"=$true; "--json-only"=$true; "--observe-after-step"=$true; "--verify-after-step"=$true; "--retry-live-steps"=$true; "--confirm-sensitive"=$true}
-    $skipValue = @{"--settle-ms"=$true; "--observe-match"=$true; "--verify-match"=$true; "--verify-label-after-step"=$true; "--verify-after-label"=$true; "--verify-label-window"=$true; "--verify-label-timeout-ms"=$true; "--verify-label-interval-ms"=$true; "--retry-failed-step"=$true; "--retry-delay-ms"=$true}
-    $items = New-Object System.Collections.ArrayList
-    $skipNext = $false
-    foreach ($a in $InputArgs) {
-      if ($skipNext) { $skipNext = $false; continue }
-      if ($skip.ContainsKey($a)) { continue }
-      if ($skipValue.ContainsKey($a)) { $skipNext = $true; continue }
-      [void]$items.Add($a)
-    }
-    return @($items)
-  }
-  function _InvokeWorkflowChild {
-    param([string[]]$ChildArgs)
-    $rawLines = & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @ChildArgs 2>&1
-    $exitCode = $LASTEXITCODE
-    $raw = (($rawLines | ForEach-Object { $_.ToString() }) -join "`n")
-    $obj = $null
-    try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
-    return [pscustomobject]@{ exit=[int]$exitCode; raw=$raw; json=$obj }
-  }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $plan = _Build-WorkflowPlan -Rest @(_WorkflowPlanArgs -InputArgs $Rest)
-  if (-not $dryRun -and $plan.live_step_count -gt 0 -and -not $AllowLiveControl) {
-    throw "macro workflow-run requires -AllowLiveControl when live steps are present"
-  }
-  $sensitiveSteps = @($plan.steps | Where-Object { $_.requires_sensitive_confirmation })
-  if (-not $dryRun -and $sensitiveSteps.Count -gt 0 -and -not $confirmSensitive) {
-    $sw.Stop()
-    $issues = @($sensitiveSteps | ForEach-Object {
-      [pscustomobject]@{
-        index = $_.index
-        macro = $_.macro
-        command = $_.command
-        risk_level = $_.safety.risk_level
-        risk_score = [int]$_.safety.risk_score
-        categories = @($_.safety.categories)
-        recommended_action = $_.safety.recommended_action
-      }
-    })
-    $payload = [pscustomobject]@{
-      schema = "cucp.workflow-run/v1"
-      status = "blocked"
-      reason = "sensitive_action_requires_confirmation"
-      dry_run = [bool]$dryRun
-      confirm_sensitive = [bool]$confirmSensitive
-      confirmation_flag = "--confirm-sensitive"
-      executed_count = 0
-      failed_count = 0
-      verify_failed_count = 0
-      retry_count = 0
-      sensitive_step_count = [int]$sensitiveSteps.Count
-      safety_issues = @($issues)
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      plan = if ($includePlan) { $plan } else { $null }
-      steps = @()
-      next_action = "Re-run with --confirm-sensitive only if the user explicitly approved these exact sensitive live actions."
-    }
-    if ($Brief -and -not $jsonOnly) { [Console]::Out.WriteLine("blocked workflow-run reason=sensitive_action_requires_confirmation sensitive=$($sensitiveSteps.Count)") }
-    else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 14)) }
-    return 3
-  }
-  if (-not [bool]$plan.safe_to_run) {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.workflow-run/v1"
-      status = "blocked"
-      reason = "plan_not_safe"
-      dry_run = [bool]$dryRun
-      executed_count = 0
-      failed_count = 0
-      verify_failed_count = 0
-      retry_count = 0
-      retry_failed_step = [int]$retryFailedStep
-      retry_delay_ms = [int]$retryDelayMs
-      retry_live_steps = [bool]$retryLiveSteps
-      confirm_sensitive = [bool]$confirmSensitive
-      verify_label_after_step = $verifyLabelAfterStep
-      verify_label_window = $verifyLabelWindow
-      verify_label_timeout_ms = [int]$verifyLabelTimeout
-      verify_label_interval_ms = [int]$verifyLabelInterval
-      settle_ms = [int]$settleMs
-      observe_after_step = [bool]$observeAfterStep
-      verify_after_step = [bool]$verifyAfterStep
-      observe_match = $observeMatch
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      plan = if ($includePlan) { $plan } else { $null }
-      errors = @($plan.errors)
-      steps = @()
-    }
-    if ($Brief -and -not $jsonOnly) { [Console]::Out.WriteLine("blocked workflow-run reason=plan_not_safe errors=$($plan.errors.Count)") }
-    else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 12)) }
-    return 3
-  }
-  if ($dryRun) {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.workflow-run/v1"
-      status = "ready"
-      reason = "dry_run"
-      dry_run = $true
-      executed_count = 0
-      failed_count = 0
-      verify_failed_count = 0
-      retry_count = 0
-      retry_failed_step = [int]$retryFailedStep
-      retry_delay_ms = [int]$retryDelayMs
-      retry_live_steps = [bool]$retryLiveSteps
-      confirm_sensitive = [bool]$confirmSensitive
-      verify_label_after_step = $verifyLabelAfterStep
-      verify_label_window = $verifyLabelWindow
-      verify_label_timeout_ms = [int]$verifyLabelTimeout
-      verify_label_interval_ms = [int]$verifyLabelInterval
-      settle_ms = [int]$settleMs
-      observe_after_step = [bool]$observeAfterStep
-      verify_after_step = [bool]$verifyAfterStep
-      observe_match = $observeMatch
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      plan = $plan
-      steps = @()
-    }
-    if ($Brief -and -not $jsonOnly) { [Console]::Out.WriteLine("ready workflow-run dry-run steps=$($plan.step_count) live=$($plan.live_step_count)") }
-    else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 12)) }
-    return 0
-  }
-
-  $results = New-Object System.Collections.ArrayList
-  $executed = 0
-  $failed = 0
-  $verifyFailed = 0
-  $retryCount = 0
-  foreach ($step in @($plan.steps)) {
-    $stepSw = [System.Diagnostics.Stopwatch]::StartNew()
-    $attempts = New-Object System.Collections.ArrayList
-    $attempt = 0
-    $lastR = $null
-    $lastPostObservation = $null
-    $lastPostObservationRaw = $null
-    $lastPostObservationExit = $null
-    $lastVerificationStatus = "not_requested"
-    $lastLabelVerificationStatus = "not_requested"
-    $lastLabelVerificationExit = $null
-    $lastLabelVerificationRaw = $null
-    $stepFailed = $true
-    $retrySkippedReason = ""
-
-    while ($true) {
-      $attempt++
-      $attemptSw = [System.Diagnostics.Stopwatch]::StartNew()
-      $childArgs = @("-Quiet")
-      if ([bool]$step.live_required) { $childArgs += "-AllowLiveControl" }
-      $childArgs += @($step.command)
-      if ([bool]$step.live_required -and $confirmSensitive) { $childArgs += "--confirm-sensitive" }
-      $r = _InvokeWorkflowChild -ChildArgs $childArgs
-      if ($settleMs -gt 0) { Start-Sleep -Milliseconds $settleMs }
-      $postObservation = $null
-      $postObservationRaw = $null
-      $postObservationExit = $null
-      $verificationStatus = "not_requested"
-      $labelVerificationStatus = "not_requested"
-      $labelVerificationExit = $null
-      $labelVerificationRaw = $null
-      if ($observeAfterStep) {
-        $obsArgs = @("-Quiet","macro","windows","--json-only")
-        if ($observeMatch) { $obsArgs += @("--match",$observeMatch) }
-        $obs = _InvokeWorkflowChild -ChildArgs $obsArgs
-        $postObservationExit = [int]$obs.exit
-        if ($obs.json) { $postObservation = $obs.json } else { $postObservationRaw = $obs.raw }
-        if ($verifyAfterStep) {
-          if ($obs.exit -eq 0) { $verificationStatus = "ok" }
-          else { $verificationStatus = "partial" }
-        } else {
-          $verificationStatus = if ($obs.exit -eq 0) { "observed" } else { "observe_partial" }
-        }
-      }
-      if ($verifyLabelAfterStep) {
-        $labelArgs = @("-Quiet","-Brief","macro","wait-label","--label",$verifyLabelAfterStep,"--timeout-ms","$verifyLabelTimeout","--interval-ms","$verifyLabelInterval")
-        if ($verifyLabelWindow) { $labelArgs += @("--window",$verifyLabelWindow) }
-        elseif ($observeMatch) { $labelArgs += @("--window",$observeMatch) }
-        $labelResult = _InvokeWorkflowChild -ChildArgs $labelArgs
-        $labelVerificationExit = [int]$labelResult.exit
-        $labelVerificationRaw = $labelResult.raw
-        $labelVerificationStatus = if ($labelResult.exit -eq 0) { "ok" } else { "partial" }
-      }
-      $attemptSw.Stop()
-      $attemptFailed = ($r.exit -ne 0 -or ($verifyAfterStep -and $postObservationExit -ne $null -and $postObservationExit -ne 0) -or ($verifyLabelAfterStep -and $labelVerificationExit -ne $null -and $labelVerificationExit -ne 0))
-      [void]$attempts.Add([pscustomobject]@{
-        attempt = $attempt
-        status = if (-not $attemptFailed) { "ok" } else { "partial" }
-        exit = $r.exit
-        elapsed_ms = [int]$attemptSw.Elapsed.TotalMilliseconds
-        result = $r.json
-        raw = if ($r.json) { $null } else { $r.raw }
-        verification_status = $verificationStatus
-        post_observation_exit = $postObservationExit
-        post_observation = $postObservation
-        post_observation_raw = $postObservationRaw
-        label_verification_status = $labelVerificationStatus
-        label_verification_exit = $labelVerificationExit
-        label_verification_raw = $labelVerificationRaw
-      })
-
-      $lastR = $r
-      $lastPostObservation = $postObservation
-      $lastPostObservationRaw = $postObservationRaw
-      $lastPostObservationExit = $postObservationExit
-      $lastVerificationStatus = $verificationStatus
-      $lastLabelVerificationStatus = $labelVerificationStatus
-      $lastLabelVerificationExit = $labelVerificationExit
-      $lastLabelVerificationRaw = $labelVerificationRaw
-      $stepFailed = $attemptFailed
-      if (-not $stepFailed) { break }
-
-      $retriesUsed = $attempt - 1
-      if ($retryFailedStep -le 0 -or $retriesUsed -ge $retryFailedStep) { break }
-      if ([bool]$step.live_required -and -not $retryLiveSteps) {
-        $retrySkippedReason = "live_step_retry_requires_retry_live_steps"
-        break
-      }
-      $retryCount++
-      if ($retryDelayMs -gt 0) { Start-Sleep -Milliseconds $retryDelayMs }
-    }
-
-    $stepSw.Stop()
-    $executed++
-    if ($stepFailed) { $failed++ }
-    if ($stepFailed -and (($verifyAfterStep -and $lastPostObservationExit -ne $null -and $lastPostObservationExit -ne 0) -or ($verifyLabelAfterStep -and $lastLabelVerificationExit -ne $null -and $lastLabelVerificationExit -ne 0))) { $verifyFailed++ }
-    [void]$results.Add([pscustomobject]@{
-      index = $step.index
-      macro = $step.macro
-      live_required = [bool]$step.live_required
-      command = @($step.command)
-      status = if (-not $stepFailed) { "ok" } else { "partial" }
-      exit = $lastR.exit
-      elapsed_ms = [int]$stepSw.Elapsed.TotalMilliseconds
-      attempt_count = $attempt
-      retry_count = [Math]::Max(0, $attempt - 1)
-      retry_skipped_reason = $retrySkippedReason
-      attempts = @($attempts)
-      result = $lastR.json
-      raw = if ($lastR.json) { $null } else { $lastR.raw }
-      settle_ms = [int]$settleMs
-      verification_status = $lastVerificationStatus
-      post_observation_exit = $lastPostObservationExit
-      post_observation = $lastPostObservation
-      post_observation_raw = $lastPostObservationRaw
-      label_verification_status = $lastLabelVerificationStatus
-      label_verification_exit = $lastLabelVerificationExit
-      label_verification_raw = $lastLabelVerificationRaw
-    })
-    if ($stepFailed -and -not $continueOnError) { break }
-  }
-  $sw.Stop()
-  $status = if ($failed -eq 0 -and $executed -eq $plan.step_count) { "ok" } else { "partial" }
-  $failureSummary = $null
-  $nextAction = ""
-  if ($status -ne "ok") {
-    $failedStep = @($results | Where-Object { $_.status -ne "ok" } | Select-Object -First 1)
-    if ($failedStep) {
-      $failureKind = "command_failed"
-      $evidence = ""
-      $retryExhausted = $false
-      if ($failedStep.label_verification_exit -ne $null -and [int]$failedStep.label_verification_exit -ne 0) {
-        $failureKind = "label_verification_failed"
-        $evidence = "$($failedStep.label_verification_raw)"
-        $nextAction = "Run macro find-label --label '$verifyLabelAfterStep' with the right --match/--window, or increase --verify-label-timeout-ms after confirming the expected UI label should appear."
-      } elseif ($failedStep.post_observation_exit -ne $null -and [int]$failedStep.post_observation_exit -ne 0) {
-        $failureKind = "window_verification_failed"
-        $evidence = "post_observation_exit=$($failedStep.post_observation_exit)"
-        $target = if ($observeMatch) { $observeMatch } else { $verifyMatch }
-        $nextAction = "Run macro windows --match '$target' to confirm the target window, or adjust --verify-match/--observe-match before retrying."
-      } elseif ($failedStep.retry_skipped_reason) {
-        $failureKind = "retry_skipped"
-        $evidence = "$($failedStep.retry_skipped_reason)"
-        $nextAction = "Live step retry was skipped. Use --retry-live-steps only if repeating this action is safe and idempotent."
-      } else {
-        $recommended = ""
-        try {
-          if ($failedStep.result -and $failedStep.result.recoverable_errors -and $failedStep.result.recoverable_errors.Count -gt 0) {
-            $recommended = "$($failedStep.result.recoverable_errors[0].recommended_action)"
-          }
-        } catch { $recommended = "" }
-        if ($recommended) { $nextAction = $recommended }
-        else { $nextAction = "Inspect the failed step result, then run macro windows or list-affordances to re-ground before retrying the workflow." }
-      }
-      if ($retryFailedStep -gt 0 -and [int]$failedStep.retry_count -ge $retryFailedStep) { $retryExhausted = $true }
-      $failureSummary = [pscustomobject]@{
-        step_index = $failedStep.index
-        macro = $failedStep.macro
-        failure_kind = $failureKind
-        exit = $failedStep.exit
-        status = $failedStep.status
-        attempt_count = $failedStep.attempt_count
-        retry_count = $failedStep.retry_count
-        retry_exhausted = [bool]$retryExhausted
-        verification_status = $failedStep.verification_status
-        label_verification_status = $failedStep.label_verification_status
-        evidence = $evidence
-        next_action = $nextAction
-      }
-    } else {
-      $nextAction = "No failed step was captured. Re-run with --include-plan and inspect raw workflow output."
-    }
-  }
-  $payload = [pscustomobject]@{
-    schema = "cucp.workflow-run/v1"
-    status = $status
-    reason = if ($status -eq "ok") { "" } else { "step_failed_or_stopped" }
-    next_action = $nextAction
-    failure_summary = $failureSummary
-    dry_run = $false
-    executed_count = $executed
-    failed_count = $failed
-    verify_failed_count = $verifyFailed
-    retry_count = $retryCount
-    retry_failed_step = [int]$retryFailedStep
-    retry_delay_ms = [int]$retryDelayMs
-      retry_live_steps = [bool]$retryLiveSteps
-      confirm_sensitive = [bool]$confirmSensitive
-      sensitive_step_count = [int]$plan.sensitive_step_count
-      verify_label_after_step = $verifyLabelAfterStep
-    verify_label_window = $verifyLabelWindow
-    verify_label_timeout_ms = [int]$verifyLabelTimeout
-    verify_label_interval_ms = [int]$verifyLabelInterval
-    total_steps = $plan.step_count
-    settle_ms = [int]$settleMs
-    observe_after_step = [bool]$observeAfterStep
-    verify_after_step = [bool]$verifyAfterStep
-    observe_match = $observeMatch
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    plan = if ($includePlan) { $plan } else { $null }
-    steps = @($results)
-  }
-  try { _Trajectory-Append -Kind "workflow-run" -Payload @{ status=$status; executed_count=$executed; failed_count=$failed; total_steps=$plan.step_count; elapsed_ms=[int]$sw.Elapsed.TotalMilliseconds } } catch { }
-  if ($Brief -and -not $jsonOnly) { [Console]::Out.WriteLine("$status workflow-run executed=$executed failed=$failed total=$($plan.step_count) elapsed_ms=$($payload.elapsed_ms)") }
-  else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 14)) }
-  if ($status -eq "ok") { return 0 }
-  return 2
+function _Invoke-LegacyExecutionChild {
+  param([string]$ScriptPath, $Effect, [bool]$LiveCeiling, [bool]$SensitiveCeiling,
+        [switch]$SensitiveCeilingContractVerified)
+  if (-not $SensitiveCeilingContractVerified) { throw 'Execution child sensitive-ceiling contract has not been qualified.' }
+  $childTokens=$null;$childErrors=$null
+  $childAst=[Management.Automation.Language.Parser]::ParseFile($ScriptPath,[ref]$childTokens,[ref]$childErrors)
+  $childReader=@($childAst.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq '_Read-Switch'},$true))
+  if ($childErrors.Count -gt 0 -or $childReader.Count -ne 1 -or -not $childReader[0].Extent.Text.Contains('cucp.execution-sensitive-ceiling/v1')) { throw 'Execution child does not support cucp.execution-sensitive-ceiling/v1.' }
+  if ($Effect.kind -ne 'Child' -or $Effect.argv -isnot [array] -or
+      @($Effect.argv | Where-Object { $_ -isnot [string] }).Count -gt 0 -or
+      $Effect.live -isnot [bool] -or $Effect.quiet -isnot [bool] -or
+      $Effect.brief -isnot [bool] -or $Effect.confirm_sensitive -isnot [bool]) { throw 'Invalid typed execution child descriptor.' }
+  if ($Effect.live -and -not $LiveCeiling) { throw 'Execution descriptor exceeds live startup authority.' }
+  if ($Effect.confirm_sensitive -and -not $SensitiveCeiling) { throw 'Execution descriptor exceeds sensitive startup authority.' }
+  $bootstrap = @'
+$ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
+$utf8=New-Object Text.UTF8Encoding($false,$true)
+[Console]::OutputEncoding=$utf8
+$reader=New-Object IO.StreamReader -ArgumentList @([Console]::OpenStandardInput(),$utf8,$true)
+try {$text=$reader.ReadToEnd()} finally {$reader.Dispose()}
+$r=$text | ConvertFrom-Json
+$expected=@('schema','script_path','argv','live','quiet','brief','sensitive_ceiling')
+if(@($r.PSObject.Properties).Count -ne $expected.Count -or @($r.PSObject.Properties | Where-Object {$_.Name -notin $expected}).Count -gt 0 -or
+   $r.schema -ne 'cucp.execution-child/v1' -or $r.script_path -isnot [string] -or $r.argv -isnot [array] -or
+   @($r.argv | Where-Object {$_ -isnot [string]}).Count -gt 0 -or $r.live -isnot [bool] -or
+   $r.quiet -isnot [bool] -or $r.brief -isnot [bool] -or $r.sensitive_ceiling -isnot [bool]) {throw 'Invalid execution child request.'}
+Set-Variable -Name CUCP_EXECUTION_SENSITIVE_CEILING -Scope Global -Option Constant -Value ([bool]$r.sensitive_ceiling)
+$global:LASTEXITCODE=0
+& ([string]$r.script_path) -AllowLiveControl:([bool]$r.live) -Quiet:([bool]$r.quiet) -Brief:([bool]$r.brief) -CucpArgs ([string[]]$r.argv)
+exit [int]$LASTEXITCODE
+'@
+  $utf8=New-Object Text.UTF8Encoding($false,$true)
+  $request=[ordered]@{schema='cucp.execution-child/v1';script_path=$ScriptPath;argv=@($Effect.argv);
+    live=[bool]$Effect.live;quiet=[bool]$Effect.quiet;brief=[bool]$Effect.brief;sensitive_ceiling=($SensitiveCeiling -and [bool]$Effect.confirm_sensitive)}
+  $bytes=$utf8.GetBytes((ConvertTo-Json -InputObject $request -Depth 8 -Compress))
+  $psi=New-Object Diagnostics.ProcessStartInfo
+  $psi.FileName=(Get-Command powershell.exe -CommandType Application -ErrorAction Stop).Source
+  $psi.Arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -InputFormat Text -OutputFormat Text -EncodedCommand '+[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($bootstrap))
+  $psi.UseShellExecute=$false;$psi.RedirectStandardInput=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true
+  $psi.StandardOutputEncoding=$utf8;$psi.StandardErrorEncoding=$utf8
+  $process=New-Object Diagnostics.Process;$process.StartInfo=$psi;$started=$false
+  try {
+    $started=$process.Start();$stdout=$process.StandardOutput.ReadToEndAsync();$stderr=$process.StandardError.ReadToEndAsync()
+    $process.StandardInput.BaseStream.Write($bytes,0,$bytes.Length);$process.StandardInput.Close();$process.WaitForExit()
+    $out=$stdout.GetAwaiter().GetResult();$err=$stderr.GetAwaiter().GetResult()
+    if($Effect.name -ceq 'direct'){[Console]::Out.Write($out);if($err){[Console]::Error.Write($err)}}
+    $raw=(($out+$err) -replace "`r`n","`n") -replace "`n$",''
+    $json=$null;try {$json=$raw|ConvertFrom-Json -ErrorAction Stop} catch {}
+    return [pscustomobject]@{exit=[int]$process.ExitCode;raw=$raw;json=$json}
+  } finally {if($started){try {if(-not $process.HasExited){$process.Kill()}} catch {}};$process.Dispose()}
 }
 
-function _TaskPlan-QuoteToken {
-  param([string]$Value)
-  if ($null -eq $Value) { return "''" }
-  $s = "$Value"
-  if ($s -match '^[A-Za-z0-9_\-\.\/\\:=@]+$') { return $s }
-  return "'" + ($s -replace "'", "''") + "'"
+function _Execution-EncodeWire($Value) {
+  if($null -eq $Value){return @{kind='scalar';value=$null}}
+  if($Value -is [string] -or $Value -is [ValueType]){return @{kind='scalar';value=$Value}}
+  if($Value -is [System.Collections.IDictionary]){return @{kind='object';properties=@(foreach($key in $Value.Keys){@{name=[string]$key;value=(_Execution-EncodeWire $Value[$key])}})}}
+  if($Value -is [System.Collections.IEnumerable]){return @{kind='array';items=@(foreach($item in $Value){_Execution-EncodeWire $item})}}
+  return @{kind='object';properties=@(foreach($p in $Value.PSObject.Properties){@{name=$p.Name;value=(_Execution-EncodeWire $p.Value)}})}
 }
 
-function _TaskPlan-StepString {
-  param([object[]]$Command)
-  $tokens = New-Object System.Collections.ArrayList
-  foreach ($item in @($Command)) {
-    if ($null -eq $item) { continue }
-    if (($item -is [array]) -or ($item -is [System.Collections.IEnumerable] -and -not ($item -is [string]))) {
-      foreach ($sub in @($item)) {
-        if ($null -ne $sub) { [void]$tokens.Add("$sub") }
-      }
-    } else {
-      [void]$tokens.Add("$item")
+function _Execution-Require($Condition,[string]$Message) {
+  if (-not $Condition) { throw (New-Object InvalidOperationException -ArgumentList $Message) }
+}
+
+function _Execution-Fields($Value,[string[]]$Names) {
+  _Execution-Require ($null -ne $Value -and $Value -isnot [array] -and $Value -isnot [string] -and $Value -isnot [ValueType]) 'Expected an execution protocol object.'
+  $properties=@($Value.PSObject.Properties)
+  _Execution-Require ($properties.Count -eq $Names.Count -and @($properties | Where-Object {$_.Name -cnotin $Names}).Count -eq 0) 'Unexpected execution protocol fields.'
+}
+
+function _Execution-DecodeWire($Wire) {
+  _Execution-Require ($null -ne $Wire -and $Wire.kind -is [string]) 'Missing execution wire tag.'
+  switch -CaseSensitive ($Wire.kind) {
+    'scalar' {
+      _Execution-Fields $Wire @('kind','value')
+      _Execution-Require ($null -eq $Wire.value -or $Wire.value -is [string] -or $Wire.value -is [ValueType]) 'Invalid scalar wire value.'
+      return ,$Wire.value
     }
+    'array' {
+      _Execution-Fields $Wire @('kind','items');_Execution-Require ($Wire.items -is [array]) 'Wire array items must be an array.'
+      $items=New-Object Collections.ArrayList
+      foreach($item in $Wire.items){[void]$items.Add((_Execution-DecodeWire $item))}
+      return ,([object[]]$items.ToArray())
+    }
+    'object' {
+      _Execution-Fields $Wire @('kind','properties');_Execution-Require ($Wire.properties -is [array]) 'Wire object properties must be an array.'
+      $object=[ordered]@{}
+      foreach($property in $Wire.properties){
+        _Execution-Fields $property @('name','value');_Execution-Require ($property.name -is [string] -and -not $object.Contains($property.name)) 'Invalid or duplicate wire property.'
+        $object[$property.name]=_Execution-DecodeWire $property.value
+      }
+      return ,([pscustomobject]$object)
+    }
+    default {throw 'Unknown execution wire kind.'}
   }
-  return ((@($tokens) | ForEach-Object { _TaskPlan-QuoteToken -Value "$_" }) -join " ")
 }
 
-function _TaskPlan-UnwrapCommand {
-  param($Command)
-  if ($null -eq $Command) { return @() }
-  $items = @($Command)
-  if ($items.Count -eq 1 -and $items[0] -is [array]) { return @($items[0]) }
-  return @($items)
+function _Execution-WriteChunks($Writer,[long]$Id,[string]$Target,$Value) {
+  $utf8=New-Object Text.UTF8Encoding($false,$true)
+  $bytes=$utf8.GetBytes((ConvertTo-Json -InputObject $Value -Depth 100 -Compress))
+  for($offset=0;$offset -lt $bytes.Length;$offset+=49152){
+    $count=[Math]::Min(49152,$bytes.Length-$offset)
+    $frame=[ordered]@{kind='part';id=$Id;data=[Convert]::ToBase64String($bytes,$offset,$count)}
+    if($Target){$frame['target']=$Target}
+    $Writer.WriteLine((ConvertTo-Json -InputObject $frame -Compress))
+  }
+  $end=[ordered]@{kind='end';id=$Id};if($Target){$end['target']=$Target}
+  $Writer.WriteLine((ConvertTo-Json -InputObject $end -Compress));$Writer.Flush()
 }
+
+function _Execution-WriteDiagnostic($State,$Process,$Stderr,[string]$ErrorText) {
+  # Qualification-only opt-in. Never modify the protocol or replace its error.
+  try {
+    if($env:CUCP_EXECUTION_DIAGNOSTICS -cne '1' -or $State.diagnostic_phase -ceq 'host-error'){return}
+    $counter=Get-Variable -Name ExecutionDiagnosticCount -Scope Script -ErrorAction SilentlyContinue
+    $count=if($null -eq $counter){0}else{[int]$counter.Value}
+    if($count -ge 4){return};$script:ExecutionDiagnosticCount=$count+1
+    $line=[string]$State.diagnostic_frame;$prefix=$line.Substring(0,[Math]::Min(256,$line.Length))
+    $points=@(foreach($character in $line.Substring(0,[Math]::Min(16,$line.Length)).ToCharArray()){'U+{0:X4}' -f [int]$character})
+    $exited=$null;$code=$null;$err=''
+    if($null -ne $Process){$exited=$Process.HasExited;if($exited){$code=$Process.ExitCode}}
+    if($null -ne $Stderr -and $Stderr.IsCompleted){$err=[string]$Stderr.GetAwaiter().GetResult()}
+    $record=[ordered]@{phase=[string]$State.diagnostic_phase;expected_id=$State.diagnostic_expected_id;
+      frame_characters=$line.Length;prefix_codepoints=$points;frame_prefix=$prefix;
+      host_exited=$exited;host_exit=$code;stderr_prefix=$err.Substring(0,[Math]::Min(1024,$err.Length));
+      error=$ErrorText.Substring(0,[Math]::Min(512,$ErrorText.Length))}
+    [Console]::Error.WriteLine('[execution-protocol] '+(ConvertTo-Json -InputObject $record -Depth 5 -Compress))
+  } catch {} # Diagnostic collection cannot mask the original failure.
+}
+
+function _Execution-ValidateEffect($Effect,$State) {
+  _Execution-Fields $Effect @('kind','name','argv','data','live','quiet','brief','confirm_sensitive')
+  _Execution-Require ($Effect.kind -is [string] -and $Effect.name -is [string] -and $Effect.argv -is [array] -and
+    @($Effect.argv | Where-Object {$_ -isnot [string]}).Count -eq 0 -and $Effect.live -is [bool] -and
+    $Effect.quiet -is [bool] -and $Effect.brief -is [bool] -and $Effect.confirm_sensitive -is [bool]) 'Malformed execution effect descriptor.'
+  _Execution-Require (-not $Effect.live -or $State.live) 'Effect exceeds immutable live startup authority.'
+  _Execution-Require (-not $Effect.confirm_sensitive -or $State.sensitive) 'Effect exceeds immutable sensitive startup authority.'
+  $Effect.data=_Execution-DecodeWire $Effect.data
+  if($State.family -ceq 'interaction'){_Interaction-ValidateEffect $Effect $State;return}
+  if($State.family -ceq 'diagnostics'){_Diagnostic-ValidateEffect $Effect $State;return}
+  $a=@($Effect.argv);$d=$Effect.data;$n=$Effect.name;$kind=$Effect.kind
+  _Execution-Require ($kind -cin @('WorkflowPlan','Child','Native','LocalMacro','CdpPort','HistoryRead','HistoryAppend','TrajectoryAppend','Sleep','Clock','Timestamp','CachePath','FileExists','RemoveFile','SendEscape','Console')) 'Unknown execution effect.'
+  if($kind -ne 'Child'){_Execution-Require (-not $Effect.quiet -and -not $Effect.brief) 'Non-child effect changed child options.'}
+  if($kind -notin @('Child','SendEscape')){_Execution-Require (-not $Effect.confirm_sensitive) 'Unexpected sensitive effect option.'}
+  if($kind -notin @('Child','Native','LocalMacro','SendEscape')){_Execution-Require (-not $Effect.live) 'Unexpected live effect option.'}
+  switch -CaseSensitive ($kind) {
+    'WorkflowPlan' {_Execution-Require ($n -eq '' -and $null -eq $d) 'Invalid workflow acquisition descriptor.'}
+    'Child' {_Execution-Require ($n -cin @('','direct') -and $null -eq $d) 'Invalid child execution descriptor.'}
+    'Native' {
+      _Execution-Require ($n -eq '' -and $null -eq $d -and $a.Count -ge 2 -and ($a.Count%2) -eq 0 -and $a[0] -ceq '-Action') 'Invalid native execution descriptor.'
+      $action=$a[1];$live=$action -cin @('uia-invoke','uia-click','click','ocr-uia-invoke','cdp-smart-click')
+      _Execution-Require ($Effect.live -eq $live) 'Native action/live classification mismatch.'
+      $fields=switch -CaseSensitive ($action) {
+        'focused' {@()};'modal-detect' {@('-Match')}
+        'uia-find' {@('-Label','-Match','-Role')};'uia-invoke' {@('-Label','-Match','-Role')};'uia-click' {@('-Label','-Match','-Role')}
+        'cdp-smart-click' {@('-CdpText','-CdpPort','-CdpPageMatch')}
+        'ocr-uia-invoke' {@('-OcrText','-OcrMatch','-OcrMaxCandidates','-Match','-OcrLanguage')}
+        'ocr-find-text' {@('-OcrText','-OcrMatch','-OcrMaxCandidates','-Match','-OcrLanguage')}
+        'click' {@('-X','-Y','-Button','-ClickRefine','-TargetMatch')}
+        'screenshot' {@('-OutPath','-ScreenshotX','-ScreenshotY','-ScreenshotW','-ScreenshotH')}
+        'screenshot-diff' {@('-DiffBefore','-DiffAfter','-DiffThreshold')}
+        default {throw 'Native action is outside execution coordination.'}
+      }
+      $seen=@{}
+      for($i=2;$i -lt $a.Count;$i+=2){_Execution-Require ($a[$i] -cin $fields -and -not $seen.ContainsKey($a[$i])) 'Invalid or duplicate native effect argument.';$seen[$a[$i]]=$a[$i+1]}
+      if($action -eq 'screenshot'){_Execution-Require ($State.paths.ContainsKey($seen['-OutPath'])) 'Screenshot destination is not owned by this execution.'}
+      if($action -eq 'screenshot-diff'){_Execution-Require ($State.paths.ContainsKey($seen['-DiffBefore']) -and $State.paths.ContainsKey($seen['-DiffAfter'])) 'Screenshot diff paths are not owned by this execution.'}
+    }
+    'LocalMacro' {_Execution-Require ($n -cin @('click-point','icon-find') -and $null -eq $d -and $Effect.live -eq ($n -eq 'click-point')) 'Invalid local execution macro.'}
+    'CdpPort' {_Execution-Require ($n -eq '' -and $null -eq $d -and $a.Count -eq 2 -and $a[1] -ceq '120' -and $a[0] -match '^\d+$') 'Invalid CDP port query.'}
+    'HistoryRead' {_Execution-Require ($n -eq '' -and $null -eq $d -and $a.Count -eq 3 -and $a[2] -ceq '5') 'Invalid history query.'}
+    'HistoryAppend' {
+      _Execution-Require ($n -eq '' -and $a.Count -eq 3) 'Invalid history append descriptor.'
+      _Execution-Fields $d @('success','elapsed_ms');_Execution-Require ($d.success -is [bool] -and ($d.elapsed_ms -is [int] -or $d.elapsed_ms -is [long]) -and $d.elapsed_ms -ge [int]::MinValue -and $d.elapsed_ms -le [int]::MaxValue) 'Invalid history append payload.'
+    }
+    'TrajectoryAppend' {
+      _Execution-Require ($n -cin @('workflow-run','task-run','form-run') -and $a.Count -eq 0) 'Invalid trajectory append kind.'
+      if($n -eq 'task-run'){_Execution-Fields $d @('status','dry_run','workflow_exit','elapsed_ms')}
+      else {_Execution-Fields $d @('status','executed_count','failed_count','total_steps','elapsed_ms')}
+    }
+    'Sleep' {_Execution-Require ($n -eq '' -and $a.Count -eq 0 -and ($d -is [int] -or $d -is [long]) -and $d -ge 0 -and $d -le [int]::MaxValue) 'Invalid execution sleep.'}
+    'Clock' {_Execution-Require ($n -cin @('start','stop','elapsed') -and $a.Count -eq 0 -and $d -is [string] -and $d -cin @('total','step','attempt','run')) 'Invalid execution clock.'}
+    'Timestamp' {_Execution-Require ($n -cin @('o','HHmmss-fff') -and $a.Count -eq 0 -and $null -eq $d) 'Invalid execution timestamp.'}
+    'CachePath' {_Execution-Require ($n -cin @('smartclick-before','smartclick-after','smartclick-retry-before','smartclick-retry-after') -and $a.Count -eq 0 -and $d -is [string] -and $d -match '^\d{6}-\d{3}$') 'Invalid execution capture path.'}
+    'FileExists' {_Execution-Require ($n -eq '' -and $a.Count -eq 0 -and $d -is [string] -and $State.paths.ContainsKey($d)) 'Execution file probe is outside owned captures.'}
+    'RemoveFile' {_Execution-Require ($n -eq '' -and $a.Count -eq 0 -and $d -is [string] -and $State.paths.ContainsKey($d)) 'Execution cleanup is outside owned captures.'}
+    'SendEscape' {_Execution-Require ($n -eq '' -and $a.Count -eq 0 -and $null -eq $d -and $Effect.live -and $Effect.confirm_sensitive) 'Escape input requires both explicit startup gates.'}
+    'Console' {_Execution-Require ($n -eq '' -and $a.Count -eq 0 -and $d -is [string]) 'Invalid execution console output.'}
+  }
+}
+
+function _Execution-SendEscape {
+  Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+  [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+}
+
+function _Execution-Dispatch($Effect,$State) {
+  if($State.family -ceq 'interaction'){return ,(_Interaction-Dispatch $Effect $State)}
+  if($State.family -ceq 'diagnostics'){return ,(_Diagnostic-Dispatch $Effect $State)}
+  $a=[string[]]$Effect.argv;$d=$Effect.data;$n=$Effect.name
+  switch -CaseSensitive ($Effect.kind) {
+    'WorkflowPlan' {return ,(_Build-WorkflowPlan -Rest $a)}
+    'Child' {return ,(_Invoke-LegacyExecutionChild -ScriptPath $State.script_path -Effect $Effect -LiveCeiling $State.live -SensitiveCeiling $State.sensitive -SensitiveCeilingContractVerified)}
+    'Native' {return ,(Invoke-NativeHelper -ArgList $a)}
+    'LocalMacro' {
+      $previous=[Console]::Out;$writer=New-Object IO.StringWriter
+      try {
+        [Console]::SetOut($writer)
+        if($n -eq 'click-point'){$exit=Invoke-MacroClickPoint -Rest $a}else{Invoke-MacroIconFind -Rest $a | Out-Null;$exit=0}
+      } finally {[Console]::SetOut($previous)}
+      $raw=$writer.ToString();$writer.Dispose();$json=$null
+      try {$json=$raw|ConvertFrom-Json -ErrorAction Stop} catch {}
+      return [pscustomobject]@{exit=[int]$exit;raw=$raw;json=$json}
+    }
+    'CdpPort' {return Test-CdpPortQuick -Port ([int]$a[0]) -TimeoutMs ([int]$a[1])}
+    'HistoryRead' {return ,(_History-PickBestStrategy -Label $a[0] -Match $a[1] -LookbackN ([int]$a[2]))}
+    'HistoryAppend' {_History-Append -Label $a[0] -Match $a[1] -Strategy $a[2] -Success ([bool]$d.success) -ElapsedMs ([int]$d.elapsed_ms);return}
+    'TrajectoryAppend' {$payload=@{};foreach($p in $d.PSObject.Properties){$payload[$p.Name]=$p.Value};_Trajectory-Append -Kind $n -Payload $payload;return}
+    'Sleep' {Start-Sleep -Milliseconds ([int]$d);return}
+    'Clock' {
+      if($n -eq 'start'){$State.clocks[$d]=[Diagnostics.Stopwatch]::StartNew();return 0}
+      if(-not $State.clocks.ContainsKey($d)){throw 'Execution clock has not been started.'}
+      if($n -eq 'stop'){$State.clocks[$d].Stop()}
+      return [int]$State.clocks[$d].Elapsed.TotalMilliseconds
+    }
+    'Timestamp' {return (Get-Date).ToString($n)}
+    'CachePath' {$path=Join-Path $State.cache_dir ($n+'-'+$d+'.png');$State.paths[$path]=$true;return $path}
+    'FileExists' {return Test-Path -LiteralPath ([string]$d)}
+    'RemoveFile' {Remove-Item -LiteralPath ([string]$d) -Force -ErrorAction SilentlyContinue;return}
+    'SendEscape' {_Execution-SendEscape;return}
+    'Console' {[Console]::Out.WriteLine([string]$d);return}
+    default {throw 'Unknown execution effect.'}
+  }
+}
+
+# This classification records possible owned-state changes; it grants no authority.
+# The validated descriptor has already passed the family-specific ownership checks.
+function _Execution-EffectMayChangeState($Effect) {
+  if($Effect.live){return $true}
+  if($Effect.kind -cin @('Child','HistoryAppend','TrajectoryAppend','RemoveFile','PointCacheWrite','AnchorAppend','Appshot','Vision','Notice','Cucp')){return $true}
+  if($Effect.kind -ceq 'LocalMacro'){return $Effect.name -cne 'icon-find'}
+  if($Effect.kind -ceq 'Native'){return $true} # Retained helper may write cache/log files for every action.
+  if($Effect.kind -ceq 'Diagnostic'){
+    if($Effect.name -cin @('AuditProbe','ClearAppshotCache','Appshot','Notice','HelperUp','AssertAuthorized','Cli','Native')){return $true}
+    if($Effect.name -ceq 'Macro'){return ($Effect.data.name -cin @('health-quick','find-label')) -or
+      ($Effect.data.name -ceq 'windows' -and $Effect.argv.Count -eq 1 -and $Effect.argv[0] -ceq '--rich')}
+  }
+  return $false
+}
+
+function _Invoke-LegacyExecutionEffectLoop {
+  param([Diagnostics.Process]$HostProcess,[hashtable]$State)
+  $utf8=New-Object Text.UTF8Encoding($false,$true);$sequence=0L
+  while($true) {
+    $buffer=New-Object IO.MemoryStream;$target=$null;$id=$null
+    try {
+      while($true) {
+        $State.diagnostic_phase='read-frame';$State.diagnostic_expected_id=$sequence+1;$State.diagnostic_frame=$null
+        $line=$HostProcess.StandardOutput.ReadLine();if($null -eq $line){if($State.state_effect_seen -or $State.live_effect_seen){throw 'mutation_may_have_occurred=true; automatic_retry=false; execution session disconnected.'};throw 'Execution session disconnected; automatic_retry=false.'}
+        $State.diagnostic_frame=$line;$State.diagnostic_phase='parse-frame'
+        $frame=$line|ConvertFrom-Json -ErrorAction Stop
+        $State.diagnostic_phase='validate-frame'
+        if($frame.kind -ceq 'part'){_Execution-Fields $frame @('kind','target','id','data')}
+        elseif($frame.kind -ceq 'end'){_Execution-Fields $frame @('kind','target','id')}
+        else {throw 'Unknown execution frame kind.'}
+        _Execution-Require ($frame.target -cin @('effect','complete','error') -and ($frame.id -is [int] -or $frame.id -is [long]) -and $frame.id -eq ($sequence+1)) 'Invalid execution frame sequence.'
+        if($null -eq $id){$id=[long]$frame.id;$target=[string]$frame.target}
+        _Execution-Require ($frame.id -eq $id -and $frame.target -ceq $target) 'Execution frame target changed.'
+        if($frame.kind -ceq 'end'){break}
+        _Execution-Require ($frame.data -is [string]) 'Execution chunk data must be a base64 string.'
+        $part=[Convert]::FromBase64String($frame.data);_Execution-Require ($part.Length -le 49152) 'Execution chunk exceeds 48 KiB.';$buffer.Write($part,0,$part.Length)
+      }
+      $State.diagnostic_phase='parse-message'
+      $message=$utf8.GetString($buffer.ToArray())|ConvertFrom-Json -ErrorAction Stop
+    } finally {$buffer.Dispose()}
+    $sequence=$id
+    if($target -ceq 'error'){
+      $State.diagnostic_phase='host-error'
+      _Execution-Fields $message @('message','mutation_may_have_occurred','automatic_retry')
+      _Execution-Require ($message.message -is [string] -and $message.mutation_may_have_occurred -is [bool] -and $message.automatic_retry -is [bool] -and -not $message.automatic_retry) 'Invalid execution error envelope.'
+      if($message.mutation_may_have_occurred){throw ('mutation_may_have_occurred=true; automatic_retry=false; '+$message.message)}
+      throw $message.message
+    }
+    if($target -ceq 'complete') {
+      $State.diagnostic_phase='validate-completion'
+      _Execution-Fields $message @('payload','exit','json_depth','brief','emit_json')
+      # PS5 parses JSON integers as Int32; PS7 uses Int64. Accept both parser
+      # representations while preserving the exact integer/range contract.
+      _Execution-Require (($message.exit -is [int] -or $message.exit -is [long]) -and
+        $message.exit -ge [int]::MinValue -and $message.exit -le [int]::MaxValue -and
+        ($State.family -ceq 'interaction' -or ($message.exit -ge 0 -and $message.exit -le 3)) -and
+        ($message.json_depth -is [int] -or $message.json_depth -is [long]) -and
+        $message.json_depth -ge 0 -and $message.json_depth -le 100 -and $message.emit_json -is [bool] -and ($null -eq $message.brief -or $message.brief -is [string])) 'Invalid execution completion envelope.'
+      $payload=_Execution-DecodeWire $message.payload
+      if($State.family -ceq 'diagnostics'){$payload=_Diagnostic-PreparePayload $payload $State}
+      if($message.emit_json){[Console]::Out.WriteLine((ConvertTo-Json -InputObject $payload -Depth ([int]$message.json_depth)))}
+      elseif($null -ne $message.brief){[Console]::Out.WriteLine([string]$message.brief)}
+      return [int]$message.exit
+    }
+    # Protocol/authority failures must terminate, never become fallback replies.
+    $State.diagnostic_phase='validate-effect'
+    _Execution-ValidateEffect $message $State
+    $State.diagnostic_phase='dispatch-effect'
+    if($message.live){$State.live_effect_seen=$true}
+    $currentMayChangeState=[bool](_Execution-EffectMayChangeState $message)
+    if($currentMayChangeState){$State.state_effect_seen=$true}
+    try {$value=_Execution-Dispatch $message $State;$reply=@{state='ok';value=(_Execution-EncodeWire $value)}}
+    catch {$reply=@{state='error';message=$_.Exception.Message;mutation_may_have_occurred=[bool]($currentMayChangeState -or $State.live_effect_seen)}}
+    _Execution-WriteChunks -Writer $State.writer -Id $id -Target '' -Value $reply
+  }
+}
+
+function _Invoke-LegacyExecutionFamily {
+  param([ValidateSet('workflow-run','task-run','form-run','smart-click','watch','recovery-plan','recovery-run')][string]$Operation,[string[]]$Rest,[string]$ScriptPath)
+  # Capture immutable invocation context before any plan/acquisition effect.
+  $liveCeiling=[bool]$AllowLiveControl
+  $sensitiveCeiling=[bool](_Read-StandaloneConfirmation -Rest $Rest)
+  $inherited=Get-Variable -Name CUCP_EXECUTION_SENSITIVE_CEILING -Scope Global -ErrorAction SilentlyContinue
+  if($null -ne $inherited -and ($inherited.Value -isnot [bool] -or -not $inherited.Value -or
+      -not ($inherited.Options -band [Management.Automation.ScopedItemOptions]::Constant))){$sensitiveCeiling=$false}
+  $startup=[ordered]@{schema='cucp.execution-start/v1';operation=$Operation;rest=@($Rest);brief=[bool]$Brief;
+    cache_seconds=[int]$CacheSeconds;vision_available=[bool]$Script:CliPath;culture=[Globalization.CultureInfo]::CurrentCulture.Name}
+  $restCopy=@($Rest);if($null -ne $restCopy){$restCopy=$restCopy.Clone()}
+  $state=@{family='execution';operation=$Operation;rest=$restCopy;state_effect_seen=$false;live=$liveCeiling;sensitive=$sensitiveCeiling;script_path=$ScriptPath;cache_dir=$Script:CacheDir;paths=@{};clocks=@{};writer=$null;live_effect_seen=$false}
+  return _Invoke-LegacyExecutionHost -EntryPoint 'legacy-execution-session' -Startup $startup -State $state
+}
+
+function _Invoke-LegacyExecutionHost {
+  param([ValidateSet('legacy-execution-session','legacy-interaction-session','legacy-diagnostic-session')][string]$EntryPoint,
+    $Startup,[hashtable]$State)
+  _Execution-Require ($State.live -is [bool] -and $State.sensitive -is [bool]) 'Host authority ceilings must be booleans.'
+  $expectedFamily=switch($EntryPoint){'legacy-execution-session'{'execution'};'legacy-interaction-session'{'interaction'};'legacy-diagnostic-session'{'diagnostics'}}
+  _Execution-Require ($State.family -ceq $expectedFamily -and $State.operation -ceq $Startup.operation) 'Host family or operation context mismatch.'
+  $State.state_effect_seen=$false;$State.live_effect_seen=$false
+  $native=$env:CUCP_NATIVE_HOST
+  if(-not $native){$native=Join-Path $PSScriptRoot '..\pcucp-next\bin\native\PcuCp.NativeHost.exe'}
+  $native=[IO.Path]::GetFullPath($native)
+  if(-not (Test-Path -LiteralPath $native -PathType Leaf)){throw 'Matching execution runtime missing. Publish the native runtime or set CUCP_NATIVE_HOST to its executable/DLL.'}
+  $psi=New-Object Diagnostics.ProcessStartInfo
+  switch ([IO.Path]::GetExtension($native).ToLowerInvariant()) {
+    '.dll' {
+      if($native.Contains('"') -or $native.Contains("`r") -or $native.Contains("`n")){throw 'Invalid execution runtime DLL path.'}
+      $psi.FileName=(Get-Command dotnet.exe -CommandType Application -TotalCount 1 -ErrorAction Stop).Source
+      $psi.Arguments='"'+$native+'" '+$EntryPoint
+    }
+    '.exe' {$psi.FileName=$native;$psi.Arguments=$EntryPoint}
+    default {throw 'Execution runtime must be an executable or DLL, never a shell script.'}
+  }
+  if($State.live){$psi.Arguments+=' --allow-live-control'}
+  if($State.sensitive){$psi.Arguments+=' --confirm-sensitive'}
+  $utf8=New-Object Text.UTF8Encoding($false,$true)
+  $psi.UseShellExecute=$false;$psi.CreateNoWindow=$true
+  $psi.RedirectStandardInput=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true
+  $psi.StandardOutputEncoding=$utf8;$psi.StandardErrorEncoding=$utf8
+  $process=New-Object Diagnostics.Process;$process.StartInfo=$psi;$started=$false;$writer=$null;$stderr=$null
+  try {
+    $started=$process.Start();if(-not $started){throw 'Execution runtime did not start.'}
+    $stderr=$process.StandardError.ReadToEndAsync()
+    # Own no-BOM writer; .NET Framework's default redirected writer is not used.
+    $writer=New-Object IO.StreamWriter -ArgumentList @($process.StandardInput.BaseStream,$utf8,4096,$true)
+    $state.writer=$writer
+    _Execution-WriteChunks -Writer $writer -Id 0 -Target '' -Value $startup
+    $exit=_Invoke-LegacyExecutionEffectLoop -HostProcess $process -State $state
+    $writer.Flush();$writer.Dispose();$writer=$null;$process.StandardInput.Close()
+    if(-not $process.WaitForExit(10000)){throw 'Execution runtime did not exit after its final report; no action was retried.'}
+    $err=$stderr.GetAwaiter().GetResult()
+    if($process.ExitCode -ne $exit){throw ('Execution runtime exit did not match its final report. '+$err)}
+    if($State.family -ceq 'interaction'){foreach($item in $State.pipeline_output){Write-Output -InputObject $item}}
+    return [int]$exit
+  } catch {
+    _Execution-WriteDiagnostic -State $state -Process $process -Stderr $stderr -ErrorText $_.Exception.Message
+    if(($state.state_effect_seen -or $state.live_effect_seen) -and $_.Exception.Message -notlike 'mutation_may_have_occurred=true;*'){
+      throw ('mutation_may_have_occurred=true; automatic_retry=false; '+$_.Exception.Message)
+    }
+    throw
+  } finally {
+    if($null -ne $writer){try {$writer.Dispose()}catch {}}
+    if($started){try {if(-not $process.HasExited){$process.Kill();[void]$process.WaitForExit(5000)}}catch {}}
+    $process.Dispose()
+  }
+}
+
+function Invoke-MacroWorkflowRun {param([string[]]$Rest) return _Invoke-LegacyExecutionFamily -Operation 'workflow-run' -Rest $Rest -ScriptPath $PSCommandPath}
+
+
+
+
+
+
 
 function _AppStrategy-NormalizeRoute {
   param([string]$Strategy)
@@ -10220,14 +6202,7 @@ function _AppStrategy-NormalizeRoute {
   }
 }
 
-function _AppStrategy-Key {
-  param([string]$Process, [string]$Class, [string]$AppType)
-  $parts = @($Process, $Class, $AppType) | ForEach-Object {
-    "$_".Trim().ToLowerInvariant() -replace '[^a-z0-9_.-]+', '-'
-  } | Where-Object { $_ }
-  if (@($parts).Count -eq 0) { return "unknown-app" }
-  return (@($parts | Select-Object -First 3) -join "|")
-}
+
 
 function _AppStrategy-Read {
   if (-not $Script:AppStrategyFile -or -not (Test-Path -LiteralPath $Script:AppStrategyFile)) { return @() }
@@ -10295,2057 +6270,277 @@ function _AppStrategy-Append {
   }
 }
 
-function _AppProfile-StrategyScore {
-  param(
-    [string]$AppType,
-    [string[]]$RouteOrder,
-    $CdpProbe,
-    $UiaProbe,
-    [string[]]$Labels,
-    $PersistedStrategy,
-    [bool]$BrowserLike,
-    [bool]$OfficeLike,
-    [bool]$NoProbe
-  )
-
-  $scores = @{}
-  $reasons = @{}
-  function _ScoreAdd {
-    param([string]$Route, [int]$Points, [string]$Reason)
-    if (-not $Route) { return }
-    $routeKey = _AppStrategy-NormalizeRoute -Strategy $Route
-    if (-not $routeKey) { return }
-    if (-not $scores.ContainsKey($routeKey)) { $scores[$routeKey] = 0; $reasons[$routeKey] = New-Object System.Collections.ArrayList }
-    $scores[$routeKey] += [int]$Points
-    if ($Reason) { [void]$reasons[$routeKey].Add($Reason) }
-  }
-
-  $rank = 0
-  foreach ($route in @($RouteOrder)) {
-    $rank++
-    _ScoreAdd -Route $route -Points ([Math]::Max(4, 24 - ($rank * 3))) -Reason "base_route_rank_$rank"
-  }
-
-  if ($CdpProbe) {
-    if ([bool]$CdpProbe.available) { _ScoreAdd -Route "cdp_dom" -Points 45 -Reason "cdp_probe_available" }
-    else { _ScoreAdd -Route "cdp_dom" -Points -18 -Reason "cdp_probe_unavailable:$($CdpProbe.reason)" }
-  } elseif ($BrowserLike -and $NoProbe) {
-    _ScoreAdd -Route "cdp_dom" -Points 18 -Reason "browser_like_cdp_probe_skipped"
-  }
-
-  if ($UiaProbe) {
-    if ([bool]$UiaProbe.available) {
-      _ScoreAdd -Route "uia_pattern" -Points 28 -Reason "uia_affordances_available"
-      _ScoreAdd -Route "uia_click" -Points 16 -Reason "uia_affordances_available"
-      try {
-        $labelHits = @($UiaProbe.label_hits | Where-Object { $_.found -eq $true }).Count
-        if ($labelHits -gt 0) { _ScoreAdd -Route "uia_pattern" -Points ([Math]::Min(20, $labelHits * 6)) -Reason "uia_label_hits=$labelHits" }
-      } catch { }
-      try {
-        if ([int]$UiaProbe.small_icon_count -gt 0) {
-          _ScoreAdd -Route "precision_point" -Points 14 -Reason "uia_small_icon_targets=$($UiaProbe.small_icon_count)"
-        }
-      } catch { }
-    } else {
-      _ScoreAdd -Route "ocr" -Points 18 -Reason "uia_probe_unavailable"
-      _ScoreAdd -Route "precision_point" -Points 8 -Reason "uia_probe_unavailable"
-    }
-  } else {
-    _ScoreAdd -Route "uia_pattern" -Points 10 -Reason "uia_not_probed"
-  }
-
-  if ($OfficeLike) {
-    _ScoreAdd -Route "uia_value_or_pattern" -Points 24 -Reason "document_or_mail_app"
-    _ScoreAdd -Route "safe_type_guarded" -Points 16 -Reason "document_or_mail_app"
-  } else {
-    _ScoreAdd -Route "precision_point" -Points 10 -Reason "generic_window_coordinate_fallback"
-    _ScoreAdd -Route "ocr" -Points 8 -Reason "generic_visual_text_fallback"
-  }
-
-  if ($PersistedStrategy) {
-    $persistedRoute = _AppStrategy-NormalizeRoute -Strategy "$($PersistedStrategy.strategy)"
-    if ($persistedRoute) {
-      _ScoreAdd -Route $persistedRoute -Points 18 -Reason "persisted_last_good_strategy"
-    }
-  }
-
-  $routeScores = New-Object System.Collections.ArrayList
-  foreach ($k in $scores.Keys) {
-    [void]$routeScores.Add([pscustomobject]@{
-      route = "$k"
-      score = [int]([Math]::Max(0, [Math]::Min(100, $scores[$k])))
-      reasons = @($reasons[$k])
-    })
-  }
-  $ordered = @($routeScores | Sort-Object @{ Expression = { -1 * [int]$_.score } }, route)
-  $best = @($ordered | Select-Object -First 1)[0]
-  $score = if ($best) { [int]$best.score } else { 0 }
-  $confidence = if ($score -ge 75) { "high" } elseif ($score -ge 50) { "medium" } elseif ($score -ge 25) { "low" } else { "none" }
-  return [pscustomobject]@{
-    schema = "cucp.app-profile-strategy-score/v1"
-    app_type = $AppType
-    recommended_strategy = if ($best) { "$($best.route)" } else { "none" }
-    confidence = $confidence
-    total_score = $score
-    route_order = @($ordered | ForEach-Object { "$($_.route)" })
-    route_scores = @($ordered)
-    evidence = [pscustomobject]@{
-      cdp_probe = if ($CdpProbe) { [pscustomobject]@{ available = [bool]$CdpProbe.available; reason = "$($CdpProbe.reason)"; port = [int]$CdpProbe.port } } else { $null }
-      uia_probe = if ($UiaProbe) { [pscustomobject]@{ available = [bool]$UiaProbe.available; affordance_count = [int]$UiaProbe.affordance_count; small_icon_count = [int]$UiaProbe.small_icon_count } } else { $null }
-      label_count = [int](@($Labels | Where-Object { -not [string]::IsNullOrWhiteSpace("$_") } | Select-Object -Unique).Count)
-      persisted_strategy = $PersistedStrategy
-    }
-  }
-}
-
 function Invoke-MacroAppProfile {
   param([string[]]$Rest)
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  if (-not $match) { $match = _Read-OptValue -Rest $Rest -Name "--window" }
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $includeAffordances = _Read-Switch -Rest $Rest -Name "--include-affordances"
-  $autoProbe = (_Read-Switch -Rest $Rest -Name "--auto-probe") -or (_Read-Switch -Rest $Rest -Name "--probe")
-  $probeCdpRequested = $autoProbe -or (_Read-Switch -Rest $Rest -Name "--probe-cdp")
-  $probeUiaRequested = $autoProbe -or (_Read-Switch -Rest $Rest -Name "--probe-uia")
-  $noProbe = _Read-Switch -Rest $Rest -Name "--no-probe"
-  $recordStrategy = (_Read-Switch -Rest $Rest -Name "--record-strategy") -or (_Read-Switch -Rest $Rest -Name "--remember-strategy")
-  $noStrategyHistory = _Read-Switch -Rest $Rest -Name "--no-strategy-history"
-  $cdpPort = [int](_Read-OptValue -Rest $Rest -Name "--cdp-port")
-  if ($cdpPort -le 0) { $cdpPort = [int](_Read-OptValue -Rest $Rest -Name "--port") }
-  if ($cdpPort -le 0) { $cdpPort = 9222 }
-  $uiaProbeLimit = [int](_Read-OptValue -Rest $Rest -Name "--probe-uia-limit")
-  if ($uiaProbeLimit -le 0) { $uiaProbeLimit = 120 }
-  $labels = @(_Read-AllOptValues -Rest $Rest -Name "--label")
-  foreach ($clickLabel in @(_Read-AllOptValues -Rest $Rest -Name "--click-label")) { $labels += $clickLabel }
-  foreach ($fieldSpec in @(_Read-AllOptValues -Rest $Rest -Name "--field")) {
-    if ($fieldSpec -and "$fieldSpec".Contains("=")) {
-      $fieldLabel = "$fieldSpec".Substring(0, "$fieldSpec".IndexOf("=")).Trim()
-      if ($fieldLabel) { $labels += $fieldLabel }
+  $historyFile=$Script:AppStrategyFile
+  $recordRequested=(_Read-Switch -Rest $Rest -Name '--record-strategy') -or (_Read-Switch -Rest $Rest -Name '--remember-strategy')
+  $historyEnabled=-not (_Read-Switch -Rest $Rest -Name '--no-strategy-history')
+  $jsonOnly=_Read-Switch -Rest $Rest -Name '--json-only'
+  $captures=New-Object Collections.ArrayList
+  $arguments=@{rest=@($Rest);brief=[bool]$Brief;culture=[Globalization.CultureInfo]::CurrentCulture.Name;history_file=$historyFile;elapsed_ms=0;cdp_elapsed_ms=0;uia_elapsed_ms=0;captured_replies=@()}
+  $recordAttempted=$false;$evaluations=0;$facadeCalls=0;$recordCompletion=$null
+  $sw=[Diagnostics.Stopwatch]::StartNew()
+  for ($probe=0;$probe -le 7;$probe++) {
+    if ($null -ne $recordCompletion) { $state=$recordCompletion }
+    else {
+      if ($facadeCalls -ge 7) { throw 'App-profile exceeded its facade call budget.' }
+      $facadeCalls++
+      $arguments.captured_replies=@($captures)
+      $state=_Invoke-LegacyCompatibility -Operation 'app-profile-advance' -Arguments $arguments
+      if ($state.facade -cne 'cucp.app-profile-controller/v1' -or $state.kernel_evaluations -notin @(1,2)) { throw 'Missing app-profile controller validation.' }
+      $evaluations += [int]$state.kernel_evaluations
+      if ($evaluations -gt 8) { throw 'App-profile exceeded its pure evaluation budget.' }
     }
-  }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $allWindows = @(_Enumerate-Win32Windows)
-  $allVisible = @($allWindows | Where-Object { $_.visible })
-  $candidates = if ($match) { @(_Enumerate-Win32Windows -Match $match | Where-Object { $_.visible }) } else { @($allVisible) }
-  $eligible = @($candidates | Where-Object { -not $_.minimized })
-  if ($eligible.Count -eq 0) { $eligible = @($candidates) }
-  $target = $eligible | Sort-Object `
-    @{ Expression = { if ($_.foreground) { 0 } else { 1 } } }, `
-    @{ Expression = { if ($_.title) { 0 } else { 1 } } }, `
-    @{ Expression = { -1 * [int]$_.rect.width * [int]$_.rect.height } } |
-    Select-Object -First 1
-
-  $sample = @($allVisible | Select-Object -First 10 | ForEach-Object {
-    [pscustomobject]@{
-      title = $_.title
-      process = $_.process
-      class = $_.class
-      foreground = [bool]$_.foreground
-      minimized = [bool]$_.minimized
-      rect = $_.rect
+    if ($state.state -ceq 'error') { throw [string]$state.error }
+    if (-not [object]::Equals($Script:AppStrategyFile,$historyFile)) { throw 'App-profile history destination changed during acquisition.' }
+    if ($state.state -ceq 'complete') {
+      if ($state.queries -isnot [array] -or $state.queries.Count -ne $captures.Count) { throw 'Invalid app-profile completion trace.' }
+      $sw.Stop();$elapsed=[int]$sw.Elapsed.TotalMilliseconds
+      $state.payload.elapsed_ms=$elapsed
+      if ($Brief -and -not $jsonOnly) { [Console]::Out.WriteLine(($state.brief -replace 'elapsed_ms=\d+$',"elapsed_ms=$elapsed")) }
+      else { [Console]::Out.WriteLine(($state.payload | ConvertTo-Json -Depth ([int]$state.json_depth))) }
+      return [int]$state.exit
     }
-  })
-
-  if (-not $target) {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.app-profile/v1"
-      status = "partial"
-      reason = if ($match) { "no_matching_window" } else { "no_visible_window" }
-      match = $match
-      window_count = [int]$allVisible.Count
-      selected_window = $null
-      recommended_strategy = "not_found"
-      route_order = @()
-      strategy_score = [pscustomobject]@{
-        schema = "cucp.app-profile-strategy-score/v1"
-        app_type = "unknown"
-        recommended_strategy = "not_found"
-        confidence = "none"
-        total_score = 0
-        route_order = @()
-        route_scores = @()
-        evidence = [pscustomobject]@{
-          cdp_probe = $null
-          uia_probe = $null
-          label_count = [int](@($labels | Where-Object { -not [string]::IsNullOrWhiteSpace("$_") } | Select-Object -Unique).Count)
-          persisted_strategy = $null
+    $query=$state.query
+    if ($probe -ge 7 -or $state.state -cne 'query' -or $state.queries -isnot [array] -or $state.queries.Count -ne ($captures.Count+1) -or $query.argv -isnot [array]) { throw 'Invalid app-profile acquisition state.' }
+    $authorization=$state.record_authorization
+    if ($query.kind -ceq 'record') {
+      # Independent side-effect gate: user flags, fixed destination, controller
+      # preflight, score threshold, matching argv, and no previous append attempt.
+      $score=$authorization.strategy_score
+      $expectedConfidence=if ($score.total_score -ge 75) {'high'} else {'medium'}
+      if (-not $recordRequested -or -not $historyEnabled -or $recordAttempted -or
+          $state.kernel_evaluations -ne 2 -or
+          $authorization.schema -cne 'cucp.app-profile-record-authorization/v1' -or
+          $state.record_completion.state -cne 'complete' -or
+          $state.record_completion.payload.schema -cne 'cucp.app-profile/v1' -or
+          $state.record_completion.queries.Count -ne ($captures.Count+1) -or
+          -not [object]::Equals($authorization.history_file,$historyFile) -or
+          ($score.total_score -isnot [int] -and $score.total_score -isnot [long]) -or $score.total_score -lt 50 -or $score.total_score -gt 100 -or
+          $score.confidence -cne $expectedConfidence -or $query.argv.Count -ne 8 -or
+          -not [string]::Equals((ConvertTo-Json -InputObject @($authorization.query.argv) -Compress),
+            (ConvertTo-Json -InputObject @($query.argv) -Compress),[StringComparison]::Ordinal)) {
+        throw 'App-profile record lacks a valid explicit authorization.'
+      }
+      $ready=$state.record_completion
+    } elseif ($null -ne $authorization -or $null -ne $state.record_completion -or $state.kernel_evaluations -ne 1) { throw 'Unexpected app-profile record authorization.' }
+    if ($query.kind -ceq 'history' -and -not $historyEnabled) { throw 'App-profile history is disabled.' }
+    $capture=@{kind=$query.kind;argv=@($query.argv)}
+    try {
+      switch -CaseSensitive ($query.kind) {
+        'windows' {
+          if ($query.argv.Count -eq 0) { $capture.result=@(_Enumerate-Win32Windows) }
+          else { $capture.result=@(_Enumerate-Win32Windows -Match $query.argv[1]) }
         }
-      }
-      strategy_persistence = [pscustomobject]@{
-        enabled = -not $noStrategyHistory
-        app_key = "not_found"
-        history_file = $Script:AppStrategyFile
-        last_good_strategy = $null
-        record_requested = [bool]$recordStrategy
-        recorded = $false
-        record = $null
-        skipped_reason = if ($recordStrategy) { "no_matching_window" } else { "" }
-      }
-      recommended_task_options = @()
-      probe_commands = @()
-      windows_sample = @($sample)
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      next_action = if ($match) { "Run macro windows --json-only to inspect available windows, then retry app-profile with a narrower --match." } else { "Open or focus the target app, then run macro app-profile again." }
-    }
-    if ($Brief -and -not $jsonOnly) { [Console]::Out.WriteLine("partial app-profile reason=$($payload.reason) windows=$($payload.window_count)") }
-    else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 12)) }
-    return 2
-  }
-
-  $title = if ($target.title) { "$($target.title)" } else { "" }
-  $process = if ($target.process) { "$($target.process)" } else { "" }
-  $class = if ($target.class) { "$($target.class)" } else { "" }
-  $titleLower = $title.ToLowerInvariant()
-  $processLower = $process.ToLowerInvariant()
-  $classLower = $class.ToLowerInvariant()
-  $identity = (($titleLower + " " + $processLower + " " + $classLower).Trim())
-  $targetMatch = if ($match) { $match } elseif ($title) { $title } elseif ($process) { $process } else { "$($target.hwnd)" }
-
-  function _AppProfileProbeCdp {
-    param([int]$Port)
-    $pSw = [System.Diagnostics.Stopwatch]::StartNew()
-    $available = $false
-    $status = "partial"
-    $reason = "cdp_port_closed"
-    $browser = $null
-    $protocol = $null
-    $pageCount = 0
-    if (Test-CdpPortQuick -Port $Port -TimeoutMs 120) {
-      $r = Invoke-NativeHelper -ArgList @("-Action","cdp-detect","-CdpPort","$Port")
-      if ($r.Json -and $r.Json.status -eq "ok") {
-        $available = $true
-        $status = "ok"
-        $reason = ""
-        $browser = $r.Json.browser
-        $protocol = $r.Json.protocol_version
-        try { $pageCount = [int]$r.Json.page_count } catch { $pageCount = 0 }
-      } else {
-        $reason = if ($r.Json -and $r.Json.reason) { "$($r.Json.reason)" } else { "cdp_detect_failed" }
-      }
-    }
-    $pSw.Stop()
-    return [pscustomobject]@{
-      kind = "cdp"
-      enabled = $true
-      status = $status
-      available = [bool]$available
-      port = [int]$Port
-      browser = $browser
-      protocol_version = $protocol
-      page_count = [int]$pageCount
-      reason = $reason
-      elapsed_ms = [int]$pSw.Elapsed.TotalMilliseconds
-    }
-  }
-
-  function _AppProfileProbeUia {
-    param([string]$FocusedWindow, [string[]]$WantedLabels, [int]$Limit, [int64]$Hwnd)
-    $pSw = [System.Diagnostics.Stopwatch]::StartNew()
-    $items = @(_Get-UIAffordances -FocusedWindow $FocusedWindow -MaxElements $Limit -MinSize 6 -Hwnd $Hwnd)
-    $roles = @($items | Group-Object -Property role | Sort-Object Count -Descending | Select-Object -First 8 | ForEach-Object {
-      [pscustomobject]@{ role = "$($_.Name)"; count = [int]$_.Count }
-    })
-    $labelHits = New-Object System.Collections.ArrayList
-    foreach ($label in @($WantedLabels | Where-Object { -not [string]::IsNullOrWhiteSpace("$_") } | Select-Object -Unique)) {
-      $needle = "$label".ToLowerInvariant()
-      $hit = $false
-      foreach ($it in $items) {
-        $hay = New-Object System.Collections.ArrayList
-        if ($it.text) { [void]$hay.Add("$($it.text)") }
-        if ($it.synonyms) {
-          foreach ($s in @($it.synonyms)) { if ($s) { [void]$hay.Add("$s") } }
+        'cdp_port' {
+          $cdpWatch=[Diagnostics.Stopwatch]::StartNew()
+          # The original consumes this reply only as an if-condition.
+          $capture.result=[bool](Test-CdpPortQuick -Port ([int]$query.argv[0]) -TimeoutMs 120)
+          if (-not $capture.result) { $cdpWatch.Stop() }
         }
-        foreach ($s in @($hay)) {
-          $sl = "$s".ToLowerInvariant()
-          if ($sl -eq $needle -or $sl.Contains($needle) -or $needle.Contains($sl)) { $hit = $true; break }
+        'native' { $capture.result=Invoke-NativeHelper -ArgList @('-Action','cdp-detect','-CdpPort',$query.argv[3]);$cdpWatch.Stop() }
+        'uia' {
+          $uiaWatch=[Diagnostics.Stopwatch]::StartNew()
+          $capture.result=@(_Get-UIAffordances -FocusedWindow $query.argv[1] -MaxElements ([int]$query.argv[3]) -MinSize 6 -Hwnd ([int64]$query.argv[7]))
+          $uiaWatch.Stop();$arguments.uia_elapsed_ms=[int]$uiaWatch.Elapsed.TotalMilliseconds
         }
-        if ($hit) { break }
+        'history' {
+          $capture.result=_AppStrategy-LastGood -AppKey $query.argv[0]
+          # Remove only runtime Array wrapper metadata before JSON transport.
+          # Literal objects with value/Count properties remain ordinary objects.
+          if ($capture.result -is [array]) { $capture.result=$capture.result.Clone() }
+        }
+        'record' {
+          $recordAttempted=$true
+          $capture.result=_AppStrategy-Append -AppKey $query.argv[0] -AppType $query.argv[1] -Strategy $query.argv[2] -Confidence $query.argv[3] -Score ([int]$query.argv[4]) -Process $query.argv[5] -Class $query.argv[6] -Title $query.argv[7]
+          # Preserve the original raw value and PowerShell truth rule. The target,
+          # score and all other output were validated before the single write.
+          $ready.payload.strategy_persistence.record=$capture.result
+          $ready.payload.strategy_persistence.recorded=[bool]($capture.result -and -not $capture.result.error)
+          $recordCompletion=$ready
+        }
+        default { throw 'Unsupported app-profile acquisition kind.' }
       }
-      [void]$labelHits.Add([pscustomobject]@{ label = "$label"; found = [bool]$hit })
+    } catch {
+      if ($query.kind -ceq 'record') { throw }
+      [void]$capture.Remove('result');$capture.error=$_.Exception.Message
     }
-    $pSw.Stop()
-    return [pscustomobject]@{
-      kind = "uia"
-      enabled = $true
-      status = if ($items.Count -gt 0) { "ok" } else { "partial" }
-      available = [bool]($items.Count -gt 0)
-      affordance_count = [int]$items.Count
-      small_icon_count = [int](@($items | Where-Object { $_.small_icon }).Count)
-      roles = @($roles)
-      label_hits = @($labelHits)
-      sample = @($items | Select-Object -First 8 -Property text,role,rect,small_icon,confidence)
-      elapsed_ms = [int]$pSw.Elapsed.TotalMilliseconds
-    }
+    if ($cdpWatch -and -not $cdpWatch.IsRunning) { $arguments.cdp_elapsed_ms=[int]$cdpWatch.Elapsed.TotalMilliseconds }
+    [void]$captures.Add($capture)
   }
+  throw 'App-profile did not finish within its acquisition bound.'
+}
 
-  $appType = "win32_desktop"
-  $routeOrder = @("uia_pattern","uia_click","precision_point","ocr")
-  $notes = New-Object System.Collections.ArrayList
-  $taskOptions = New-Object System.Collections.ArrayList
-  function _AppProfileAddOptions {
-    param([string[]]$Items)
-    foreach ($it in @($Items)) {
-      if ($null -ne $it -and "$it" -ne "") { [void]$taskOptions.Add("$it") }
-    }
+function _Invoke-LegacyReadOnlyQuery {
+  param([string[]]$ChildArgs)
+  if ($ChildArgs.Count -lt 4 -or $ChildArgs[0] -ne '-Quiet' -or $ChildArgs[1] -ne 'macro' -or
+      $ChildArgs[2] -notin @('task-plan','form-plan','smart-plan') -or $ChildArgs[-1] -ne '--json-only') {
+    throw 'Invalid readonly planning query descriptor.'
   }
-
-  _AppProfileAddOptions -Items @("--match",$targetMatch,"--precision-points","--settle-ms","150","--verify-after-step","--retry-failed-step","1")
-
-  $browserLike = ($processLower -match '^(chrome|msedge|brave|firefox|electron|cursor|code|windsurf)$') -or ($classLower -like '*chrome_widgetwin*')
-  $officeLike = ($identity -match 'winword|excel|powerpnt|outlook|onenote|hwp|wordpad|notepad')
-  $runCdpProbe = (-not $noProbe) -and ($probeCdpRequested -or $browserLike)
-  $runUiaProbe = (-not $noProbe) -and $probeUiaRequested
-  $cdpProbe = $null
-  $uiaProbe = $null
-  if ($runCdpProbe) { $cdpProbe = _AppProfileProbeCdp -Port $cdpPort }
-  if ($runUiaProbe) { $uiaProbe = _AppProfileProbeUia -FocusedWindow $targetMatch -WantedLabels $labels -Limit $uiaProbeLimit -Hwnd ([int64]$target.hwnd) }
-  $cdpAvailable = ($cdpProbe -and [bool]$cdpProbe.available)
-  $useCdp = $false
-
-  if ($browserLike) {
-    $appType = "browser_or_electron"
-    if ($cdpAvailable -or $noProbe) {
-      $routeOrder = @("cdp_dom","uia_pattern","uia_click","ocr","precision_point")
-      _AppProfileAddOptions -Items @("--allow-cdp")
-      if ($cdpPort -ne 9222) { _AppProfileAddOptions -Items @("--cdp-port","$cdpPort") }
-      $useCdp = $true
-      if ($cdpAvailable) { [void]$notes.Add("CDP probe succeeded; prefer DOM actions because they avoid mouse movement and coordinate drift.") }
-      else { [void]$notes.Add("CDP probing was skipped by --no-probe; keep CDP in the route as an opt-in assumption.") }
-    } else {
-      $routeOrder = @("uia_pattern","uia_click","precision_point","ocr")
-      [void]$notes.Add("CDP probe did not confirm an available DevTools port, so the recommended route starts with UIA and precision points.")
-    }
-    [void]$notes.Add("For Chrome/Electron, enable remote debugging when DOM-grade control is required.")
-  } elseif ($officeLike) {
-    $appType = "document_or_mail_app"
-    $routeOrder = @("uia_value_or_pattern","safe_type_guarded","shortcut","precision_point","ocr")
-    [void]$notes.Add("Document/mail apps usually benefit from direct UIA value/pattern actions, guarded typing, and verification after each step.")
-  } else {
-    [void]$notes.Add("Generic Win32 route: try UIA actions first, then guarded precision points, then OCR only when labels are not exposed.")
+  # Fixed code receives data on stdin and binds the named array in-process.
+  # Native powershell -File reparses control-like values as script switches.
+  $bootstrap = @'
+$ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
+$utf8=New-Object Text.UTF8Encoding($false,$true)
+[Console]::OutputEncoding=$utf8
+$reader=New-Object IO.StreamReader -ArgumentList @([Console]::OpenStandardInput(),$utf8,$true)
+try { $wire=$reader.ReadToEnd() } finally { $reader.Dispose() }
+if ($wire.Length -gt 0 -and $wire[0] -eq [char]0xfeff) { $wire=$wire.Substring(1) }
+$request=$wire | ConvertFrom-Json
+if ($request.schema -ne 'cucp.readonly-plan-query/v1' -or $request.script_path -isnot [string] -or @($request.argv).Count -lt 2 -or $request.argv[0] -ne 'macro' -or $request.argv[1] -notin @('task-plan','form-plan','smart-plan') -or $request.argv[-1] -ne '--json-only' -or @($request.argv | Where-Object { $_ -isnot [string] }).Count -gt 0) { throw 'Invalid readonly planning query.' }
+$global:LASTEXITCODE=0
+& ([string]$request.script_path) -Quiet -CucpArgs ([string[]]$request.argv)
+exit [int]$LASTEXITCODE
+'@
+  $utf8 = New-Object Text.UTF8Encoding($false,$true)
+  $wire = @{schema='cucp.readonly-plan-query/v1';script_path=$PSCommandPath;argv=@($ChildArgs | Select-Object -Skip 1)} | ConvertTo-Json -Depth 6 -Compress
+  $bytes = $utf8.GetBytes($wire)
+  if ($bytes.Length -gt 1048576) { throw 'Readonly planning query exceeds 1 MiB.' }
+  $psi = New-Object Diagnostics.ProcessStartInfo
+  $psi.FileName = (Get-Command powershell.exe -CommandType Application -ErrorAction Stop).Source
+  $psi.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -InputFormat Text -OutputFormat Text -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($bootstrap))
+  $psi.UseShellExecute = $false
+  $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
+  $psi.StandardOutputEncoding = $utf8; $psi.StandardErrorEncoding = $utf8
+  $process = New-Object Diagnostics.Process
+  $process.StartInfo = $psi
+  $started = $false
+  try {
+    $started = $process.Start()
+    $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
+    $process.StandardInput.BaseStream.Write($bytes,0,$bytes.Length)
+    $process.StandardInput.Close()
+    $process.WaitForExit()
+    $out = $stdout.GetAwaiter().GetResult(); $err = $stderr.GetAwaiter().GetResult()
+    if ($out.Length -gt 16777216 -or $err.Length -gt 1048576) { throw 'Readonly planning response exceeds its budget.' }
+    $raw = (($out + $err) -replace "`r`n", "`n") -replace "`n$", ''
+    $obj = $null
+    try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
+    return [pscustomobject]@{exit=[int]$process.ExitCode;raw=$raw;json=$obj}
+  } finally {
+    if ($started) { try { if (-not $process.HasExited) { $process.Kill() } } catch { } }
+    $process.Dispose()
   }
-
-  if ($uiaProbe -and -not [bool]$uiaProbe.available) {
-    [void]$notes.Add("UIA probe found no exposed affordances; expect OCR or guarded coordinate routes to matter more for this app.")
-  } elseif ($uiaProbe -and [int]$uiaProbe.small_icon_count -gt 0) {
-    [void]$notes.Add("UIA probe found small icon affordances; precision-point routes are useful for tiny toolbar controls.")
-  }
-
-  $appKey = _AppStrategy-Key -Process $process -Class $class -AppType $appType
-  $lastGoodStrategy = $null
-  if (-not $noStrategyHistory) {
-    try { $lastGoodStrategy = _AppStrategy-LastGood -AppKey $appKey } catch { $lastGoodStrategy = $null }
-  }
-  if ($lastGoodStrategy) {
-    [void]$notes.Add("Last good app strategy found in app-strategy history: $($lastGoodStrategy.strategy).")
-  }
-  $strategyScore = _AppProfile-StrategyScore `
-    -AppType $appType `
-    -RouteOrder $routeOrder `
-    -CdpProbe $cdpProbe `
-    -UiaProbe $uiaProbe `
-    -Labels $labels `
-    -PersistedStrategy $lastGoodStrategy `
-    -BrowserLike $browserLike `
-    -OfficeLike $officeLike `
-    -NoProbe $noProbe
-  $routeOrder = @($strategyScore.route_order)
-  $recordedStrategy = $null
-  $recordSkippedReason = ""
-  if ($recordStrategy -and -not $noStrategyHistory) {
-    if (@("medium","high") -contains "$($strategyScore.confidence)") {
-      $recordedStrategy = _AppStrategy-Append `
-        -AppKey $appKey `
-        -AppType $appType `
-        -Strategy "$($strategyScore.recommended_strategy)" `
-        -Confidence "$($strategyScore.confidence)" `
-        -Score ([int]$strategyScore.total_score) `
-        -Process $process `
-        -Class $class `
-        -Title $title
-    } else {
-      $recordSkippedReason = "confidence_below_medium"
-    }
-  } elseif ($recordStrategy -and $noStrategyHistory) {
-    $recordSkippedReason = "disabled_by_no_strategy_history"
-  }
-
-  $probeCommands = New-Object System.Collections.ArrayList
-  foreach ($label in @($labels | Where-Object { -not [string]::IsNullOrWhiteSpace("$_") } | Select-Object -Unique)) {
-    $cmd = @("macro","smart-plan","--label","$label","--match",$targetMatch,"--precision-points")
-    if ($useCdp) {
-      $cmd += "--allow-cdp"
-      if ($cdpPort -ne 9222) { $cmd += @("--cdp-port","$cdpPort") }
-    }
-    $cmd += "--json-only"
-    [void]$probeCommands.Add([pscustomobject]@{
-      label = "$label"
-      command = @($cmd)
-      command_line = _TaskPlan-StepString -Command $cmd
-      purpose = "Read-only route probe for this label before any live control."
-    })
-  }
-
-  $affordanceCommand = $null
-  if ($includeAffordances) {
-    $affCmd = @("macro","list-affordances","--window",$targetMatch,"--limit","40","--json-only")
-    $affordanceCommand = [pscustomobject]@{
-      command = @($affCmd)
-      command_line = _TaskPlan-StepString -Command $affCmd
-      purpose = "Optional read-only UIA affordance inventory for label discovery."
-    }
-  }
-
-  $taskPrefix = @("macro","task-plan") + @($taskOptions)
-  $sw.Stop()
-  $payload = [pscustomobject]@{
-    schema = "cucp.app-profile/v1"
-    status = "ok"
-    match = $match
-    selected_window = [pscustomobject]@{
-      title = $title
-      process = $process
-      class = $class
-      hwnd = $target.hwnd
-      pid = $target.pid
-      foreground = [bool]$target.foreground
-      minimized = [bool]$target.minimized
-      rect = $target.rect
-    }
-    app_type = $appType
-    recommended_strategy = $strategyScore.recommended_strategy
-    route_order = @($routeOrder)
-    strategy_score = $strategyScore
-    strategy_persistence = [pscustomobject]@{
-      enabled = -not $noStrategyHistory
-      app_key = $appKey
-      history_file = $Script:AppStrategyFile
-      last_good_strategy = $lastGoodStrategy
-      record_requested = [bool]$recordStrategy
-      recorded = [bool]($recordedStrategy -and -not $recordedStrategy.error)
-      record = $recordedStrategy
-      skipped_reason = $recordSkippedReason
-    }
-    capability_probes = [pscustomobject]@{
-      cdp = $cdpProbe
-      uia = $uiaProbe
-    }
-    recommended_task_options = @($taskOptions)
-    suggested_task_plan_prefix = @($taskPrefix)
-    suggested_task_plan_prefix_line = _TaskPlan-StepString -Command $taskPrefix
-    probe_commands = @($probeCommands)
-    affordance_probe = $affordanceCommand
-    windows_sample = @($sample)
-    notes = @($notes)
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    next_action = "Append the task-specific fields/click labels/text to suggested_task_plan_prefix, run the returned plan or probe commands as read-only, then use task-run --dry-run before live control."
-  }
-  if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine("ok app-profile type=$appType strategy=$($payload.recommended_strategy) labels=$($probeCommands.Count) elapsed_ms=$($payload.elapsed_ms)")
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 14))
-  }
-  return 0
 }
 
 function Invoke-MacroTaskPreset {
   param([string[]]$Rest)
-  $kind = _Read-OptValue -Rest $Rest -Name "--kind"
-  if (-not $kind) { $kind = _Read-OptValue -Rest $Rest -Name "--preset" }
-  if (-not $kind) { $kind = _Read-OptValue -Rest $Rest -Name "--type" }
   $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $kind = "$kind".ToLowerInvariant()
-  if (-not $kind) { throw "macro task-preset requires --kind document|mail|form-submit|file-upload|file-download|settings" }
-
-  $taskArgs = New-Object System.Collections.ArrayList
-  [void]$taskArgs.Add("macro")
-  [void]$taskArgs.Add("task-plan")
-  $presetMode = "task"
-  $workflowSteps = New-Object System.Collections.ArrayList
-  $extraCommands = New-Object System.Collections.ArrayList
-
-  function _PresetAdd {
-    param([string[]]$Items)
-    foreach ($it in @($Items)) {
-      if ($null -ne $it -and "$it" -ne "") { [void]$taskArgs.Add("$it") }
-    }
+  $preset = _Invoke-LegacyCompatibility -Operation 'task-preset-prepare' -Arguments @{rest=@($Rest)} -PreserveInvalidArguments
+  if ($preset.schema -ne 'cucp.task-preset-preparation/v1' -or $preset.mode -notin @('task','workflow') -or @($preset.queries).Count -ne 1) {
+    throw 'Invalid task preset preparation response; no planning query was executed.'
   }
-
-  function _PresetForwardValue {
-    param([string]$Name)
-    $v = _Read-OptValue -Rest $Rest -Name $Name
-    if ($v) { _PresetAdd -Items @($Name,$v) }
-  }
-
-  function _PresetForwardSwitch {
-    param([string]$Name)
-    if (_Read-Switch -Rest $Rest -Name $Name) { _PresetAdd -Items @($Name) }
-  }
-
+  $query = @($preset.queries)[0]
   function _PresetInvokeJson {
     param([string[]]$ChildArgs)
-    $rawLines = & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @ChildArgs 2>&1
-    $exitCode = $LASTEXITCODE
-    $raw = (($rawLines | ForEach-Object { $_.ToString() }) -join "`n")
-    $obj = $null
-    try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
-    return [pscustomobject]@{ exit=[int]$exitCode; raw=$raw; json=$obj }
+    return (_Invoke-LegacyReadOnlyQuery -ChildArgs $ChildArgs)
   }
 
-  $app = _Read-OptValue -Rest $Rest -Name "--app"
-  $waitTitle = _Read-OptValue -Rest $Rest -Name "--wait-title"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $notes = New-Object System.Collections.ArrayList
-
-  switch ($kind) {
-    "document" {
-      $text = _Read-OptValue -Rest $Rest -Name "--text"
-      if (-not $text) { $text = _Read-OptValue -Rest $Rest -Name "--body" }
-      if (-not $text) { throw "macro task-preset --kind document requires --text" }
-      if (-not $app) { $app = "notepad" }
-      if (-not $waitTitle) { $waitTitle = "Notepad" }
-      if (-not $match) { $match = $waitTitle }
-      _PresetAdd -Items @("--app",$app,"--wait-title",$waitTitle,"--match",$match,"--type-text",$text)
-      if (_Read-Switch -Rest $Rest -Name "--replace") { _PresetAdd -Items @("--pre-shortcut","ctrl+a") }
-      if (_Read-Switch -Rest $Rest -Name "--save") { _PresetAdd -Items @("--shortcut","ctrl+s") }
-      foreach ($shortcut in @(_Read-AllOptValues -Rest $Rest -Name "--shortcut")) { _PresetAdd -Items @("--shortcut",$shortcut) }
-      [void]$notes.Add("document preset maps to app launch/wait, optional replace, text input, optional save shortcut")
+  $elapsed = 0
+  if ($preset.mode -eq 'task') {
+    $childArgs = @($query.argv)
+    if ($query.kind -ne 'task_plan' -or $null -ne $query.rest -or $childArgs.Count -lt 4 -or
+        $childArgs[0] -ne '-Quiet' -or $childArgs[1] -ne 'macro' -or $childArgs[2] -ne 'task-plan' -or
+        $childArgs[-1] -ne '--json-only' -or @($childArgs | Where-Object { $_ -isnot [string] }).Count -gt 0) {
+      throw 'Invalid task preset child query; only the task-plan query is allowed.'
     }
-    "mail" {
-      $to = _Read-OptValue -Rest $Rest -Name "--to"
-      $subject = _Read-OptValue -Rest $Rest -Name "--subject"
-      $body = _Read-OptValue -Rest $Rest -Name "--body"
-      $sendLabel = _Read-OptValue -Rest $Rest -Name "--send-label"
-      if (-not $sendLabel -and (_Read-Switch -Rest $Rest -Name "--send")) { $sendLabel = "Send" }
-      if (-not $to -and -not $subject -and -not $body -and -not $sendLabel) { throw "macro task-preset --kind mail requires --to/--subject/--body and optionally --send-label" }
-      if ($app) { _PresetAdd -Items @("--app",$app) }
-      if ($waitTitle) { _PresetAdd -Items @("--wait-title",$waitTitle) }
-      if ($match) { _PresetAdd -Items @("--match",$match) }
-      $toLabel = _Read-OptValue -Rest $Rest -Name "--to-label"; if (-not $toLabel) { $toLabel = "To" }
-      $subjectLabel = _Read-OptValue -Rest $Rest -Name "--subject-label"; if (-not $subjectLabel) { $subjectLabel = "Subject" }
-      $bodyLabel = _Read-OptValue -Rest $Rest -Name "--body-label"; if (-not $bodyLabel) { $bodyLabel = "Body" }
-      if ($to) { _PresetAdd -Items @("--field",("$toLabel=$to")) }
-      if ($subject) { _PresetAdd -Items @("--field",("$subjectLabel=$subject")) }
-      if ($body) { _PresetAdd -Items @("--field",("$bodyLabel=$body")) }
-      if ($sendLabel) { _PresetAdd -Items @("--send-label",$sendLabel) }
-      if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { _PresetAdd -Items @("--allow-cdp") }
-      [void]$notes.Add("mail preset maps to form fields and optional send label; --allow-cdp is enabled unless --no-cdp is set")
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $planResult = _PresetInvokeJson -ChildArgs $childArgs
+    $sw.Stop()
+    $elapsed = [int]$sw.Elapsed.TotalMilliseconds
+    $captured = @{exit=[int]$planResult.exit; raw=$planResult.raw; json=$planResult.json}
+  } else {
+    if ($query.kind -ne 'workflow_plan' -or $null -ne $query.argv -or @($query.rest).Count -eq 0 -or
+        @($query.rest | Where-Object { $_ -isnot [string] }).Count -gt 0) {
+      throw 'Invalid task preset workflow query.'
     }
-    { $_ -eq "form" -or $_ -eq "form-submit" } {
-      $presetMode = "workflow"
-      $fieldSpecs = @(_Read-AllOptValues -Rest $Rest -Name "--field")
-      $sendLabel = _Read-OptValue -Rest $Rest -Name "--send-label"
-      if (-not $sendLabel) { $sendLabel = _Read-OptValue -Rest $Rest -Name "--submit-label" }
-      if (-not $sendLabel -and (_Read-Switch -Rest $Rest -Name "--submit")) { $sendLabel = "Submit" }
-      if ($fieldSpecs.Count -eq 0 -and -not $sendLabel) { throw "macro task-preset --kind form-submit requires --field and/or --send-label/--submit-label" }
-      $cmd = @("macro","form-run")
-      foreach ($f in $fieldSpecs) { $cmd += @("--field",$f) }
-      if ($sendLabel) { $cmd += @("--send-label",$sendLabel) }
-      if ($match) { $cmd += @("--match",$match) }
-      if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $cmd += "--allow-cdp" }
-      $cdpPageMatch = _Read-OptValue -Rest $Rest -Name "--cdp-page-match"
-      $cdpPort = _Read-OptValue -Rest $Rest -Name "--cdp-port"
-      if ($cdpPageMatch) { $cmd += @("--cdp-page-match",$cdpPageMatch) }
-      if ($cdpPort) { $cmd += @("--cdp-port",$cdpPort) }
-      if (_Read-Switch -Rest $Rest -Name "--clear-first") { $cmd += "--clear-first" }
-      if (_Read-Switch -Rest $Rest -Name "--include-ocr") { $cmd += "--include-ocr" }
-      if ((_Read-Switch -Rest $Rest -Name "--precision-points") -or (_Read-Switch -Rest $Rest -Name "--point-plan")) { $cmd += "--precision-points" }
-      [void]$workflowSteps.Add((_TaskPlan-StepString -Command $cmd))
-      [void]$extraCommands.Add([pscustomobject]@{ kind="form_dry_run"; command=@($cmd + "--dry-run") })
-      [void]$notes.Add("form-submit preset maps to one form-run workflow step; run the generated form dry-run command before live control")
-    }
-    { $_ -eq "file-upload" -or $_ -eq "upload" } {
-      $presetMode = "workflow"
-      $path = _Read-OptValue -Rest $Rest -Name "--path"
-      if (-not $path) { $path = _Read-OptValue -Rest $Rest -Name "--file" }
-      if (-not $path) { throw "macro task-preset --kind file-upload requires --path" }
-      $uploadLabel = _Read-OptValue -Rest $Rest -Name "--upload-label"
-      if (-not $uploadLabel) { $uploadLabel = _Read-OptValue -Rest $Rest -Name "--label" }
-      if (-not $uploadLabel) { $uploadLabel = "Upload" }
-      $dialogTitle = _Read-OptValue -Rest $Rest -Name "--dialog-title"
-      if (-not $dialogTitle) { $dialogTitle = "Open" }
-      $dialogTimeout = _Read-OptValue -Rest $Rest -Name "--dialog-timeout-ms"
-      if (-not $dialogTimeout) { $dialogTimeout = "8000" }
-      $clickCmd = @("macro","smart-click","--label",$uploadLabel,"--allow-mouse-fallback")
-      if ($match) { $clickCmd += @("--match",$match) }
-      if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $clickCmd += "--allow-cdp" }
-      if (_Read-Switch -Rest $Rest -Name "--precision-points") { $clickCmd += "--precision-points" }
-      if (_Read-Switch -Rest $Rest -Name "--include-ocr") { $clickCmd += "--include-ocr" }
-      [void]$workflowSteps.Add((_TaskPlan-StepString -Command $clickCmd))
-      [void]$workflowSteps.Add((_TaskPlan-StepString -Command @("macro","wait-window","--title",$dialogTitle,"--timeout-ms",$dialogTimeout)))
-      [void]$workflowSteps.Add((_TaskPlan-StepString -Command @("macro","safe-type","--target-match",$dialogTitle,"--text",$path,"--enter")))
-      [void]$notes.Add("file-upload preset maps to upload button click, file dialog wait, guarded path entry, and Enter")
-    }
-    { $_ -eq "file-download" -or $_ -eq "download" } {
-      $presetMode = "workflow"
-      $downloadLabel = _Read-OptValue -Rest $Rest -Name "--download-label"
-      if (-not $downloadLabel) { $downloadLabel = _Read-OptValue -Rest $Rest -Name "--label" }
-      if (-not $downloadLabel) { $downloadLabel = "Download" }
-      $clickCmd = @("macro","smart-click","--label",$downloadLabel,"--allow-mouse-fallback")
-      if ($match) { $clickCmd += @("--match",$match) }
-      if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $clickCmd += "--allow-cdp" }
-      if (_Read-Switch -Rest $Rest -Name "--precision-points") { $clickCmd += "--precision-points" }
-      if (_Read-Switch -Rest $Rest -Name "--include-ocr") { $clickCmd += "--include-ocr" }
-      [void]$workflowSteps.Add((_TaskPlan-StepString -Command $clickCmd))
-      $verifyLabel = _Read-OptValue -Rest $Rest -Name "--verify-label"
-      if ($verifyLabel) {
-        $verifyTimeout = _Read-OptValue -Rest $Rest -Name "--verify-timeout-ms"
-        if (-not $verifyTimeout) { $verifyTimeout = "5000" }
-        $waitCmd = @("macro","wait-label","--label",$verifyLabel,"--timeout-ms",$verifyTimeout)
-        if ($match) { $waitCmd += @("--window",$match) }
-        [void]$workflowSteps.Add((_TaskPlan-StepString -Command $waitCmd))
-      }
-      [void]$notes.Add("file-download preset maps to a download button click plus optional verification label wait")
-    }
-    { $_ -eq "settings" -or $_ -eq "app-settings" } {
-      $presetMode = "workflow"
-      $settingsLabel = _Read-OptValue -Rest $Rest -Name "--settings-label"
-      if (-not $settingsLabel) { $settingsLabel = "Settings" }
-      $fieldSpecs = @(_Read-AllOptValues -Rest $Rest -Name "--field")
-      $saveLabel = _Read-OptValue -Rest $Rest -Name "--save-label"
-      if (-not $saveLabel) { $saveLabel = _Read-OptValue -Rest $Rest -Name "--apply-label" }
-      if (-not $saveLabel -and (_Read-Switch -Rest $Rest -Name "--save")) { $saveLabel = "Save" }
-      if (-not $saveLabel -and (_Read-Switch -Rest $Rest -Name "--apply")) { $saveLabel = "Apply" }
-      $settingsCmd = @("macro","smart-click","--label",$settingsLabel,"--allow-mouse-fallback")
-      if ($match) { $settingsCmd += @("--match",$match) }
-      if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $settingsCmd += "--allow-cdp" }
-      [void]$workflowSteps.Add((_TaskPlan-StepString -Command $settingsCmd))
-      foreach ($spec in $fieldSpecs) {
-        $rawSpec = "$spec"
-        $eq = $rawSpec.IndexOf("=")
-        if ($eq -le 0) { throw "macro task-preset --kind settings field must be Label=Value" }
-        $fieldLabel = $rawSpec.Substring(0, $eq).Trim()
-        $fieldValue = $rawSpec.Substring($eq + 1)
-        if (-not $fieldLabel) { throw "macro task-preset --kind settings field label is empty" }
-        $fieldCmd = @("macro","smart-click","--label",$fieldLabel,"--allow-mouse-fallback")
-        if ($match) { $fieldCmd += @("--match",$match) }
-        if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $fieldCmd += "--allow-cdp" }
-        [void]$workflowSteps.Add((_TaskPlan-StepString -Command $fieldCmd))
-        if ($match) { [void]$workflowSteps.Add((_TaskPlan-StepString -Command @("macro","safe-type","--target-match",$match,"--text",$fieldValue))) }
-        else { [void]$workflowSteps.Add((_TaskPlan-StepString -Command @("macro","type-native","--text",$fieldValue))) }
-      }
-      foreach ($clickLabel in @(_Read-AllOptValues -Rest $Rest -Name "--click-label")) {
-        $cmd = @("macro","smart-click","--label",$clickLabel,"--allow-mouse-fallback")
-        if ($match) { $cmd += @("--match",$match) }
-        if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $cmd += "--allow-cdp" }
-        [void]$workflowSteps.Add((_TaskPlan-StepString -Command $cmd))
-      }
-      if ($saveLabel) {
-        $saveCmd = @("macro","smart-click","--label",$saveLabel,"--allow-mouse-fallback")
-        if ($match) { $saveCmd += @("--match",$match) }
-        if (-not (_Read-Switch -Rest $Rest -Name "--no-cdp")) { $saveCmd += "--allow-cdp" }
-        [void]$workflowSteps.Add((_TaskPlan-StepString -Command $saveCmd))
-      }
-      [void]$notes.Add("settings preset maps to open settings, optional field edits, optional extra clicks, and optional save/apply")
-    }
-    default {
-      throw "macro task-preset supports --kind document|mail|form-submit|file-upload|file-download|settings"
-    }
+    $captured = @{workflow_plan=(_Build-WorkflowPlan -Rest @($query.rest))}
   }
-
-  if ($presetMode -eq "task") {
-    foreach ($name in @("--name","--verify-label","--verify-timeout-ms","--settle-ms","--observe-match","--verify-match","--verify-label-after-step","--verify-label-window","--verify-label-timeout-ms","--verify-label-interval-ms","--retry-failed-step","--retry-delay-ms","--precision-radius","--precision-step","--point-cache-ttl")) {
-      _PresetForwardValue -Name $name
-    }
-    foreach ($name in @("--allow-cdp","--no-cdp","--precision-points","--include-ocr","--verify-after-step","--observe-after-step","--retry-live-steps","--clear-first","--enter","--press-enter")) {
-      _PresetForwardSwitch -Name $name
-    }
-  }
-
-  if ($presetMode -eq "workflow") {
-    $workflowName = _Read-OptValue -Rest $Rest -Name "--name"
-    if (-not $workflowName) { $workflowName = $kind }
-    $workflowPlanRest = @("--name",$workflowName)
-    foreach ($s in @($workflowSteps)) { $workflowPlanRest += @("--step",$s) }
-    $workflowPlan = if ($workflowSteps.Count -gt 0) { _Build-WorkflowPlan -Rest $workflowPlanRest } else { $null }
-    $workflowPlanCommand = @("macro","workflow-plan") + $workflowPlanRest
-    $workflowRunCommand = @("macro","workflow-run")
-    $workflowDryRunCommand = @("macro","workflow-run","--dry-run")
-    foreach ($name in @("--settle-ms","--observe-match","--verify-match","--verify-label-after-step","--verify-label-window","--verify-label-timeout-ms","--verify-label-interval-ms","--retry-failed-step","--retry-delay-ms")) {
-      $v = _Read-OptValue -Rest $Rest -Name $name
-      if ($v) {
-        $workflowRunCommand += @($name,$v)
-        $workflowDryRunCommand += @($name,$v)
-      }
-    }
-    foreach ($name in @("--observe-after-step","--verify-after-step","--retry-live-steps")) {
-      if (_Read-Switch -Rest $Rest -Name $name) {
-        $workflowRunCommand += $name
-        $workflowDryRunCommand += $name
-      }
-    }
-    foreach ($s in @($workflowSteps)) {
-      $workflowRunCommand += @("--step",$s)
-      $workflowDryRunCommand += @("--step",$s)
-    }
-    $status = if ($workflowPlan -and [bool]$workflowPlan.safe_to_run) { "ok" } else { "partial" }
-    $payload = [pscustomobject]@{
-      schema = "cucp.task-preset/v1"
-      status = $status
-      kind = $kind
-      mode = "workflow"
-      elapsed_ms = 0
-      generated_task_plan_command = $null
-      generated_task_run_command = $null
-      generated_workflow_plan_command = @($workflowPlanCommand)
-      generated_workflow_run_command = @($workflowRunCommand)
-      generated_workflow_dry_run_command = @($workflowDryRunCommand)
-      extra_commands = @($extraCommands)
-      task_plan_exit = $null
-      task_plan = $null
-      task_plan_raw = $null
-      workflow_plan = $workflowPlan
-      notes = @($notes)
-      next_step = if ($status -eq "ok") { "Run generated_workflow_dry_run_command first. For live control, use generated_workflow_run_command with -AllowLiveControl; add --confirm-sensitive only after explicit approval when required." } else { "Inspect workflow_plan errors and narrow labels/window/app before running." }
-    }
-    if ($Brief -and -not $jsonOnly) {
-      [Console]::Out.WriteLine("$status task-preset kind=$kind mode=workflow steps=$($workflowSteps.Count)")
-    } else {
-      [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 18))
-    }
-    if ($status -eq "ok") { return 0 }
-    return 2
-  }
-
-  $taskRunArgs = New-Object System.Collections.ArrayList
-  [void]$taskRunArgs.Add("macro")
-  [void]$taskRunArgs.Add("task-run")
-  for ($i = 2; $i -lt $taskArgs.Count; $i++) { [void]$taskRunArgs.Add($taskArgs[$i]) }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $planResult = _PresetInvokeJson -ChildArgs (@("-Quiet") + @($taskArgs) + @("--json-only"))
-  $sw.Stop()
-  $taskPlan = $planResult.json
-  $status = if ($taskPlan -and [bool]$taskPlan.safe_to_run) { "ok" } else { "partial" }
-  $payload = [pscustomobject]@{
-    schema = "cucp.task-preset/v1"
-    status = $status
-    kind = $kind
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    generated_task_plan_command = @($taskArgs)
-    generated_task_run_command = @($taskRunArgs)
-    task_plan_exit = [int]$planResult.exit
-    task_plan = $taskPlan
-    task_plan_raw = if ($taskPlan) { $null } else { $planResult.raw }
-    notes = @($notes)
-    next_step = if ($status -eq "ok") { "Run generated_task_run_command with --dry-run first, then with -AllowLiveControl only after user authorization." } else { "Inspect task_plan errors and narrow labels/window/app before running." }
+  $payload = _Invoke-LegacyCompatibility -Operation 'task-preset-complete' -Arguments @{rest=@($Rest); captured_query_result=$captured; elapsed_ms=$elapsed} -PreserveInvalidArguments
+  if ($payload.schema -ne 'cucp.task-preset/v1' -or $payload.status -notin @('ok','partial') -or $payload.kind -ne $preset.kind) {
+    throw 'Invalid task preset completion response.'
   }
   if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine("$status task-preset kind=$kind task_plan_exit=$($planResult.exit) elapsed_ms=$($payload.elapsed_ms)")
+    if ($preset.mode -eq 'workflow') {
+      [Console]::Out.WriteLine("$($payload.status) task-preset kind=$($payload.kind) mode=workflow steps=$(@($preset.workflow_steps).Count)")
+    } else {
+      [Console]::Out.WriteLine("$($payload.status) task-preset kind=$($payload.kind) task_plan_exit=$($payload.task_plan_exit) elapsed_ms=$($payload.elapsed_ms)")
+    }
   } else {
     [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 18))
   }
-  if ($status -eq "ok") { return 0 }
+  if ($payload.status -eq 'ok') { return 0 }
   return 2
 }
 
 function Invoke-MacroTaskPlan {
   param([string[]]$Rest)
-  $name = _Read-OptValue -Rest $Rest -Name "--name"
-  $app = _Read-OptValue -Rest $Rest -Name "--app"
-  if (-not $app) { $app = _Read-OptValue -Rest $Rest -Name "--open-app" }
-  $appArgs = _Read-OptValue -Rest $Rest -Name "--app-args"
-  $waitTitle = _Read-OptValue -Rest $Rest -Name "--wait-title"
-  if (-not $waitTitle) { $waitTitle = _Read-OptValue -Rest $Rest -Name "--verify-window" }
-  $waitTimeout = [int](_Read-OptValue -Rest $Rest -Name "--wait-timeout-ms")
-  $verifyLabel = _Read-OptValue -Rest $Rest -Name "--verify-label"
-  $verifyTimeout = [int](_Read-OptValue -Rest $Rest -Name "--verify-timeout-ms")
-  $fieldSpecs = @(_Read-AllOptValues -Rest $Rest -Name "--field")
-  $clickLabels = @(_Read-AllOptValues -Rest $Rest -Name "--click-label")
-  $typeTexts = @(_Read-AllOptValues -Rest $Rest -Name "--type-text")
-  if ($typeTexts.Count -eq 0) { $typeTexts = @(_Read-AllOptValues -Rest $Rest -Name "--text") }
-  $preShortcuts = @(_Read-AllOptValues -Rest $Rest -Name "--pre-shortcut")
-  $shortcuts = @(_Read-AllOptValues -Rest $Rest -Name "--shortcut")
-  foreach ($k in @(_Read-AllOptValues -Rest $Rest -Name "--keys")) { $shortcuts += $k }
-  $sendLabel = _Read-OptValue -Rest $Rest -Name "--send-label"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $window = _Read-OptValue -Rest $Rest -Name "--window"
-  $allowCdp = _Read-Switch -Rest $Rest -Name "--allow-cdp"
-  $disableCdp = _Read-Switch -Rest $Rest -Name "--no-cdp"
-  $cdpPageMatch = _Read-OptValue -Rest $Rest -Name "--cdp-page-match"
-  $cdpPortRaw = _Read-OptValue -Rest $Rest -Name "--cdp-port"
-  $clearFirst = _Read-Switch -Rest $Rest -Name "--clear-first"
-  $pressEnter = (_Read-Switch -Rest $Rest -Name "--press-enter") -or (_Read-Switch -Rest $Rest -Name "--enter")
-  $includeOcr = _Read-Switch -Rest $Rest -Name "--include-ocr"
-  $precisionPoints = (_Read-Switch -Rest $Rest -Name "--precision-points") -or (_Read-Switch -Rest $Rest -Name "--point-plan")
-  $precisionRadiusRaw = _Read-OptValue -Rest $Rest -Name "--precision-radius"
-  $precisionStepRaw = _Read-OptValue -Rest $Rest -Name "--precision-step"
-  $pointCacheTtlRaw = _Read-OptValue -Rest $Rest -Name "--point-cache-ttl"
-  if (-not $pointCacheTtlRaw) { $pointCacheTtlRaw = _Read-OptValue -Rest $Rest -Name "--cache-ttl" }
-  $settleMsRaw = _Read-OptValue -Rest $Rest -Name "--settle-ms"
-  $observeAfterStep = _Read-Switch -Rest $Rest -Name "--observe-after-step"
-  $verifyAfterStep = _Read-Switch -Rest $Rest -Name "--verify-after-step"
-  $observeMatch = _Read-OptValue -Rest $Rest -Name "--observe-match"
-  $verifyMatch = _Read-OptValue -Rest $Rest -Name "--verify-match"
-  $verifyLabelAfterStep = _Read-OptValue -Rest $Rest -Name "--verify-label-after-step"
-  if (-not $verifyLabelAfterStep) { $verifyLabelAfterStep = _Read-OptValue -Rest $Rest -Name "--verify-after-label" }
-  $verifyLabelWindow = _Read-OptValue -Rest $Rest -Name "--verify-label-window"
-  $verifyLabelTimeoutRaw = _Read-OptValue -Rest $Rest -Name "--verify-label-timeout-ms"
-  $verifyLabelIntervalRaw = _Read-OptValue -Rest $Rest -Name "--verify-label-interval-ms"
-  $retryFailedRaw = _Read-OptValue -Rest $Rest -Name "--retry-failed-step"
-  $retryDelayRaw = _Read-OptValue -Rest $Rest -Name "--retry-delay-ms"
-  $retryLiveSteps = _Read-Switch -Rest $Rest -Name "--retry-live-steps"
-  if (-not $observeMatch -and $verifyMatch) { $observeMatch = $verifyMatch }
-  if ($verifyAfterStep) { $observeAfterStep = $true }
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  if (-not $match) { $match = $window }
-  if ($waitTimeout -le 0) { $waitTimeout = 8000 }
-  if ($verifyTimeout -le 0) { $verifyTimeout = 3000 }
-
-  if (-not $app -and -not $waitTitle -and $fieldSpecs.Count -eq 0 -and $clickLabels.Count -eq 0 -and $typeTexts.Count -eq 0 -and $preShortcuts.Count -eq 0 -and $shortcuts.Count -eq 0 -and -not $sendLabel -and -not $verifyLabel) {
-    throw "macro task-plan requires --app/--wait-title/--field/--type-text/--shortcut/--click-label/--send-label/--verify-label"
-  }
-
+  $jsonOnly = _Read-Switch -Rest $Rest -Name '--json-only'
+  $prepared = _Invoke-LegacyCompatibility -Operation 'task-plan-prepare' -Arguments @{rest=@($Rest)} -PreserveInvalidArguments
+  if ($prepared.schema -ne 'cucp.task-plan-preparation/v1' -or $prepared.queries -isnot [System.Array]) { throw 'Invalid task planning preparation response.' }
   function _InvokeTaskChildJson {
     param([string[]]$ChildArgs)
-    $rawLines = & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @ChildArgs 2>&1
-    $exitCode = $LASTEXITCODE
-    $raw = (($rawLines | ForEach-Object { $_.ToString() }) -join "`n")
-    $obj = $null
-    try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
-    return [pscustomobject]@{ exit=[int]$exitCode; raw=$raw; json=$obj }
+    return (_Invoke-LegacyReadOnlyQuery -ChildArgs $ChildArgs)
   }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $workflowSteps = New-Object System.Collections.ArrayList
-  $items = New-Object System.Collections.ArrayList
-  $errors = New-Object System.Collections.ArrayList
-
-  if ($app) {
-    $cmd = @("macro","app-launch","--name",$app)
-    if ($appArgs) { $cmd += @("--args",$appArgs) }
-    if ($waitTitle) { $cmd += @("--wait-title",$waitTitle,"--wait-timeout-ms","$waitTimeout") }
-    $step = _TaskPlan-StepString -Command $cmd
-    [void]$workflowSteps.Add($step)
-    [void]$items.Add([pscustomobject]@{ kind="app_launch"; safe_to_act=$true; live_required=$true; command=@($cmd); step=$step })
-  } elseif ($waitTitle) {
-    $cmd = @("macro","wait-window","--title",$waitTitle,"--timeout-ms","$waitTimeout")
-    $step = _TaskPlan-StepString -Command $cmd
-    [void]$workflowSteps.Add($step)
-    [void]$items.Add([pscustomobject]@{ kind="wait_window"; safe_to_act=$true; live_required=$false; command=@($cmd); step=$step })
+  $sw = [Diagnostics.Stopwatch]::StartNew()
+  $captured = New-Object Collections.ArrayList
+  foreach ($query in $prepared.queries) {
+    if ($query.kind -isnot [string] -or $query.argv -isnot [System.Array] -or @($query.argv | Where-Object { $_ -isnot [string] }).Count -gt 0) { throw 'Invalid planning query field types.' }
+    $argv = @($query.argv)
+    $macro = if ($query.kind -eq 'form_plan') { 'form-plan' } elseif ($query.kind -eq 'smart_plan') { 'smart-plan' } else { $null }
+    if (-not $macro -or $argv.Count -lt 6 -or $argv[0] -ne '-Quiet' -or $argv[1] -ne 'macro' -or $argv[2] -ne $macro -or $argv[-1] -ne '--json-only') { throw 'Invalid task planning query descriptor.' }
+    $reply = _InvokeTaskChildJson -ChildArgs $argv
+    [void]$captured.Add(@{kind=$query.kind;argv=$argv;exit=[int]$reply.exit;raw=[string]$reply.raw;json=$reply.json})
   }
-
-  foreach ($shortcut in $preShortcuts) {
-    if ([string]::IsNullOrWhiteSpace("$shortcut")) { continue }
-    $cmd = @("macro","shortcut","--keys","$shortcut")
-    $step = _TaskPlan-StepString -Command $cmd
-    [void]$workflowSteps.Add($step)
-    [void]$items.Add([pscustomobject]@{ kind="shortcut"; phase="pre"; keys="$shortcut"; safe_to_act=$true; live_required=$true; command=@($cmd); step=$step })
-  }
-
-  $typeIndex = 0
-  foreach ($typeText in $typeTexts) {
-    if ($null -eq $typeText) { continue }
-    $typeIndex++
-    if ($match) {
-      $cmd = @("macro","safe-type","--target-match",$match,"--text","$typeText")
-      if ($pressEnter) { $cmd += "--enter" }
-      $route = "safe_type_guarded"
-    } else {
-      $cmd = @("macro","type-native","--text","$typeText")
-      if ($clearFirst -and $typeIndex -eq 1) { $cmd += "--clear" }
-      if ($pressEnter) { $cmd += "--enter" }
-      $route = "type_native"
-    }
-    $step = _TaskPlan-StepString -Command $cmd
-    [void]$workflowSteps.Add($step)
-    [void]$items.Add([pscustomobject]@{ kind="type_text"; route=$route; index=$typeIndex; safe_to_act=$true; live_required=$true; command=@($cmd); step=$step })
-  }
-
-  $formPlan = $null
-  if ($fieldSpecs.Count -gt 0 -or $sendLabel) {
-    $formArgs = @("-Quiet","macro","form-plan")
-    foreach ($f in $fieldSpecs) { $formArgs += @("--field",$f) }
-    if ($sendLabel) { $formArgs += @("--send-label",$sendLabel) }
-    if ($match) { $formArgs += @("--match",$match) }
-    if ($allowCdp) { $formArgs += "--allow-cdp" }
-    if ($disableCdp) { $formArgs += "--no-cdp" }
-    if ($cdpPageMatch) { $formArgs += @("--cdp-page-match",$cdpPageMatch) }
-    if ($cdpPortRaw) { $formArgs += @("--cdp-port",$cdpPortRaw) }
-    if ($clearFirst) { $formArgs += "--clear-first" }
-    if ($includeOcr) { $formArgs += "--include-ocr" }
-    if ($precisionPoints) { $formArgs += "--precision-points" }
-    if ($precisionRadiusRaw) { $formArgs += @("--precision-radius",$precisionRadiusRaw) }
-    if ($precisionStepRaw) { $formArgs += @("--precision-step",$precisionStepRaw) }
-    if ($pointCacheTtlRaw) { $formArgs += @("--point-cache-ttl",$pointCacheTtlRaw) }
-    $formArgs += "--json-only"
-    $formResult = _InvokeTaskChildJson -ChildArgs $formArgs
-    $formPlan = $formResult.json
-    if (-not $formPlan) {
-      [void]$errors.Add([pscustomobject]@{ code="form_plan_unparseable"; exit=$formResult.exit; raw=$formResult.raw })
-    } elseif (-not [bool]$formPlan.safe_to_act) {
-      [void]$errors.Add([pscustomobject]@{ code="form_plan_not_safe"; unsafe_steps=$formPlan.unsafe_steps; errors=$formPlan.errors })
-    } else {
-      foreach ($cp in @($formPlan.command_plan)) {
-        $cmd = @(_TaskPlan-UnwrapCommand -Command $cp.command)
-        if ($cmd.Count -eq 0) { continue }
-        $step = _TaskPlan-StepString -Command $cmd
-        [void]$workflowSteps.Add($step)
-        [void]$items.Add([pscustomobject]@{ kind="form_step"; label=$cp.label; route=$cp.route; safe_to_act=$true; live_required=$true; command=@($cmd); step=$step })
-      }
-    }
-  }
-
-  foreach ($clickLabel in $clickLabels) {
-    $planArgs = @("-Quiet","macro","smart-plan","--label",$clickLabel)
-    if ($match) { $planArgs += @("--match",$match) }
-    if ($allowCdp) { $planArgs += "--allow-cdp" }
-    if ($disableCdp) { $planArgs += "--no-cdp" }
-    if ($cdpPageMatch) { $planArgs += @("--cdp-page-match",$cdpPageMatch) }
-    if ($cdpPortRaw) { $planArgs += @("--cdp-port",$cdpPortRaw) }
-    if ($includeOcr) { $planArgs += "--include-ocr" }
-    if ($precisionPoints) { $planArgs += "--precision-points" }
-    if ($precisionRadiusRaw) { $planArgs += @("--precision-radius",$precisionRadiusRaw) }
-    if ($precisionStepRaw) { $planArgs += @("--precision-step",$precisionStepRaw) }
-    if ($pointCacheTtlRaw) { $planArgs += @("--point-cache-ttl",$pointCacheTtlRaw) }
-    $planArgs += "--json-only"
-    $clickPlan = _InvokeTaskChildJson -ChildArgs $planArgs
-    if (-not $clickPlan.json -or -not [bool]$clickPlan.json.safe_to_act) {
-      [void]$errors.Add([pscustomobject]@{ code="click_plan_not_safe"; label=$clickLabel; exit=$clickPlan.exit; plan=$clickPlan.json })
-      continue
-    }
-    $cmd = @(_TaskPlan-UnwrapCommand -Command $clickPlan.json.recommended_command)
-    $step = _TaskPlan-StepString -Command $cmd
-    [void]$workflowSteps.Add($step)
-    [void]$items.Add([pscustomobject]@{ kind="click"; label=$clickLabel; route=$clickPlan.json.best_route; safe_to_act=$true; live_required=$true; command=@($cmd); step=$step; plan=$clickPlan.json })
-  }
-
-  foreach ($shortcut in $shortcuts) {
-    if ([string]::IsNullOrWhiteSpace("$shortcut")) { continue }
-    $cmd = @("macro","shortcut","--keys","$shortcut")
-    $step = _TaskPlan-StepString -Command $cmd
-    [void]$workflowSteps.Add($step)
-    [void]$items.Add([pscustomobject]@{ kind="shortcut"; phase="post"; keys="$shortcut"; safe_to_act=$true; live_required=$true; command=@($cmd); step=$step })
-  }
-
-  if ($verifyLabel) {
-    $cmd = @("macro","wait-label","--label",$verifyLabel,"--timeout-ms","$verifyTimeout")
-    if ($match) { $cmd += @("--window",$match) }
-    $step = _TaskPlan-StepString -Command $cmd
-    [void]$workflowSteps.Add($step)
-    [void]$items.Add([pscustomobject]@{ kind="verify_label"; label=$verifyLabel; safe_to_act=$true; live_required=$false; command=@($cmd); step=$step })
-  }
-
-  $wfArgs = @("--name",$(if ($name) { $name } else { "task" }))
-  foreach ($s in @($workflowSteps)) { $wfArgs += @("--step",$s) }
+  $assembly = _Invoke-LegacyCompatibility -Operation 'task-plan-assemble' -Arguments @{rest=@($Rest);captured_query_results=@($captured)} -PreserveInvalidArguments
+  if ($assembly.schema -ne 'cucp.task-plan-assembly/v1' -or $assembly.workflow_required -isnot [bool] -or $assembly.workflow_rest -isnot [System.Array] -or @($assembly.workflow_rest | Where-Object { $_ -isnot [string] }).Count -gt 0) { throw 'Invalid task workflow assembly response.' }
   $workflowPlan = $null
-  if ($workflowSteps.Count -gt 0) { $workflowPlan = _Build-WorkflowPlan -Rest $wfArgs }
-  $safeToRun = ($workflowPlan -and [bool]$workflowPlan.safe_to_run -and $errors.Count -eq 0)
-  $workflowRun = @("macro","workflow-run")
-  if ($settleMsRaw) { $workflowRun += @("--settle-ms",$settleMsRaw) }
-  if ($observeAfterStep -and -not $verifyAfterStep) { $workflowRun += "--observe-after-step" }
-  if ($verifyAfterStep) { $workflowRun += "--verify-after-step" }
-  if ($observeMatch) { $workflowRun += @("--observe-match",$observeMatch) }
-  if ($verifyLabelAfterStep) { $workflowRun += @("--verify-label-after-step",$verifyLabelAfterStep) }
-  if ($verifyLabelWindow) { $workflowRun += @("--verify-label-window",$verifyLabelWindow) }
-  if ($verifyLabelTimeoutRaw) { $workflowRun += @("--verify-label-timeout-ms",$verifyLabelTimeoutRaw) }
-  if ($verifyLabelIntervalRaw) { $workflowRun += @("--verify-label-interval-ms",$verifyLabelIntervalRaw) }
-  if ($retryFailedRaw) { $workflowRun += @("--retry-failed-step",$retryFailedRaw) }
-  if ($retryDelayRaw) { $workflowRun += @("--retry-delay-ms",$retryDelayRaw) }
-  if ($retryLiveSteps) { $workflowRun += "--retry-live-steps" }
-  foreach ($s in @($workflowSteps)) { $workflowRun += @("--step",$s) }
-  $workflowDryRun = @("macro","workflow-run","--dry-run")
-  if ($settleMsRaw) { $workflowDryRun += @("--settle-ms",$settleMsRaw) }
-  if ($observeAfterStep -and -not $verifyAfterStep) { $workflowDryRun += "--observe-after-step" }
-  if ($verifyAfterStep) { $workflowDryRun += "--verify-after-step" }
-  if ($observeMatch) { $workflowDryRun += @("--observe-match",$observeMatch) }
-  if ($verifyLabelAfterStep) { $workflowDryRun += @("--verify-label-after-step",$verifyLabelAfterStep) }
-  if ($verifyLabelWindow) { $workflowDryRun += @("--verify-label-window",$verifyLabelWindow) }
-  if ($verifyLabelTimeoutRaw) { $workflowDryRun += @("--verify-label-timeout-ms",$verifyLabelTimeoutRaw) }
-  if ($verifyLabelIntervalRaw) { $workflowDryRun += @("--verify-label-interval-ms",$verifyLabelIntervalRaw) }
-  if ($retryFailedRaw) { $workflowDryRun += @("--retry-failed-step",$retryFailedRaw) }
-  if ($retryDelayRaw) { $workflowDryRun += @("--retry-delay-ms",$retryDelayRaw) }
-  if ($retryLiveSteps) { $workflowDryRun += "--retry-live-steps" }
-  foreach ($s in @($workflowSteps)) { $workflowDryRun += @("--step",$s) }
-
+  if ($assembly.workflow_required) { $workflowPlan = _Build-WorkflowPlan -Rest @($assembly.workflow_rest) }
   $sw.Stop()
-  $payload = [pscustomobject]@{
-    schema = "cucp.task-plan/v1"
-    status = if ($safeToRun) { "ok" } else { "partial" }
-    name = $name
-    app = $app
-    match = $match
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    safe_to_run = [bool]$safeToRun
-    live_step_count = if ($workflowPlan) { [int]$workflowPlan.live_step_count } else { 0 }
-    sensitive_step_count = if ($workflowPlan) { [int]$workflowPlan.sensitive_step_count } else { 0 }
-    requires_sensitive_confirmation = if ($workflowPlan) { [bool]$workflowPlan.requires_sensitive_confirmation } else { $false }
-    step_count = if ($workflowPlan) { [int]$workflowPlan.step_count } else { 0 }
-    recommended_command = if ($workflowSteps.Count -gt 0) { [object[]]@($workflowRun) } else { $null }
-    dry_run_command = if ($workflowSteps.Count -gt 0) { [object[]]@($workflowDryRun) } else { $null }
-    run_options = [pscustomobject]@{
-      settle_ms = $settleMsRaw
-      observe_after_step = [bool]$observeAfterStep
-      verify_after_step = [bool]$verifyAfterStep
-      observe_match = $observeMatch
-      verify_label_after_step = $verifyLabelAfterStep
-      verify_label_window = $verifyLabelWindow
-      verify_label_timeout_ms = $verifyLabelTimeoutRaw
-      verify_label_interval_ms = $verifyLabelIntervalRaw
-      retry_failed_step = $retryFailedRaw
-      retry_delay_ms = $retryDelayRaw
-      retry_live_steps = [bool]$retryLiveSteps
-    }
-    workflow_plan = $workflowPlan
-    items = @($items)
-    form_plan = $formPlan
-    errors = @($errors)
-    next_step = if ($safeToRun) { "Run dry_run_command first; run recommended_command with -AllowLiveControl only after user authorization when live_step_count > 0. If requires_sensitive_confirmation is true, add --confirm-sensitive only after explicit approval of that exact action." } else { "Resolve errors or unsafe embedded plans, then re-run task-plan." }
-  }
-
+  $payload = _Invoke-LegacyCompatibility -Operation 'task-plan-complete' -Arguments @{rest=@($Rest);captured_query_results=@($captured);captured_workflow_plan=$workflowPlan;elapsed_ms=[int]$sw.Elapsed.TotalMilliseconds} -PreserveInvalidArguments
+  if ($payload.schema -ne 'cucp.task-plan/v1' -or $payload.safe_to_run -isnot [bool] -or $payload.status -notin @('ok','partial') -or (($payload.status -eq 'ok') -ne $payload.safe_to_run)) { throw 'Invalid task planning completion response.' }
   if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine("$($payload.status) task-plan steps=$($payload.step_count) live=$($payload.live_step_count) errors=$($errors.Count) elapsed_ms=$($payload.elapsed_ms)")
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 18))
-  }
-  if ($safeToRun) { return 0 }
+    [Console]::Out.WriteLine("$($payload.status) task-plan steps=$($payload.step_count) live=$($payload.live_step_count) errors=$(@($payload.errors).Count) elapsed_ms=$($payload.elapsed_ms)")
+  } else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 18)) }
+  if ($payload.safe_to_run) { return 0 }
   return 2
 }
 
-function Invoke-MacroTaskRun {
-  param([string[]]$Rest)
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $dryRun = _Read-Switch -Rest $Rest -Name "--dry-run"
-  $continueOnError = _Read-Switch -Rest $Rest -Name "--continue-on-error"
-  $includePlan = _Read-Switch -Rest $Rest -Name "--include-plan"
-  $confirmSensitive = _Read-Switch -Rest $Rest -Name "--confirm-sensitive"
-
-  function _TaskRunPlanArgs {
-    param([string[]]$InputArgs)
-    $skip = @{
-      "--json-only" = $true
-      "--dry-run" = $true
-      "--continue-on-error" = $true
-      "--include-plan" = $true
-      "--confirm-sensitive" = $true
-    }
-    $items = New-Object System.Collections.ArrayList
-    foreach ($a in $InputArgs) {
-      if ($skip.ContainsKey($a)) { continue }
-      [void]$items.Add($a)
-    }
-    return @($items)
-  }
-
-  function _InvokeTaskRunChildJson {
-    param([string[]]$ChildArgs)
-    $rawLines = & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @ChildArgs 2>&1
-    $exitCode = $LASTEXITCODE
-    $raw = (($rawLines | ForEach-Object { $_.ToString() }) -join "`n")
-    $obj = $null
-    try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
-    return [pscustomobject]@{ exit=[int]$exitCode; raw=$raw; json=$obj }
-  }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $planArgs = @("-Quiet","macro","task-plan") + @(_TaskRunPlanArgs -InputArgs $Rest) + @("--json-only")
-  $planResult = _InvokeTaskRunChildJson -ChildArgs $planArgs
-  $plan = $planResult.json
-  if (-not $plan) {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.task-run/v1"
-      status = "error"
-      reason = "task_plan_unparseable"
-      dry_run = [bool]$dryRun
-      confirm_sensitive = [bool]$confirmSensitive
-      executed = $false
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      plan_exit = $planResult.exit
-      plan_raw = $planResult.raw
-    }
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 8))
-    return 1
-  }
-
-  if (-not [bool]$plan.safe_to_run) {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.task-run/v1"
-      status = "blocked"
-      reason = "task_plan_not_safe"
-      dry_run = [bool]$dryRun
-      confirm_sensitive = [bool]$confirmSensitive
-      executed = $false
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      plan = if ($includePlan) { $plan } else { $null }
-      plan_errors = @($plan.errors)
-    }
-    if ($Brief -and -not $jsonOnly) { [Console]::Out.WriteLine("blocked task-run reason=task_plan_not_safe errors=$($plan.errors.Count)") }
-    else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 16)) }
-    return 3
-  }
-
-  if (-not $dryRun -and [int]$plan.live_step_count -gt 0 -and -not $AllowLiveControl) {
-    throw "macro task-run requires -AllowLiveControl when live steps are present"
-  }
-
-  $command = if ($dryRun) { @($plan.dry_run_command) } else { @($plan.recommended_command) }
-  if ($command.Count -eq 0) {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.task-run/v1"
-      status = "blocked"
-      reason = "missing_recommended_command"
-      dry_run = [bool]$dryRun
-      confirm_sensitive = [bool]$confirmSensitive
-      executed = $false
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      plan = if ($includePlan) { $plan } else { $null }
-    }
-    if ($Brief -and -not $jsonOnly) { [Console]::Out.WriteLine("blocked task-run reason=missing_recommended_command") }
-    else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 12)) }
-    return 3
-  }
-
-  $childArgs = @("-Quiet")
-  if (-not $dryRun -and [int]$plan.live_step_count -gt 0) { $childArgs += "-AllowLiveControl" }
-  $childArgs += @($command)
-  if ($continueOnError -and -not $dryRun) { $childArgs += "--continue-on-error" }
-  if ($confirmSensitive -and -not $dryRun) { $childArgs += "--confirm-sensitive" }
-  if ($includePlan) { $childArgs += "--include-plan" }
-  $childArgs += "--json-only"
-
-  $runSw = [System.Diagnostics.Stopwatch]::StartNew()
-  $runResult = _InvokeTaskRunChildJson -ChildArgs $childArgs
-  $runSw.Stop()
-  $sw.Stop()
-  $runStatus = if ($runResult.json -and $runResult.json.status) { "$($runResult.json.status)" } elseif ($runResult.exit -eq 0) { "ok" } else { "partial" }
-  $status = if ($dryRun) {
-    if ($runResult.exit -eq 0) { "ready" } else { "blocked" }
-  } else {
-    if ($runResult.exit -eq 0 -and ($runStatus -eq "ok" -or $runStatus -eq "ready")) { "ok" } elseif ($runResult.exit -eq 3) { "blocked" } else { "partial" }
-  }
-  $payload = [pscustomobject]@{
-    schema = "cucp.task-run/v1"
-    status = $status
-    reason = if ($status -eq "ok" -or $status -eq "ready") { "" } else { "workflow_failed_or_blocked" }
-    dry_run = [bool]$dryRun
-    confirm_sensitive = [bool]$confirmSensitive
-    executed = (-not $dryRun -and $runResult.exit -ne 3)
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    task_plan = if ($includePlan -or $dryRun) { $plan } else { $null }
-    workflow_exit = [int]$runResult.exit
-    workflow_elapsed_ms = [int]$runSw.Elapsed.TotalMilliseconds
-    workflow_failure_summary = if ($runResult.json) { $runResult.json.failure_summary } else { $null }
-    next_action = if ($runResult.json -and $runResult.json.next_action) { "$($runResult.json.next_action)" } elseif ($status -eq "partial" -or $status -eq "blocked") { "Inspect workflow_result and re-ground with macro windows/list-affordances before retrying." } else { "" }
-    workflow_result = $runResult.json
-    workflow_raw = if ($runResult.json) { $null } else { $runResult.raw }
-  }
-  try { _Trajectory-Append -Kind "task-run" -Payload @{ status=$status; dry_run=[bool]$dryRun; workflow_exit=[int]$runResult.exit; elapsed_ms=[int]$sw.Elapsed.TotalMilliseconds } } catch { }
-  if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine("$status task-run dry_run=$dryRun workflow_exit=$($runResult.exit) elapsed_ms=$($payload.elapsed_ms)")
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 18))
-  }
-  if ($status -eq "ok" -or $status -eq "ready") { return 0 }
-  if ($status -eq "blocked") { return 3 }
-  return 2
-}
+function Invoke-MacroTaskRun {param([string[]]$Rest) return _Invoke-LegacyExecutionFamily -Operation 'task-run' -Rest $Rest -ScriptPath $PSCommandPath}
 
 function Invoke-MacroFormPlan {
   param([string[]]$Rest)
-  $fieldSpecs = @(_Read-AllOptValues -Rest $Rest -Name "--field")
-  $sendLabel = _Read-OptValue -Rest $Rest -Name "--send-label"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $window = _Read-OptValue -Rest $Rest -Name "--window"
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $allowCdp = _Read-Switch -Rest $Rest -Name "--allow-cdp"
-  $disableCdp = _Read-Switch -Rest $Rest -Name "--no-cdp"
-  $cdpPageMatch = _Read-OptValue -Rest $Rest -Name "--cdp-page-match"
-  $cdpPortRaw = _Read-OptValue -Rest $Rest -Name "--cdp-port"
-  $clearFirst = _Read-Switch -Rest $Rest -Name "--clear-first"
-  $includeOcr = _Read-Switch -Rest $Rest -Name "--include-ocr"
-  $precisionPoints = (_Read-Switch -Rest $Rest -Name "--precision-points") -or (_Read-Switch -Rest $Rest -Name "--point-plan")
-  $precisionRadiusRaw = _Read-OptValue -Rest $Rest -Name "--precision-radius"
-  $precisionStepRaw = _Read-OptValue -Rest $Rest -Name "--precision-step"
-  $pointCacheTtlRaw = _Read-OptValue -Rest $Rest -Name "--point-cache-ttl"
-  if (-not $pointCacheTtlRaw) { $pointCacheTtlRaw = _Read-OptValue -Rest $Rest -Name "--cache-ttl" }
-  if (-not $match) { $match = $window }
-  if ($fieldSpecs.Count -eq 0 -and -not $sendLabel) { throw "macro form-plan requires --field `"Label=Value`" and/or --send-label" }
-
+  $jsonOnly = _Read-Switch -Rest $Rest -Name '--json-only'
+  $prepared = _Invoke-LegacyCompatibility -Operation 'form-plan-prepare' -Arguments @{rest=@($Rest)} -PreserveInvalidArguments
+  if ($prepared.schema -ne 'cucp.form-plan-preparation/v1' -or $prepared.queries -isnot [System.Array]) { throw 'Invalid form planning preparation response.' }
   function _InvokeChildSmartPlanJson {
     param([string[]]$PlanArgs)
-    $args = @("-Quiet","macro","smart-plan") + $PlanArgs + @("--json-only")
-    $rawLines = & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args 2>&1
-    $exitCode = $LASTEXITCODE
-    $raw = (($rawLines | ForEach-Object { $_.ToString() }) -join "`n")
-    $obj = $null
-    try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
-    return [pscustomobject]@{
-      exit = [int]$exitCode
-      raw = $raw
-      json = $obj
-    }
+    return (_Invoke-LegacyReadOnlyQuery -ChildArgs (@('-Quiet','macro','smart-plan') + $PlanArgs + @('--json-only')))
   }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $steps = New-Object System.Collections.ArrayList
-  $errors = New-Object System.Collections.ArrayList
-  $index = 0
-
-  foreach ($spec in $fieldSpecs) {
-    $index++
-    $rawSpec = "$spec"
-    $eq = $rawSpec.IndexOf("=")
-    if ($eq -le 0) {
-      [void]$errors.Add([pscustomobject]@{
-        code = "bad_field_spec"
-        message = "field spec must be Label=Value"
-        field = $rawSpec
-      })
-      continue
-    }
-    $fieldLabel = $rawSpec.Substring(0, $eq).Trim()
-    $fieldValue = $rawSpec.Substring($eq + 1)
-    if (-not $fieldLabel) {
-      [void]$errors.Add([pscustomobject]@{
-        code = "empty_field_label"
-        message = "field label is empty"
-        field = $rawSpec
-      })
-      continue
-    }
-
-    $planArgs = @("--label",$fieldLabel,"--type-text",$fieldValue)
-    if ($match) { $planArgs += @("--match",$match) }
-    if ($allowCdp) { $planArgs += "--allow-cdp" }
-    if ($disableCdp) { $planArgs += "--no-cdp" }
-    if ($cdpPageMatch) { $planArgs += @("--cdp-page-match",$cdpPageMatch) }
-    if ($cdpPortRaw) { $planArgs += @("--cdp-port",$cdpPortRaw) }
-    if ($clearFirst) { $planArgs += "--clear-first" }
-
-    $r = _InvokeChildSmartPlanJson -PlanArgs $planArgs
-    $safe = $false
-    if ($r.json) { $safe = [bool]$r.json.safe_to_act }
-    [void]$steps.Add([pscustomobject]@{
-      index = $index
-      kind = "type"
-      label = $fieldLabel
-      value_length = $fieldValue.Length
-      exit = $r.exit
-      safe_to_act = $safe
-      best_route = if ($r.json) { $r.json.best_route } else { $null }
-      recommended_command = if ($r.json) { $r.json.recommended_command } else { $null }
-      plan = $r.json
-      raw = if ($r.json) { $null } else { $r.raw }
-    })
+  $sw = [Diagnostics.Stopwatch]::StartNew()
+  $captured = New-Object Collections.ArrayList
+  foreach ($query in $prepared.queries) {
+    if ($query.kind -isnot [string] -or $query.argv -isnot [System.Array] -or @($query.argv | Where-Object { $_ -isnot [string] }).Count -gt 0) { throw 'Invalid planning query field types.' }
+    $argv = @($query.argv)
+    if ($query.kind -ne 'smart_plan' -or $argv.Count -lt 6 -or $argv[0] -ne '-Quiet' -or $argv[1] -ne 'macro' -or $argv[2] -ne 'smart-plan' -or $argv[-1] -ne '--json-only') { throw 'Invalid form planning query descriptor.' }
+    $reply = _InvokeChildSmartPlanJson -PlanArgs @($argv[3..($argv.Count - 2)])
+    [void]$captured.Add(@{kind=$query.kind;argv=$argv;exit=[int]$reply.exit;raw=[string]$reply.raw;json=$reply.json})
   }
-
-  if ($sendLabel) {
-    $index++
-    $planArgs = @("--label",$sendLabel)
-    if ($match) { $planArgs += @("--match",$match) }
-    if ($allowCdp) { $planArgs += "--allow-cdp" }
-    if ($disableCdp) { $planArgs += "--no-cdp" }
-    if ($cdpPageMatch) { $planArgs += @("--cdp-page-match",$cdpPageMatch) }
-    if ($cdpPortRaw) { $planArgs += @("--cdp-port",$cdpPortRaw) }
-    if ($includeOcr) { $planArgs += "--include-ocr" }
-    if ($precisionPoints) { $planArgs += "--precision-points" }
-    if ($precisionRadiusRaw) { $planArgs += @("--precision-radius",$precisionRadiusRaw) }
-    if ($precisionStepRaw) { $planArgs += @("--precision-step",$precisionStepRaw) }
-    if ($pointCacheTtlRaw) { $planArgs += @("--point-cache-ttl",$pointCacheTtlRaw) }
-
-    $r = _InvokeChildSmartPlanJson -PlanArgs $planArgs
-    $safe = $false
-    if ($r.json) { $safe = [bool]$r.json.safe_to_act }
-    [void]$steps.Add([pscustomobject]@{
-      index = $index
-      kind = "click"
-      label = $sendLabel
-      value_length = 0
-      exit = $r.exit
-      safe_to_act = $safe
-      best_route = if ($r.json) { $r.json.best_route } else { $null }
-      recommended_command = if ($r.json) { $r.json.recommended_command } else { $null }
-      plan = $r.json
-      raw = if ($r.json) { $null } else { $r.raw }
-    })
-  }
-
-  $safeSteps = @($steps | Where-Object { $_.safe_to_act })
-  $commandPlan = @($steps | ForEach-Object {
-    [pscustomobject]@{
-      index = $_.index
-      kind = $_.kind
-      label = $_.label
-      safe_to_act = [bool]$_.safe_to_act
-      route = $_.best_route
-      command = $_.recommended_command
-    }
-  })
-  $unsafeSteps = @($steps | Where-Object { -not $_.safe_to_act } | ForEach-Object {
-    [pscustomobject]@{
-      index = $_.index
-      kind = $_.kind
-      label = $_.label
-      route = $_.best_route
-      exit = $_.exit
-    }
-  })
-  $allSafe = ($steps.Count -gt 0 -and $safeSteps.Count -eq $steps.Count -and $errors.Count -eq 0)
   $sw.Stop()
-  $payload = [pscustomobject]@{
-    schema = "cucp.form-plan/v1"
-    status = if ($allSafe) { "ok" } else { "partial" }
-    match = $match
-    field_count = $fieldSpecs.Count
-    send_label = $sendLabel
-    safe_to_act = [bool]$allSafe
-    step_count = $steps.Count
-    safe_step_count = $safeSteps.Count
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    command_plan = $commandPlan
-    unsafe_steps = $unsafeSteps
-    steps = @($steps)
-    errors = @($errors)
-    next_step = if ($allSafe) { "Run each recommended_command in order with -AllowLiveControl only after user authorization; verify after each step." } else { "Resolve unsafe steps by narrowing labels/window, enabling --allow-cdp, or inspecting each embedded smart-plan." }
-  }
-
+  $payload = _Invoke-LegacyCompatibility -Operation 'form-plan-complete' -Arguments @{rest=@($Rest);captured_query_results=@($captured);elapsed_ms=[int]$sw.Elapsed.TotalMilliseconds} -PreserveInvalidArguments
+  if ($payload.schema -ne 'cucp.form-plan/v1' -or $payload.safe_to_act -isnot [bool] -or $payload.status -notin @('ok','partial') -or (($payload.status -eq 'ok') -ne $payload.safe_to_act)) { throw 'Invalid form planning completion response.' }
   if ($Brief -and -not $jsonOnly) {
-    if ($allSafe) {
-      [Console]::Out.WriteLine("ok form-plan steps=$($steps.Count) safe=$($safeSteps.Count) match='$match' elapsed_ms=$($payload.elapsed_ms)")
-    } else {
-      [Console]::Out.WriteLine("partial form-plan steps=$($steps.Count) safe=$($safeSteps.Count) errors=$($errors.Count) match='$match' elapsed_ms=$($payload.elapsed_ms)")
-    }
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 16))
-  }
-  if ($allSafe) { return 0 }
+    if ($payload.safe_to_act) { [Console]::Out.WriteLine("ok form-plan steps=$($payload.step_count) safe=$($payload.safe_step_count) match='$($payload.match)' elapsed_ms=$($payload.elapsed_ms)") }
+    else { [Console]::Out.WriteLine("partial form-plan steps=$($payload.step_count) safe=$($payload.safe_step_count) errors=$(@($payload.errors).Count) match='$($payload.match)' elapsed_ms=$($payload.elapsed_ms)") }
+  } else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 16)) }
+  if ($payload.safe_to_act) { return 0 }
   return 2
 }
 
-function Invoke-MacroFormRun {
-  param([string[]]$Rest)
-  $jsonOnly = _Read-Switch -Rest $Rest -Name "--json-only"
-  $dryRun = _Read-Switch -Rest $Rest -Name "--dry-run"
-  $continueOnError = _Read-Switch -Rest $Rest -Name "--continue-on-error"
-  $includePlan = _Read-Switch -Rest $Rest -Name "--include-plan"
-  $confirmSensitive = _Read-Switch -Rest $Rest -Name "--confirm-sensitive"
-  if (-not $dryRun -and -not $AllowLiveControl) { throw "macro form-run requires -AllowLiveControl" }
+function Invoke-MacroFormRun {param([string[]]$Rest) return _Invoke-LegacyExecutionFamily -Operation 'form-run' -Rest $Rest -ScriptPath $PSCommandPath}
 
-  function _PlanArgsForFormRun {
-    param([string[]]$InputArgs)
-    $skip = @{
-      "--json-only" = $true
-      "--dry-run" = $true
-      "--continue-on-error" = $true
-      "--include-plan" = $true
-      "--confirm-sensitive" = $true
-    }
-    $items = New-Object System.Collections.ArrayList
-    foreach ($a in $InputArgs) {
-      if ($skip.ContainsKey($a)) { continue }
-      [void]$items.Add($a)
-    }
-    return @($items)
-  }
-
-  function _InvokeSelfJson {
-    param([string[]]$ChildArgs)
-    $rawLines = & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @ChildArgs 2>&1
-    $exitCode = $LASTEXITCODE
-    $raw = (($rawLines | ForEach-Object { $_.ToString() }) -join "`n")
-    $obj = $null
-    try { $obj = $raw | ConvertFrom-Json -ErrorAction Stop } catch { }
-    return [pscustomobject]@{
-      exit = [int]$exitCode
-      raw = $raw
-      json = $obj
-    }
-  }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $planArgs = @("-Quiet","macro","form-plan") + @(_PlanArgsForFormRun -InputArgs $Rest) + @("--json-only")
-  $planResult = _InvokeSelfJson -ChildArgs $planArgs
-  $plan = $planResult.json
-  if (-not $plan) {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.form-run/v1"
-      status = "error"
-      reason = "plan_unparseable"
-      dry_run = [bool]$dryRun
-      confirm_sensitive = [bool]$confirmSensitive
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      plan_exit = $planResult.exit
-      plan_raw = $planResult.raw
-      steps = @()
-    }
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 8))
-    return 1
-  }
-
-  if (-not [bool]$plan.safe_to_act) {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.form-run/v1"
-      status = "blocked"
-      reason = "plan_not_safe"
-      dry_run = [bool]$dryRun
-      confirm_sensitive = [bool]$confirmSensitive
-      safe_to_act = $false
-      executed_count = 0
-      failed_count = 0
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      plan_exit = $planResult.exit
-      unsafe_steps = @($plan.unsafe_steps)
-      plan_errors = @($plan.errors)
-      plan = if ($includePlan) { $plan } else { $null }
-      steps = @()
-    }
-    if ($Brief -and -not $jsonOnly) {
-      [Console]::Out.WriteLine("blocked form-run reason=plan_not_safe safe=$($plan.safe_step_count)/$($plan.step_count) elapsed_ms=$($payload.elapsed_ms)")
-    } else {
-      [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 16))
-    }
-    return 3
-  }
-
-  if ($dryRun) {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.form-run/v1"
-      status = "ready"
-      reason = "dry_run"
-      dry_run = $true
-      confirm_sensitive = [bool]$confirmSensitive
-      safe_to_act = $true
-      executed_count = 0
-      failed_count = 0
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      command_plan = @($plan.command_plan)
-      plan = if ($includePlan) { $plan } else { $null }
-      steps = @()
-    }
-    if ($Brief -and -not $jsonOnly) {
-      [Console]::Out.WriteLine("ready form-run dry-run steps=$($plan.step_count) elapsed_ms=$($payload.elapsed_ms)")
-    } else {
-      [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 16))
-    }
-    return 0
-  }
-
-  $sensitiveSteps = @($plan.command_plan | ForEach-Object {
-    $cmd = @($_.command)
-    $macroName = if ($cmd.Count -ge 2 -and $cmd[0] -eq "macro") { "$($cmd[1])" } else { "" }
-    $safetyText = ((@($cmd) + @($_.kind, $_.label)) -join " ")
-    $safety = _Classify-SafetyFromText -Text $safetyText -MacroName $macroName
-    if ($safety.requires_explicit_confirmation) {
-      [pscustomobject]@{
-        index = $_.index
-        kind = $_.kind
-        label = $_.label
-        macro = $macroName
-        command = @($cmd)
-        risk_level = $safety.risk_level
-        risk_score = [int]$safety.risk_score
-        categories = @($safety.categories)
-        recommended_action = $safety.recommended_action
-      }
-    }
-  })
-  if ($sensitiveSteps.Count -gt 0 -and -not $confirmSensitive) {
-    $sw.Stop()
-    $payload = [pscustomobject]@{
-      schema = "cucp.form-run/v1"
-      status = "blocked"
-      reason = "sensitive_action_requires_confirmation"
-      dry_run = $false
-      confirm_sensitive = [bool]$confirmSensitive
-      safe_to_act = $false
-      executed_count = 0
-      failed_count = 0
-      sensitive_step_count = [int]$sensitiveSteps.Count
-      safety_issues = @($sensitiveSteps)
-      confirmation_flag = "--confirm-sensitive"
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-      plan = if ($includePlan) { $plan } else { $null }
-      steps = @()
-      next_action = "Re-run with --confirm-sensitive only if the user explicitly approved these exact sensitive form actions."
-    }
-    if ($Brief -and -not $jsonOnly) {
-      [Console]::Out.WriteLine("blocked form-run reason=sensitive_action_requires_confirmation sensitive=$($sensitiveSteps.Count)")
-    } else {
-      [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 16))
-    }
-    return 3
-  }
-
-  $results = New-Object System.Collections.ArrayList
-  $executed = 0
-  $failed = 0
-  foreach ($step in @($plan.command_plan)) {
-    $cmd = @($step.command)
-    $stepSw = [System.Diagnostics.Stopwatch]::StartNew()
-    if (-not [bool]$step.safe_to_act -or $cmd.Count -eq 0 -or $cmd[0] -ne "macro") {
-      $stepSw.Stop()
-      $failed++
-      [void]$results.Add([pscustomobject]@{
-        index = $step.index
-        kind = $step.kind
-        label = $step.label
-        route = $step.route
-        status = "blocked"
-        reason = "unsafe_or_invalid_command"
-        exit = 3
-        elapsed_ms = [int]$stepSw.Elapsed.TotalMilliseconds
-        command = $cmd
-        result = $null
-        raw = $null
-      })
-      if (-not $continueOnError) { break }
-      continue
-    }
-
-    $runArgs = @("-AllowLiveControl","-Quiet") + $cmd
-    $r = _InvokeSelfJson -ChildArgs $runArgs
-    $stepSw.Stop()
-    $executed++
-    if ($r.exit -ne 0) { $failed++ }
-    [void]$results.Add([pscustomobject]@{
-      index = $step.index
-      kind = $step.kind
-      label = $step.label
-      route = $step.route
-      status = if ($r.exit -eq 0) { "ok" } else { "partial" }
-      reason = if ($r.json -and $r.json.reason) { "$($r.json.reason)" } elseif ($r.exit -eq 0) { "" } else { "command_failed" }
-      exit = $r.exit
-      elapsed_ms = [int]$stepSw.Elapsed.TotalMilliseconds
-      command = $cmd
-      result = $r.json
-      raw = if ($r.json) { $null } else { $r.raw }
-    })
-    if ($r.exit -ne 0 -and -not $continueOnError) { break }
-  }
-
-  $sw.Stop()
-  $status = if ($failed -eq 0 -and $executed -eq @($plan.command_plan).Count) { "ok" } else { "partial" }
-  $payload = [pscustomobject]@{
-    schema = "cucp.form-run/v1"
-    status = $status
-    reason = if ($status -eq "ok") { "" } else { "step_failed_or_stopped" }
-    dry_run = $false
-    confirm_sensitive = [bool]$confirmSensitive
-    safe_to_act = $true
-    executed_count = $executed
-    failed_count = $failed
-    total_steps = @($plan.command_plan).Count
-    elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    plan_elapsed_ms = [int]$plan.elapsed_ms
-    command_plan = @($plan.command_plan)
-    plan = if ($includePlan) { $plan } else { $null }
-    steps = @($results)
-  }
-  try {
-    _Trajectory-Append -Kind "form-run" -Payload @{
-      status = $status
-      executed_count = $executed
-      failed_count = $failed
-      total_steps = @($plan.command_plan).Count
-      elapsed_ms = [int]$sw.Elapsed.TotalMilliseconds
-    }
-  } catch { }
-  if ($Brief -and -not $jsonOnly) {
-    [Console]::Out.WriteLine("$status form-run executed=$executed failed=$failed total=$($payload.total_steps) elapsed_ms=$($payload.elapsed_ms)")
-  } else {
-    [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 16))
-  }
-  if ($status -eq "ok") { return 0 }
-  return 2
-}
-
-function Invoke-MacroSmartClick {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro smart-click requires -AllowLiveControl" }
-  $label = _Read-OptValue -Rest $Rest -Name "--label"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $role  = _Read-OptValue -Rest $Rest -Name "--role"
-  $verifyLabel = _Read-OptValue -Rest $Rest -Name "--verify-label"
-  $verifyTimeout = [int](_Read-OptValue -Rest $Rest -Name "--verify-timeout-ms")
-  $allowVision = _Read-Switch -Rest $Rest -Name "--allow-vision"
-  $allowMouseFallback = _Read-Switch -Rest $Rest -Name "--allow-mouse-fallback"
-  # OCR Stage는 default ON. 명시 비활성화는 --no-ocr.
-  $disableOcr = _Read-Switch -Rest $Rest -Name "--no-ocr"
-  $ocrLang = _Read-OptValue -Rest $Rest -Name "--ocr-language"
-  $ocrMatch = _Read-OptValue -Rest $Rest -Name "--ocr-match"
-  if (-not $ocrMatch) { $ocrMatch = "contains" }
-  # v0.9.0: 클릭 후 화면 변화 검증
-  $verifyScreen = _Read-Switch -Rest $Rest -Name "--verify-screen-changed"
-  $verifyWaitMs = [int](_Read-OptValue -Rest $Rest -Name "--verify-wait-ms")
-  # v1.0.0: 화면 변화 없으면 cascade 한 번 더 (retry-on-no-change). 기본 0 (off).
-  # verify-screen 활성화 시에만 의미가 있음.
-  $retryOnNoChange = [int](_Read-OptValue -Rest $Rest -Name "--retry-on-no-change")
-  # v1.1.0: history learning. default ON. --no-history 로 비활성.
-  $disableHistory = _Read-Switch -Rest $Rest -Name "--no-history"
-  $preferHistory = _Read-Switch -Rest $Rest -Name "--prefer-history"
-  $ocrMaxCandidates = [int](_Read-OptValue -Rest $Rest -Name "--ocr-max-candidates")
-  $disableCdp = _Read-Switch -Rest $Rest -Name "--no-cdp"
-  $allowCdp = _Read-Switch -Rest $Rest -Name "--allow-cdp"
-  $cdpPageMatch = _Read-OptValue -Rest $Rest -Name "--cdp-page-match"
-  $cdpPortRaw = _Read-OptValue -Rest $Rest -Name "--cdp-port"
-  $cdpPort = [int]$cdpPortRaw
-  $precisionPoints = (_Read-Switch -Rest $Rest -Name "--precision-points") -or (_Read-Switch -Rest $Rest -Name "--point-plan")
-  $precisionRadiusRaw = _Read-OptValue -Rest $Rest -Name "--precision-radius"
-  if (-not $precisionRadiusRaw) { $precisionRadiusRaw = _Read-OptValue -Rest $Rest -Name "--point-radius" }
-  $precisionStepRaw = _Read-OptValue -Rest $Rest -Name "--precision-step"
-  if (-not $precisionStepRaw) { $precisionStepRaw = _Read-OptValue -Rest $Rest -Name "--point-step" }
-  $pointCacheTtlRaw = _Read-OptValue -Rest $Rest -Name "--point-cache-ttl"
-  if (-not $pointCacheTtlRaw) { $pointCacheTtlRaw = _Read-OptValue -Rest $Rest -Name "--cache-ttl" }
-  $precisionRadius = 6
-  $precisionStep = 2
-  $pointCacheTtl = $CacheSeconds
-  if (-not $label) { throw "macro smart-click requires --label" }
-  if ($verifyTimeout -le 0) { $verifyTimeout = 3000 }
-  if ($verifyWaitMs -le 0) { $verifyWaitMs = 500 }
-  if ($retryOnNoChange -lt 0) { $retryOnNoChange = 0 }
-  if ($ocrMaxCandidates -le 0) { $ocrMaxCandidates = 4 }
-  if ($ocrMaxCandidates -gt 8) { $ocrMaxCandidates = 8 }
-  if ($cdpPort -le 0) { $cdpPort = 9222 }
-  if ($null -ne $precisionRadiusRaw -and "$precisionRadiusRaw" -ne "") { $precisionRadius = [int]$precisionRadiusRaw }
-  if ($null -ne $precisionStepRaw -and "$precisionStepRaw" -ne "") { $precisionStep = [int]$precisionStepRaw }
-  if ($null -ne $pointCacheTtlRaw -and "$pointCacheTtlRaw" -ne "") { $pointCacheTtl = [int]$pointCacheTtlRaw }
-  if ($precisionRadius -lt 0) { $precisionRadius = 0 }
-  if ($precisionRadius -gt 64) { $precisionRadius = 64 }
-  if ($precisionStep -le 0) { $precisionStep = 2 }
-  if ($precisionStep -gt 16) { $precisionStep = 16 }
-  if ($pointCacheTtl -lt 0) { $pointCacheTtl = 0 }
-  $cdpStageEnabled = (-not $disableCdp) -and ($allowCdp -or $cdpPageMatch -or $cdpPortRaw)
-
-  # v1.1.0: 과거 같은 (label, match) 시도에서 가장 자주 성공한 strategy 조회
-  # null 이면 기본 cascade. string 이면 그 strategy 부터 시도.
-  $hintedStrategy = $null
-  if (-not $disableHistory) {
-    try { $hintedStrategy = _History-PickBestStrategy -Label $label -Match $match -LookbackN 5 } catch { }
-  }
-  if ($hintedStrategy -and -not $preferHistory) {
-    # OCR/vision fallback 성공 이력이 fast UIA 경로를 건너뛰지 않게 기본값은 보수적으로 둔다.
-    $slowHistoryHints = @("uia_precision_point","fusion_uia_invoke","fusion_coord","ocr_text","vision_precise")
-    if ($slowHistoryHints -contains $hintedStrategy) { $hintedStrategy = $null }
-  }
-
-  # cascade stage gates — hint 가 있으면 그 stage 만 활성화, 없으면 모든 stage 활성.
-  # 미스매치/실패 시 모든 stage 활성으로 폴백 (안전).
-  $tryStage0 = $true   # cdp_smart_click
-  $tryStage1 = $true   # uia_pattern
-  $tryStage2 = $true   # uia_coord
-  $tryStage3 = $true   # icon_find
-  $tryStage4 = $true   # fusion_uia_invoke / fusion_coord
-  $tryStage5 = $true   # ocr_text
-  $tryStage6 = $true   # vision_precise
-  if ($hintedStrategy) {
-    # hint 매핑 — 그 stage 만 활성화. 실패하면 cascade 전체 활성으로 fallback.
-    $tryStage0 = ($hintedStrategy -eq "cdp_smart_click")
-    $tryStage1 = ($hintedStrategy -eq "uia_pattern")
-    $tryStage2 = ($hintedStrategy -eq "uia_coord" -or $hintedStrategy -eq "uia_precision_point")
-    $tryStage3 = ($hintedStrategy -eq "icon_find")
-    $tryStage4 = ($hintedStrategy -eq "fusion_uia_invoke" -or $hintedStrategy -eq "fusion_coord")
-    $tryStage5 = ($hintedStrategy -eq "ocr_text")
-    $tryStage6 = ($hintedStrategy -eq "vision_precise")
-  }
-
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  $strategy = ""
-  $rc = 1
-  $resultLine = ""
-
-  # v0.9.0: --verify-screen-changed 옵션 시 cascade 시작 전 before 스크린샷 캡처
-  $verifyBeforePng = $null
-  $verifyAfterPng = $null
-  $verifyDiffRegion = $null   # foreground 윈도우 region
-  if ($verifyScreen) {
-    try {
-      $rFg = Invoke-NativeHelper -ArgList @("-Action","focused")
-      if ($rFg.Json -and $rFg.Json.foreground) {
-        $fgr = $rFg.Json.foreground.rect
-        $verifyDiffRegion = [ordered]@{
-          x = [int]$fgr.x; y = [int]$fgr.y
-          width = [int]$fgr.width; height = [int]$fgr.height
-        }
-      }
-    } catch { }
-    if (-not $verifyDiffRegion) {
-      # foreground 못 찾으면 가상 데스크톱 전체 (느림 — 일단 비활성화)
-      $verifyScreen = $false
-    } else {
-      $tag = (Get-Date).ToString("HHmmss-fff")
-      $verifyBeforePng = Join-Path $Script:CacheDir ("smartclick-before-$tag.png")
-      $vrA = Invoke-NativeHelper -ArgList @("-Action","screenshot","-OutPath",$verifyBeforePng,
-              "-ScreenshotX","$($verifyDiffRegion.x)","-ScreenshotY","$($verifyDiffRegion.y)",
-              "-ScreenshotW","$($verifyDiffRegion.width)","-ScreenshotH","$($verifyDiffRegion.height)")
-      if (-not ($vrA.Json -and $vrA.Json.status -eq "ok")) {
-        # 캡처 실패 — verify-screen 비활성화하고 진행
-        $verifyScreen = $false
-        if (Test-Path -LiteralPath $verifyBeforePng) { Remove-Item -LiteralPath $verifyBeforePng -Force -ErrorAction SilentlyContinue }
-        $verifyBeforePng = $null
-      }
-    }
-  }
-
-  # Stage 0: CDP/DOM 직접 클릭 (웹/Electron 앱에서 가장 빠르고 좌표 무관)
-  if ($rc -ne 0 -and $tryStage0 -and $cdpStageEnabled) {
-    try {
-      if (Test-CdpPortQuick -Port $cdpPort -TimeoutMs 120) {
-        $cdpArgs = @("-Action","cdp-smart-click","-CdpText",$label,"-CdpPort","$cdpPort")
-        if ($cdpPageMatch) { $cdpArgs += @("-CdpPageMatch", $cdpPageMatch) }
-        elseif ($match) { $cdpArgs += @("-CdpPageMatch", $match) }
-        $r0 = Invoke-NativeHelper -ArgList $cdpArgs
-        if ($r0.Json -and $r0.Json.status -eq "ok") {
-          $strategy = "cdp_smart_click"
-          $rc = 0
-          $resultLine = "ok smart-click '$label' strategy=cdp_smart_click matched='$($r0.Json.matched_text)' score=$($r0.Json.score) tag=$($r0.Json.tag_name) mouse_moved=False"
-        }
-      }
-    } catch { }
-  }
-
-  # Stage 1: UIA Pattern 직통 (가장 안정적)
-  if ($rc -ne 0 -and $tryStage1) {
-    $args = @("-Action","uia-invoke","-Label",$label)
-    if ($match) { $args += @("-Match", $match) }
-    if ($role)  { $args += @("-Role", $role) }
-    $r1 = Invoke-NativeHelper -ArgList $args
-    if ($r1.Json -and $r1.Json.status -eq "ok") {
-      $strategy = "uia_pattern"
-      $rc = 0
-      $resultLine = "ok smart-click '$label' strategy=uia_pattern method=$($r1.Json.method) mouse_moved=False"
-    } elseif ($r1.Json -and $r1.Json.reason -eq "low_confidence_match") {
-      # 신뢰도 낮음 — vision 시도하지 말고 즉시 거부 (안전).
-      # v1.1.0: hint 가 있는 케이스에선 low-confidence 도 cascade 폴백 허용 (학습된 strategy 재시도용).
-      if (-not $hintedStrategy) {
-        [Console]::Out.WriteLine("partial smart-click '$label' low_confidence score=$($r1.Json.score) strategy=stopped")
-        if (-not $disableHistory) { _History-Append -Label $label -Match $match -Strategy "uia_pattern" -Success $false -ElapsedMs ([int]$sw.Elapsed.TotalMilliseconds) }
-        return 2
-      }
-    }
-  }
-
-  # Stage 2: UIA 좌표 클릭 (mouse_moved=True 허용)
-  if ($rc -ne 0 -and $tryStage2 -and $allowMouseFallback) {
-    $precisionAttempted = $false
-    if ($precisionPoints) {
-      try {
-        $findArgs2 = @("-Action","uia-find","-Label",$label)
-        if ($match) { $findArgs2 += @("-Match", $match) }
-        if ($role)  { $findArgs2 += @("-Role", $role) }
-        $r2Find = Invoke-NativeHelper -ArgList $findArgs2
-        if ($r2Find.Json -and $r2Find.Json.status -eq "ok" -and -not [bool]$r2Find.Json.ambiguous -and $r2Find.Json.top -and $r2Find.Json.top.click_point) {
-          $pt2 = $r2Find.Json.top.click_point
-          if ($pt2.x -and $pt2.y) {
-            $precisionAttempted = $true
-            $cpRest = @(
-              "--x","$($pt2.x)",
-              "--y","$($pt2.y)",
-              "--refine","uia-safe",
-              "--micro-refine",
-              "--precision-radius","$precisionRadius",
-              "--precision-step","$precisionStep",
-              "--cache-ttl","$pointCacheTtl"
-            )
-            if ($match) { $cpRest += @("--target-match",$match) }
-            $oldOut2 = [Console]::Out
-            $sb2 = New-Object System.IO.StringWriter
-            [Console]::SetOut($sb2)
-            $cpExit = 1
-            try {
-              $cpExit = Invoke-MacroClickPoint -Rest $cpRest
-            } finally {
-              [Console]::SetOut($oldOut2)
-            }
-            $cpRaw = $sb2.ToString().Trim()
-            if ($cpExit -eq 0) {
-              $strategy = "uia_precision_point"
-              $rc = 0
-              $resultLine = "ok smart-click '$label' strategy=uia_precision_point @($($pt2.x),$($pt2.y)) micro_refine=True cache_ttl=$pointCacheTtl mouse_moved=True"
-            }
-          }
-        }
-      } catch { }
-    }
-    if ($rc -ne 0 -and -not $precisionAttempted) {
-      $args2 = @("-Action","uia-click","-Label",$label)
-      if ($match) { $args2 += @("-Match", $match) }
-      if ($role)  { $args2 += @("-Role", $role) }
-      $r2 = Invoke-NativeHelper -ArgList $args2
-      if ($r2.Json -and $r2.Json.status -eq "ok") {
-        $strategy = "uia_coord"
-        $rc = 0
-        $resultLine = "ok smart-click '$label' strategy=uia_coord @($($r2.Json.x),$($r2.Json.y)) mouse_moved=True"
-      }
-    }
-  }
-
-  # Stage 3: icon-find (synonym 기반)
-  if ($rc -ne 0 -and $tryStage3 -and $allowMouseFallback) {
-    try {
-      $captured = ""
-      $oldOut = [Console]::Out
-      $sb = New-Object System.IO.StringWriter
-      [Console]::SetOut($sb)
-      try {
-        Invoke-MacroIconFind -Rest @("--label",$label,"--match",$match,"--max-size","96","--limit","5","--json-only") | Out-Null
-      } finally { [Console]::SetOut($oldOut) }
-      $captured = $sb.ToString()
-      $env_ = $captured | ConvertFrom-Json -ErrorAction SilentlyContinue
-      if ($env_ -and $env_.status -eq "ok" -and $env_.top -and $env_.top.score -ge 60) {
-        # 좌표 클릭
-        $cx = [int]$env_.top.center.x
-        $cy = [int]$env_.top.center.y
-        $iconClickArgs = @("-Action","click","-X","$cx","-Y","$cy","-Button","left","-ClickRefine","uia-safe")
-        if ($match) { $iconClickArgs += @("-TargetMatch", $match) }
-        $r3 = Invoke-NativeHelper -ArgList $iconClickArgs
-        if ($r3.Json -and $r3.Json.status -eq "ok") {
-          $strategy = "icon_find"
-          $rc = 0
-          $resultLine = "ok smart-click '$label' strategy=icon_find @($cx,$cy) score=$($env_.top.score) mouse_moved=True"
-        }
-      }
-    } catch { }
-  }
-
-  # Stage 4: OCR+UIA fusion — ocr-uia-invoke 액션이 한 프로세스 안에서
-  # OCR 매칭 + UIA element 탐색 + InvokePattern.Invoke() 까지 다 처리.
-  # v0.9.0 의 fuse(read-only) → wrapper 가 element name 으로 다시 uia-invoke 하던
-  # 패턴은 Name 비어있는 element 에 대해 못 동작했음. v1.0.0 부터는 element handle
-  # 자체로 invoke 하므로 Name 없어도 OK (AutomationId / ClassName 만 있어도).
-  if ($rc -ne 0 -and $tryStage4 -and -not $disableOcr) {
-    try {
-      $invokeArgs = @("-Action","ocr-uia-invoke","-OcrText",$label,"-OcrMatch",$ocrMatch,"-OcrMaxCandidates","$ocrMaxCandidates")
-      if ($match) { $invokeArgs += @("-Match", $match) }
-      if ($ocrLang) { $invokeArgs += @("-OcrLanguage", $ocrLang) }
-      $rOuInv = Invoke-NativeHelper -ArgList $invokeArgs
-      if ($rOuInv.Json -and $rOuInv.Json.status -eq "ok") {
-        # 마우스 안 움직임 — element 직접 invoke 성공
-        $strategy = "fusion_uia_invoke"
-        $rc = 0
-        $idLabel = ""
-        if ($rOuInv.Json.uia_name) { $idLabel = "name='$($rOuInv.Json.uia_name)'" }
-        elseif ($rOuInv.Json.uia_automation_id) { $idLabel = "id='$($rOuInv.Json.uia_automation_id)'" }
-        elseif ($rOuInv.Json.uia_class_name) { $idLabel = "class='$($rOuInv.Json.uia_class_name)'" }
-        $resultLine = "ok smart-click '$label' strategy=fusion_uia_invoke method=$($rOuInv.Json.method) $idLabel mouse_moved=False"
-      } elseif ($rOuInv.Json -and $rOuInv.Json.reason -eq "no_invoke_pattern" -and $allowMouseFallback) {
-        # element 는 있지만 invoke pattern 없음 → 좌표 클릭 fallback
-        $fcx = [int]$rOuInv.Json.fallback_coord.x
-        $fcy = [int]$rOuInv.Json.fallback_coord.y
-        $clickArgs = @("-Action","click","-X","$fcx","-Y","$fcy","-Button","left","-ClickRefine","uia-safe")
-        if ($match) { $clickArgs += @("-TargetMatch", $match) }
-        $rFc = Invoke-NativeHelper -ArgList $clickArgs
-        if ($rFc.Json -and $rFc.Json.status -eq "ok") {
-          $strategy = "fusion_coord"
-          $rc = 0
-          $resultLine = "ok smart-click '$label' strategy=fusion_coord @($fcx,$fcy) ocr_score=$($rOuInv.Json.ocr_score) mouse_moved=True"
-        }
-      }
-    } catch { }
-  }
-
-  # Stage 5: OCR text 좌표 (UIA element 없는 순수 캔버스/이미지 표면)
-  # OCR도 좌표 기반 클릭 → --allow-mouse-fallback 필요. min-score=70.
-  if ($rc -ne 0 -and $tryStage5 -and $allowMouseFallback -and -not $disableOcr) {
-    try {
-      $ocrArgs = @("-Action","ocr-find-text","-OcrText",$label,"-OcrMatch",$ocrMatch,"-OcrMaxCandidates","$ocrMaxCandidates")
-      if ($match) { $ocrArgs += @("-Match", $match) }
-      if ($ocrLang) { $ocrArgs += @("-OcrLanguage", $ocrLang) }
-      $rOcr = Invoke-NativeHelper -ArgList $ocrArgs
-      if ($rOcr.Json -and $rOcr.Json.status -eq "ok" -and $rOcr.Json.top -and [int]$rOcr.Json.top.score -ge 70) {
-        $oTop = $rOcr.Json.top
-        $ocx = [int]$oTop.cx; $ocy = [int]$oTop.cy
-        $clickArgs = @("-Action","click","-X","$ocx","-Y","$ocy","-Button","left","-ClickRefine","uia-safe")
-        if ($match) { $clickArgs += @("-TargetMatch", $match) }
-        $rOcrClick = Invoke-NativeHelper -ArgList $clickArgs
-        if ($rOcrClick.Json -and $rOcrClick.Json.status -eq "ok") {
-          $strategy = "ocr_text"
-          $rc = 0
-          $resultLine = "ok smart-click '$label' strategy=ocr_text matched='$($oTop.text)' score=$($oTop.score) @($ocx,$ocy) mouse_moved=True"
-        }
-      }
-    } catch { }
-  }
-
-  # Stage 6: vision-click-precise (옵션, 마지막)
-  if ($rc -ne 0 -and $tryStage6 -and $allowVision) {
-    # vision-click-precise는 cli.mjs 의존이라 가능할 때만
-    if ($Script:CliPath) {
-      $vargs = @("macro","vision-click-precise","--describe",$label)
-      if ($match) { $vargs += @("--window", $match) }
-      $strategy = "vision_attempt"
-      # 호출은 wrapper 자기 자신 (재귀)
-      $vresult = & $PSCommandPath -AllowLiveControl -Quiet -Brief @vargs
-      if ($LASTEXITCODE -eq 0) {
-        $rc = 0
-        $strategy = "vision_precise"
-        $resultLine = "ok smart-click '$label' strategy=vision_precise mouse_moved=True"
-      }
-    }
-  }
-
-  $sw.Stop()
-  $elapsed = [int]$sw.Elapsed.TotalMilliseconds
-
-  # 클릭 검증 (옵션)
-  $verified = $true
-  if ($rc -eq 0 -and $verifyLabel) {
-    $waitArgs = @("macro","wait-label","--label",$verifyLabel,"--timeout-ms","$verifyTimeout")
-    if ($match) { $waitArgs += @("--window", $match) }
-    & $PSCommandPath @waitArgs | Out-Null
-    $verified = ($LASTEXITCODE -eq 0)
-    if (-not $verified) {
-      if ($Brief) { [Console]::Out.WriteLine("partial smart-click '$label' strategy=$strategy verify_failed='$verifyLabel'") }
-      return 2
-    }
-  }
-
-  # v0.9.0: 클릭 후 화면 변화 검증 (옵션)
-  # v1.0.0: --retry-on-no-change N 옵션과 결합 — false 시 cascade 한 번 더 시도
-  $screenVerified = $true
-  $screenChangedRatio = 0.0
-  $retryCount = 0
-  if ($rc -eq 0 -and $verifyScreen -and $verifyBeforePng) {
-    Start-Sleep -Milliseconds $verifyWaitMs
-    $tag2 = (Get-Date).ToString("HHmmss-fff")
-    $verifyAfterPng = Join-Path $Script:CacheDir ("smartclick-after-$tag2.png")
-    $vrAft = Invoke-NativeHelper -ArgList @("-Action","screenshot","-OutPath",$verifyAfterPng,
-              "-ScreenshotX","$($verifyDiffRegion.x)","-ScreenshotY","$($verifyDiffRegion.y)",
-              "-ScreenshotW","$($verifyDiffRegion.width)","-ScreenshotH","$($verifyDiffRegion.height)")
-    if ($vrAft.Json -and $vrAft.Json.status -eq "ok") {
-      $vrDiff = Invoke-NativeHelper -ArgList @("-Action","screenshot-diff",
-                "-DiffBefore",$verifyBeforePng,"-DiffAfter",$verifyAfterPng,"-DiffThreshold","16")
-      if ($vrDiff.Json -and $vrDiff.Json.status -eq "ok") {
-        $screenChangedRatio = [double]$vrDiff.Json.changed_ratio
-        $screenVerified = [bool]$vrDiff.Json.changed
-      }
-    }
-    Remove-Item -LiteralPath $verifyBeforePng -Force -ErrorAction SilentlyContinue
-    if ($verifyAfterPng) { Remove-Item -LiteralPath $verifyAfterPng -Force -ErrorAction SilentlyContinue }
-
-    # 화면 변화 없음 + retry 옵션 활성 → 같은 cascade 한 번 더
-    while (-not $screenVerified -and $retryCount -lt $retryOnNoChange) {
-      $retryCount++
-      # 새 before 캡처
-      $tagR = (Get-Date).ToString("HHmmss-fff")
-      $verifyBeforePng = Join-Path $Script:CacheDir ("smartclick-retry-before-$tagR.png")
-      $vrR = Invoke-NativeHelper -ArgList @("-Action","screenshot","-OutPath",$verifyBeforePng,
-              "-ScreenshotX","$($verifyDiffRegion.x)","-ScreenshotY","$($verifyDiffRegion.y)",
-              "-ScreenshotW","$($verifyDiffRegion.width)","-ScreenshotH","$($verifyDiffRegion.height)")
-      if (-not ($vrR.Json -and $vrR.Json.status -eq "ok")) { break }
-
-      # cascade 재실행 — Stage 1 (UIA Pattern) 한 번 만 (retry 는 단순화)
-      $rArgs = @("-Action","uia-invoke","-Label",$label)
-      if ($match) { $rArgs += @("-Match", $match) }
-      if ($role)  { $rArgs += @("-Role", $role) }
-      $rRetry = Invoke-NativeHelper -ArgList $rArgs
-      # retry 가 새로운 strategy 를 잡을 수도 있음
-      if ($rRetry.Json -and $rRetry.Json.status -eq "ok") {
-        $strategy = "$strategy+retry_uia_pattern"
-      } elseif ($allowMouseFallback -and -not $disableOcr) {
-        # 폴백: ocr-uia-invoke 한 번 더
-        $rRetryArgs = @("-Action","ocr-uia-invoke","-OcrText",$label,"-OcrMatch",$ocrMatch,"-OcrMaxCandidates","$ocrMaxCandidates")
-        if ($match) { $rRetryArgs += @("-Match", $match) }
-        if ($ocrLang) { $rRetryArgs += @("-OcrLanguage", $ocrLang) }
-        $rRetry2 = Invoke-NativeHelper -ArgList $rRetryArgs
-        if ($rRetry2.Json -and $rRetry2.Json.status -eq "ok") {
-          $strategy = "$strategy+retry_fusion"
-        }
-      }
-
-      Start-Sleep -Milliseconds $verifyWaitMs
-      $tagR2 = (Get-Date).ToString("HHmmss-fff")
-      $verifyAfterPng = Join-Path $Script:CacheDir ("smartclick-retry-after-$tagR2.png")
-      $vrAft2 = Invoke-NativeHelper -ArgList @("-Action","screenshot","-OutPath",$verifyAfterPng,
-                "-ScreenshotX","$($verifyDiffRegion.x)","-ScreenshotY","$($verifyDiffRegion.y)",
-                "-ScreenshotW","$($verifyDiffRegion.width)","-ScreenshotH","$($verifyDiffRegion.height)")
-      if ($vrAft2.Json -and $vrAft2.Json.status -eq "ok") {
-        $vrDiff2 = Invoke-NativeHelper -ArgList @("-Action","screenshot-diff",
-                  "-DiffBefore",$verifyBeforePng,"-DiffAfter",$verifyAfterPng,"-DiffThreshold","16")
-        if ($vrDiff2.Json -and $vrDiff2.Json.status -eq "ok") {
-          $screenChangedRatio = [double]$vrDiff2.Json.changed_ratio
-          $screenVerified = [bool]$vrDiff2.Json.changed
-        }
-      }
-      Remove-Item -LiteralPath $verifyBeforePng -Force -ErrorAction SilentlyContinue
-      if ($verifyAfterPng) { Remove-Item -LiteralPath $verifyAfterPng -Force -ErrorAction SilentlyContinue }
-    }
-
-    if (-not $screenVerified) {
-      if ($Brief) {
-        [Console]::Out.WriteLine("partial smart-click '$label' strategy=$strategy screen_unchanged ratio=$screenChangedRatio retries=$retryCount")
-      }
-      return 2
-    }
-  }
-
-  if ($rc -ne 0) {
-    # v1.1.0: hint 가 있었고 그 stage 가 실패했으면 cascade 전체 활성화 후 재시도.
-    # 환경 변화 (UI 업데이트) 로 학습된 strategy 가 더 이상 안 통할 때 안전망.
-    if ($hintedStrategy) {
-      $tryStage0 = $true; $tryStage1 = $true; $tryStage2 = $true; $tryStage3 = $true
-      $tryStage4 = $true; $tryStage5 = $true; $tryStage6 = $true
-      $hintedStrategy = $null   # 두 번째 시도에서 hint 영향 없게
-
-      # Stage 1 재시도 (hint 외의 가장 안전한 stage 부터)
-      $args = @("-Action","uia-invoke","-Label",$label)
-      if ($match) { $args += @("-Match", $match) }
-      if ($role)  { $args += @("-Role", $role) }
-      $r1f = Invoke-NativeHelper -ArgList $args
-      if ($r1f.Json -and $r1f.Json.status -eq "ok") {
-        $strategy = "uia_pattern+hint_fallback"; $rc = 0
-        $resultLine = "ok smart-click '$label' strategy=uia_pattern hint_fallback method=$($r1f.Json.method) mouse_moved=False"
-      } elseif ($allowMouseFallback -and -not $disableOcr) {
-        # Stage 4 재시도 — hint 가 fusion 류였을 가능성 높음
-        $invokeArgs = @("-Action","ocr-uia-invoke","-OcrText",$label,"-OcrMatch",$ocrMatch,"-OcrMaxCandidates","$ocrMaxCandidates")
-        if ($match) { $invokeArgs += @("-Match", $match) }
-        if ($ocrLang) { $invokeArgs += @("-OcrLanguage", $ocrLang) }
-        $rOuf = Invoke-NativeHelper -ArgList $invokeArgs
-        if ($rOuf.Json -and $rOuf.Json.status -eq "ok") {
-          $strategy = "fusion_uia_invoke+hint_fallback"; $rc = 0
-          $resultLine = "ok smart-click '$label' strategy=fusion_uia_invoke hint_fallback method=$($rOuf.Json.method) mouse_moved=False"
-        }
-      }
-    }
-  }
-
-  if ($rc -ne 0) {
-    # 임시 PNG 정리
-    if ($verifyBeforePng -and (Test-Path -LiteralPath $verifyBeforePng)) {
-      Remove-Item -LiteralPath $verifyBeforePng -Force -ErrorAction SilentlyContinue
-    }
-    if ($Brief) { [Console]::Out.WriteLine("partial smart-click '$label' all_strategies_failed allow_vision=$allowVision allow_mouse=$allowMouseFallback") }
-    # v1.1.0: history append (실패)
-    if (-not $disableHistory) {
-      _History-Append -Label $label -Match $match -Strategy "none" -Success $false -ElapsedMs ([int]$sw.Elapsed.TotalMilliseconds)
-    }
-    return 2
-  }
-
-  # v1.1.0: history append (성공). strategy 의 +hint_fallback 같은 suffix 는 떼고 base strategy 만 저장.
-  if (-not $disableHistory) {
-    $baseStrategy = $strategy -replace '\+.*$', ''
-    _History-Append -Label $label -Match $match -Strategy $baseStrategy -Success $true -ElapsedMs ([int]$sw.Elapsed.TotalMilliseconds)
-  }
-
-  if ($Brief) {
-    if ($verifyLabel) { $resultLine += " verified='$verifyLabel'" }
-    if ($verifyScreen) { $resultLine += " screen_changed=$screenVerified ratio=$screenChangedRatio" }
-    if ($hintedStrategy) { $resultLine += " hint='$hintedStrategy'" }
-    $resultLine += " elapsed_ms=$elapsed"
-    [Console]::Out.WriteLine($resultLine)
-  } else {
-    [Console]::Out.WriteLine(([pscustomobject]@{
-      schema = "cucp.smart-click/v1"
-      status = "ok"
-      label = $label
-      strategy = $strategy
-      hinted_strategy = $hintedStrategy
-      verified = $verified
-      verify_label = $verifyLabel
-      verify_screen_changed = $screenVerified
-      verify_screen_ratio = $screenChangedRatio
-      elapsed_ms = $elapsed
-    } | ConvertTo-Json -Depth 4))
-  }
-  return 0
-}
+function Invoke-MacroSmartClick {param([string[]]$Rest) return _Invoke-LegacyExecutionFamily -Operation 'smart-click' -Rest $Rest -ScriptPath $PSCommandPath}
 
 # ============================================================================
 # macro watch ─ 연속 관찰 모드 (continuous observation)
@@ -12360,66 +6555,7 @@ function Invoke-MacroSmartClick {
 #   cycle=N foreground='...' delta=changed/same affordance_count=M
 # ============================================================================
 
-function Invoke-MacroWatch {
-  param([string[]]$Rest)
-  $intervalMs = [int](_Read-OptValue -Rest $Rest -Name "--interval-ms")
-  $maxCycles = [int](_Read-OptValue -Rest $Rest -Name "--max-cycles")
-  $untilLabel = _Read-OptValue -Rest $Rest -Name "--until-label"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  if ($intervalMs -le 0) { $intervalMs = 500 }
-  if ($maxCycles -le 0) { $maxCycles = 20 }
-
-  $cycles = New-Object System.Collections.ArrayList
-  $prevTitle = ""
-  $prevHwnd = 0
-  $foundUntilLabel = $false
-  for ($i = 1; $i -le $maxCycles; $i++) {
-    # foreground
-    $rFocused = Invoke-NativeHelper -ArgList @("-Action","focused")
-    $title = ""; $hwnd = 0
-    if ($rFocused.Json -and $rFocused.Json.foreground) {
-      $title = "$($rFocused.Json.foreground.title)"
-      $hwnd = [int64]$rFocused.Json.foreground.hwnd
-    }
-    $delta = if ($i -eq 1) { "init" } elseif ($title -eq $prevTitle -and $hwnd -eq $prevHwnd) { "same" } else { "changed" }
-
-    # until-label 검사 (옵션)
-    $hasLabel = $false
-    if ($untilLabel) {
-      $matchArg = if ($match) { $match } else { $title }
-      $rFind = Invoke-NativeHelper -ArgList @("-Action","uia-find","-Match",$matchArg,"-Label",$untilLabel)
-      if ($rFind.Json -and $rFind.Json.status -eq "ok") { $hasLabel = $true }
-    }
-
-    if ($Brief) {
-      $line = "cycle=$i title='$title' delta=$delta"
-      if ($untilLabel) { $line += " until='$untilLabel'=$hasLabel" }
-      [Console]::Out.WriteLine($line)
-    }
-    [void]$cycles.Add([ordered]@{
-      cycle = $i
-      title = $title
-      hwnd = $hwnd
-      delta = $delta
-      until_label_present = if ($untilLabel) { $hasLabel } else { $null }
-      collected_at = (Get-Date).ToString("o")
-    })
-    if ($untilLabel -and $hasLabel) { $foundUntilLabel = $true; break }
-    $prevTitle = $title; $prevHwnd = $hwnd
-    if ($i -lt $maxCycles) { Start-Sleep -Milliseconds $intervalMs }
-  }
-  if (-not $Brief) {
-    [Console]::Out.WriteLine(([pscustomobject]@{
-      schema = "cucp.watch/v1"
-      status = if ($untilLabel -and -not $foundUntilLabel) { "partial" } else { "ok" }
-      until_label = $untilLabel
-      until_label_found = $foundUntilLabel
-      cycles = @($cycles)
-    } | ConvertTo-Json -Depth 6))
-  }
-  if ($untilLabel -and -not $foundUntilLabel) { return 2 }
-  return 0
-}
+function Invoke-MacroWatch {param([string[]]$Rest) return _Invoke-LegacyExecutionFamily -Operation 'watch' -Rest $Rest -ScriptPath $PSCommandPath}
 
 # ============================================================================
 # OCR 매크로 (Windows.Media.Ocr) — 브라우저 캔버스/이미지 표면 커버
@@ -12529,67 +6665,7 @@ function Invoke-MacroOcrFindText {
 # 안전 정책:
 #   - min-score 미달 → partial(2) 거부
 #   - top 후보 없음 → partial(2) 거부
-function Invoke-MacroOcrClick {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro ocr-click requires -AllowLiveControl" }
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  $match = _Read-OptValue -Rest $Rest -Name "--match"
-  $region = _Read-OptValue -Rest $Rest -Name "--region"
-  $btn = _Read-OptValue -Rest $Rest -Name "--button"
-  $lang = _Read-OptValue -Rest $Rest -Name "--language"
-  $targetMatch = _Read-OptValue -Rest $Rest -Name "--target-match"
-  $minScore = [int](_Read-OptValue -Rest $Rest -Name "--min-score")
-  if (-not $text) { throw "macro ocr-click requires --text" }
-  if (-not $match) { $match = "contains" }
-  if (-not $btn) { $btn = "left" }
-  if ($minScore -le 0) { $minScore = 70 }
-
-  # Stage A: OCR 좌표 찾기 (read-only)
-  $findArgs = @("-Action","ocr-find-text","-OcrText",$text,"-OcrMatch",$match,"-OcrMaxCandidates","8")
-  if ($lang) { $findArgs += @("-OcrLanguage", $lang) }
-  if ($targetMatch) { $findArgs += @("-Match", $targetMatch) }
-  if ($region) {
-    $parts = $region -split ','
-    if ($parts.Count -eq 4) {
-      $findArgs += @("-ScreenshotX",$parts[0].Trim(),"-ScreenshotY",$parts[1].Trim(),
-                     "-ScreenshotW",$parts[2].Trim(),"-ScreenshotH",$parts[3].Trim())
-    }
-  }
-  $rFind = Invoke-NativeHelper -ArgList $findArgs
-  if (-not ($rFind.Json -and $rFind.Json.status -eq "ok")) {
-    if ($Brief) { [Console]::Out.WriteLine("partial ocr-click '$text' reason=no_text_match exit=$($rFind.ExitCode)") }
-    return 2
-  }
-  $top = $rFind.Json.top
-  if ([int]$top.score -lt $minScore) {
-    if ($Brief) {
-      [Console]::Out.WriteLine("partial ocr-click '$text' low_confidence score=$($top.score) min=$minScore matched='$($top.text)'")
-    }
-    return 2
-  }
-
-  # Stage B: 좌표 클릭 (라이브)
-  $cx = [int]$top.cx; $cy = [int]$top.cy
-  $clickArgs = @("-Action","click","-X","$cx","-Y","$cy","-Button",$btn,"-ClickRefine","uia-safe")
-  if ($targetMatch) { $clickArgs += @("-TargetMatch", $targetMatch) }
-  $rClick = Invoke-NativeHelper -ArgList $clickArgs
-  _Trajectory-Append -Kind "click" -Payload @{
-    source = "ocr_click"
-    x = $cx; y = $cy; button = $btn
-    text = $text; matched_text = $top.text; score = $top.score
-    exit = $rClick.ExitCode
-  }
-  if ($Brief) {
-    if ($rClick.Json -and $rClick.Json.status -eq "ok") {
-      [Console]::Out.WriteLine("ok ocr-click '$text' matched='$($top.text)' score=$($top.score) @($cx,$cy) button=$btn elapsed_ms=$($rClick.ElapsedMs)")
-    } else {
-      [Console]::Out.WriteLine("err ocr-click '$text' click_failed exit=$($rClick.ExitCode)")
-    }
-  } else {
-    if ($rClick.Raw) { [Console]::Out.Write($rClick.Raw) }
-  }
-  return $rClick.ExitCode
-}
+function Invoke-MacroOcrClick {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'ocr-click' -Rest $Rest -ScriptPath $PSCommandPath}
 
 # ============================================================================
 # v0.9.0 — OCR+UIA fusion + screenshot diff verify
@@ -13362,22 +7438,7 @@ $Script:CucpV14Schema = @{
 # 보안 보완: secret/PII redaction helper (release-notes 출력에 사용)
 # 패턴: GitHub PAT (ghp_/gho_/ghs_/...), OpenAI sk-, AWS AKIA, Bearer/JWT, PEM
 # ----------------------------------------------------------------------------
-function _Cucp-RedactSecrets { param([string]$Text)
-  if (-not $Text) { return $Text }
-  $patterns = @(
-    @{ rx = '\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{16,}'; tag = '[REDACTED:github_pat]' },
-    @{ rx = '\bsk-[A-Za-z0-9]{20,}';                      tag = '[REDACTED:openai_key]' },
-    @{ rx = '\bAKIA[A-Z0-9]{16}\b';                       tag = '[REDACTED:aws_key]' },
-    @{ rx = '(?i)bearer\s+[A-Za-z0-9_\-\.=]{20,}';        tag = '[REDACTED:bearer]' },
-    @{ rx = 'eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}'; tag = '[REDACTED:jwt]' },
-    @{ rx = '-----BEGIN [A-Z ]+PRIVATE KEY-----';         tag = '[REDACTED:pem_block]' }
-  )
-  $out = $Text
-  foreach ($p in $patterns) {
-    $out = [regex]::Replace($out, $p.rx, $p.tag)
-  }
-  return $out
-}
+
 
 # ----------------------------------------------------------------------------
 # 1. cdp-deep-find ─ Shadow DOM/iframe 깊이 보고 (read-only)
@@ -13386,52 +7447,7 @@ function _Cucp-RedactSecrets { param([string]$Text)
 # 동기: smart-find/type 가 deepCollect 로 traversal 하지만 그 메타정보가
 #       외부에 안 보임. 디버깅/벤치마크용으로 노출.
 # ----------------------------------------------------------------------------
-function Invoke-MacroCdpDeepFind {
-  param([string[]]$Rest)
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  if (-not $text) { throw "macro cdp-deep-find requires --text" }
-  $pm   = _Read-OptValue -Rest $Rest -Name "--page-match"
-  $portStr = _Read-OptValue -Rest $Rest -Name "--port"
-  $port = 9222
-  if ($portStr) { try { $port = [int]$portStr } catch { $port = 9222 } }
-  if ($port -le 0) { $port = 9222 }
-  # CDP 포트 quick TCP preflight ─ 닫혀있으면 native helper 호출 안 함
-  if (-not (Test-CdpPortQuick -Port $port -TimeoutMs 120)) {
-    $payload = [ordered]@{
-      schema = $Script:CucpV14Schema.CdpDeepFind
-      status = "partial"
-      reason = "cdp_port_closed"
-      port   = $port
-      recommended_action = "start the Electron app with --remote-debugging-port=$port"
-    }
-    if ($Brief) { [Console]::Out.WriteLine("partial cdp-deep-find port=$port closed") }
-    else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 8)) }
-    return 2
-  }
-  $argList = @("-Action","cdp-deep-find","-CdpText",$text,"-CdpPort","$port")
-  if ($pm) { $argList += @("-CdpPageMatch", $pm) }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $out = [ordered]@{ schema = $Script:CucpV14Schema.CdpDeepFind }
-  if ($r.Json) {
-    foreach ($prop in $r.Json.PSObject.Properties) { $out[$prop.Name] = $prop.Value }
-  } else {
-    $out["status"] = "error"
-    $out["reason"] = "helper_failed"
-  }
-  if ($Brief) {
-    $cnt = 0; $sr = 0; $ifc = 0
-    if ($r.Json -and $r.Json.found_count) { $cnt = [int]$r.Json.found_count }
-    if ($r.Json -and $r.Json.traversal) {
-      if ($r.Json.traversal.shadow_roots_seen) { $sr  = [int]$r.Json.traversal.shadow_roots_seen }
-      if ($r.Json.traversal.iframes_seen)      { $ifc = [int]$r.Json.traversal.iframes_seen }
-    }
-    [Console]::Out.WriteLine("ok cdp-deep-find text='$text' found=$cnt shadow_roots=$sr iframes=$ifc")
-  } else {
-    [Console]::Out.WriteLine(($out | ConvertTo-Json -Depth 10))
-  }
-  if ($r.Json -and $r.Json.status -eq "ok") { return 0 }
-  return 2
-}
+
 
 # ----------------------------------------------------------------------------
 # 2. ime-paste ─ 한국어 IME-safe clipboard paste (live)
@@ -13604,104 +7620,7 @@ function Invoke-MacroModalDetect {
 # 입력: [--match <s>] [--failed-step <s>] [--failed-reason <s>]
 # 출력: cucp.recovery-plan/v1 { modal, foreground, recovery_candidates[], next_action }
 # ----------------------------------------------------------------------------
-function Invoke-MacroRecoveryPlan {
-  param([string[]]$Rest)
-  $tm           = _Read-OptValue -Rest $Rest -Name "--match"
-  $failedStep   = _Read-OptValue -Rest $Rest -Name "--failed-step"
-  $failedReason = _Read-OptValue -Rest $Rest -Name "--failed-reason"
-  # Step A: modal-detect
-  $modal = $null
-  try {
-    $ma = @("-Action","modal-detect")
-    if ($tm) { $ma += @("-Match", $tm) }
-    $mr = Invoke-NativeHelper -ArgList $ma
-    if ($mr.Json) { $modal = $mr.Json }
-  } catch { $modal = $null }
-  # Step B: foreground info
-  $fg = $null
-  try {
-    $fr = Invoke-NativeHelper -ArgList @("-Action","focused")
-    if ($fr.Json) { $fg = $fr.Json }
-  } catch { $fg = $null }
-  # Step C: 추천 후보 생성
-  $candidates = New-Object System.Collections.ArrayList
-  $hasModal = ($modal -and $modal.candidate_count -and ($modal.candidate_count -gt 0))
-  if ($hasModal) {
-    $top = $modal.modal_candidates[0]
-    $isModalFlag = $false
-    if ($top.is_modal) { $isModalFlag = $true }
-    $topScore = 0
-    if ($top.score) { $topScore = [int]$top.score }
-    if ($isModalFlag -or ($topScore -ge 100)) {
-      [void]$candidates.Add([ordered]@{
-        rank=1; action="dismiss_modal"; method="shortcut";
-        command='macro shortcut --keys "escape"';
-        live=$true; sensitive=$true;
-        evidence="modal:$($top.title) score:$topScore"
-      })
-      [void]$candidates.Add([ordered]@{
-        rank=2; action="confirm_modal"; method="shortcut";
-        command='macro shortcut --keys "enter"';
-        live=$true; sensitive=$true;
-        evidence="modal:$($top.title)"
-      })
-    } elseif ($topScore -ge 60) {
-      [void]$candidates.Add([ordered]@{
-        rank=1; action="observe_dialog"; method="modal-detect";
-        command="macro modal-detect";
-        live=$false; sensitive=$false;
-        evidence="dialog_class:$($top.class)"
-      })
-      [void]$candidates.Add([ordered]@{
-        rank=2; action="find_dialog_button"; method="find-label";
-        command='macro find-label --label "OK" --explain';
-        live=$false; sensitive=$false;
-        evidence="dialog_score:$topScore"
-      })
-    }
-  }
-  # 모달 없으면: 재관찰 + 사용자 제공 step retry 추천
-  if ($candidates.Count -eq 0) {
-    [void]$candidates.Add([ordered]@{
-      rank=1; action="re_observe"; method="windows";
-      command="macro windows";
-      live=$false; sensitive=$false;
-      evidence="no_modal_detected"
-    })
-    if ($failedStep) {
-      [void]$candidates.Add([ordered]@{
-        rank=2; action="retry_failed_step"; method="as_provided";
-        command="$failedStep";
-        live=$true; sensitive=$true;
-        evidence="user_provided_step"
-      })
-    }
-  }
-  $rec = $null
-  $next = "observe"
-  if ($candidates.Count -gt 0) {
-    $rec  = $candidates[0]
-    $next = "$($candidates[0].action)"
-  }
-  $out = [ordered]@{
-    schema              = $Script:CucpV14Schema.RecoveryPlan
-    status              = "ok"
-    modal               = $modal
-    foreground          = $fg
-    failed_step         = $failedStep
-    failed_reason       = $failedReason
-    recovery_candidates = @($candidates)
-    candidate_count     = [int]$candidates.Count
-    recommended         = $rec
-    next_action         = $next
-  }
-  if ($Brief) {
-    [Console]::Out.WriteLine("ok recovery-plan candidates=$($out.candidate_count) next=$next")
-  } else {
-    [Console]::Out.WriteLine(($out | ConvertTo-Json -Depth 10))
-  }
-  return 0
-}
+function Invoke-MacroRecoveryPlan {param([string[]]$Rest) return _Invoke-LegacyExecutionFamily -Operation 'recovery-plan' -Rest $Rest -ScriptPath $PSCommandPath}
 
 # ----------------------------------------------------------------------------
 # 6. recovery-run ─ recovery-plan 실행 (live, sensitive gate)
@@ -13709,194 +7628,14 @@ function Invoke-MacroRecoveryPlan {
 # 출력: cucp.recovery-run/v1
 # 보안: live action 은 -AllowLiveControl + --confirm-sensitive 둘 다 필수
 # ----------------------------------------------------------------------------
-function Invoke-MacroRecoveryRun {
-  param([string[]]$Rest)
-  $dryRun  = _Read-Switch -Rest $Rest -Name "--dry-run"
-  $confirm = _Read-Switch -Rest $Rest -Name "--confirm-sensitive"
-  $tm = _Read-OptValue -Rest $Rest -Name "--match"
-  if (-not $dryRun) {
-    if (-not $AllowLiveControl) { throw "macro recovery-run requires -AllowLiveControl (or --dry-run)" }
-  }
-  # Build plan inline (recovery-plan 과 동일 로직)
-  $modal = $null
-  try {
-    $ma = @("-Action","modal-detect")
-    if ($tm) { $ma += @("-Match", $tm) }
-    $mr = Invoke-NativeHelper -ArgList $ma
-    if ($mr.Json) { $modal = $mr.Json }
-  } catch { $modal = $null }
-  $recAction = "observe"
-  $recCmd    = "macro windows"
-  $recLive   = $false
-  $hasModal  = ($modal -and $modal.candidate_count -and ($modal.candidate_count -gt 0))
-  if ($hasModal) {
-    $top = $modal.modal_candidates[0]
-    $isModalFlag = $false
-    if ($top.is_modal) { $isModalFlag = $true }
-    $topScore = 0
-    if ($top.score) { $topScore = [int]$top.score }
-    if ($isModalFlag -or ($topScore -ge 100)) {
-      $recAction = "dismiss_modal"
-      $recCmd    = "shortcut:escape"
-      $recLive   = $true
-    }
-  }
-  # Sensitive gate: live 필요한데 confirm 없으면 blocked (exit 3)
-  if ($recLive -and (-not $confirm) -and (-not $dryRun)) {
-    $blocked = [ordered]@{
-      schema  = $Script:CucpV14Schema.RecoveryRun
-      status  = "blocked"
-      reason  = "sensitive_recovery_requires_confirmation"
-      recommended_action  = $recAction
-      recommended_command = $recCmd
-      next_action = "Re-run with --confirm-sensitive only after explicit user approval."
-    }
-    if ($Brief) { [Console]::Out.WriteLine("blocked recovery-run reason=sensitive_recovery_requires_confirmation") }
-    else { [Console]::Out.WriteLine(($blocked | ConvertTo-Json -Depth 10)) }
-    return 3
-  }
-  # Dry-run: 실행 안 하고 plan 만 반환
-  if ($dryRun) {
-    $modalCount = 0
-    if ($modal -and $modal.candidate_count) { $modalCount = [int]$modal.candidate_count }
-    $out = [ordered]@{
-      schema  = $Script:CucpV14Schema.RecoveryRun
-      status  = "ready"
-      dry_run = $true
-      recommended_action  = $recAction
-      recommended_command = $recCmd
-      requires_live       = $recLive
-      modal_candidate_count = $modalCount
-    }
-    if ($Brief) { [Console]::Out.WriteLine("ready recovery-run dry-run action=$recAction") }
-    else { [Console]::Out.WriteLine(($out | ConvertTo-Json -Depth 10)) }
-    return 0
-  }
-  # Live execution
-  $execResult = $null
-  if ($recAction -eq "dismiss_modal") {
-    try {
-      Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
-      [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
-      Start-Sleep -Milliseconds 80
-      $execResult = [ordered]@{ method="sendkeys_esc"; status="ok" }
-    } catch {
-      $execResult = [ordered]@{ method="sendkeys_esc"; status="error"; detail=$_.Exception.Message }
-    }
-  } else {
-    $execResult = [ordered]@{ method="observe_only"; status="ok" }
-  }
-  $finalStatus = "ok"
-  if ($execResult.status -ne "ok") { $finalStatus = "partial" }
-  $out = [ordered]@{
-    schema = $Script:CucpV14Schema.RecoveryRun
-    status = $finalStatus
-    executed_action = $recAction
-    execution = $execResult
-    modal_before = $modal
-  }
-  if ($Brief) {
-    [Console]::Out.WriteLine("$finalStatus recovery-run action=$recAction")
-  } else {
-    [Console]::Out.WriteLine(($out | ConvertTo-Json -Depth 10))
-  }
-  if ($finalStatus -eq "ok") { return 0 } else { return 2 }
-}
+function Invoke-MacroRecoveryRun {param([string[]]$Rest) return _Invoke-LegacyExecutionFamily -Operation 'recovery-run' -Rest $Rest -ScriptPath $PSCommandPath}
 
 # ----------------------------------------------------------------------------
 # 7. precision-validate ─ coordinate precision 측정 (read-only)
 # 입력: --x <n> --y <n> [--target-match <s>] [--samples <n>]
 # 출력: cucp.precision-validate/v1 { drift_max, drift_avg, stable, recommendation }
 # ----------------------------------------------------------------------------
-function Invoke-MacroPrecisionValidate {
-  param([string[]]$Rest)
-  $xStr = _Read-OptValue -Rest $Rest -Name "--x"
-  $yStr = _Read-OptValue -Rest $Rest -Name "--y"
-  if (-not $xStr -or -not $yStr) { throw "macro precision-validate requires --x and --y" }
-  $tm = _Read-OptValue -Rest $Rest -Name "--target-match"
-  $samplesStr = _Read-OptValue -Rest $Rest -Name "--samples"
-  $x = [int]$xStr
-  $y = [int]$yStr
-  $samples = 5
-  if ($samplesStr) { try { $samples = [int]$samplesStr } catch { $samples = 5 } }
-  if ($samples -lt 1)  { $samples = 1 }
-  if ($samples -gt 20) { $samples = 20 }
-  $points = New-Object System.Collections.ArrayList
-  $totalMs = 0
-  $errors  = 0
-  for ($i = 0; $i -lt $samples; $i++) {
-    $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    try {
-      $a = @("-Action","hit-scan","-X","$x","-Y","$y","-ScanRadius","6","-ScanStep","2")
-      if ($tm) { $a += @("-TargetMatch", $tm) }
-      $r = Invoke-NativeHelper -ArgList $a
-      $sw.Stop()
-      $elapsed = [int]$sw.ElapsedMilliseconds
-      $totalMs += $elapsed
-      $bestX = $null; $bestY = $null; $score = 0
-      if ($r.ExitCode -eq 0 -and $r.Json -and $r.Json.status -eq "ok" -and $r.Json.recommended_point) {
-        if ($null -ne $r.Json.recommended_point.x) { $bestX = [int]$r.Json.recommended_point.x }
-        if ($null -ne $r.Json.recommended_point.y) { $bestY = [int]$r.Json.recommended_point.y }
-        if ($r.Json.best -and $null -ne $r.Json.best.final_score) { $score = [int]$r.Json.best.final_score }
-      }
-      if ($null -ne $bestX -and $null -ne $bestY) {
-        [void]$points.Add([ordered]@{ iteration=$i+1; x=$bestX; y=$bestY; elapsed_ms=$elapsed; score=$score })
-      } else {
-        $errors++
-      }
-    } catch {
-      $sw.Stop()
-      $errors++
-    }
-    Start-Sleep -Milliseconds 30
-  }
-  # Drift = mean point 으로부터 각 sample 의 거리. max/avg 계산
-  $driftMax = 0.0
-  $driftAvg = 0.0
-  if ($points.Count -ge 2) {
-    $xs = @($points | ForEach-Object { $_.x })
-    $ys = @($points | ForEach-Object { $_.y })
-    $mx = ($xs | Measure-Object -Average).Average
-    $my = ($ys | Measure-Object -Average).Average
-    $sumD = 0.0
-    foreach ($p in $points) {
-      $dx = $p.x - $mx
-      $dy = $p.y - $my
-      $d  = [Math]::Sqrt($dx*$dx + $dy*$dy)
-      if ($d -gt $driftMax) { $driftMax = $d }
-      $sumD += $d
-    }
-    $driftAvg = $sumD / $points.Count
-  }
-  $hasEvidence = ($points.Count -ge 2 -and $errors -eq 0)
-  $stable = ($hasEvidence -and $driftMax -le 2.0)
-  $rec = "use_uia_pattern_or_relabel"
-  if ($stable) { $rec = "safe_to_use_anchor" }
-  elseif ($hasEvidence -and $driftMax -le 5.0) { $rec = "use_with_micro_refine" }
-  if (-not $hasEvidence) { $rec = "collect_successful_samples" }
-  $avgElapsed = 0
-  if ($samples -gt 0) { $avgElapsed = [int]($totalMs / $samples) }
-  $out = [ordered]@{
-    schema = $Script:CucpV14Schema.PrecisionValidate
-    status = if ($hasEvidence) { "ok" } else { "partial" }
-    input  = [ordered]@{ x=$x; y=$y; target_match=$tm; samples=$samples }
-    sample_count = [int]$points.Count
-    error_count  = [int]$errors
-    avg_elapsed_ms = $avgElapsed
-    points = @($points)
-    drift_max = if ($points.Count -ge 2) { [Math]::Round($driftMax, 2) } else { $null }
-    drift_avg = if ($points.Count -ge 2) { [Math]::Round($driftAvg, 2) } else { $null }
-    stable    = $stable
-    recommendation = $rec
-  }
-  if ($Brief) {
-    [Console]::Out.WriteLine("$($out.status) precision-validate samples=$($out.sample_count) drift_max=$($out.drift_max)px stable=$stable rec=$rec")
-  } else {
-    [Console]::Out.WriteLine(($out | ConvertTo-Json -Depth 10))
-  }
-  if ($hasEvidence) { return 0 }
-  return 2
-}
+function Invoke-MacroPrecisionValidate {param([string[]]$Rest) return _Invoke-LegacyInteractionFamily -Operation 'precision-validate' -Rest $Rest -ScriptPath $PSCommandPath}
 
 # ----------------------------------------------------------------------------
 # 8. benchmark ─ read-only 측정 + SLO 검증 (read-only, 라이브 클래스룸 안 씀)
@@ -13904,140 +7643,7 @@ function Invoke-MacroPrecisionValidate {
 # 출력: cucp.benchmark/v1 { results[], slo_pass_rate_pct, recommendation }
 # 보안: 텍스트/PII 미포함, 길이/타이밍만 측정
 # ----------------------------------------------------------------------------
-function Invoke-MacroBenchmark {
-  param([string[]]$Rest)
-  $itersStr = _Read-OptValue -Rest $Rest -Name "--iters"
-  $baselinePath = _Read-OptValue -Rest $Rest -Name "--baseline"
-  $iters = 3
-  if ($itersStr) { try { $iters = [int]$itersStr } catch { $iters = 3 } }
-  if ($iters -lt 1)  { $iters = 1 }
-  if ($iters -gt 10) { $iters = 10 }
-  # 측정 대상 (모두 read-only native helper actions, helper 외 의존성 없음)
-  $targets = @(
-    @{ name="windows";      args=@("-Action","windows");      slo_ms=600 },
-    @{ name="health";       args=@("-Action","health");       slo_ms=400 },
-    @{ name="focused";      args=@("-Action","focused");      slo_ms=500 },
-    @{ name="modal-detect"; args=@("-Action","modal-detect"); slo_ms=800 }
-  )
-  $results = New-Object System.Collections.ArrayList
-  foreach ($t in $targets) {
-    $samples = New-Object System.Collections.ArrayList
-    for ($i = 0; $i -lt $iters; $i++) {
-      $sw = [System.Diagnostics.Stopwatch]::StartNew()
-      $okFlag = $false
-      $errMsg = $null
-      try {
-        $r = Invoke-NativeHelper -ArgList $t.args
-        $sw.Stop()
-        if ($r.ExitCode -eq 0 -and $r.Json) {
-          if ($r.Json.status) {
-            if ($r.Json.status -eq "ok") { $okFlag = $true }
-          } else {
-            $okFlag = $true
-          }
-        }
-      } catch {
-        $sw.Stop()
-        $errMsg = $_.Exception.Message
-      }
-      $entry = [ordered]@{ iter=$i+1; ms=[int]$sw.ElapsedMilliseconds; ok=$okFlag }
-      if ($errMsg) { $entry["error"] = $errMsg }
-      [void]$samples.Add($entry)
-    }
-    $okMs = @($samples | Where-Object { $_.ok } | ForEach-Object { $_.ms })
-    $p50 = $null; $p95 = $null; $avg = $null
-    if ($okMs.Count -gt 0) {
-      $sorted = @($okMs | Sort-Object)
-      $i50 = [int]([Math]::Ceiling($sorted.Count * 0.5)) - 1
-      $i95 = [int]([Math]::Ceiling($sorted.Count * 0.95)) - 1
-      if ($i50 -lt 0) { $i50 = 0 }
-      if ($i95 -lt 0) { $i95 = 0 }
-      $p50 = $sorted[$i50]
-      $p95 = $sorted[$i95]
-      $avg = [int](($okMs | Measure-Object -Average).Average)
-    }
-    # A passing timing percentile cannot conceal failures or an empty sample.
-    $sloOk = ($okMs.Count -eq $iters -and $okMs.Count -gt 0 -and $p95 -le $t.slo_ms)
-    [void]$results.Add([ordered]@{
-      name=$t.name; iters=$iters; ok_count=$okMs.Count; failure_count=($iters - $okMs.Count);
-      p50_ms=$p50; p95_ms=$p95; avg_ms=$avg;
-      slo_ms=$t.slo_ms; slo_ok=$sloOk;
-      samples=@($samples)
-    })
-  }
-  $totalSlos = (@($results | Where-Object { $_.slo_ok })).Count
-  $passRate = 0.0
-  if ($targets.Count -gt 0) {
-    $passRate = [Math]::Round(([double]$totalSlos / [double]$targets.Count) * 100.0, 1)
-  }
-  $rec = "investigate_helper_health"
-  if ($passRate -ge 90.0)      { $rec = "all_within_slo" }
-  elseif ($passRate -ge 60.0)  { $rec = "review_slow_targets" }
-  # v1.5.0: --baseline 비교 모드 (read-only, regression detection)
-  $baselineCompare = $null
-  if ($baselinePath -and (Test-Path -LiteralPath $baselinePath)) {
-    try {
-      $baseRaw = @(Get-Content -LiteralPath $baselinePath -Raw)
-      $base = $baseRaw -join "" | ConvertFrom-Json
-      $cmpRows = New-Object System.Collections.ArrayList
-      $regressed = 0
-      $improved  = 0
-      foreach ($cur in $results) {
-        $b = $base.results | Where-Object { $_.name -eq $cur.name } | Select-Object -First 1
-        if (-not $b -or $null -eq $cur.p50_ms -or $null -eq $b.p50_ms) { continue }
-        $deltaP50 = $cur.p50_ms - [int]$b.p50_ms
-        $deltaP95 = $cur.p95_ms - [int]$b.p95_ms
-        $pctP50 = 0
-        if ([int]$b.p50_ms -gt 0) { $pctP50 = [Math]::Round((([double]$deltaP50) / [double]$b.p50_ms) * 100.0, 1) }
-        $verdict = "neutral"
-        if ($deltaP50 -le -10) { $verdict = "improved"; $improved++ }
-        elseif ($deltaP50 -ge 30) { $verdict = "regressed"; $regressed++ }
-        [void]$cmpRows.Add([ordered]@{
-          name = $cur.name
-          baseline_p50_ms = [int]$b.p50_ms
-          current_p50_ms  = $cur.p50_ms
-          delta_ms = $deltaP50
-          delta_pct = $pctP50
-          verdict = $verdict
-        })
-      }
-      $baselineCompare = [ordered]@{
-        baseline_path = $baselinePath
-        compared_targets = $cmpRows.Count
-        improved_count = $improved
-        regressed_count = $regressed
-        rows = @($cmpRows)
-      }
-    } catch {
-      $baselineCompare = [ordered]@{
-        baseline_path = $baselinePath
-        error = "baseline_load_failed"
-        detail = $_.Exception.Message
-      }
-    }
-  }
-  $out = [ordered]@{
-    schema = $Script:CucpV14Schema.Benchmark
-    status = "ok"
-    iters  = $iters
-    target_count = $targets.Count
-    results      = @($results)
-    slo_pass_count    = $totalSlos
-    slo_pass_rate_pct = $passRate
-    recommendation    = $rec
-    baseline_compare  = $baselineCompare
-  }
-  if ($Brief) {
-    if ($baselineCompare -and -not $baselineCompare.error) {
-      [Console]::Out.WriteLine("ok benchmark targets=$($targets.Count) iters=$iters slo_pass=$totalSlos/$($targets.Count) ($passRate%) improved=$($baselineCompare.improved_count) regressed=$($baselineCompare.regressed_count)")
-    } else {
-      [Console]::Out.WriteLine("ok benchmark targets=$($targets.Count) iters=$iters slo_pass=$totalSlos/$($targets.Count) ($passRate%)")
-    }
-  } else {
-    [Console]::Out.WriteLine(($out | ConvertTo-Json -Depth 10))
-  }
-  return 0
-}
+function Invoke-MacroBenchmark {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'benchmark' -Rest $Rest}
 
 # ----------------------------------------------------------------------------
 # 9. release-notes ─ CHANGELOG -> release notes (read-only, secret redact)
@@ -14045,107 +7651,7 @@ function Invoke-MacroBenchmark {
 # 출력: cucp.release-notes/v1 { notes[], migration_notes, external_agent_usage }
 # 보안: secret 패턴 자동 redact (PAT, sk-, AKIA, Bearer, JWT, PEM)
 # ----------------------------------------------------------------------------
-function Invoke-MacroReleaseNotes {
-  param([string[]]$Rest)
-  $version  = _Read-OptValue -Rest $Rest -Name "--version"
-  $sinceStr = _Read-OptValue -Rest $Rest -Name "--since"
-  # PS 5.x 함정: Get-Content 단일 라인 스칼라 반환 -> @() 강제
-  $changelogPath = Join-Path $PSScriptRoot "..\CHANGELOG.md"
-  $clResolved = Resolve-Path -LiteralPath $changelogPath -ErrorAction SilentlyContinue
-  if (-not $clResolved) { throw "macro release-notes: CHANGELOG.md not found at $changelogPath" }
-  $clRaw = @(Get-Content -LiteralPath $clResolved.Path)
-  # 버전별 split (## v 또는 ## 0.1.0 형식)
-  $sections = New-Object System.Collections.ArrayList
-  $current = $null
-  foreach ($line in $clRaw) {
-    if ($line -match '^##\s+v?(\d+\.\d+\.\d+)') {
-      if ($current) { [void]$sections.Add($current) }
-      $current = [ordered]@{
-        version = $Matches[1]
-        header  = $line
-        body    = New-Object System.Collections.ArrayList
-      }
-    } elseif ($current) {
-      [void]$current.body.Add($line)
-    }
-  }
-  if ($current) { [void]$sections.Add($current) }
-  # 필터
-  $filtered = @()
-  if ($version) {
-    $filtered = @($sections | Where-Object { $_.version -eq $version })
-  } elseif ($sinceStr) {
-    $sinceParts = $sinceStr -split '\.'
-    if ($sinceParts.Count -ge 3) {
-      $sj = ([int]$sinceParts[0] * 10000) + ([int]$sinceParts[1] * 100) + [int]$sinceParts[2]
-      $filtered = @($sections | Where-Object {
-        $vp = $_.version -split '\.'
-        if ($vp.Count -ge 3) {
-          $vj = ([int]$vp[0] * 10000) + ([int]$vp[1] * 100) + [int]$vp[2]
-          $vj -ge $sj
-        } else { $false }
-      })
-    }
-  } else {
-    if ($sections.Count -gt 0) { $filtered = @($sections[0]) }
-  }
-  # 각 버전 body 에서 ###Added/Improved/Verified/Fixed 분리
-  $notes = New-Object System.Collections.ArrayList
-  foreach ($s in $filtered) {
-    $added = New-Object System.Collections.ArrayList
-    $improved = New-Object System.Collections.ArrayList
-    $verified = New-Object System.Collections.ArrayList
-    $fixed = New-Object System.Collections.ArrayList
-    $cur = $null
-    foreach ($bl in $s.body) {
-      if ($bl -match '^###\s+(Added|Improved|Verified|Fixed|Why|Internal|Documentation|Tests|Limits)') {
-        $cur = $Matches[1]
-      } elseif ($bl -match '^-\s+(.+)$') {
-        $item = _Cucp-RedactSecrets -Text $Matches[1]
-        switch ($cur) {
-          "Added"    { [void]$added.Add($item) }
-          "Improved" { [void]$improved.Add($item) }
-          "Verified" { [void]$verified.Add($item) }
-          "Fixed"    { [void]$fixed.Add($item) }
-        }
-      }
-    }
-    $highlights = @()
-    if ($added.Count -gt 0)    { $highlights += @($added | Select-Object -First 3) }
-    if ($improved.Count -gt 0) { $highlights += @($improved | Select-Object -First 2) }
-    [void]$notes.Add([ordered]@{
-      version    = $s.version
-      highlights = @($highlights | Select-Object -First 5)
-      added      = @($added)
-      improved   = @($improved)
-      verified   = @($verified)
-      fixed      = @($fixed)
-    })
-  }
-  $filterDesc = "latest"
-  if ($version)        { $filterDesc = "version=$version" }
-  elseif ($sinceStr)   { $filterDesc = "since=$sinceStr" }
-  $migration = "v1.4.0: 새 매크로 9개 추가 (cdp-deep-find, ime-paste, safe-type-ime, modal-detect, recovery-plan, recovery-run, precision-validate, benchmark, release-notes). 기존 매크로 호환성 영향 없음. DOM bridge v2 (Shadow DOM/iframe traversal) 자동 적용."
-  $usage = "AI agent loop: Observe (windows/find-label) -> Plan (smart-plan/task-plan) -> Act (-AllowLiveControl + safety gate -> click-label/safe-type-ime) -> Verify (modal-detect/precision-validate) -> Recover (recovery-run --confirm-sensitive)."
-  $out = [ordered]@{
-    schema = $Script:CucpV14Schema.ReleaseNotes
-    status = "ok"
-    changelog_path = $clResolved.Path
-    total_versions_in_changelog = [int]$sections.Count
-    filter      = $filterDesc
-    note_count  = [int]$notes.Count
-    notes       = @($notes)
-    migration_notes      = $migration
-    external_agent_usage = $usage
-  }
-  if ($Brief) {
-    $vList = @($notes | ForEach-Object { $_.version }) -join ","
-    [Console]::Out.WriteLine("ok release-notes notes=$($out.note_count) versions=$vList")
-  } else {
-    [Console]::Out.WriteLine(($out | ConvertTo-Json -Depth 10))
-  }
-  return 0
-}
+function Invoke-MacroReleaseNotes {param([string[]]$Rest) return _Invoke-LegacyDiagnosticFamily -Operation 'release-notes' -Rest $Rest}
 
 # ============================================================================
 # v1.7.0 — daemon batch + mouse-verify (single-shot 누적 가속 + 정확도 측정)
@@ -14159,63 +7665,7 @@ function Invoke-MacroReleaseNotes {
 # ProseMirror / TipTap 같은 React state-managed editor 가 execCommand 거부 시
 # 이 매크로 사용. live actuation 이라 -AllowLiveControl 필수.
 # ----------------------------------------------------------------------------
-function Invoke-MacroCdpProseMirrorInsert {
-  param([string[]]$Rest)
-  if (-not $AllowLiveControl) { throw "macro cdp-prosemirror-insert requires -AllowLiveControl" }
-  $selector = _Read-OptValue -Rest $Rest -Name "--selector"
-  $text = _Read-OptValue -Rest $Rest -Name "--text"
-  $pageMatch = _Read-OptValue -Rest $Rest -Name "--page-match"
-  $portStr = _Read-OptValue -Rest $Rest -Name "--port"
-  $port = 9222
-  if ($portStr) { try { $port = [int]$portStr } catch { $port = 9222 } }
-  if (-not $selector) { throw "macro cdp-prosemirror-insert requires --selector (CSS, e.g. '.ProseMirror')" }
-  if (-not $text) { throw "macro cdp-prosemirror-insert requires --text" }
-  if (-not (Test-CdpPortQuick -Port $port -TimeoutMs 120)) {
-    $payload = [ordered]@{
-      schema = "cucp.cdp-prosemirror-insert/v1"
-      status = "partial"
-      reason = "cdp_port_closed"
-      port = $port
-      recommended_action = "launch chrome/electron with --remote-debugging-port=$port (see references/cdp-setup.md)"
-    }
-    if ($Brief) { [Console]::Out.WriteLine("partial cdp-prosemirror-insert port=$port closed") }
-    else { [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 8)) }
-    return 2
-  }
-  $argList = @(
-    "-Action","cdp-prosemirror-insert",
-    "-CdpSelector",$selector,
-    "-CdpText",$text,
-    "-CdpPort","$port"
-  )
-  if ($pageMatch) { $argList += @("-CdpPageMatch", $pageMatch) }
-  $r = Invoke-NativeHelper -ArgList $argList
-  $out = [ordered]@{ schema = "cucp.cdp-prosemirror-insert/v1" }
-  if ($r.Json) {
-    foreach ($p in $r.Json.PSObject.Properties) { $out[$p.Name] = $p.Value }
-  } else {
-    $out["status"] = "error"
-    $out["reason"] = "helper_failed"
-  }
-  if ($Brief) {
-    if ($r.Json -and $r.Json.status -eq "ok" -and $r.Json.changed) {
-      [Console]::Out.WriteLine("ok cdp-prosemirror-insert before_len=$($r.Json.before_length) after_len=$($r.Json.after_length) text='$text'")
-    } else {
-      $reason = if ($r.Json -and $r.Json.reason) { "$($r.Json.reason)" } else { "unknown" }
-      [Console]::Out.WriteLine("partial cdp-prosemirror-insert reason=$reason")
-    }
-  } else {
-    [Console]::Out.WriteLine(($out | ConvertTo-Json -Depth 10))
-  }
-  if ($r.Json) {
-    switch ($r.Json.status) {
-      "ok"      { return 0 }
-      "blocked" { return 3 }
-      default   { return 2 }
-    }
-  }
-  return 1
-}
+
 
 # ----------------------------------------------------------------------------
 # macro daemon batch <commands.json>

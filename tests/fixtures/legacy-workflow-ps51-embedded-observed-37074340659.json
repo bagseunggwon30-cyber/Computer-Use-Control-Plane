@@ -1,0 +1,1768 @@
+{
+  "schema": "cucp.workflow-ps51-embedded-observations/v1",
+  "provenance": {
+    "evidence": "observed-windows-powershell-5.1",
+    "run_id": "37074340659",
+    "run_url": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37074340659",
+    "tested_commit": "48bb1651499d0857b4886b3f5cd8b2ed04d5e8a0",
+    "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
+    "log_file": "tokenizer-next-ci-37074340659-foundation.log",
+    "log_sha256": "d7090be7d8bcb52fd4d2a2b156f862c40a5dc66a66a507374916ca009dabb53e",
+    "log_line": 225,
+    "normalization": "Exact inferred-gap JSON rows from the run log. before is PS5.1, after is the historical candidate; localized detail/message fields were omitted. Replaying these rows is not fresh Windows qualification."
+  },
+  "observed_gaps": [
+    {
+      "id": "here_literal_suffix_word",
+      "step": "macro type-native --text @'\nvalue\n'@tail",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "value",
+          "tail"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "here_literal_bare_cr",
+      "step": "macro type-native --text @'\rbody\r'@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "body"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "here_expandable_suffix_word",
+      "step": "macro type-native --text @\"\nvalue\n\"@tail",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "value",
+          "tail"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "here_expandable_bare_cr",
+      "step": "macro type-native --text @\"\rbody\r\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "body"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_empty_brace",
+      "step": "macro type-native --text \"${}\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_empty_brace",
+      "step": "macro type-native --text @\"\n${}\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_unclosed_brace",
+      "step": "macro type-native --text \"${name\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_unclosed_brace",
+      "step": "macro type-native --text @\"\n${name\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_nested_brace",
+      "step": "macro type-native --text \"${a{b}\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_nested_brace",
+      "step": "macro type-native --text @\"\n${a{b}\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_scope_no_name",
+      "step": "macro type-native --text \"$name:\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_scope_no_name",
+      "step": "macro type-native --text @\"\n$name:\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_scope_blank_name",
+      "step": "macro type-native --text \"$env: \"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_scope_blank_name",
+      "step": "macro type-native --text @\"\n$env: \n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_multiple_scope_colons",
+      "step": "macro type-native --text \"$env::PATH\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$env::PATH"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_multiple_scope_colons",
+      "step": "macro type-native --text @\"\n$env::PATH\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$env::PATH"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_braced_scope_no_name",
+      "step": "macro type-native --text \"${env:}\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_braced_scope_no_name",
+      "step": "macro type-native --text @\"\n${env:}\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_unicode_variable",
+      "step": "macro type-native --text \"$이름\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$이름"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_unicode_variable",
+      "step": "macro type-native --text @\"\n$이름\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$이름"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_missing_subexpression_close",
+      "step": "macro type-native --text \"$(inspect\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_missing_subexpression_close",
+      "step": "macro type-native --text @\"\n$(inspect\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_nested_subexpression",
+      "step": "macro type-native --text \"$($(inspect))\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$($(inspect))"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_nested_subexpression",
+      "step": "macro type-native --text @\"\n$($(inspect))\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$($(inspect))"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_quoted_subexpression",
+      "step": "macro type-native --text \"$(\"text\")\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(\"text\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_quoted_subexpression",
+      "step": "macro type-native --text @\"\n$(\"text\")\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(\"text\")"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_operator_subexpression",
+      "step": "macro type-native --text \"$(1 + 2)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(1 + 2)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_operator_subexpression",
+      "step": "macro type-native --text @\"\n$(1 + 2)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(1 + 2)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_keyword_subexpression",
+      "step": "macro type-native --text \"$(if)\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_keyword_subexpression",
+      "step": "macro type-native --text @\"\n$(if)\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_comment_subexpression",
+      "step": "macro type-native --text \"$(inspect # comment)\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_comment_subexpression",
+      "step": "macro type-native --text @\"\n$(inspect # comment)\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_newline_subexpression",
+      "step": "macro type-native --text \"$(inspect\n)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect\n)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_newline_subexpression",
+      "step": "macro type-native --text @\"\n$(inspect\n)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect\n)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_empty_subexpression",
+      "step": "macro type-native --text \"$()\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$()"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_empty_subexpression",
+      "step": "macro type-native --text @\"\n$()\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$()"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_quoted_close_in_subexpression",
+      "step": "macro type-native --text \"$(\"x)\")\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_quoted_close_in_subexpression",
+      "step": "macro type-native --text @\"\n$(\"x)\")\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_dollar_subexpression_arguments",
+      "step": "macro type-native --text \"$(inspect item)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect item)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_dollar_subexpression_arguments",
+      "step": "macro type-native --text @\"\n$(inspect item)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(inspect item)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_question_scope_no_name",
+      "step": "macro type-native --text \"$name?:\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_question_scope_no_name",
+      "step": "macro type-native --text @\"\n$name?:\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_question_name_scope_no_name",
+      "step": "macro type-native --text \"$name?part:\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_question_name_scope_no_name",
+      "step": "macro type-native --text @\"\n$name?part:\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_scoped_question_name",
+      "step": "macro type-native --text \"$env:name?part:\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$env:name?part:"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_scoped_question_name",
+      "step": "macro type-native --text @\"\n$env:name?part:\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$env:name?part:"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_unicode_scope_no_name",
+      "step": "macro type-native --text \"$name이름:\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_unicode_scope_no_name",
+      "step": "macro type-native --text @\"\n$name이름:\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_enum_keyword",
+      "step": "macro type-native --text \"$(enum)\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_enum_keyword",
+      "step": "macro type-native --text @\"\n$(enum)\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_enum_keyword_upper",
+      "step": "macro type-native --text \"$(ENUM)\"",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_enum_keyword_upper",
+      "step": "macro type-native --text @\"\n$(ENUM)\n\"@",
+      "before": {
+        "ok": false,
+        "error": "parse_error",
+        "tokens": []
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_public",
+      "step": "macro type-native --text \"$(public)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(public)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_public",
+      "step": "macro type-native --text @\"\n$(public)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(public)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_Public",
+      "step": "macro type-native --text \"$(Public)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Public)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_Public",
+      "step": "macro type-native --text @\"\n$(Public)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Public)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_private",
+      "step": "macro type-native --text \"$(private)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(private)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_private",
+      "step": "macro type-native --text @\"\n$(private)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(private)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_Private",
+      "step": "macro type-native --text \"$(Private)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Private)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_Private",
+      "step": "macro type-native --text @\"\n$(Private)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Private)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_static",
+      "step": "macro type-native --text \"$(static)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(static)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_static",
+      "step": "macro type-native --text @\"\n$(static)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(static)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_Static",
+      "step": "macro type-native --text \"$(Static)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Static)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_Static",
+      "step": "macro type-native --text @\"\n$(Static)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Static)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_interface",
+      "step": "macro type-native --text \"$(interface)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(interface)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_interface",
+      "step": "macro type-native --text @\"\n$(interface)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(interface)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_Interface",
+      "step": "macro type-native --text \"$(Interface)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Interface)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_Interface",
+      "step": "macro type-native --text @\"\n$(Interface)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Interface)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_namespace",
+      "step": "macro type-native --text \"$(namespace)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(namespace)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_namespace",
+      "step": "macro type-native --text @\"\n$(namespace)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(namespace)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_Namespace",
+      "step": "macro type-native --text \"$(Namespace)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Namespace)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_Namespace",
+      "step": "macro type-native --text @\"\n$(Namespace)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Namespace)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_module",
+      "step": "macro type-native --text \"$(module)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(module)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_module",
+      "step": "macro type-native --text @\"\n$(module)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(module)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_Module",
+      "step": "macro type-native --text \"$(Module)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Module)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_Module",
+      "step": "macro type-native --text @\"\n$(Module)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Module)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_type",
+      "step": "macro type-native --text \"$(type)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(type)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_type",
+      "step": "macro type-native --text @\"\n$(type)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(type)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_Type",
+      "step": "macro type-native --text \"$(Type)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Type)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_Type",
+      "step": "macro type-native --text @\"\n$(Type)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Type)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_assembly",
+      "step": "macro type-native --text \"$(assembly)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(assembly)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_assembly",
+      "step": "macro type-native --text @\"\n$(assembly)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(assembly)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_Assembly",
+      "step": "macro type-native --text \"$(Assembly)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Assembly)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_Assembly",
+      "step": "macro type-native --text @\"\n$(Assembly)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Assembly)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_command",
+      "step": "macro type-native --text \"$(command)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(command)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_command",
+      "step": "macro type-native --text @\"\n$(command)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(command)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_Command",
+      "step": "macro type-native --text \"$(Command)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Command)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_Command",
+      "step": "macro type-native --text @\"\n$(Command)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Command)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_hidden",
+      "step": "macro type-native --text \"$(hidden)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(hidden)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_hidden",
+      "step": "macro type-native --text @\"\n$(hidden)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(hidden)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_Hidden",
+      "step": "macro type-native --text \"$(Hidden)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Hidden)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_Hidden",
+      "step": "macro type-native --text @\"\n$(Hidden)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Hidden)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_base",
+      "step": "macro type-native --text \"$(base)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(base)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_base",
+      "step": "macro type-native --text @\"\n$(base)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(base)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_Base",
+      "step": "macro type-native --text \"$(Base)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Base)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_Base",
+      "step": "macro type-native --text @\"\n$(Base)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Base)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_default",
+      "step": "macro type-native --text \"$(default)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(default)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_default",
+      "step": "macro type-native --text @\"\n$(default)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(default)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_quoted_keyword_Default",
+      "step": "macro type-native --text \"$(Default)\"",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Default)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    },
+    {
+      "id": "bounded_here_keyword_Default",
+      "step": "macro type-native --text @\"\n$(Default)\n\"@",
+      "before": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "$(Default)"
+        ]
+      },
+      "after": {
+        "ok": false,
+        "error": "unsupported_token",
+        "tokens": []
+      }
+    }
+  ]
+}

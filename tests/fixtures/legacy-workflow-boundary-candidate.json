@@ -1,0 +1,2848 @@
+{
+  "schema": "cucp.workflow-boundary-candidate/v1",
+  "observed_provenance": {
+    "evidence": "observed-windows-powershell-5.1",
+    "run_id": "37074340659",
+    "run_url": "https://github.com/bagseunggwon30-cyber/Computer-Use-Control-Plane/actions/runs/37074340659",
+    "tested_commit": "48bb1651499d0857b4886b3f5cd8b2ed04d5e8a0",
+    "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
+    "log_sha256": "d7090be7d8bcb52fd4d2a2b156f862c40a5dc66a66a507374916ca009dabb53e",
+    "source": "WORKFLOW PARSER NOT QUALIFIED historical before values, extracted from foundation log",
+    "normalization": "Localized detail/message fields excluded; expected contains the original PS5.1 result.",
+    "log_line": 223
+  },
+  "observed": [
+    {
+      "id": "observed_signed_negative",
+      "step": "-1",
+      "expected": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-1"
+        ]
+      }
+    },
+    {
+      "id": "observed_signed_positive",
+      "step": "+1",
+      "expected": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "+1"
+        ]
+      }
+    },
+    {
+      "id": "observed_stop_parsing",
+      "step": "macro windows --% --anything $env:PATH",
+      "expected": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "--anything $env:PATH"
+        ]
+      }
+    },
+    {
+      "id": "observed_unquoted_dollar",
+      "step": "macro type-native --text a$b",
+      "expected": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "a$b"
+        ]
+      }
+    },
+    {
+      "id": "observed_adjacent_lf",
+      "step": "macro type-native --text foo`\nbar",
+      "expected": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "foo\nbar"
+        ]
+      }
+    },
+    {
+      "id": "observed_adjacent_crlf",
+      "step": "macro type-native --text foo`\r\nbar",
+      "expected": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "foo\r",
+          "bar"
+        ]
+      }
+    },
+    {
+      "id": "observed_bracket_argument",
+      "step": "macro windows [string]",
+      "expected": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "[string]"
+        ]
+      }
+    },
+    {
+      "id": "observed_nbsp",
+      "step": "macro type-native --text a\u00a0b",
+      "expected": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "observed_em_space",
+      "step": "macro type-native --text a\u2003b",
+      "expected": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "observed_nul_boundary",
+      "step": "macro type-native --text a\u0000b",
+      "expected": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "type-native",
+          "--text",
+          "a",
+          "\u0000b"
+        ]
+      }
+    }
+  ],
+  "inferred_provenance": {
+    "evidence": "inferred-unqualified",
+    "qualification": "Candidate contracts only. Must replay against fresh Windows PowerShell 5.1 before qualification. Rejected neighbors constrain rejection without prescribing diagnostics owned by parse-error preflight.",
+    "design_references": [
+      "https://raw.githubusercontent.com/PowerShell/PowerShell/v6.0.0-alpha.9/src/System.Management.Automation/engine/parser/tokenizer.cs",
+      "https://raw.githubusercontent.com/PowerShell/PowerShell/v6.0.0-alpha.9/src/System.Management.Automation/engine/parser/CharTraits.cs",
+      "https://raw.githubusercontent.com/PowerShell/PowerShell/v6.0.0-alpha.9/src/System.Management.Automation/engine/parser/Parser.cs"
+    ],
+    "reference_limit": "Public early PowerShell source informs boundary rules but is not PS5.1 execution evidence."
+  },
+  "inferred": [
+    {
+      "id": "signed_plus_0",
+      "step": "+0",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "+0"
+        ]
+      }
+    },
+    {
+      "id": "signed_plus_42",
+      "step": "+42",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "+42"
+        ]
+      }
+    },
+    {
+      "id": "signed_plus_0003",
+      "step": "+0003",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "+0003"
+        ]
+      }
+    },
+    {
+      "id": "signed_plus_2147483648",
+      "step": "+2147483648",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "+2147483648"
+        ]
+      }
+    },
+    {
+      "id": "signed_plus_0.25",
+      "step": "+0.25",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "+0.25"
+        ]
+      }
+    },
+    {
+      "id": "signed_plus_.5",
+      "step": "+.5",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "+.5"
+        ]
+      }
+    },
+    {
+      "id": "signed_plus_1.",
+      "step": "+1.",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "+1."
+        ]
+      }
+    },
+    {
+      "id": "signed_plus_1e3",
+      "step": "+1e3",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "+1e3"
+        ]
+      }
+    },
+    {
+      "id": "signed_plus_1E-3",
+      "step": "+1E-3",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "+1E-3"
+        ]
+      }
+    },
+    {
+      "id": "signed_plus_1e+2",
+      "step": "+1e+2",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "+1e+2"
+        ]
+      }
+    },
+    {
+      "id": "signed_expression_10",
+      "step": "+1 value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_11",
+      "step": "+1\u00a0value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_12",
+      "step": "+1\u2003value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_13",
+      "step": "+1\u0000value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_14",
+      "step": "+1; macro windows",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_15",
+      "step": "+1 | macro windows",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_16",
+      "step": "+1 + 2",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_minus_0",
+      "step": "-0",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-0"
+        ]
+      }
+    },
+    {
+      "id": "signed_minus_42",
+      "step": "-42",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-42"
+        ]
+      }
+    },
+    {
+      "id": "signed_minus_0003",
+      "step": "-0003",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-0003"
+        ]
+      }
+    },
+    {
+      "id": "signed_minus_2147483648",
+      "step": "-2147483648",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-2147483648"
+        ]
+      }
+    },
+    {
+      "id": "signed_minus_0.25",
+      "step": "-0.25",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-0.25"
+        ]
+      }
+    },
+    {
+      "id": "signed_minus_.5",
+      "step": "-.5",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-.5"
+        ]
+      }
+    },
+    {
+      "id": "signed_minus_1.",
+      "step": "-1.",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-1."
+        ]
+      }
+    },
+    {
+      "id": "signed_minus_1e3",
+      "step": "-1e3",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-1e3"
+        ]
+      }
+    },
+    {
+      "id": "signed_minus_1E-3",
+      "step": "-1E-3",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-1E-3"
+        ]
+      }
+    },
+    {
+      "id": "signed_minus_1e+2",
+      "step": "-1e+2",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-1e+2"
+        ]
+      }
+    },
+    {
+      "id": "signed_expression_27",
+      "step": "-1 value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_28",
+      "step": "-1\u00a0value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_29",
+      "step": "-1\u2003value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_30",
+      "step": "-1\u0000value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_31",
+      "step": "-1; macro windows",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_32",
+      "step": "-1 | macro windows",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_expression_33",
+      "step": "-1 + 2",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_34",
+      "step": "+",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_35",
+      "step": "-",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_36",
+      "step": "++1",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_37",
+      "step": "--1",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_38",
+      "step": "+abc",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_39",
+      "step": "-abc",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_40",
+      "step": "+1+2",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_41",
+      "step": "-1/2",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_42",
+      "step": "-1e",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_43",
+      "step": "-1e+",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_44",
+      "step": "-1..2",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_45",
+      "step": "+0x",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_46",
+      "step": "-.",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unqualified_number_47",
+      "step": "-1e9999",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "signed_newline",
+      "step": "-42\n+8",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "-42",
+          "+8"
+        ]
+      }
+    },
+    {
+      "id": "argument_negative",
+      "step": "macro windows -42",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "-42"
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_50",
+      "step": "macro windows --% --anything $env:PATH",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "--anything $env:PATH"
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_51",
+      "step": "macro windows --% a  b\t c  ",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a  b\t c  "
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_52",
+      "step": "macro windows --% \"a b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "\"a b\""
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_53",
+      "step": "macro windows --% \"unterminated",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "\"unterminated"
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_54",
+      "step": "macro windows --% $(",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "$("
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_55",
+      "step": "macro windows --% ${}",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "${}"
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_56",
+      "step": "macro windows --% {}[];<>",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "{}[];<>"
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_57",
+      "step": "macro windows --% a&b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a&b"
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_58",
+      "step": "macro windows --% a`n$b %PATH%",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a`n$b %PATH%"
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_59",
+      "step": "macro windows --% a\u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_60",
+      "step": "macro windows --% 'unclosed",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "'unclosed"
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_61",
+      "step": "macro windows --% \"a|b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "\"a|b\""
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_62",
+      "step": "macro windows --% \u201ca|b\u201d",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "\u201ca|b\u201d"
+        ]
+      }
+    },
+    {
+      "id": "stop_raw_63",
+      "step": "macro windows --% \"a&&b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "\"a&&b\""
+        ]
+      }
+    },
+    {
+      "id": "stop_cooked_marker_64",
+      "step": "macro windows '--%' a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a",
+          "b"
+        ]
+      },
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1",
+        "run_id": "37079778520",
+        "observation_id": "stop_cooked_marker_64"
+      }
+    },
+    {
+      "id": "stop_cooked_marker_65",
+      "step": "macro windows \"--%\" a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a",
+          "b"
+        ]
+      },
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1",
+        "run_id": "37079778520",
+        "observation_id": "stop_cooked_marker_65"
+      }
+    },
+    {
+      "id": "stop_cooked_marker_66",
+      "step": "macro windows `--% a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "stop_cooked_marker_67",
+      "step": "macro windows --`% a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "stop_empty_68",
+      "step": "macro windows --%",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%"
+        ]
+      }
+    },
+    {
+      "id": "stop_empty_69",
+      "step": "macro windows --% ",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%"
+        ]
+      }
+    },
+    {
+      "id": "stop_empty_70",
+      "step": "macro windows --%\t",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%"
+        ]
+      }
+    },
+    {
+      "id": "stop_empty_71",
+      "step": "macro windows --%\u00a0",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%"
+        ]
+      }
+    },
+    {
+      "id": "stop_empty_72",
+      "step": "macro windows --%\u2003",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%"
+        ]
+      }
+    },
+    {
+      "id": "stop_newline_73",
+      "step": "macro windows --% a`\nmacro windows",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a`",
+          "macro",
+          "windows"
+        ]
+      }
+    },
+    {
+      "id": "stop_newline_74",
+      "step": "macro windows --% a`\rmacro windows",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a`",
+          "macro",
+          "windows"
+        ]
+      }
+    },
+    {
+      "id": "stop_newline_75",
+      "step": "macro windows --% a`\r\nmacro windows",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a`",
+          "macro",
+          "windows"
+        ]
+      }
+    },
+    {
+      "id": "stop_pipeline_76",
+      "step": "macro windows --% | more",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_pipeline_77",
+      "step": "macro windows --% a | more",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_pipeline_78",
+      "step": "macro windows --% 'a|b'",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_pipeline_79",
+      "step": "macro windows --% a&&b",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_pipeline_80",
+      "step": "macro windows --% a || b",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_pipeline_81",
+      "step": "macro windows --% \"a\" | more",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_newline_does_not_hide_variable",
+      "step": "macro windows --% raw\n$env:PATH",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "marker_suffix_is_word",
+      "step": "macro windows --%tail a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%tail",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "unquoted_dollar_84",
+      "step": "macro windows a$b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a$b"
+        ]
+      }
+    },
+    {
+      "id": "unquoted_dollar_85",
+      "step": "macro windows prefix$env:PATH",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "prefix$env:PATH"
+        ]
+      }
+    },
+    {
+      "id": "unquoted_dollar_86",
+      "step": "macro windows prefix${name}suffix",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "prefix${name}suffix"
+        ]
+      }
+    },
+    {
+      "id": "unquoted_dollar_87",
+      "step": "macro windows a$b.txt",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a$b.txt"
+        ]
+      }
+    },
+    {
+      "id": "unquoted_dollar_88",
+      "step": "macro windows a$b[0]",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a$b[0]"
+        ]
+      }
+    },
+    {
+      "id": "unquoted_dollar_89",
+      "step": "macro windows a$(inspect)b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a$(inspect)b"
+        ]
+      }
+    },
+    {
+      "id": "unquoted_dollar_90",
+      "step": "macro windows a$",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a$"
+        ]
+      }
+    },
+    {
+      "id": "unquoted_dollar_91",
+      "step": "macro windows a`$b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a$b"
+        ]
+      }
+    },
+    {
+      "id": "unquoted_dollar_guard_92",
+      "step": "macro windows $name",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unquoted_dollar_guard_93",
+      "step": "macro windows $env:PATH",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unquoted_dollar_guard_94",
+      "step": "macro windows ${name}",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unquoted_dollar_guard_95",
+      "step": "macro windows $(inspect)",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unquoted_dollar_guard_96",
+      "step": "macro windows a${}",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unquoted_dollar_guard_97",
+      "step": "macro windows a${name",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unquoted_dollar_guard_98",
+      "step": "macro windows a$(inspect",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unquoted_dollar_guard_99",
+      "step": "macro windows a$(if)",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unquoted_dollar_guard_100",
+      "step": "macro windows \"a\"$b",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "unquoted_dollar_guard_101",
+      "step": "macro windows 'a'$b",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "adjacent_escape_102",
+      "step": "macro windows foo`\nbar",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "foo\nbar"
+        ]
+      }
+    },
+    {
+      "id": "adjacent_escape_103",
+      "step": "macro windows foo`\rbar",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "foo\rbar"
+        ]
+      }
+    },
+    {
+      "id": "adjacent_escape_104",
+      "step": "macro windows foo`\r\nbar",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "foo\r",
+          "bar"
+        ]
+      }
+    },
+    {
+      "id": "adjacent_escape_105",
+      "step": "macro windows [foo]`\nbar",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "[foo]\nbar"
+        ]
+      }
+    },
+    {
+      "id": "adjacent_escape_106",
+      "step": "macro windows [foo]`\rbar",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "[foo]\rbar"
+        ]
+      }
+    },
+    {
+      "id": "adjacent_escape_107",
+      "step": "macro windows [foo]`\r\nbar",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "[foo]\r",
+          "bar"
+        ]
+      }
+    },
+    {
+      "id": "adjacent_escape_108",
+      "step": "macro windows \ud55c\uae00`\nbar",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "\ud55c\uae00\nbar"
+        ]
+      }
+    },
+    {
+      "id": "adjacent_escape_109",
+      "step": "macro windows \ud55c\uae00`\rbar",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "\ud55c\uae00\rbar"
+        ]
+      }
+    },
+    {
+      "id": "adjacent_escape_110",
+      "step": "macro windows \ud55c\uae00`\r\nbar",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "\ud55c\uae00\r",
+          "bar"
+        ]
+      }
+    },
+    {
+      "id": "standalone_continuation_111",
+      "step": "macro windows `\nnext",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "next"
+        ]
+      }
+    },
+    {
+      "id": "standalone_continuation_112",
+      "step": "macro windows `\rnext",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "next"
+        ]
+      }
+    },
+    {
+      "id": "standalone_continuation_113",
+      "step": "macro windows `\r\nnext",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "next"
+        ]
+      }
+    },
+    {
+      "id": "bracket_word_114",
+      "step": "macro windows [string]",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "[string]"
+        ]
+      }
+    },
+    {
+      "id": "bracket_word_115",
+      "step": "macro windows [array[]]",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "[array[]]"
+        ]
+      }
+    },
+    {
+      "id": "bracket_word_116",
+      "step": "macro windows [unfinished",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "[unfinished"
+        ]
+      }
+    },
+    {
+      "id": "bracket_word_117",
+      "step": "macro windows foo[0]",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "foo[0]"
+        ]
+      }
+    },
+    {
+      "id": "bracket_word_118",
+      "step": "macro windows foo]",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "foo]"
+        ]
+      }
+    },
+    {
+      "id": "bracket_word_119",
+      "step": "macro windows []",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "[]"
+        ]
+      }
+    },
+    {
+      "id": "bracket_word_120",
+      "step": "macro windows [a]tail",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "[a]tail"
+        ]
+      }
+    },
+    {
+      "id": "bracket_syntax_121",
+      "step": "[string]",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "bracket_syntax_122",
+      "step": "macro windows [",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "bracket_syntax_123",
+      "step": "macro windows [ word ]",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "bracket_syntax_124",
+      "step": "macro windows ]",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "bracket_syntax_125",
+      "step": "macro windows ]suffix",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "bracket_syntax_126",
+      "step": "macro windows [x]; more",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "bracket_syntax_127",
+      "step": "macro windows [x] | more",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_0009",
+      "step": "macro\twindows\ta\tb",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_0009",
+      "step": "macro windows \"a\tb\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\tb"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_0009",
+      "step": "macro windows\t-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_000b",
+      "step": "macro\u000bwindows\u000ba\u000bb",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_000b",
+      "step": "macro windows \"a\u000bb\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u000bb"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_000b",
+      "step": "macro windows\u000b-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_000c",
+      "step": "macro\fwindows\fa\fb",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_000c",
+      "step": "macro windows \"a\fb\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\fb"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_000c",
+      "step": "macro windows\f-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_0085",
+      "step": "macro\u0085windows\u0085a\u0085b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_0085",
+      "step": "macro windows \"a\u0085b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u0085b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_0085",
+      "step": "macro windows\u0085-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_00a0",
+      "step": "macro\u00a0windows\u00a0a\u00a0b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_00a0",
+      "step": "macro windows \"a\u00a0b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u00a0b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_00a0",
+      "step": "macro windows\u00a0-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_1680",
+      "step": "macro\u1680windows\u1680a\u1680b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_1680",
+      "step": "macro windows \"a\u1680b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u1680b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_1680",
+      "step": "macro windows\u1680-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_2000",
+      "step": "macro\u2000windows\u2000a\u2000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_2000",
+      "step": "macro windows \"a\u2000b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u2000b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_2000",
+      "step": "macro windows\u2000-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_2001",
+      "step": "macro\u2001windows\u2001a\u2001b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_2001",
+      "step": "macro windows \"a\u2001b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u2001b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_2001",
+      "step": "macro windows\u2001-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_2002",
+      "step": "macro\u2002windows\u2002a\u2002b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_2002",
+      "step": "macro windows \"a\u2002b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u2002b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_2002",
+      "step": "macro windows\u2002-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_2003",
+      "step": "macro\u2003windows\u2003a\u2003b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_2003",
+      "step": "macro windows \"a\u2003b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u2003b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_2003",
+      "step": "macro windows\u2003-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_2004",
+      "step": "macro\u2004windows\u2004a\u2004b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_2004",
+      "step": "macro windows \"a\u2004b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u2004b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_2004",
+      "step": "macro windows\u2004-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_2005",
+      "step": "macro\u2005windows\u2005a\u2005b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_2005",
+      "step": "macro windows \"a\u2005b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u2005b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_2005",
+      "step": "macro windows\u2005-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_2006",
+      "step": "macro\u2006windows\u2006a\u2006b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_2006",
+      "step": "macro windows \"a\u2006b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u2006b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_2006",
+      "step": "macro windows\u2006-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_2007",
+      "step": "macro\u2007windows\u2007a\u2007b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_2007",
+      "step": "macro windows \"a\u2007b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u2007b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_2007",
+      "step": "macro windows\u2007-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_2008",
+      "step": "macro\u2008windows\u2008a\u2008b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_2008",
+      "step": "macro windows \"a\u2008b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u2008b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_2008",
+      "step": "macro windows\u2008-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_2009",
+      "step": "macro\u2009windows\u2009a\u2009b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_2009",
+      "step": "macro windows \"a\u2009b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u2009b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_2009",
+      "step": "macro windows\u2009-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_200a",
+      "step": "macro\u200awindows\u200aa\u200ab",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_200a",
+      "step": "macro windows \"a\u200ab\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u200ab"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_200a",
+      "step": "macro windows\u200a-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_2028",
+      "step": "macro\u2028windows\u2028a\u2028b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_2028",
+      "step": "macro windows \"a\u2028b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u2028b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_2028",
+      "step": "macro windows\u2028-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_2029",
+      "step": "macro\u2029windows\u2029a\u2029b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_2029",
+      "step": "macro windows \"a\u2029b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u2029b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_2029",
+      "step": "macro windows\u2029-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_202f",
+      "step": "macro\u202fwindows\u202fa\u202fb",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_202f",
+      "step": "macro windows \"a\u202fb\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u202fb"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_202f",
+      "step": "macro windows\u202f-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_205f",
+      "step": "macro\u205fwindows\u205fa\u205fb",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_205f",
+      "step": "macro windows \"a\u205fb\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u205fb"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_205f",
+      "step": "macro windows\u205f-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "whitespace_3000",
+      "step": "macro\u3000windows\u3000a\u3000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "quoted_whitespace_3000",
+      "step": "macro windows \"a\u3000b\"",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u3000b"
+        ]
+      }
+    },
+    {
+      "id": "whitespace_does_not_reset_command_3000",
+      "step": "macro windows\u3000-Name value",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "nonseparator_194",
+      "step": "macro windows a\u200bb",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u200bb"
+        ]
+      }
+    },
+    {
+      "id": "nonseparator_195",
+      "step": "macro windows a\ufeffb",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\ufeffb"
+        ]
+      }
+    },
+    {
+      "id": "nul_196",
+      "step": "macro windows a\u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "nul_197",
+      "step": "macro windows \u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "nul_198",
+      "step": "macro windows a\u0000",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a"
+        ]
+      },
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1",
+        "run_id": "37079778520",
+        "observation_id": "nul_198"
+      }
+    },
+    {
+      "id": "nul_199",
+      "step": "macro windows a\u0000\u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "\u0000b"
+        ]
+      },
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1",
+        "run_id": "37079778520",
+        "observation_id": "nul_199"
+      }
+    },
+    {
+      "id": "nul_200",
+      "step": "macro windows a`\u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a`",
+          "\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "nul_201",
+      "step": "macro windows `\u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "nul_202",
+      "step": "macro windows a`0b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "nul_203",
+      "step": "macro windows a\u0000 b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      },
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1",
+        "run_id": "37079778520",
+        "observation_id": "nul_203"
+      }
+    },
+    {
+      "id": "quoted_nul_unqualified_204",
+      "step": "macro windows \"a\u0000b\"",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "quoted_nul_unqualified_205",
+      "step": "macro windows 'a\u0000b'",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "quoted_nul_unqualified_206",
+      "step": "macro windows \"a`\u0000b\"",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "quoted_nul_unqualified_207",
+      "step": "macro windows @'\na\u0000b\n'@",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "quoted_nul_unqualified_208",
+      "step": "macro windows @\"\na\u0000b\n\"@",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_adjacent_nul_unterminated_quote",
+      "step": "macro windows --%\u0000\"unterminated",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_adjacent_nul_subexpression",
+      "step": "macro windows --%\u0000$(",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "stop_quoted_marker_adjacent_nul",
+      "step": "macro windows '--%'\u0000raw",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "\u0000raw"
+        ]
+      },
+      "candidate_basis": {
+        "evidence": "observed-windows-powershell-5.1",
+        "run_id": "37079778520",
+        "observation_id": "stop_quoted_marker_adjacent_nul"
+      }
+    },
+    {
+      "id": "stop_escaped_marker_adjacent_nul",
+      "step": "macro windows `--%\u0000raw",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "repair_quoted_marker_single_quoted_payload",
+      "step": "macro windows '--%' \"a b\" c",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b",
+          "c"
+        ]
+      }
+    },
+    {
+      "id": "repair_quoted_marker_single_unicode_space",
+      "step": "macro windows '--%' a\u2003b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "repair_quoted_marker_single_variable",
+      "step": "macro windows '--%' $env:PATH",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "repair_quoted_marker_single_unterminated",
+      "step": "macro windows '--%' \"unterminated",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "repair_quoted_marker_single_then_raw_marker",
+      "step": "macro windows '--%' --% a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "repair_quoted_marker_double_quoted_payload",
+      "step": "macro windows \"--%\" \"a b\" c",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b",
+          "c"
+        ]
+      }
+    },
+    {
+      "id": "repair_quoted_marker_double_unicode_space",
+      "step": "macro windows \"--%\" a\u2003b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "repair_quoted_marker_double_variable",
+      "step": "macro windows \"--%\" $env:PATH",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "repair_quoted_marker_double_unterminated",
+      "step": "macro windows \"--%\" \"unterminated",
+      "candidate": {
+        "ok": false,
+        "tokens": []
+      }
+    },
+    {
+      "id": "repair_quoted_marker_double_then_raw_marker",
+      "step": "macro windows \"--%\" --% a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "repair_generic_marker_raw",
+      "step": "macro windows --% a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "repair_generic_marker_backtick_prefix",
+      "step": "macro windows `--% a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "repair_generic_marker_backtick_percent",
+      "step": "macro windows --`% a b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "--%",
+          "a b"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_double_end",
+      "step": "macro windows a\u0000\u0000",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_triple_word",
+      "step": "macro windows a\u0000\u0000\u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_tab",
+      "step": "macro windows a\u0000\tb",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_newline",
+      "step": "macro windows a\u0000\nmacro windows",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "macro",
+          "windows"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_retained_word",
+      "step": "macro windows a\u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a",
+          "\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_raw_head",
+      "step": "macro windows \u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_cooked_with_letters",
+      "step": "macro windows a`0b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a\u0000b"
+        ]
+      }
+    },
+    {
+      "id": "repair_nul_backtick_nul_word",
+      "step": "macro windows a`\u0000b",
+      "candidate": {
+        "ok": true,
+        "error": "",
+        "tokens": [
+          "macro",
+          "windows",
+          "a`",
+          "\u0000b"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+tests/fixtures/legacy-workflow-ps51-raw-diagnostics-37082726512.json -text whitespace=cr-at-eol
+tests/fixtures/legacy-workflow-ps51-raw-diagnostics-37086299736.json -text whitespace=cr-at-eol
+# Exact history oracle and manifest provenance must survive Windows checkouts.
+tests/fixtures/history-reducers/oracle.ps1 -text
+tests/fixtures/history-reducers/original-functions.json -text
+tests/fixtures/history-reducers/windows-ps51-host-37092069983.raw.json -text whitespace=cr-at-eol
+# Exact observed helper startup stderr retains its original CRLF bytes.
+tests/fixtures/legacy-helper/observed-startup.stderr.bin -text -diff
+# Exact diagnostic data, never imported as executable PowerShell.
+tests/fixtures/legacy-helper/observed-binding.stdout.bin -text -diff
+# Exact observed benchmark route records retain their captured byte digest.
+tests/fixtures/legacy-benchmark-brief-observed-37103413852.json -text
+tests/fixtures/legacy-helper/observed-args-only/*.bin -text -diff
+# Exact observed staged-launch failures are raw diagnostics, never executable source.
+tests/fixtures/legacy-helper/observed-detached-startup.stderr.bin -text -diff
+tests/fixtures/legacy-helper/observed-staged-wrapper-launch.log.bin -text -diff
+# Exact two-Application resolution record; diagnostic bytes, never executable source.
+tests/fixtures/legacy-helper/observed-staged-python-resolution.log.bin -text -diff
+# Exact malformed start envelope retains observed CRLF and formatting.
+tests/fixtures/legacy-helper/observed-staged-void-completion.stdout.bin -text -diff
+# Exact Windows venv capture data; preserve bytes, never executable source.
+tests/fixtures/legacy-helper/observed-autostart-venv-request.json -text
+tests/fixtures/legacy-helper/observed-autostart-venv-capture.json -text
+tests/fixtures/legacy-helper/observed-autostart-venv-driver.json -text
+tests/fixtures/legacy-helper/observed-autostart-venv-manifest.json -text
+# Exact direct short-path failure, package evidence and provenance manifest.
+tests/fixtures/legacy-helper/observed-direct-path/* -text whitespace=cr-at-eol
+tests/fixtures/legacy-helper/observed-direct-path/*.bin -diff
+# Exact SmartPlan timeout traces and process records retain observed CRLF bytes.
+tests/fixtures/legacy-observation/observed-smart-plan-37120978323/* -text whitespace=cr-at-eol

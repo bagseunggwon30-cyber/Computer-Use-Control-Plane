@@ -1,14 +1,13 @@
-using System.Text;
 using System.Windows.Automation;
 
 internal static class UiaElementActions
 {
     private sealed record Entry(AutomationElement Element, int[] RuntimeId, IntPtr Hwnd, int Pid,
-        string Name, string AutomationId, int ControlType, RectInfo Geometry);
+        string Name, string AutomationId, int ControlType, RectInfo Geometry, IReadOnlyDictionary<string, object> PatternStates);
     private static readonly UiaReferenceStore<Entry> References = new();
     internal static void BeginObservation() => References.Begin();
     internal static void Invalidate() => References.Clear();
-    internal static string? Register(AutomationElement element, WindowTarget? target)
+    internal static string? Register(AutomationElement element, WindowTarget? target, IReadOnlyDictionary<string, object> states)
     {
         if (target is null) return null;
         var current = element.Current;
@@ -17,59 +16,147 @@ internal static class UiaElementActions
         var runtime = element.GetRuntimeId();
         if (runtime is null || runtime.Length == 0) return null;
         return References.Add(new(element, runtime, target.Hwnd, target.Pid, current.Name ?? "",
-            current.AutomationId ?? "", current.ControlType.Id, new(rect.X, rect.Y, rect.Width, rect.Height)));
+            current.AutomationId ?? "", current.ControlType.Id, new(rect.X, rect.Y, rect.Width, rect.Height), states));
     }
 
     internal static NativeResult Execute(string command, CommandOptions options)
     {
-        options.Allow("--hwnd", "--pid", "--element-ref", "--text-b64", "--allow-live-control",
-            "--expected-x", "--expected-y", "--expected-width", "--expected-height");
-        if (!options.Has("--allow-live-control")) throw new NativeFailure("live_control_required", "UIA actions require live control.");
-        // Consume before any provider call. A provider failure can never make a token replayable.
+        var request = UiaPatternRequest.Parse(command, options);
+        // Consume before any provider call. A provider failure cannot make a token replayable.
         var entry = References.Consume(options.Required("--element-ref"));
         var target = WindowTarget.Read(options, true);
         if (target.Hwnd != entry.Hwnd || target.Pid != entry.Pid)
             throw new NativeFailure("target_mismatch", "Element reference belongs to another target.");
-        PrivilegeInspector.RequireInputAccess(target.Pid);
-        target.Validate(true);
-        var attempted = false;
-        try
+        void Validate()
         {
-            ValidateElement(entry, target);
-            object pattern;
-            string? value = null;
-            if (command == "uia-invoke")
-            {
-                if (options.Has("--text-b64")) throw CommandOptions.Invalid("Invoke does not accept a value.");
-                if (!entry.Element.TryGetCurrentPattern(InvokePattern.Pattern, out pattern))
-                    throw new NativeFailure("unsupported_pattern", "Element does not support InvokePattern; no input fallback is performed.");
-            }
-            else
-            {
-                var encoded = options.Required("--text-b64");
-                if (encoded.Length > 24000) throw CommandOptions.Invalid("Encoded value is too long.");
-                try { value = new UTF8Encoding(false, true).GetString(Convert.FromBase64String(encoded)); }
-                catch (Exception ex) when (ex is FormatException or DecoderFallbackException) { throw CommandOptions.Invalid("Invalid UTF-8/base64 value."); }
-                if (value.Length > 4096 || value.Contains('\0')) throw CommandOptions.Invalid("Value must be at most 4096 UTF-16 units without NUL.");
-                if (!entry.Element.TryGetCurrentPattern(ValuePattern.Pattern, out pattern) || ((ValuePattern)pattern).Current.IsReadOnly)
-                    throw new NativeFailure("unsupported_pattern", "Element does not support a writable ValuePattern.");
-            }
-            ValidateElement(entry, target);
-            target.Validate(true);
             PrivilegeInspector.RequireInputAccess(target.Pid);
-            attempted = true;
-            if (command == "uia-invoke") ((InvokePattern)pattern).Invoke();
-            else ((ValuePattern)pattern).SetValue(value!);
-            return NativeResult.Ok(command, new { target = target.Identity, dispatched = true,
-                verification = "not_verified", automatic_retry = false, may_have_acted = true });
+            target.Validate(true);
+            ValidateElement(entry, target);
         }
-        catch (Exception ex)
+        return UiaPatternExecution.Run(command, target.Identity, Validate, () =>
         {
-            return new NativeResult("pcucp.native/v1", attempted ? "partial" : "error", command,
-                new { may_have_acted = attempted, automatic_retry = false },
-                [new NativeError(ex is NativeFailure nf ? nf.Code : "uia_provider_error", ex.Message)]);
+            var action = Prepare(entry.Element, request);
+            var key = command switch
+            {
+                "uia-toggle" => "toggle", "uia-select" => "selection_item",
+                "uia-expand-collapse" => "expand_collapse", "uia-scroll" => "scroll", _ => null
+            };
+            if (key is not null)
+            {
+                entry.PatternStates.TryGetValue(key, out var observed);
+                UiaPatternExecution.RequireObservedState(observed, action.Before);
+            }
+            return action;
+        });
+    }
+
+    internal static IReadOnlyDictionary<string, object> ReadPatternStates(AutomationElement element, IReadOnlyList<string> patterns)
+    {
+        var states = new Dictionary<string, object>(StringComparer.Ordinal);
+        if (element.Current.IsPassword) return states;
+        if (patterns.Contains("Toggle"))
+            states["toggle"] = new ToggleSnapshot(Pattern<TogglePattern>(element, TogglePattern.Pattern).Current.ToggleState.ToString().ToLowerInvariant());
+        if (patterns.Contains("SelectionItem"))
+            states["selection_item"] = new SelectionSnapshot(Pattern<SelectionItemPattern>(element, SelectionItemPattern.Pattern).Current.IsSelected);
+        if (patterns.Contains("ExpandCollapse"))
+            states["expand_collapse"] = new ExpansionSnapshot(Pattern<ExpandCollapsePattern>(element, ExpandCollapsePattern.Pattern).Current.ExpandCollapseState.ToString().ToLowerInvariant());
+        if (patterns.Contains("Scroll"))
+        {
+            var current = Pattern<ScrollPattern>(element, ScrollPattern.Pattern).Current;
+            states["scroll"] = Snapshot(current.HorizontalScrollPercent, current.VerticalScrollPercent,
+                current.HorizontalViewSize, current.VerticalViewSize, current.HorizontallyScrollable, current.VerticallyScrollable);
+        }
+        return states;
+    }
+
+    private static T Pattern<T>(AutomationElement element, AutomationPattern pattern) where T : class
+    {
+        if (!element.TryGetCurrentPattern(pattern, out var value) || value is not T typed)
+            throw new NativeFailure("unsupported_pattern", $"Element does not support {typeof(T).Name}; no fallback is performed.");
+        return typed;
+    }
+
+    private static PreparedUiaAction Stateful(string method, Func<object?> read, Action dispatch)
+    {
+        var before = read();
+        return new(method, before, dispatch, read, () =>
+        {
+            if (!Equals(before, read())) throw new NativeFailure("element_state_changed", "UIA pattern state changed during preflight; observe again.");
+        });
+    }
+
+    private static PreparedUiaAction Prepare(AutomationElement element, UiaPatternRequest request)
+    {
+        switch (request.Command)
+        {
+            case "uia-invoke":
+                var invoke = Pattern<InvokePattern>(element, InvokePattern.Pattern);
+                return new("InvokePattern.Invoke", null, invoke.Invoke, () => null, () => { });
+            case "uia-set-value":
+                var value = Pattern<ValuePattern>(element, ValuePattern.Pattern);
+                void Writable()
+                {
+                    if (value.Current.IsReadOnly) throw new NativeFailure("value_readonly", "Element ValuePattern is read-only.");
+                }
+                Writable();
+                // Never echo the value or read the existing field value into metadata.
+                return new("ValuePattern.SetValue", null, () => value.SetValue(request.Text!), () => null, Writable);
+            case "uia-toggle":
+                var toggle = Pattern<TogglePattern>(element, TogglePattern.Pattern);
+                return Stateful("TogglePattern.Toggle", () => new ToggleSnapshot(toggle.Current.ToggleState.ToString().ToLowerInvariant()), toggle.Toggle);
+            case "uia-select":
+                var selection = Pattern<SelectionItemPattern>(element, SelectionItemPattern.Pattern);
+                Action select = request.SelectionMode switch
+                {
+                    "replace" => selection.Select, "add" => selection.AddToSelection, "remove" => selection.RemoveFromSelection,
+                    _ => throw CommandOptions.Invalid("Unsupported selection operation.")
+                };
+                return Stateful("SelectionItemPattern." + (request.SelectionMode switch { "replace" => "Select", "add" => "AddToSelection", _ => "RemoveFromSelection" }),
+                    () => new SelectionSnapshot(selection.Current.IsSelected), select);
+            case "uia-expand-collapse":
+                var expand = Pattern<ExpandCollapsePattern>(element, ExpandCollapsePattern.Pattern);
+                object ReadExpansion()
+                {
+                    var state = expand.Current.ExpandCollapseState;
+                    if (state == ExpandCollapseState.LeafNode) throw new NativeFailure("unsupported_pattern", "A leaf node cannot expand or collapse.");
+                    return new ExpansionSnapshot(state.ToString().ToLowerInvariant());
+                }
+                return Stateful(request.State == "expanded" ? "ExpandCollapsePattern.Expand" : "ExpandCollapsePattern.Collapse",
+                    ReadExpansion, request.State == "expanded" ? expand.Expand : expand.Collapse);
+            case "uia-scroll":
+                var scroll = Pattern<ScrollPattern>(element, ScrollPattern.Pattern);
+                object ReadScroll()
+                {
+                    var state = scroll.Current;
+                    if ((request.Horizontal != "none" && !state.HorizontallyScrollable) || (request.Vertical != "none" && !state.VerticallyScrollable))
+                        throw new NativeFailure("scroll_axis_unavailable", "Requested UIA scroll axis is unavailable.");
+                    return Snapshot(state.HorizontalScrollPercent, state.VerticalScrollPercent,
+                        state.HorizontalViewSize, state.VerticalViewSize, state.HorizontallyScrollable, state.VerticallyScrollable);
+                }
+                return Stateful("ScrollPattern.Scroll", ReadScroll, () => scroll.Scroll(Amount(request.Horizontal), Amount(request.Vertical)));
+            default: throw CommandOptions.Invalid("Unknown UIA operation.");
         }
     }
+
+    private sealed record ToggleSnapshot(string State);
+    private sealed record SelectionSnapshot(bool Selected);
+    private sealed record ExpansionSnapshot(string State);
+    private sealed record ScrollSnapshot(double HorizontalPercent, double VerticalPercent,
+        double HorizontalViewSize, double VerticalViewSize, bool HorizontallyScrollable, bool VerticallyScrollable);
+    private static ScrollSnapshot Snapshot(double horizontal, double vertical, double width, double height, bool horizontalEnabled, bool verticalEnabled)
+    {
+        if (!double.IsFinite(horizontal) || !double.IsFinite(vertical) || !double.IsFinite(width) || !double.IsFinite(height) ||
+            horizontal < -1 || horizontal > 100 || vertical < -1 || vertical > 100 || width < 0 || width > 100 || height < 0 || height > 100)
+            throw new InvalidOperationException("Provider returned invalid scroll percentages.");
+        return new(horizontal, vertical, width, height, horizontalEnabled, verticalEnabled);
+    }
+
+    private static ScrollAmount Amount(string amount) => amount switch
+    {
+        "none" => ScrollAmount.NoAmount, "small-increment" => ScrollAmount.SmallIncrement,
+        "large-increment" => ScrollAmount.LargeIncrement, "small-decrement" => ScrollAmount.SmallDecrement,
+        "large-decrement" => ScrollAmount.LargeDecrement, _ => throw CommandOptions.Invalid("Invalid UIA scroll amount.")
+    };
 
     private static void ValidateElement(Entry entry, WindowTarget target)
     {

@@ -35,10 +35,16 @@ class PlannerTests(unittest.TestCase):
                 self.assertEqual(result['route']['fallback'], 'none')
 
     def test_legacy_route_never_becomes_implicit_engine_capability(self):
-        result = plan_command('cdp-eval')
+        result = plan_command('safe-type')
         self.assertEqual(result['route']['primary'], 'legacy-powershell')
-        self.assertFalse(COMMANDS['cdp-eval'].available_in_engine)
-        self.assertNotIn('cdp-eval', {item['name'] for item in capabilities()})
+        self.assertFalse(COMMANDS['safe-type'].available_in_engine)
+        self.assertNotIn('safe-type', {item['name'] for item in capabilities()})
+
+    def test_migrated_cdp_requires_explicit_optional_adapter_and_live_eval(self):
+        result = plan_command('cdp-eval')
+        self.assertEqual(result['route']['primary'], 'python-cdp-adapter')
+        self.assertTrue(result['safety']['live_control_required'])
+        self.assertTrue(COMMANDS['cdp-eval'].available_in_engine)
 
     def test_normalization_does_not_bypass_mutation_classification(self):
         result = plan_command(' APP_LAUNCH ')

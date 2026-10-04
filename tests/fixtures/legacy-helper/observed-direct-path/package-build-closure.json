@@ -1,0 +1,38 @@
+{
+  "schema": "cucp.helper-package-build-evidence/v1",
+  "build_output": {
+    "PcuCp.LegacyHelper.exe": {
+      "sha256": "0a78b62fa891d353ecc50d479d4450aca376b7b55ae5f6e37e0168d88a363352",
+      "bytes": 63488
+    },
+    "PcuCp.LegacyHelper.exe.config": {
+      "sha256": "051099983b896673909e01a1f631b6652abb88da95c9f06f3efef4be033091fa",
+      "bytes": 174
+    },
+    "PcuCp.LegacyHelper.pdb": {
+      "sha256": "f296fb546aa49d3df46cb5bef3ca21111c6190f2650d26e1ce936a9b5600c87e",
+      "bytes": 17164
+    },
+    "PcuCp.LegacyInterop.dll": {
+      "sha256": "9b3f8c3e35e662a19aeb2d0339c828f5b5e2e640385f1015e2680c26ad8f43cd",
+      "bytes": 15872
+    },
+    "PcuCp.LegacyInterop.pdb": {
+      "sha256": "99d1f3484637cca7723b7f6d881cff563fe963f16f3fdee13feb110dd34615fc",
+      "bytes": 4556
+    }
+  },
+  "included": [
+    "PcuCp.LegacyHelper.exe",
+    "PcuCp.LegacyHelper.exe.config",
+    "PcuCp.LegacyInterop.dll"
+  ],
+  "source_program": {
+    "sha256": "25fa8fc3032199c213fe52505d2688510af07c85471a0f3e70a5116d552d62e5",
+    "bytes": 9132
+  },
+  "source_project": {
+    "sha256": "36a16788d024b0d45991d0292a65e55b810c8c53aede9b21ee691a2e48ac24bc",
+    "bytes": 973
+  }
+}
