@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "scripts/cucp.ps1",
-      "lines": 7551,
+      "lines": 7423,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -667,262 +667,266 @@
           "line": 5163
         },
         {
-          "name": "Invoke-MacroHistory",
+          "name": "_History-Capture",
           "line": 5246
         },
         {
+          "name": "Invoke-MacroHistory",
+          "line": 5261
+        },
+        {
           "name": "Invoke-MacroSmartPlan",
-          "line": 5352
+          "line": 5316
         },
         {
           "name": "_Parse-WorkflowStepTokens",
-          "line": 5449
+          "line": 5413
         },
         {
           "name": "_Read-WorkflowStepSpecs",
-          "line": 5484
+          "line": 5448
         },
         {
           "name": "_Build-WorkflowPlan",
-          "line": 5505
+          "line": 5469
         },
         {
           "name": "Invoke-MacroWorkflowPlan",
-          "line": 5519
+          "line": 5483
         },
         {
           "name": "_Invoke-LegacyExecutionChild",
-          "line": 5532
+          "line": 5496
         },
         {
           "name": "_Execution-EncodeWire($Value)",
-          "line": 5585
+          "line": 5549
         },
         {
           "name": "_Execution-Require($Condition,[string]$Message)",
-          "line": 5593
+          "line": 5557
         },
         {
           "name": "_Execution-Fields($Value,[string[]]$Names)",
-          "line": 5597
+          "line": 5561
         },
         {
           "name": "_Execution-DecodeWire($Wire)",
-          "line": 5603
+          "line": 5567
         },
         {
           "name": "_Execution-WriteChunks($Writer,[long]$Id,[string]$Target,$Value)",
-          "line": 5630
+          "line": 5594
         },
         {
           "name": "_Execution-WriteDiagnostic($State,$Process,$Stderr,[string]$ErrorText)",
-          "line": 5643
+          "line": 5607
         },
         {
           "name": "_Execution-ValidateEffect($Effect,$State)",
-          "line": 5663
+          "line": 5627
         },
         {
           "name": "_Execution-SendEscape",
-          "line": 5724
+          "line": 5688
         },
         {
           "name": "_Execution-Dispatch($Effect,$State)",
-          "line": 5729
+          "line": 5693
         },
         {
           "name": "_Execution-EffectMayChangeState($Effect)",
-          "line": 5770
+          "line": 5734
         },
         {
           "name": "_Invoke-LegacyExecutionEffectLoop",
-          "line": 5783
+          "line": 5747
         },
         {
           "name": "_Invoke-LegacyExecutionFamily",
-          "line": 5845
+          "line": 5809
         },
         {
           "name": "_Invoke-LegacyExecutionHost",
-          "line": 5860
+          "line": 5824
         },
         {
           "name": "Invoke-MacroWorkflowRun",
-          "line": 5915
+          "line": 5879
         },
         {
           "name": "_AppStrategy-NormalizeRoute",
-          "line": 5923
+          "line": 5887
         },
         {
           "name": "_AppStrategy-Read",
-          "line": 5944
+          "line": 5908
         },
         {
           "name": "_AppStrategy-LastGood",
-          "line": 5957
+          "line": 5921
         },
         {
           "name": "_AppStrategy-Append",
-          "line": 5967
+          "line": 5931
         },
         {
           "name": "Invoke-MacroAppProfile",
-          "line": 6010
+          "line": 5974
         },
         {
           "name": "_Invoke-LegacyReadOnlyQuery",
-          "line": 6111
+          "line": 6075
         },
         {
           "name": "Invoke-MacroTaskPreset",
-          "line": 6164
+          "line": 6128
         },
         {
           "name": "Invoke-MacroTaskPlan",
-          "line": 6214
+          "line": 6178
         },
         {
           "name": "Invoke-MacroTaskRun",
-          "line": 6247
+          "line": 6211
         },
         {
           "name": "Invoke-MacroFormPlan",
-          "line": 6249
+          "line": 6213
         },
         {
           "name": "Invoke-MacroFormRun",
-          "line": 6278
+          "line": 6242
         },
         {
           "name": "Invoke-MacroSmartClick",
-          "line": 6280
+          "line": 6244
         },
         {
           "name": "Invoke-MacroWatch",
-          "line": 6295
+          "line": 6259
         },
         {
           "name": "Invoke-MacroOcrScreen",
-          "line": 6309
+          "line": 6273
         },
         {
           "name": "Invoke-MacroOcrImage",
-          "line": 6313
+          "line": 6277
         },
         {
           "name": "Invoke-MacroOcrFindText",
-          "line": 6319
+          "line": 6283
         },
         {
           "name": "Invoke-MacroOcrClick",
-          "line": 6327
+          "line": 6291
         },
         {
           "name": "Invoke-MacroOcrUiaFuse",
-          "line": 6341
+          "line": 6305
         },
         {
           "name": "Invoke-MacroOcrUiaInvoke",
-          "line": 6348
+          "line": 6312
         },
         {
           "name": "Invoke-MacroScreenshotDiff",
-          "line": 6354
+          "line": 6318
         },
         {
           "name": "Invoke-MacroClickAndVerifyScreen",
-          "line": 6361
+          "line": 6325
         },
         {
           "name": "Invoke-MacroAutoDo",
-          "line": 6458
+          "line": 6422
         },
         {
           "name": "_Trajectory-Append",
-          "line": 6567
+          "line": 6531
         },
         {
           "name": "_Trajectory-Read",
-          "line": 6591
+          "line": 6555
         },
         {
           "name": "_Trajectory-Clear",
-          "line": 6605
+          "line": 6569
         },
         {
           "name": "_History-Append",
-          "line": 6629
+          "line": 6593
         },
         {
           "name": "_History-PickBestStrategy",
-          "line": 6668
+          "line": 6602
         },
         {
           "name": "_History-Stats",
-          "line": 6715
+          "line": 6611
         },
         {
           "name": "_Helper-IsUp",
-          "line": 6752
+          "line": 6624
         },
         {
           "name": "_Helper-Ensure",
-          "line": 6757
+          "line": 6629
         },
         {
           "name": "Invoke-MacroSession",
-          "line": 6778
+          "line": 6650
         },
         {
           "name": "Invoke-MacroImePaste",
-          "line": 7013
+          "line": 6885
         },
         {
           "name": "Invoke-MacroSafeTypeIme",
-          "line": 7022
+          "line": 6894
         },
         {
           "name": "Invoke-MacroModalDetect",
-          "line": 7102
+          "line": 6974
         },
         {
           "name": "Invoke-MacroRecoveryPlan",
-          "line": 7109
+          "line": 6981
         },
         {
           "name": "Invoke-MacroRecoveryRun",
-          "line": 7117
+          "line": 6989
         },
         {
           "name": "Invoke-MacroPrecisionValidate",
-          "line": 7124
+          "line": 6996
         },
         {
           "name": "Invoke-MacroBenchmark",
-          "line": 7132
+          "line": 7004
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 7140
+          "line": 7012
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 7172
+          "line": 7044
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 7287
+          "line": 7159
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 7383
+          "line": 7255
         }
       ]
     },
     {
       "path": "scripts/cucp-legacy-cdp-adapter.ps1",
-      "lines": 207,
+      "lines": 212,
       "functions": [
         {
           "name": "_Invoke-LegacyCdpBridge",
@@ -930,95 +934,95 @@
         },
         {
           "name": "_Invoke-LegacyCdpMacro",
-          "line": 112
+          "line": 117
         },
         {
           "name": "Invoke-MacroCdpDetect",
-          "line": 144
-        },
-        {
-          "name": "Invoke-MacroCdpEval",
-          "line": 145
-        },
-        {
-          "name": "Invoke-MacroCdpType",
-          "line": 146
-        },
-        {
-          "name": "Invoke-MacroCdpClick",
-          "line": 147
-        },
-        {
-          "name": "Invoke-MacroCdpSmartFind",
-          "line": 148
-        },
-        {
-          "name": "Invoke-MacroCdpSmartTypeFind",
           "line": 149
         },
         {
-          "name": "Invoke-MacroCdpSmartClick",
+          "name": "Invoke-MacroCdpEval",
           "line": 150
         },
         {
-          "name": "Invoke-MacroCdpSmartType",
+          "name": "Invoke-MacroCdpType",
           "line": 151
         },
         {
-          "name": "Invoke-MacroCdpDeepFind",
+          "name": "Invoke-MacroCdpClick",
           "line": 152
         },
         {
-          "name": "Invoke-MacroCdpProseMirrorInsert",
+          "name": "Invoke-MacroCdpSmartFind",
           "line": 153
         },
         {
-          "name": "_Invoke-LegacyCdpNativeArgv",
+          "name": "Invoke-MacroCdpSmartTypeFind",
+          "line": 154
+        },
+        {
+          "name": "Invoke-MacroCdpSmartClick",
+          "line": 155
+        },
+        {
+          "name": "Invoke-MacroCdpSmartType",
+          "line": 156
+        },
+        {
+          "name": "Invoke-MacroCdpDeepFind",
           "line": 157
         },
         {
+          "name": "Invoke-MacroCdpProseMirrorInsert",
+          "line": 158
+        },
+        {
+          "name": "_Invoke-LegacyCdpNativeArgv",
+          "line": 162
+        },
+        {
           "name": "_Invoke-LegacyCdpNative",
-          "line": 173
+          "line": 178
         },
         {
           "name": "_Action-CdpDetect",
-          "line": 197
-        },
-        {
-          "name": "_Action-CdpEval",
-          "line": 198
-        },
-        {
-          "name": "_Action-CdpType",
-          "line": 199
-        },
-        {
-          "name": "_Action-CdpClick",
-          "line": 200
-        },
-        {
-          "name": "_Action-CdpSmartFind",
-          "line": 201
-        },
-        {
-          "name": "_Action-CdpSmartTypeFind",
           "line": 202
         },
         {
-          "name": "_Action-CdpSmartClick",
+          "name": "_Action-CdpEval",
           "line": 203
         },
         {
-          "name": "_Action-CdpSmartType",
+          "name": "_Action-CdpType",
           "line": 204
         },
         {
-          "name": "_Action-CdpDeepFind",
+          "name": "_Action-CdpClick",
           "line": 205
         },
         {
-          "name": "_Action-CdpProseMirrorInsert",
+          "name": "_Action-CdpSmartFind",
           "line": 206
+        },
+        {
+          "name": "_Action-CdpSmartTypeFind",
+          "line": 207
+        },
+        {
+          "name": "_Action-CdpSmartClick",
+          "line": 208
+        },
+        {
+          "name": "_Action-CdpSmartType",
+          "line": 209
+        },
+        {
+          "name": "_Action-CdpDeepFind",
+          "line": 210
+        },
+        {
+          "name": "_Action-CdpProseMirrorInsert",
+          "line": 211
         }
       ]
     },
@@ -1473,8 +1477,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 803276,
-    "removed": 210202,
+    "current": 784078,
+    "removed": 229400,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
@@ -2146,6 +2150,12 @@
       "replacement": "pcucp-next/packaging/source_map.py",
       "original_sha256": "0d34f9042b2ea20c54d1032940c8712d7fde68e47a7eee43bd886ff6cbf2fe7e",
       "evidence": "C# read-only Parser.ParseInput and Python collection; independent pinned historical AST/hash parity and inert side-effect/nested Unicode checks."
+    },
+    {
+      "path": "tests/pcucp-next.Fast.Tests.ps1",
+      "replacement": "tests/python/test_core_fast_smoke.py",
+      "original_sha256": "17546cee5a497a324f08d20116bc10bd0158ed1aedf4d9f3133a513004c3e5e1",
+      "evidence": "All 18 checks converted to Python; actual prebuilt C# Windows/UIA/OCR observations and Python source launcher, no PowerShell test runtime or on-demand build. Explicit local skip versus mandatory Windows CI prerequisites."
     }
   ]
 }

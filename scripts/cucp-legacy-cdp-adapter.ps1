@@ -4,10 +4,10 @@
 
 # region cdp-process-bridge
 function _Invoke-LegacyCdpBridge {
-  param([ValidateSet('native','desktop-native','native-prepare','macro-prepare','macro-complete','native-macro-prepare','native-macro-complete')][string]$Operation,
+  param([ValidateSet('native','desktop-native','native-prepare','macro-prepare','macro-complete','native-macro-prepare','native-macro-complete','history-storage')][string]$Operation,
         [hashtable]$Request, [switch]$LiveAuthority, [int]$Port = 9222, [int]$TimeoutMs = 15000)
   $hostExe = $env:CUCP_LEGACY_CDP_HOST
-  if ($hostExe -and $Operation -cnotin @('desktop-native','native-macro-prepare','native-macro-complete')) {
+  if ($hostExe -and $Operation -cnotin @('desktop-native','native-macro-prepare','native-macro-complete','history-storage')) {
     $executable = [IO.Path]::GetFullPath($hostExe)
     $prefix = 'legacy-cdp-bridge'
     $directory = [IO.Path]::GetDirectoryName($executable)
@@ -22,12 +22,17 @@ function _Invoke-LegacyCdpBridge {
   if ([IO.Path]::GetExtension($executable) -ne '.exe' -or -not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw 'Matching CDP executable is missing; no fallback was attempted.' }
   $utf8 = New-Object Text.UTF8Encoding($false, $true)
   $bytes = $utf8.GetBytes(($Request | ConvertTo-Json -Depth 32 -Compress) + "`n")
-  $requestLimit=if($Operation -ceq 'native-macro-complete'){67108864}else{1048576}
+  $requestLimit=if($Operation -cin @('native-macro-complete','history-storage')){67108864}else{1048576}
   if ($bytes.Length -gt $requestLimit) { throw 'Bridge request exceeds its byte limit; no retry was attempted.' }
   $psi = New-Object Diagnostics.ProcessStartInfo
   $psi.FileName = $executable
   $psi.WorkingDirectory = $directory
   $psi.Arguments = $prefix + ' --operation ' + $Operation
+  if ($Operation -ceq 'history-storage') {
+    $path=[string]$Script:HistoryFile
+    if (-not [IO.Path]::IsPathRooted($path) -or $path.Contains('"') -or $path.Contains("`r") -or $path.Contains("`n") -or $path.EndsWith('\')) {throw 'Invalid history startup destination.'}
+    $psi.Arguments+=' --history-file "'+$path+'" --history-maximum '+([int]$Script:HistoryMax).ToString([Globalization.CultureInfo]::InvariantCulture)
+  }
   if ($Operation -cin @('native-macro-prepare','native-macro-complete')) {
     foreach($path in @($Script:CacheDir,$Script:AuditDir)) {
       if(-not [IO.Path]::IsPathRooted($path) -or $path.Contains('"') -or $path.Contains("`r") -or $path.Contains("`n") -or $path.EndsWith('\')) {throw 'Invalid native macro startup directory.'}
@@ -74,7 +79,7 @@ function _Invoke-LegacyCdpBridge {
       if ($null -ne $outRead -and $outRead.IsCompleted) {
         $progressed = $true
         $n = $outRead.GetAwaiter().GetResult()
-        $outputLimit = if($Operation -ceq 'native-macro-complete'){67108864}elseif ($Operation -eq 'desktop-native') { 33554432 } else { 4194304 }
+        $outputLimit = if($Operation -cin @('native-macro-complete','history-storage')){67108864}elseif ($Operation -eq 'desktop-native') { 33554432 } else { 4194304 }
         if ($out.Length + $n -gt $outputLimit) { throw 'Native bridge stdout exceeds its byte limit; no retry was attempted.' }
         if ($n -gt 0) { [void]$out.Append($outBuffer, 0, $n); $outRead = $process.StandardOutput.ReadAsync($outBuffer, 0, $outBuffer.Length) }
         else { $outRead = $null }

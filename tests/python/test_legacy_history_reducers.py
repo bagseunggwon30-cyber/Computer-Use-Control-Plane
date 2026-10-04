@@ -591,7 +591,19 @@ class HistorySourceTests(unittest.TestCase):
             self.assertEqual(len(body), function['utf8_bytes'])
             self.assertEqual(digest(body), function['sha256'])
             extracted = re.search(rb'^function ' + re.escape(function['name'].encode()) + rb' \{.*?^\}', current, re.M | re.S).group()
-            self.assertEqual(extracted, body)
+            # Reviewed production cutover at 56fa721: the immutable original
+            # is still the oracle, never the new delegate. Only these two
+            # current bodies changed; app-strategy bodies remain byte-exact.
+            delegates = {
+                '_History-PickBestStrategy': 'a2ef38155f3828685475d3125f64832bce3fd3632ea7f66de3e570b3e01eeaaf',
+                '_History-Stats': 'db23784daba3324af9cace6dfef356f45d8d4955b7ee0fefbc0522a24eeea800',
+            }
+            if function['name'] in delegates:
+                self.assertEqual(digest(extracted), delegates[function['name']])
+                self.assertIn(b"-Operation 'history-storage'", extracted)
+                self.assertNotIn(b'Get-Content', extracted)
+            else:
+                self.assertEqual(extracted, body)
     def test_original_loader_rejects_corrupt_and_oversized_bytes(self):
         manifest = original_manifest()
         with tempfile.TemporaryDirectory(prefix='history-loader-test-') as owned:

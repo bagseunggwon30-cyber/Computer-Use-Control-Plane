@@ -5243,70 +5243,34 @@ function Test-CdpPortQuick {
 #   macro history stats                          — 전체 통계 (성공률, strategy 분포)
 #   macro history clear                          — 학습 데이터 삭제
 # ============================================================================
+function _History-Capture {
+  param([string]$Label='', [string]$Match='', [switch]$Pick, [switch]$Stats)
+  try{$capture=_Invoke-LegacyCdpBridge -Operation 'history-storage' -Request @{action='read';args=@{}}}catch{if(-not ($Pick -or $Stats)){throw};return @{exists=$false;rows=@()}}
+  $rows=New-Object Collections.ArrayList;$keys=@{}
+  if($capture.exists -and (-not $Stats -or $capture.lines)){
+    foreach($line in $capture.lines){try{
+      $rec=$line|ConvertFrom-Json -ErrorAction Stop;$key="$($rec.strategy)"
+      if(-not $keys.ContainsKey($key)){$keys[$key]=$keys.PSBase.Count}
+      $matched=if($Pick){"$($rec.label)" -eq $Label -and "$($rec.match)" -eq $Match}else{"$($rec.label)" -eq $Label}
+      [void]$rows.Add(@{matched=[bool]$matched;strategy=$key;key=[int]$keys[$key];strategy_truth=[bool]$rec.strategy;success=[bool]($rec.success -eq $true);success_truth=[bool]$rec.success;label="$($rec.label)";match="$($rec.match)";elapsed="$($rec.elapsed_ms)";record=$rec})
+    }catch{}}
+  }
+  return @{exists=[bool]$capture.exists;rows=@($rows)}
+}
+
 function Invoke-MacroHistory {
   param([string[]]$Rest)
-  $action = "show"
-  if ($Rest.Count -ge 1) { $action = $Rest[0] }
-  switch ($action) {
-    "show" {
-      $label = _Read-OptValue -Rest $Rest -Name "--label"
-      $lastN = [int](_Read-OptValue -Rest $Rest -Name "--last")
-      if ($lastN -le 0) { $lastN = 20 }
-      if (-not (Test-Path -LiteralPath $Script:HistoryFile)) {
-        if ($Brief) { [Console]::Out.WriteLine("ok history empty file=none") }
-        else { [Console]::Out.WriteLine('{"status":"ok","records":[]}') }
-        return 0
-      }
-      $all = @(Get-Content -LiteralPath $Script:HistoryFile -Encoding UTF8)
-      if (-not $all) { $all = @() }
-      $records = @()
-      for ($i = $all.Count - 1; $i -ge 0 -and $records.Count -lt $lastN; $i--) {
-        try {
-          $rec = $all[$i] | ConvertFrom-Json -ErrorAction Stop
-          if ($label -and "$($rec.label)" -ne $label) { continue }
-          $records += $rec
-        } catch { continue }
-      }
-      if ($Brief) {
-        [Console]::Out.WriteLine("ok history count=$($records.Count) label='$label' last=$lastN")
-        foreach ($r in $records) {
-          $okStr = if ($r.success) { "ok" } else { "fail" }
-          [Console]::Out.WriteLine("  $okStr label='$($r.label)' match='$($r.match)' strategy=$($r.strategy) elapsed=$($r.elapsed_ms)ms")
-        }
-      } else {
-        [Console]::Out.WriteLine(([pscustomobject]@{
-          status = "ok"
-          schema = "cucp.history/v1"
-          records = @($records)
-          count = $records.Count
-        } | ConvertTo-Json -Depth 5))
-      }
-      return 0
-    }
-    "stats" {
-      $stats = _History-Stats
-      if ($Brief) {
-        $strList = ($stats.strategies.Keys | Sort-Object | ForEach-Object {
-          "$_=$($stats.strategies[$_])"
-        }) -join ", "
-        [Console]::Out.WriteLine("ok history stats total=$($stats.total) success=$($stats.success) rate=$($stats.success_rate)% strategies=[$strList]")
-      } else {
-        [Console]::Out.WriteLine(($stats | ConvertTo-Json -Depth 4))
-      }
-      return 0
-    }
-    "clear" {
-      if (Test-Path -LiteralPath $Script:HistoryFile) {
-        Remove-Item -LiteralPath $Script:HistoryFile -Force -ErrorAction SilentlyContinue
-      }
-      if ($Brief) { [Console]::Out.WriteLine("ok history cleared") }
-      else { [Console]::Out.WriteLine('{"status":"ok","cleared":true}') }
-      return 0
-    }
-    default {
-      throw "macro history requires 'show' / 'stats' / 'clear' subcommand"
-    }
-  }
+  $values=[string[]]@();if($null -ne $Rest){$values=$Rest.Clone()}
+  $capture=@{exists=$false;rows=@()}
+  if($values.Count -eq 0 -or $values[0] -in @('show','stats')){$capture=_History-Capture -Label (_Read-OptValue $values '--label') -Stats:($values.Count -gt 0 -and $values[0] -eq 'stats')}
+  $result=_Invoke-LegacyCdpBridge -Operation 'history-storage' -Request @{action='macro';args=@{rest=$values;brief=[bool]$Brief;exists=[bool]$capture.exists;rows=@($capture.rows)}}
+  if($result.verb -eq 'stats'){$stats=$result.payload;$stats.success_rate=if($stats.total -gt 0 -and ($stats.success -eq 0 -or $stats.success -eq $stats.total)){[decimal]$stats.success_rate}else{[double]$stats.success_rate};$map=@{};foreach($p in $result.strategy_pairs){$map[$p.name]=[int]$p.count};$stats.strategies=$map}
+  if($Brief){
+    foreach($line in $result.brief_lines){[Console]::Out.WriteLine([string]$line)}
+    if($result.verb -eq 'show' -and -not $result.missing){foreach($r in $result.records){$tag=if($r.success){'ok'}else{'fail'};[Console]::Out.WriteLine("  $tag label='$($r.label)' match='$($r.match)' strategy=$($r.strategy) elapsed=$($r.elapsed_ms)ms")}}
+    if($result.verb -eq 'stats'){$stats=$result.payload;$strList=($stats.strategies.Keys|Sort-Object|ForEach-Object{"$_=$($stats.strategies[$_])"}) -join ', ';[Console]::Out.WriteLine("ok history stats total=$($stats.total) success=$($stats.success) rate=$($stats.success_rate)% strategies=[$strList]")}
+  }else{[Console]::Out.WriteLine((ConvertTo-Json -InputObject $result.payload -Depth ([int]$result.json_depth)))}
+  return [int]$result.exit_code
 }
 
 # ============================================================================
@@ -6627,38 +6591,8 @@ function _Trajectory-Clear {
 
 # 한 번의 smart-click 결과 append. 1MB / HistoryMax 라인 넘으면 자동 rotate.
 function _History-Append {
-  param(
-    [string]$Label,
-    [string]$Match,
-    [string]$Strategy,
-    [bool]$Success,
-    [int]$ElapsedMs
-  )
-  try {
-    $entry = [ordered]@{
-      ts = (Get-Date).ToString("o")
-      label = $Label
-      match = $Match
-      strategy = $Strategy
-      success = $Success
-      elapsed_ms = $ElapsedMs
-    }
-    $line = ($entry | ConvertTo-Json -Compress -Depth 4)
-    Add-Content -LiteralPath $Script:HistoryFile -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue
-
-    # rotate: 1MB 또는 HistoryMax 초과 시 최신 (HistoryMax * 0.8) 만 유지
-    if (Test-Path -LiteralPath $Script:HistoryFile) {
-      $info = Get-Item -LiteralPath $Script:HistoryFile
-      if ($info.Length -gt 1MB) {
-        $all = Get-Content -LiteralPath $Script:HistoryFile -Encoding UTF8
-        if ($all.Count -gt $Script:HistoryMax) {
-          $keep = [int]($Script:HistoryMax * 0.8)
-          $tail = $all[($all.Count - $keep)..($all.Count - 1)]
-          [System.IO.File]::WriteAllLines($Script:HistoryFile, $tail, (New-Object System.Text.UTF8Encoding($true)))
-        }
-      }
-    }
-  } catch { }
+  param([string]$Label,[string]$Match,[string]$Strategy,[bool]$Success,[int]$ElapsedMs)
+  try{$null=_Invoke-LegacyCdpBridge -Operation 'history-storage' -Request @{action='append';args=@{label=$Label;match=$Match;strategy=$Strategy;success=$Success;elapsed_ms=$ElapsedMs}}}catch{}
 }
 
 # 같은 (label, match) 의 최근 N 회 시도를 읽어 후보 strategy 반환.
@@ -6666,82 +6600,20 @@ function _History-Append {
 #   - $null  → history 없음 / 모두 실패 / 학습 비활성
 #   - string → 추천 strategy 이름 (예: "uia_pattern", "fusion_uia_invoke")
 function _History-PickBestStrategy {
-  param(
-    [string]$Label,
-    [string]$Match,
-    [int]$LookbackN = 5
-  )
-  if (-not (Test-Path -LiteralPath $Script:HistoryFile)) { return $null }
-  $all = @(Get-Content -LiteralPath $Script:HistoryFile -Encoding UTF8 -ErrorAction SilentlyContinue)
-  if (-not $all -or $all.Count -eq 0) { return $null }
-
-  # 같은 (label, match) 의 최근 LookbackN 건 — 뒤에서부터 매칭
-  $candidates = New-Object System.Collections.ArrayList
-  for ($i = $all.Count - 1; $i -ge 0 -and $candidates.Count -lt $LookbackN; $i--) {
-    try {
-      $rec = $all[$i] | ConvertFrom-Json -ErrorAction Stop
-      if ("$($rec.label)" -eq $Label -and "$($rec.match)" -eq "$Match") {
-        [void]$candidates.Add($rec)
-      }
-    } catch { continue }
-  }
-  if ($candidates.Count -eq 0) { return $null }
-
-  # 성공한 strategy 들만 카운트, 가장 자주 등장한 것 반환
-  $strategyCount = @{}
-  foreach ($r in $candidates) {
-    if ($r.success -eq $true -and $r.strategy) {
-      $key = "$($r.strategy)"
-      if (-not $strategyCount.ContainsKey($key)) { $strategyCount[$key] = 0 }
-      $strategyCount[$key]++
-    }
-  }
-  if ($strategyCount.Count -eq 0) { return $null }
-
-  # 가장 많이 등장한 strategy. 동률 시 가장 최근 strategy 우선.
-  $maxCount = ($strategyCount.Values | Measure-Object -Maximum).Maximum
-  $topStrategies = @($strategyCount.Keys | Where-Object { $strategyCount[$_] -eq $maxCount })
-  if ($topStrategies.Count -eq 1) { return $topStrategies[0] }
-  # 동률 — candidates 는 최신부터이므로 처음 만나는 strategy 가 더 최근
-  foreach ($r in $candidates) {
-    if ($r.success -eq $true -and $topStrategies -contains "$($r.strategy)") {
-      return "$($r.strategy)"
-    }
-  }
-  return $topStrategies[0]
+  param([string]$Label,[string]$Match,[int]$LookbackN=5)
+  $capture=_History-Capture -Label $Label -Match $Match -Pick
+  $result=_Invoke-LegacyCdpBridge -Operation 'history-storage' -Request @{action='pick';args=@{rows=@($capture.rows);lookback=$LookbackN}}
+  if($result.tie){foreach($r in $result.candidates){if($r.success -and $result.top -contains $r.strategy){return $r.strategy}};return $result.top[0]}
+  return $result.value
 }
 
 # history 전체 통계 (macro session info / metrics 에서 호출 가능)
 function _History-Stats {
-  if (-not (Test-Path -LiteralPath $Script:HistoryFile)) {
-    return [pscustomobject]@{ total = 0; success = 0; success_rate = 0.0; strategies = @{} }
-  }
-  $all = @(Get-Content -LiteralPath $Script:HistoryFile -Encoding UTF8 -ErrorAction SilentlyContinue)
-  if (-not $all) {
-    return [pscustomobject]@{ total = 0; success = 0; success_rate = 0.0; strategies = @{} }
-  }
-  $total = 0; $success = 0
-  $byStrategy = @{}
-  foreach ($l in $all) {
-    try {
-      $r = $l | ConvertFrom-Json -ErrorAction Stop
-      $total++
-      if ($r.success -eq $true) {
-        $success++
-        $key = "$($r.strategy)"
-        if (-not $byStrategy.ContainsKey($key)) { $byStrategy[$key] = 0 }
-        $byStrategy[$key]++
-      }
-    } catch { continue }
-  }
-  $rate = 0.0
-  if ($total -gt 0) { $rate = [Math]::Round(($success / $total) * 100, 1) }
-  return [pscustomobject]@{
-    total = $total
-    success = $success
-    success_rate = $rate
-    strategies = $byStrategy
-  }
+  $capture=_History-Capture -Stats
+  $result=_Invoke-LegacyCdpBridge -Operation 'history-storage' -Request @{action='stats';args=@{rows=@($capture.rows)}}
+  $result.value.success_rate=if($result.value.total -gt 0 -and ($result.value.success -eq 0 -or $result.value.success -eq $result.value.total)){[decimal]$result.value.success_rate}else{[double]$result.value.success_rate}
+  $map=@{};foreach($p in $result.strategy_pairs){$map[$p.name]=[int]$p.count};$result.value.strategies=$map
+  return $result.value
 }
 
 # ============================================================================
