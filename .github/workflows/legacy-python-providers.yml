@@ -36,6 +36,7 @@ on:
       - 'tests/python/test_coordinate_production.py'
       - 'tests/python/test_hit_macro_production.py'
       - 'tests/python/test_surface_macro_production.py'
+      - 'tests/python/test_authorization_production.py'
       - 'tests/python/test_legacy_coordinates_runtime.py'
       - 'tests/python/test_legacy_preserved_owner.py'
       - 'tests/python/test_legacy_precision_runtime.py'
@@ -94,6 +95,7 @@ jobs:
           python -m unittest test_coordinate_production -v
           python -m unittest test_hit_macro_production -v
           python -m unittest test_surface_macro_production -v
+          python -m unittest test_authorization_production -v
           python -m unittest test_legacy_default_autostart test_legacy_helper_autostart -v
           python -m unittest test_python_helper_server test_python_helper_production -v
           python -m unittest test_start_pi test_install_runtime test_legacy_native_entry test_legacy_native_retirement test_legacy_diagnostic_runtime test_legacy_diagnostic_provider test_legacy_native_desktop test_legacy_native_macros test_legacy_coordinates_runtime test_legacy_preserved_owner test_legacy_precision_runtime test_legacy_interaction_runtime test_legacy_execution_runtime test_legacy_syntax_runtime test_legacy_host_protocol test_native_session test_legacy_dispatch_contract test_legacy_dispatch_refresh -v

@@ -1163,68 +1163,24 @@ function Invoke-Cucp {
 # ----- live-control gate ----------------------------------------------------
 function Test-LiveControlRequest {
   param([string[]]$ArgList)
-  if ($null -eq $ArgList -or $ArgList.Count -lt 1) { return $false }
-
-  if ($ArgList[0] -eq "act") { return $true }
-  if ($ArgList.Count -ge 2 -and $ArgList[0] -eq "app" -and $ArgList[1] -eq "switch") { return $true }
-  if ($ArgList.Count -ge 2 -and $ArgList[0] -eq "plan" -and $ArgList[1] -eq "run") { return $true }
-  if ($ArgList.Count -ge 2 -and $ArgList[0] -eq "scenario" -and $ArgList[1] -eq "run" -and ($ArgList -contains "--execute")) {
-    return $true
-  }
-
-  if ($ArgList.Count -ge 3 -and $ArgList[0] -eq "desktop" -and $ArgList[1] -eq "benchmark") {
-    $op = $ArgList[2]
-    $isPreflight = $ArgList -contains "--preflight-only"
-    $isVerify = $ArgList -contains "--verify-only"
-    $isDry = $ArgList -contains "--dry-run"
-    if ($op -eq "runbook") {
-      if ($isDry -or $isVerify -or $isPreflight) { return $false }
-      if ($ArgList -contains "--allow-live-control") { return $true }
-    }
-    if (($op -eq "run" -or $op -eq "collect") -and ($ArgList -contains "--live") -and -not $isPreflight) {
-      return $true
-    }
-  }
-
-  if ($ArgList.Count -ge 2 -and $ArgList[0] -eq "l5") {
-    $sub = $ArgList[1]
-    if ($sub -eq "run") { return $true }
-    if (($sub -eq "resume" -or $sub -eq "live-eval") -and ($ArgList -contains "--allow-control")) { return $true }
-  }
-
-  return $false
+  $values=[string[]]@();if($null -ne $ArgList){$values=$ArgList.Clone()}
+  $result=_Invoke-LegacyCdpBridge -Operation 'surface-macro' -Request @{name='authorization-predicates';argv=$values}
+  return [bool]$result.live
 }
 
 function Test-CoordinateMissingObservation {
   param([string[]]$ArgList)
-  if ($ArgList.Count -lt 2 -or $ArgList[0] -ne "act") { return $false }
-  $coordSubs = @("click", "right-click", "drag", "scroll", "type")
-  if (-not ($coordSubs -contains $ArgList[1])) { return $false }
-  $hasCoord = ($ArgList -contains "--x") -or ($ArgList -contains "--from-x")
-  if (-not $hasCoord) { return $false }
-  if ($ArgList -contains "--after") { return $false }
-  if ($ArgList -contains "--force") { return $false }
-  return $true
+  $values=[string[]]@();if($null -ne $ArgList){$values=$ArgList.Clone()}
+  $result=_Invoke-LegacyCdpBridge -Operation 'surface-macro' -Request @{name='authorization-predicates';argv=$values}
+  return [bool]$result.missing_observation
 }
 
 function Assert-Authorized {
   param([string[]]$ArgList)
-  $isLive = Test-LiveControlRequest -ArgList $ArgList
-  $missingObs = Test-CoordinateMissingObservation -ArgList $ArgList
-  if ($missingObs) {
-    Write-Notice -Level "ERROR" -Message "좌표 기반 act 명령은 --after <observation-id>가 필요합니다. 'observe appshot'을 먼저 실행하거나 매크로(click-label 등)를 사용하세요."
-    throw "Coordinate-based act command requires --after <observation-id>."
-  }
-  if ($isLive -and -not $AllowLiveControl) {
-    Write-Notice -Level "ERROR" -Message "라이브 데스크톱 조작이 차단되었습니다. 사용자가 명시 허락한 경우만 -AllowLiveControl 와 함께 다시 실행하세요."
-    Write-Notice -Level "WARN"  -Message "차단된 명령: $($ArgList -join ' ')"
-    throw "Live desktop control blocked. Re-run with -AllowLiveControl after explicit user authorization."
-  }
-  if ($isLive) {
-    Write-Notice -Level "WARN" -Message "라이브 컨트롤 모드: $($ArgList -join ' ')"
-  } else {
-    Write-Notice -Level "INFO" -Message "관찰/시뮬레이션 모드: $($ArgList -join ' ')"
-  }
+  $values=[string[]]@();if($null -ne $ArgList){$values=$ArgList.Clone()}
+  $result=_Invoke-LegacyCdpBridge -Operation 'surface-macro' -LiveAuthority:([bool]$AllowLiveControl) -Request @{name='authorization';argv=$values}
+  foreach($notice in @($result.notices)){Write-Notice -Level $notice.level -Message $notice.message}
+  if($result.error){throw [string]$result.error}
 }
 
 # ----- observation cache ----------------------------------------------------
