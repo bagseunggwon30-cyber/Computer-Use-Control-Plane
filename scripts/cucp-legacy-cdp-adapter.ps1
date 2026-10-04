@@ -4,10 +4,10 @@
 
 # region cdp-process-bridge
 function _Invoke-LegacyCdpBridge {
-  param([ValidateSet('native','desktop-native','native-prepare','macro-prepare','macro-complete','native-macro-prepare','native-macro-complete','history-storage','coordinates')][string]$Operation,
+  param([ValidateSet('native','desktop-native','native-prepare','macro-prepare','macro-complete','native-macro-prepare','native-macro-complete','history-storage','coordinates','surface-macro')][string]$Operation,
         [hashtable]$Request, [switch]$LiveAuthority, [int]$Port = 9222, [int]$TimeoutMs = 15000)
   $hostExe = $env:CUCP_LEGACY_CDP_HOST
-  if ($hostExe -and $Operation -cnotin @('desktop-native','native-macro-prepare','native-macro-complete','history-storage','coordinates')) {
+  if ($hostExe -and $Operation -cnotin @('desktop-native','native-macro-prepare','native-macro-complete','history-storage','coordinates','surface-macro')) {
     $executable = [IO.Path]::GetFullPath($hostExe)
     $prefix = 'legacy-cdp-bridge'
     $directory = [IO.Path]::GetDirectoryName($executable)
@@ -28,6 +28,11 @@ function _Invoke-LegacyCdpBridge {
   $psi.FileName = $executable
   $psi.WorkingDirectory = $directory
   $psi.Arguments = $prefix + ' --operation ' + $Operation
+  if($Operation -ceq 'surface-macro'){
+    $culture=[Globalization.CultureInfo]::CurrentCulture.Name
+    if($culture.Contains('"') -or $culture.Contains("`r") -or $culture.Contains("`n")){throw 'Invalid public surface culture.'}
+    $psi.Arguments+=' --surface-culture "'+$culture+'" --timeout-s '+([double]$TimeoutMs / 1000).ToString([Globalization.CultureInfo]::InvariantCulture)
+  }
   if ($Operation -ceq 'coordinates') {
     $culture=[Globalization.CultureInfo]::CurrentCulture.Name
     if($culture.Contains('"') -or $culture.Contains("`r") -or $culture.Contains("`n")){throw 'Invalid coordinate startup culture.'}
