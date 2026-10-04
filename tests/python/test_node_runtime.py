@@ -32,7 +32,7 @@ else{process.stdout.write(JSON.stringify({status:'ok',args}));}
         words=['owned','','한글😀','quoted " value','C:\\owned trailing\\','--allow-live-control']
         result=self.runtime().invoke(words,parse_reply=json.loads)
         self.assertEqual(result['ExitCode'],0);self.assertEqual(result['Json']['args'],words)
-        self.assertEqual(Path(result['FilePath']).read_text(),result['Raw'])
+        self.assertEqual(Path(result['FilePath']).read_text(encoding='utf-8'),result['Raw'])
         self.assertEqual(result['Err'],'')
     def test_missing_cli_invalid_json_and_nonzero_exit_remain_distinct(self):
         runtime=self.runtime();runtime.cli_path=None
