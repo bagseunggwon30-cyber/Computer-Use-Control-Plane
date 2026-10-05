@@ -3,6 +3,8 @@ param([string]$Source,[string]$DiagnosticSource,[string]$InputPath)
 # same-scope counter; the real entry points, dispatchers and providers are not loaded.
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
+$Script:LegacyCdpSourceRoot=[IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $Source) '..'))
+$Script:InvokeTimeoutMs=30000
 foreach($load in @(
  @{path=$Source;names=@('_Read-OptValue','_Read-Switch','_Execution-Require','_Execution-Fields','_Execution-EncodeWire','_Execution-DecodeWire','_Execution-ValidateEffect','_Precision-Require','_Precision-Fields','_Precision-ReadEffect','Invoke-MacroAppProfile')},
  @{path=$DiagnosticSource;names=@('_Diagnostic-Require','_Diagnostic-Fields','_Diagnostic-ArgvEquals','_Diagnostic-Value','_Diagnostic-IntOption','_Diagnostic-NewState','_Diagnostic-Limit','_Diagnostic-ValidateEffect')}

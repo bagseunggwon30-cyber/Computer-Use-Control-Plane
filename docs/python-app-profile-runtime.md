@@ -6,6 +6,9 @@ record flags, preflight validation, score and confidence checks, the fixed
 history destination and single-append state. The shell supplies the original
 record truth as a Boolean fact, preserving its runtime array metadata without
 confusing ordinary objects with `value`/`Count` properties for arrays.
+The transport also carries an integer-type fact for the score before JSON can
+erase the distinction between an integral Decimal and a permitted Int32/Int64.
+Python requires that fact as well as its own integer/range/confidence checks.
 
 The matching C# app-profile facade still computes and validates the recipe.
 The retained shell adapter supplies window/CDP/UIA facts and the already

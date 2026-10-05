@@ -5350,7 +5350,9 @@ function Invoke-MacroAppProfile {
       switch -CaseSensitive($state.kind){
         'kernel' {
           $arguments=@{};foreach($property in $state.args.PSObject.Properties){$arguments[$property.Name]=$property.Value}
-          $reply=@{state=(_Invoke-LegacyCompatibility -Operation 'app-profile-advance' -Arguments $arguments)}
+          $kernelState=_Invoke-LegacyCompatibility -Operation 'app-profile-advance' -Arguments $arguments
+          $scoreIsInteger=if($kernelState.query.kind -ceq 'record'){$kernelState.record_authorization.strategy_score.total_score -is [int] -or $kernelState.record_authorization.strategy_score.total_score -is [long]}else{$true}
+          $reply=@{state=$kernelState;score_is_integer=[bool]$scoreIsInteger}
         }
         'acquire' {
           $query=$state.query;$reply=@{}

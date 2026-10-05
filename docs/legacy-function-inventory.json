@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "scripts/cucp.ps1",
-      "lines": 6636,
+      "lines": 6638,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -784,151 +784,151 @@
         },
         {
           "name": "_Invoke-LegacyReadOnlyQuery",
-          "line": 5388
+          "line": 5390
         },
         {
           "name": "Invoke-MacroTaskPreset",
-          "line": 5441
+          "line": 5443
         },
         {
           "name": "Invoke-MacroTaskPlan",
-          "line": 5491
+          "line": 5493
         },
         {
           "name": "Invoke-MacroTaskRun",
-          "line": 5524
-        },
-        {
-          "name": "Invoke-MacroFormPlan",
           "line": 5526
         },
         {
-          "name": "Invoke-MacroFormRun",
-          "line": 5555
+          "name": "Invoke-MacroFormPlan",
+          "line": 5528
         },
         {
-          "name": "Invoke-MacroSmartClick",
+          "name": "Invoke-MacroFormRun",
           "line": 5557
         },
         {
+          "name": "Invoke-MacroSmartClick",
+          "line": 5559
+        },
+        {
           "name": "Invoke-MacroWatch",
-          "line": 5572
+          "line": 5574
         },
         {
           "name": "Invoke-MacroOcrScreen",
-          "line": 5586
+          "line": 5588
         },
         {
           "name": "Invoke-MacroOcrImage",
-          "line": 5590
+          "line": 5592
         },
         {
           "name": "Invoke-MacroOcrFindText",
-          "line": 5596
+          "line": 5598
         },
         {
           "name": "Invoke-MacroOcrClick",
-          "line": 5604
+          "line": 5606
         },
         {
           "name": "Invoke-MacroOcrUiaFuse",
-          "line": 5618
+          "line": 5620
         },
         {
           "name": "Invoke-MacroOcrUiaInvoke",
-          "line": 5625
+          "line": 5627
         },
         {
           "name": "Invoke-MacroScreenshotDiff",
-          "line": 5631
+          "line": 5633
         },
         {
           "name": "Invoke-MacroClickAndVerifyScreen",
-          "line": 5638
+          "line": 5640
         },
         {
           "name": "Invoke-MacroAutoDo",
-          "line": 5735
+          "line": 5737
         },
         {
           "name": "_Trajectory-Append",
-          "line": 5844
+          "line": 5846
         },
         {
           "name": "_Trajectory-Read",
-          "line": 5868
+          "line": 5870
         },
         {
           "name": "_Trajectory-Clear",
-          "line": 5882
+          "line": 5884
         },
         {
           "name": "_History-Append",
-          "line": 5906
+          "line": 5908
         },
         {
           "name": "_History-PickBestStrategy",
-          "line": 5915
+          "line": 5917
         },
         {
           "name": "_History-Stats",
-          "line": 5924
+          "line": 5926
         },
         {
           "name": "_Helper-IsUp",
-          "line": 5937
+          "line": 5939
         },
         {
           "name": "_Helper-Ensure",
-          "line": 5942
+          "line": 5944
         },
         {
           "name": "Invoke-MacroSession",
-          "line": 5963
+          "line": 5965
         },
         {
           "name": "Invoke-MacroImePaste",
-          "line": 6098
+          "line": 6100
         },
         {
           "name": "Invoke-MacroSafeTypeIme",
-          "line": 6107
+          "line": 6109
         },
         {
           "name": "Invoke-MacroModalDetect",
-          "line": 6187
+          "line": 6189
         },
         {
           "name": "Invoke-MacroRecoveryPlan",
-          "line": 6194
+          "line": 6196
         },
         {
           "name": "Invoke-MacroRecoveryRun",
-          "line": 6202
+          "line": 6204
         },
         {
           "name": "Invoke-MacroPrecisionValidate",
-          "line": 6209
+          "line": 6211
         },
         {
           "name": "Invoke-MacroBenchmark",
-          "line": 6217
+          "line": 6219
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 6225
+          "line": 6227
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 6257
+          "line": 6259
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 6372
+          "line": 6374
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 6468
+          "line": 6470
         }
       ]
     },
@@ -1485,8 +1485,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 754588,
-    "removed": 258890,
+    "current": 755016,
+    "removed": 258462,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",
