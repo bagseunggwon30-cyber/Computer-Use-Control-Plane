@@ -5309,102 +5309,82 @@ function _AppStrategy-Append {
 function Invoke-MacroAppProfile {
   param([string[]]$Rest)
   $historyFile=$Script:AppStrategyFile
-  $recordRequested=(_Read-Switch -Rest $Rest -Name '--record-strategy') -or (_Read-Switch -Rest $Rest -Name '--remember-strategy')
-  $historyEnabled=-not (_Read-Switch -Rest $Rest -Name '--no-strategy-history')
-  $jsonOnly=_Read-Switch -Rest $Rest -Name '--json-only'
-  $captures=New-Object Collections.ArrayList
-  $arguments=@{rest=@($Rest);brief=[bool]$Brief;culture=[Globalization.CultureInfo]::CurrentCulture.Name;history_file=$historyFile;elapsed_ms=0;cdp_elapsed_ms=0;uia_elapsed_ms=0;captured_replies=@()}
-  $recordAttempted=$false;$evaluations=0;$facadeCalls=0;$recordCompletion=$null
-  $sw=[Diagnostics.Stopwatch]::StartNew()
-  for ($probe=0;$probe -le 7;$probe++) {
-    if ($null -ne $recordCompletion) { $state=$recordCompletion }
-    else {
-      if ($facadeCalls -ge 7) { throw 'App-profile exceeded its facade call budget.' }
-      $facadeCalls++
-      $arguments.captured_replies=@($captures)
-      $state=_Invoke-LegacyCompatibility -Operation 'app-profile-advance' -Arguments $arguments
-      if ($state.facade -cne 'cucp.app-profile-controller/v1' -or $state.kernel_evaluations -notin @(1,2)) { throw 'Missing app-profile controller validation.' }
-      $evaluations += [int]$state.kernel_evaluations
-      if ($evaluations -gt 8) { throw 'App-profile exceeded its pure evaluation budget.' }
-    }
-    if ($state.state -ceq 'error') { throw [string]$state.error }
-    if (-not [object]::Equals($Script:AppStrategyFile,$historyFile)) { throw 'App-profile history destination changed during acquisition.' }
-    if ($state.state -ceq 'complete') {
-      if ($state.queries -isnot [array] -or $state.queries.Count -ne $captures.Count) { throw 'Invalid app-profile completion trace.' }
-      $sw.Stop();$elapsed=[int]$sw.Elapsed.TotalMilliseconds
-      $state.payload.elapsed_ms=$elapsed
-      if ($Brief -and -not $jsonOnly) { [Console]::Out.WriteLine(($state.brief -replace 'elapsed_ms=\d+$',"elapsed_ms=$elapsed")) }
-      else { [Console]::Out.WriteLine(($state.payload | ConvertTo-Json -Depth ([int]$state.json_depth))) }
-      return [int]$state.exit
-    }
-    $query=$state.query
-    if ($probe -ge 7 -or $state.state -cne 'query' -or $state.queries -isnot [array] -or $state.queries.Count -ne ($captures.Count+1) -or $query.argv -isnot [array]) { throw 'Invalid app-profile acquisition state.' }
-    $authorization=$state.record_authorization
-    if ($query.kind -ceq 'record') {
-      # Independent side-effect gate: user flags, fixed destination, controller
-      # preflight, score threshold, matching argv, and no previous append attempt.
-      $score=$authorization.strategy_score
-      $expectedConfidence=if ($score.total_score -ge 75) {'high'} else {'medium'}
-      if (-not $recordRequested -or -not $historyEnabled -or $recordAttempted -or
-          $state.kernel_evaluations -ne 2 -or
-          $authorization.schema -cne 'cucp.app-profile-record-authorization/v1' -or
-          $state.record_completion.state -cne 'complete' -or
-          $state.record_completion.payload.schema -cne 'cucp.app-profile/v1' -or
-          $state.record_completion.queries.Count -ne ($captures.Count+1) -or
-          -not [object]::Equals($authorization.history_file,$historyFile) -or
-          ($score.total_score -isnot [int] -and $score.total_score -isnot [long]) -or $score.total_score -lt 50 -or $score.total_score -gt 100 -or
-          $score.confidence -cne $expectedConfidence -or $query.argv.Count -ne 8 -or
-          -not [string]::Equals((ConvertTo-Json -InputObject @($authorization.query.argv) -Compress),
-            (ConvertTo-Json -InputObject @($query.argv) -Compress),[StringComparison]::Ordinal)) {
-        throw 'App-profile record lacks a valid explicit authorization.'
+  $python=(Get-Command python.exe -CommandType Application -TotalCount 1 -ErrorAction Stop).Source
+  $entry=[IO.Path]::GetFullPath((Join-Path $Script:LegacyCdpSourceRoot 'pcucp-next\python\legacy_app_profile.py'))
+  if(-not (Test-Path -LiteralPath $entry -PathType Leaf) -or $entry.Contains('"') -or $entry.Contains("`r") -or $entry.Contains("`n")){throw 'Matching app-profile Python entry is missing or invalid.'}
+  $utf8=New-Object Text.UTF8Encoding($false,$true)
+  $historyJson=if($null -eq $historyFile){'null'}else{ConvertTo-Json -InputObject $historyFile -Compress}
+  $history=[Convert]::ToBase64String($utf8.GetBytes($historyJson))
+  $culture=[Convert]::ToBase64String($utf8.GetBytes([Globalization.CultureInfo]::CurrentCulture.Name))
+  if(-not $culture){$culture='""'}
+  $timeout=if($Script:InvokeTimeoutMs -gt 0){$Script:InvokeTimeoutMs}else{30000}
+  $psi=New-Object Diagnostics.ProcessStartInfo
+  $psi.FileName=$python;$psi.Arguments='-E -s "'+$entry+'" --history-file-base64 '+$history+' --culture-base64 '+$culture+' --timeout-s '+([double]$timeout/1000).ToString([Globalization.CultureInfo]::InvariantCulture)
+  $psi.UseShellExecute=$false;$psi.CreateNoWindow=$true
+  $psi.RedirectStandardInput=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true
+  $psi.StandardOutputEncoding=$utf8;$psi.StandardErrorEncoding=$utf8
+  $process=New-Object Diagnostics.Process;$process.StartInfo=$psi;$started=$false
+  try{
+    [void]$process.Start();$started=$true;$watch=[Diagnostics.Stopwatch]::StartNew()
+    $err=$process.StandardError.ReadToEndAsync()
+    $reply=@{rest=@($Rest);brief=[bool]$Brief}
+    for($frame=0;$frame -lt 16;$frame++){
+      if(-not [object]::Equals($Script:AppStrategyFile,$historyFile)){throw 'App-profile history destination changed during acquisition.'}
+      $bytes=$utf8.GetBytes((ConvertTo-Json -InputObject $reply -Depth 64 -Compress)+"`n")
+      if($bytes.Length -gt 67108864){throw 'App-profile reply exceeds its byte limit.'}
+      $write=$process.StandardInput.BaseStream.WriteAsync($bytes,0,$bytes.Length)
+      $remaining=[int]([Math]::Max(0,$timeout-$watch.ElapsedMilliseconds))
+      if(-not $write.Wait($remaining)){throw 'App-profile deadline expired; no retry.'}
+      [void]$write.GetAwaiter().GetResult()
+      $flush=$process.StandardInput.BaseStream.FlushAsync()
+      $remaining=[int]([Math]::Max(0,$timeout-$watch.ElapsedMilliseconds))
+      if(-not $flush.Wait($remaining)){throw 'App-profile deadline expired; no retry.'}
+      [void]$flush.GetAwaiter().GetResult()
+      $read=$process.StandardOutput.ReadLineAsync()
+      $remaining=[int]([Math]::Max(0,$timeout-$watch.ElapsedMilliseconds))
+      if(-not $read.Wait($remaining)){throw 'App-profile deadline expired; no retry.'}
+      $raw=$read.GetAwaiter().GetResult()
+      if(-not $raw -or $utf8.GetByteCount($raw) -gt 67108864){throw 'App-profile frame is missing or exceeds its limit.'}
+      $state=$raw|ConvertFrom-Json -ErrorAction Stop
+      if($state.schema -cne 'cucp.app-profile-runtime/v1'){throw 'Invalid app-profile runtime schema.'}
+      switch -CaseSensitive($state.kind){
+        'kernel' {
+          $arguments=@{};foreach($property in $state.args.PSObject.Properties){$arguments[$property.Name]=$property.Value}
+          $kernelState=_Invoke-LegacyCompatibility -Operation 'app-profile-advance' -Arguments $arguments
+          $scoreIsInteger=if($kernelState.query.kind -ceq 'record'){$kernelState.record_authorization.strategy_score.total_score -is [int] -or $kernelState.record_authorization.strategy_score.total_score -is [long]}else{$true}
+          $reply=@{state=$kernelState;score_is_integer=[bool]$scoreIsInteger}
+        }
+        'acquire' {
+          $query=$state.query;$reply=@{}
+          try{
+            switch -CaseSensitive($query.kind){
+              'windows' {if($query.argv.Count -eq 0){$reply.result=@(_Enumerate-Win32Windows)}else{$reply.result=@(_Enumerate-Win32Windows -Match $query.argv[1])}}
+              'cdp_port' {$reply.result=[bool](Test-CdpPortQuick -Port ([int]$query.argv[0]) -TimeoutMs 120)}
+              'native' {$reply.result=Invoke-NativeHelper -ArgList @('-Action','cdp-detect','-CdpPort',$query.argv[3])}
+              'uia' {$reply.result=@(_Get-UIAffordances -FocusedWindow $query.argv[1] -MaxElements ([int]$query.argv[3]) -MinSize 6 -Hwnd ([int64]$query.argv[7]))}
+              'history' {$reply.result=_AppStrategy-LastGood -AppKey $query.argv[0];if($reply.result -is [array]){$reply.result=$reply.result.Clone()}}
+              'record' {$reply.result=_AppStrategy-Append -AppKey $query.argv[0] -AppType $query.argv[1] -Strategy $query.argv[2] -Confidence $query.argv[3] -Score ([int]$query.argv[4]) -Process $query.argv[5] -Class $query.argv[6] -Title $query.argv[7];$reply.recorded=[bool]($reply.result -and -not $reply.result.error)}
+              default {throw 'Unsupported app-profile acquisition kind.'}
+            }
+          }catch{$reply=@{error=$_.Exception.Message}}
+        }
+        'error' {throw [string]$state.error}
+        'complete' {
+          $process.StandardInput.Close()
+          if(-not $process.WaitForExit(1000) -or $process.ExitCode -ne 0){throw 'App-profile worker failed; no retry.'}
+          $state=$state.data
+          if($null -ne $state.brief){[Console]::Out.WriteLine([string]$state.brief)}
+          else{[Console]::Out.WriteLine(($state.payload|ConvertTo-Json -Depth ([int]$state.json_depth)))}
+          return [int]$state.exit
+        }
+        default {throw 'Unsupported app-profile runtime frame.'}
       }
-      $ready=$state.record_completion
-    } elseif ($null -ne $authorization -or $null -ne $state.record_completion -or $state.kernel_evaluations -ne 1) { throw 'Unexpected app-profile record authorization.' }
-    if ($query.kind -ceq 'history' -and -not $historyEnabled) { throw 'App-profile history is disabled.' }
-    $capture=@{kind=$query.kind;argv=@($query.argv)}
-    try {
-      switch -CaseSensitive ($query.kind) {
-        'windows' {
-          if ($query.argv.Count -eq 0) { $capture.result=@(_Enumerate-Win32Windows) }
-          else { $capture.result=@(_Enumerate-Win32Windows -Match $query.argv[1]) }
-        }
-        'cdp_port' {
-          $cdpWatch=[Diagnostics.Stopwatch]::StartNew()
-          # The original consumes this reply only as an if-condition.
-          $capture.result=[bool](Test-CdpPortQuick -Port ([int]$query.argv[0]) -TimeoutMs 120)
-          if (-not $capture.result) { $cdpWatch.Stop() }
-        }
-        'native' { $capture.result=Invoke-NativeHelper -ArgList @('-Action','cdp-detect','-CdpPort',$query.argv[3]);$cdpWatch.Stop() }
-        'uia' {
-          $uiaWatch=[Diagnostics.Stopwatch]::StartNew()
-          $capture.result=@(_Get-UIAffordances -FocusedWindow $query.argv[1] -MaxElements ([int]$query.argv[3]) -MinSize 6 -Hwnd ([int64]$query.argv[7]))
-          $uiaWatch.Stop();$arguments.uia_elapsed_ms=[int]$uiaWatch.Elapsed.TotalMilliseconds
-        }
-        'history' {
-          $capture.result=_AppStrategy-LastGood -AppKey $query.argv[0]
-          # Remove only runtime Array wrapper metadata before JSON transport.
-          # Literal objects with value/Count properties remain ordinary objects.
-          if ($capture.result -is [array]) { $capture.result=$capture.result.Clone() }
-        }
-        'record' {
-          $recordAttempted=$true
-          $capture.result=_AppStrategy-Append -AppKey $query.argv[0] -AppType $query.argv[1] -Strategy $query.argv[2] -Confidence $query.argv[3] -Score ([int]$query.argv[4]) -Process $query.argv[5] -Class $query.argv[6] -Title $query.argv[7]
-          # Preserve the original raw value and PowerShell truth rule. The target,
-          # score and all other output were validated before the single write.
-          $ready.payload.strategy_persistence.record=$capture.result
-          $ready.payload.strategy_persistence.recorded=[bool]($capture.result -and -not $capture.result.error)
-          $recordCompletion=$ready
-        }
-        default { throw 'Unsupported app-profile acquisition kind.' }
-      }
-    } catch {
-      if ($query.kind -ceq 'record') { throw }
-      [void]$capture.Remove('result');$capture.error=$_.Exception.Message
     }
-    if ($cdpWatch -and -not $cdpWatch.IsRunning) { $arguments.cdp_elapsed_ms=[int]$cdpWatch.Elapsed.TotalMilliseconds }
-    [void]$captures.Add($capture)
+    throw 'App-profile exceeded its frame budget.'
+  }finally{
+    if($started -and -not $process.HasExited){try{$process.Kill();[void]$process.WaitForExit(1000)}catch{}}
+    $process.Dispose()
   }
-  throw 'App-profile did not finish within its acquisition bound.'
 }
 
 function _Invoke-LegacyReadOnlyQuery {

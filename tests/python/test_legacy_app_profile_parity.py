@@ -178,6 +178,7 @@ $ErrorActionPreference='Stop';[Console]::OutputEncoding=New-Object Text.UTF8Enco
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$tokens,[ref]$errors)
 if($errors.Count){throw 'Pinned source did not parse'}
+$Script:LegacyCdpSourceRoot=[IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $Source) '..'))
 $names=@('_Read-OptValue','_Read-AllOptValues','_Read-Switch','_TaskPlan-QuoteToken','_TaskPlan-StepString',
          '_AppStrategy-NormalizeRoute','_AppStrategy-Key','_AppProfile-StrategyScore','Invoke-MacroAppProfile')
 if($CurrentBridge){$names=@('_Invoke-LegacyCompatibility','_Read-OptValue','_Read-AllOptValues','_Read-Switch','Invoke-MacroAppProfile')}
@@ -192,7 +193,12 @@ foreach($name in $names){
  $body=$fn[0].Extent.Text
  if($name -eq 'Invoke-MacroAppProfile'){
    # Only measured elapsed values are normalized; payload/format/error code is unchanged.
-   if($CurrentBridge){
+   if($CurrentBridge -and $body.Contains('legacy_app_profile.py')){
+    $marker='$state=$state.data'
+    if(([regex]::Matches($body,[regex]::Escape($marker))).Count -ne 1){throw 'Expected Python profile rendering seam'}
+    $body=$body.Replace($marker,$marker+"`n"+'$state.payload.elapsed_ms=0; if($null -ne $state.brief){$state.brief=$state.brief -replace ''elapsed_ms=\d+$'',''elapsed_ms=0''}')
+    $pattern='(?!)'
+   }elseif($CurrentBridge){
     $pattern='\[int\]\$(?:cdpWatch|uiaWatch|sw)\.Elapsed\.TotalMilliseconds'
     if([regex]::Matches($body,$pattern).Count -ne 3){throw 'Expected three retained-adapter elapsed seams'}
    }else{
@@ -217,6 +223,8 @@ if($CurrentBridge){
  function _Invoke-LegacyCompatibility {
   param([string]$Operation,[hashtable]$Arguments,[switch]$PreserveInvalidArguments)
   if($script:appendObserved){throw 'Fixture forbids compatibility transport after Append'}
+  # These are only the three measured durations normalized in the original.
+  $Arguments.elapsed_ms=0;$Arguments.cdp_elapsed_ms=0;$Arguments.uia_elapsed_ms=0
   $script:bridgeCalls++
   $frame=@{schema='cucp.legacy-compat/v1';operation=$Operation;args=$Arguments;culture=[Globalization.CultureInfo]::CurrentCulture.Name}|ConvertTo-Json -Depth 24 -Compress
   $script:maxBridgeRequestBytes=[Math]::Max($script:maxBridgeRequestBytes,[Text.Encoding]::UTF8.GetByteCount($frame))
