@@ -44,9 +44,18 @@ def _helper_reply(reply: Any) -> tuple[LegacyCdpResult, str | None, bool]:
 
 def handle(operation: str, request: dict, *, allow_live_control=False, endpoint=None, timeout_s=8,
            cache_directory=None,audit_directory=None,history_file=None,history_maximum=None,
-           coordinate_culture=None,coordinate_modern=False,surface_culture=None) -> dict:
+           coordinate_culture=None,coordinate_modern=False,surface_culture=None,session_context=None) -> dict:
     if type(allow_live_control) is not bool:
         raise ValueError('startup live authority must be boolean')
+    if operation == 'session':
+        if any(value is not None for value in (cache_directory,audit_directory,endpoint,history_file,history_maximum,
+                                              coordinate_culture,surface_culture)) or coordinate_modern:
+            raise ValueError('Unexpected session bootstrap values')
+        _fields(request, {'rest','brief'})
+        from .legacy_session_runtime import SessionRuntime
+        return SessionRuntime(session_context,allow_live_control=allow_live_control,timeout_s=timeout_s).run(**request)
+    if session_context is not None:
+        raise ValueError('Unexpected session bootstrap context')
     if operation == 'surface-macro':
         if any(value is not None for value in (cache_directory,audit_directory,endpoint,history_file,history_maximum,coordinate_culture)) or coordinate_modern:
             raise ValueError('Unexpected public surface bootstrap values')
@@ -135,7 +144,7 @@ def handle(operation: str, request: dict, *, allow_live_control=False, endpoint=
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--operation', choices=('native', 'desktop-native', 'native-prepare', 'macro-prepare', 'macro-complete',
-        'native-macro-prepare','native-macro-complete','history-storage','coordinates','surface-macro'), required=True)
+        'native-macro-prepare','native-macro-complete','history-storage','coordinates','surface-macro','session'), required=True)
     parser.add_argument('--endpoint')
     parser.add_argument('--allow-live-control', action='store_true')
     parser.add_argument('--timeout-s', type=float, default=8)
@@ -146,6 +155,7 @@ def main(argv=None):
     parser.add_argument('--coordinate-culture')
     parser.add_argument('--coordinate-modern', action='store_true')
     parser.add_argument('--surface-culture')
+    parser.add_argument('--session-context-base64')
     options = parser.parse_args(argv)
     try:
         maximum_input=64*1024*1024 if options.operation in ('native-macro-complete', 'history-storage') else MAX_FRAME
@@ -156,12 +166,16 @@ def main(argv=None):
         # Console.InputEncoding may therefore emit a UTF-8 preamble before the
         # host writes the bounded bytes. Accept one prefix, never relaxed JSON.
         request = _json(data.removeprefix(b'\xef\xbb\xbf'))
+        session_context=None
+        if options.session_context_base64 is not None:
+            import base64
+            session_context=_json(base64.b64decode(options.session_context_base64,validate=True))
         result = handle(options.operation, request, allow_live_control=options.allow_live_control,
                         endpoint=options.endpoint, timeout_s=options.timeout_s,
                         cache_directory=options.cache_directory,audit_directory=options.audit_directory,
                         history_file=options.history_file,history_maximum=options.history_maximum,
                         coordinate_culture=options.coordinate_culture,coordinate_modern=options.coordinate_modern,
-                        surface_culture=options.surface_culture)
+                        surface_culture=options.surface_culture,session_context=session_context)
         response, exit_code = dict(schema=SCHEMA, status='ok', data=result), 0
     except (ValueError, CdpError, LegacyHostError, OSError, OverflowError) as exc:
         response, exit_code = dict(schema=SCHEMA, status='error', error=dict(

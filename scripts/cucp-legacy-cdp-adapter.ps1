@@ -4,10 +4,10 @@
 
 # region cdp-process-bridge
 function _Invoke-LegacyCdpBridge {
-  param([ValidateSet('native','desktop-native','native-prepare','macro-prepare','macro-complete','native-macro-prepare','native-macro-complete','history-storage','coordinates','surface-macro')][string]$Operation,
+  param([ValidateSet('native','desktop-native','native-prepare','macro-prepare','macro-complete','native-macro-prepare','native-macro-complete','history-storage','coordinates','surface-macro','session')][string]$Operation,
         [hashtable]$Request, [switch]$LiveAuthority, [int]$Port = 9222, [int]$TimeoutMs = 15000)
   $hostExe = $env:CUCP_LEGACY_CDP_HOST
-  if ($hostExe -and $Operation -cnotin @('desktop-native','native-macro-prepare','native-macro-complete','history-storage','coordinates','surface-macro')) {
+  if ($hostExe -and $Operation -cnotin @('desktop-native','native-macro-prepare','native-macro-complete','history-storage','coordinates','surface-macro','session')) {
     $executable = [IO.Path]::GetFullPath($hostExe)
     $prefix = 'legacy-cdp-bridge'
     $directory = [IO.Path]::GetDirectoryName($executable)
@@ -28,6 +28,20 @@ function _Invoke-LegacyCdpBridge {
   $psi.FileName = $executable
   $psi.WorkingDirectory = $directory
   $psi.Arguments = $prefix + ' --operation ' + $Operation
+  if($Operation -ceq 'session'){
+    $startup=$null;$metadata=$null
+    if($Request.rest.Count -gt 0 -and $Request.rest[0] -in @('install-autostart','uninstall-autostart','autostart-status')){
+      $startup=Split-Path -Parent (_Get-AutostartShimPath)
+      $metadata=_Get-StagedAutostartMetadataDirectory
+    }
+    $context=@{cache_directory=$Script:CacheDir;audit_directory=$Script:AuditDir;wrapper_log=$Script:WrapperLog;
+      cli_path=$Script:CliPath;cache_seconds=[int]$CacheSeconds;lock_file=$Script:HelperLockPath;
+      desktop=[bool]$Script:StagedHelperDesktop;staged=[bool]$Script:StagedCompiledHelper;
+      modern=($PSVersionTable.PSVersion.Major -ge 7);
+      startup_directory=$startup;metadata_directory=$metadata}
+    $encoded=[Convert]::ToBase64String($utf8.GetBytes(($context|ConvertTo-Json -Depth 6 -Compress)))
+    $psi.Arguments+=' --session-context-base64 '+$encoded+' --timeout-s '+([double]$TimeoutMs / 1000).ToString([Globalization.CultureInfo]::InvariantCulture)
+  }
   if($Operation -ceq 'surface-macro'){
     $culture=[Globalization.CultureInfo]::CurrentCulture.Name
     if($culture.Contains('"') -or $culture.Contains("`r") -or $culture.Contains("`n")){throw 'Invalid public surface culture.'}

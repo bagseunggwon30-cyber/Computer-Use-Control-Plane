@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "scripts/cucp.ps1",
-      "lines": 6738,
+      "lines": 6638,
       "functions": [
         {
           "name": "_Validate-CliMjs",
@@ -888,53 +888,53 @@
         },
         {
           "name": "Invoke-MacroImePaste",
-          "line": 6200
+          "line": 6100
         },
         {
           "name": "Invoke-MacroSafeTypeIme",
-          "line": 6209
+          "line": 6109
         },
         {
           "name": "Invoke-MacroModalDetect",
-          "line": 6289
+          "line": 6189
         },
         {
           "name": "Invoke-MacroRecoveryPlan",
-          "line": 6296
+          "line": 6196
         },
         {
           "name": "Invoke-MacroRecoveryRun",
-          "line": 6304
+          "line": 6204
         },
         {
           "name": "Invoke-MacroPrecisionValidate",
-          "line": 6311
+          "line": 6211
         },
         {
           "name": "Invoke-MacroBenchmark",
-          "line": 6319
+          "line": 6219
         },
         {
           "name": "Invoke-MacroReleaseNotes",
-          "line": 6327
+          "line": 6227
         },
         {
           "name": "Invoke-MacroDaemon",
-          "line": 6359
+          "line": 6259
         },
         {
           "name": "Invoke-MacroDaemonServe",
-          "line": 6474
+          "line": 6374
         },
         {
           "name": "Invoke-MacroMouseVerify",
-          "line": 6570
+          "line": 6470
         }
       ]
     },
     {
       "path": "scripts/cucp-legacy-cdp-adapter.ps1",
-      "lines": 223,
+      "lines": 237,
       "functions": [
         {
           "name": "_Invoke-LegacyCdpBridge",
@@ -942,95 +942,95 @@
         },
         {
           "name": "_Invoke-LegacyCdpMacro",
-          "line": 128
+          "line": 142
         },
         {
           "name": "Invoke-MacroCdpDetect",
-          "line": 160
+          "line": 174
         },
         {
           "name": "Invoke-MacroCdpEval",
-          "line": 161
+          "line": 175
         },
         {
           "name": "Invoke-MacroCdpType",
-          "line": 162
+          "line": 176
         },
         {
           "name": "Invoke-MacroCdpClick",
-          "line": 163
+          "line": 177
         },
         {
           "name": "Invoke-MacroCdpSmartFind",
-          "line": 164
+          "line": 178
         },
         {
           "name": "Invoke-MacroCdpSmartTypeFind",
-          "line": 165
+          "line": 179
         },
         {
           "name": "Invoke-MacroCdpSmartClick",
-          "line": 166
+          "line": 180
         },
         {
           "name": "Invoke-MacroCdpSmartType",
-          "line": 167
+          "line": 181
         },
         {
           "name": "Invoke-MacroCdpDeepFind",
-          "line": 168
+          "line": 182
         },
         {
           "name": "Invoke-MacroCdpProseMirrorInsert",
-          "line": 169
+          "line": 183
         },
         {
           "name": "_Invoke-LegacyCdpNativeArgv",
-          "line": 173
+          "line": 187
         },
         {
           "name": "_Invoke-LegacyCdpNative",
-          "line": 189
+          "line": 203
         },
         {
           "name": "_Action-CdpDetect",
-          "line": 213
+          "line": 227
         },
         {
           "name": "_Action-CdpEval",
-          "line": 214
+          "line": 228
         },
         {
           "name": "_Action-CdpType",
-          "line": 215
+          "line": 229
         },
         {
           "name": "_Action-CdpClick",
-          "line": 216
+          "line": 230
         },
         {
           "name": "_Action-CdpSmartFind",
-          "line": 217
+          "line": 231
         },
         {
           "name": "_Action-CdpSmartTypeFind",
-          "line": 218
+          "line": 232
         },
         {
           "name": "_Action-CdpSmartClick",
-          "line": 219
+          "line": 233
         },
         {
           "name": "_Action-CdpSmartType",
-          "line": 220
+          "line": 234
         },
         {
           "name": "_Action-CdpDeepFind",
-          "line": 221
+          "line": 235
         },
         {
           "name": "_Action-CdpProseMirrorInsert",
-          "line": 222
+          "line": 236
         }
       ]
     },
@@ -1485,8 +1485,8 @@
   },
   "power_shell_bytes": {
     "baseline": 1013478,
-    "current": 758771,
-    "removed": 254707,
+    "current": 755016,
+    "removed": 258462,
     "scope": "all tracked .ps1 source and test files; no language exclusions"
   },
   "baseline_tree": "bf895d3120dd5e145f360cb1c41e1d79a061d048",

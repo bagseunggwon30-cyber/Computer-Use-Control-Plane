@@ -30,6 +30,7 @@ from .legacy_precision_runtime import PrecisionRuntime, PrecisionStorage, projec
 from .legacy_storage import append_trajectory
 from .legacy_coordinate_runtime import CoordinateRuntime, OPERATIONS as COORDINATE
 from .legacy_surface_macros import run_safety, SAFETY
+from .legacy_session_runtime import SessionRuntime
 from .legacy_windows import observe_windows
 from .native_session import NativeSession
 
@@ -169,7 +170,7 @@ class PreservedOwner:
                 summary=f"매크로 '{name}' 는 이 버전에서 아직 구현되지 않았습니다 (surface 에는 등록됨).", hint=route.macro.hint or '',
                 next_action="다른 매크로로 대체하거나, 이 기능이 필요하면 별도 구현 요청. 'cucp macro' 로 사용 가능 목록 확인.")
             return dict(payload=payload, exit=1, json_depth=6, brief='not_implemented ' + name if brief else None, emit_json=not brief)
-        available = name in DIAGNOSTICS | EXECUTION | PLANNING | PRECISION | INTERACTION | NATIVE | CDP | COORDINATE | SAFETY | {'windows', 'metrics', 'find-label'}
+        available = name in DIAGNOSTICS | EXECUTION | PLANNING | PRECISION | INTERACTION | NATIVE | CDP | COORDINATE | SAFETY | {'windows', 'metrics', 'find-label', 'session'}
         require(available, 'unqualified_surface: preserved macro ' + name + ' still requires its closed provider.')
         # Derive consent only from the invocation's original argv and ceiling.
         confirmed = compatibility('execution-confirmation', dict(original_argv=rest), culture=self.culture,
@@ -187,6 +188,34 @@ class PreservedOwner:
         if name in SAFETY:
             return run_safety(rest,brief=brief,culture=self.culture,timeout_s=scope.remaining(),
                               parent_deadline=scope.deadline,cancelled=scope.cancelled)
+        if name == 'session':
+            auto = bool(rest) and rest[0].lower() in ('install-autostart','uninstall-autostart','autostart-status')
+            if rest and rest[0].lower() in ('install-autostart','uninstall-autostart'):
+                require(scope.authority.live, 'session ' + rest[0].lower() + ' requires -AllowLiveControl')
+            folders = self._observations(scope, lambda runtime: runtime._read('special-folders')) if auto else {}
+            staged = self.context.get('helper_staged', False)
+            context = dict(cache_directory=self.context['cache_directory'],audit_directory=self.context['audit_directory'],
+                wrapper_log=self.context['wrapper_log'],cli_path=self.context.get('cli_path'),cache_seconds=self.cache_seconds,
+                lock_file=self.context['audit_directory'] + ('/helper-staged.pid' if staged else '/helper.pid'),
+                staged=staged,desktop=self.context.get('helper_desktop', not staged),
+                modern=self.context.get('legacy_modern', False),
+                startup_directory=folders.get('startup_directory'),metadata_directory=folders.get('metadata_directory'))
+            try:
+                result = SessionRuntime(context,allow_live_control=scope.authority.live,timeout_s=scope.remaining(),
+                    parent_deadline=scope.deadline,cancelled=scope.cancelled,mutation=scope.mutation).run(rest,brief=brief)
+                scope.remaining()
+            except LegacyHostError as error:
+                if scope.mutation.is_set() and not error.uncertain:
+                    raise LegacyHostError(str(error),uncertain=True) from error
+                raise
+            if result['notices']:
+                from .legacy_node_runtime import NodeRuntime
+                logger = NodeRuntime(cli_path=None,cache_directory=context['cache_directory'],wrapper_log=context['wrapper_log'])
+                for notice in result['notices']:
+                    logger._log(notice['level'] + ' ' + notice['message'])
+            if not quiet:
+                result['console'] = ['[CUCP] ' + notice['message'] + '\n' for notice in result['notices']]
+            return result
         if name in COORDINATE:
             runtime = CoordinateRuntime(timeout_s=scope.remaining(), parent_deadline=scope.deadline, cancelled=scope.cancelled,
                                         culture=self.culture)

@@ -23,6 +23,8 @@ internal static class LegacyDiagnosticRead
             "uia-affordances" => Affordances(options),
             "hit-test-point" => LegacyCoordinateRead.Hit(options), "coordinate-snapshot" => LegacyCoordinateRead.Snapshot(options),
             "coordinate-target" => LegacyCoordinateRead.Target(options),
+            "special-folders" => new { startup_directory = Environment.GetFolderPath(Environment.SpecialFolder.Startup),
+                metadata_directory = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) },
             "desktop-size" => new { width = CucpWin32.GetSystemMetrics(0), height = CucpWin32.GetSystemMetrics(1) },
             "native-health" => Health(), "native-windows" => NativeWindows(),
             "native-focused" => Focused(), "native-modal-detect" => Modal(),

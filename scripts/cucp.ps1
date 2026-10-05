@@ -5964,113 +5964,13 @@ function _Helper-Ensure {
 
 function Invoke-MacroSession {
   param([string[]]$Rest)
-  $action = if ($Rest.Count -ge 1) { $Rest[0] } else { "" }
-  switch ($action) {
-    "clear-cache" {
-      Get-ChildItem -LiteralPath $Script:CacheDir -Filter "appshot-*.json" -ErrorAction SilentlyContinue |
-        Remove-Item -Force -ErrorAction SilentlyContinue
-      Get-ChildItem -LiteralPath $Script:CacheDir -Filter "point-plan-*.json" -ErrorAction SilentlyContinue |
-        Remove-Item -Force -ErrorAction SilentlyContinue
-      Write-Notice -Level "OK" -Message "관찰/포인트 캐시를 비웠습니다."
-      return 0
-    }
-    "info" {
-      $cacheCount = (Get-ChildItem -LiteralPath $Script:CacheDir -Filter "appshot-*.json" -ErrorAction SilentlyContinue).Count
-      $pointPlanCacheCount = (Get-ChildItem -LiteralPath $Script:CacheDir -Filter "point-plan-*.json" -ErrorAction SilentlyContinue).Count
-      $logSize = if (Test-Path $Script:WrapperLog) { (Get-Item $Script:WrapperLog).Length } else { 0 }
-      $hsStatus = $null
-      try { $hsStatus = Get-HelperServerStatus } catch { $hsStatus = $null }
-      $info = [pscustomobject]@{
-        cache_dir = $Script:CacheDir
-        audit_dir = $Script:AuditDir
-        cache_files = $cacheCount
-        point_plan_cache_files = $pointPlanCacheCount
-        log_path = $Script:WrapperLog
-        log_size_bytes = $logSize
-        cli_path = $Script:CliPath
-        cache_seconds = $CacheSeconds
-        helper_server = $hsStatus
-      }
-      [Console]::Out.WriteLine(($info | ConvertTo-Json -Depth 6))
-      return 0
-    }
-    "start-helper" {
-      # v1.6.0: helper persistent server spawn (idempotent)
-      $idleStr = _Read-OptValue -Rest $Rest -Name "--idle-timeout-ms"
-      $idleMs = 60000
-      if ($idleStr) { try { $idleMs = [int]$idleStr } catch { $idleMs = 60000 } }
-      $r = Start-HelperServer -IdleTimeoutMs $idleMs
-      if ($Brief) {
-        if ($r.status -eq "ok") {
-          $reused = if ($r.reused) { "reused" } else { "spawned" }
-          [Console]::Out.WriteLine("ok session start-helper $reused pid=$($r.pid) pipe=$($r.pipe_name)")
-        } else {
-          [Console]::Out.WriteLine("error session start-helper reason=$($r.reason)")
-        }
-      } else {
-        $payload = [ordered]@{ schema = "cucp.helper-server-start/v1" }
-        foreach ($p in $r.PSObject.Properties) { $payload[$p.Name] = $p.Value }
-        [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 6))
-      }
-      if ($r.status -eq "ok") { return 0 } else { return 1 }
-    }
-    "stop-helper" {
-      $force = _Read-Switch -Rest $Rest -Name "--force"
-      $r = Stop-HelperServer -Force:$force
-      if ($Brief) {
-        [Console]::Out.WriteLine("$($r.status) session stop-helper stopped_pid=$($r.stopped_pid) forced=$($r.forced)")
-      } else {
-        $payload = [ordered]@{ schema = "cucp.helper-server-stop/v1" }
-        foreach ($p in $r.PSObject.Properties) { $payload[$p.Name] = $p.Value }
-        [Console]::Out.WriteLine(($payload | ConvertTo-Json -Depth 6))
-      }
-      if ($r.status -eq "ok") { return 0 } else { return 1 }
-    }
-    "helper-status" {
-      $r = Get-HelperServerStatus
-      if ($Brief) {
-        if ($r.alive) {
-          [Console]::Out.WriteLine("ok session helper-status alive pid=$($r.pid) uptime_s=$($r.uptime_s) requests=$($r.request_count)")
-        } else {
-          [Console]::Out.WriteLine("ok session helper-status not_running")
-        }
-      } else {
-        [Console]::Out.WriteLine(($r | ConvertTo-Json -Depth 6))
-      }
-      return 0
-    }
-    "install-autostart" {
-      if (-not $AllowLiveControl) { throw "session install-autostart requires -AllowLiveControl" }
-      # v2.2.0: Windows 로그인 시 helper-server 자동 기동 shim 설치 (cold first-call 제거)
-      $idleStr = _Read-OptValue -Rest $Rest -Name "--idle-timeout-ms"
-      $idleMs = 28800000  # 기본 8시간
-      if ($idleStr) { try { $idleMs = [int]$idleStr } catch { $idleMs = 28800000 } }
-      $r = Install-HelperAutostart -IdleTimeoutMs $idleMs
-      $payload = [ordered]@{ schema = "cucp.helper-autostart/v1" }
-      foreach ($p in $r.PSObject.Properties) { $payload[$p.Name] = $p.Value }
-      _Emit-Envelope -Envelope ([pscustomobject]$payload) -BriefLine "$($r.status) session install-autostart shim=$($r.shim_path)" -Depth 6
-      if ($r.status -eq "ok") { return 0 } else { return 1 }
-    }
-    "uninstall-autostart" {
-      if (-not $AllowLiveControl) { throw "session uninstall-autostart requires -AllowLiveControl" }
-      $r = Uninstall-HelperAutostart
-      $payload = [ordered]@{ schema = "cucp.helper-autostart/v1" }
-      foreach ($p in $r.PSObject.Properties) { $payload[$p.Name] = $p.Value }
-      _Emit-Envelope -Envelope ([pscustomobject]$payload) -BriefLine "$($r.status) session uninstall-autostart removed=$($r.removed)" -Depth 6
-      if ($r.status -eq "ok") { return 0 } else { return 1 }
-    }
-    "autostart-status" {
-      $r = Get-HelperAutostartStatus
-      $payload = [ordered]@{ schema = "cucp.helper-autostart/v1" }
-      foreach ($p in $r.PSObject.Properties) { $payload[$p.Name] = $p.Value }
-      _Emit-Envelope -Envelope ([pscustomobject]$payload) -BriefLine "ok session autostart-status installed=$($r.installed)" -Depth 6
-      return 0
-    }
-    default {
-      Write-Notice -Level "ERROR" -Message "session 하위 명령: clear-cache, info, start-helper, stop-helper, helper-status, install-autostart, uninstall-autostart, autostart-status"
-      return 1
-    }
-  }
+  $values=[string[]]@();if($null -ne $Rest){$values=$Rest.Clone()}
+  $request=@{rest=$values;brief=[bool]$Brief}
+  $result=_Invoke-LegacyCdpBridge -Operation 'session' -Request $request -LiveAuthority:([bool]$AllowLiveControl -and [bool]$Script:StagedAutostartLive) -TimeoutMs $Script:InvokeTimeoutMs
+  foreach($notice in @($result.notices)){Write-Notice -Level $notice.level -Message $notice.message}
+  if($null -ne $result.brief){[Console]::Out.WriteLine([string]$result.brief)}
+  elseif($result.emit_json){[Console]::Out.WriteLine((ConvertTo-Json -InputObject $result.payload -Depth ([int]$result.json_depth)))}
+  return [int]$result.exit
 }
 
 # ============================================================================
