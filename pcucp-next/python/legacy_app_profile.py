@@ -39,7 +39,10 @@ def main(argv=None):
         def kernel(args):
             write(dict(kind='kernel', args=args))
             reply = read()
-            exact(reply, ('state',))
+            exact(reply, ('state', 'score_is_integer'))
+            require(type(reply['score_is_integer']) is bool, 'Invalid app-profile scalar type fact.')
+            if reply['state'].get('query', {}).get('kind') == 'record':
+                require(reply['score_is_integer'], 'App-profile record lacks a valid explicit authorization.')
             return reply['state']
         def acquire(query):
             write(dict(kind='acquire', query=query))

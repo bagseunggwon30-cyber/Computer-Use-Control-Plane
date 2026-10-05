@@ -107,7 +107,7 @@ class AppProfileRuntimeTests(unittest.TestCase):
         command=[sys.executable,str(entry),'--history-file-base64',encode(json.dumps(DESTINATION)),
                  '--culture-base64',encode('en-US'),'--timeout-s','5']
         state=dict(completion([]),facade='cucp.app-profile-controller/v1',kernel_evaluations=1)
-        frames='\n'.join(json.dumps(value) for value in (dict(rest=[],brief=False),dict(state=state)))+'\n'
+        frames='\n'.join(json.dumps(value) for value in (dict(rest=[],brief=False),dict(state=state,score_is_integer=True)))+'\n'
         result=subprocess.run(command,input=frames.encode(),capture_output=True,timeout=8)
         self.assertEqual(result.returncode,0,result.stderr.decode())
         replies=[json.loads(line) for line in result.stdout.splitlines()]
